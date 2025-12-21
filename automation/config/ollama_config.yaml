@@ -4,7 +4,7 @@ git_provider:
   api_token: ${BUILDER_GITEA_TOKEN}
 
 repository:
-  owner: ${REPO_OWNER:-savorywatt}
+  owner: ${REPO_OWNER:-Foxshirestudios}
   name: ${REPO_NAME:-playground}
   default_branch: main
 
