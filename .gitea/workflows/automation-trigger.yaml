@@ -1,0 +1,82 @@
+name: Automation Trigger
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled, edited, closed]
+  issue_comment:
+    types: [created]
+
+jobs:
+  process-issue:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git operations
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+
+      - name: Determine action needed
+        id: determine
+        run: |
+          # Check issue labels to determine which stage to trigger
+          python3 << 'PYTHON_EOF'
+          import json
+          import os
+
+          event = json.loads('''${{ toJSON(github.event) }}''')
+          issue = event.get('issue', {})
+          labels = [label['name'] for label in issue.get('labels', [])]
+
+          # Determine stage based on labels
+          stage = 'none'
+          if 'needs-planning' in labels:
+              stage = 'planning'
+          elif 'plan-review' in labels:
+              stage = 'plan-review'
+          elif 'prompts' in labels:
+              stage = 'prompts'
+          elif 'implement' in labels:
+              stage = 'implementation'
+          elif 'code-review' in labels:
+              stage = 'code-review'
+          elif 'merge-ready' in labels:
+              stage = 'merge'
+
+          # Write to GitHub output
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'stage={stage}\n')
+          PYTHON_EOF
+
+      - name: Run automation
+        if: steps.determine.outputs.stage != 'none'
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: |
+          automation process-issue \
+            --issue ${{ github.event.issue.number }} \
+            --stage ${{ steps.determine.outputs.stage }} \
+            --log-level INFO
+
+      - name: Report status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Automation completed successfully"
+          else
+            echo "❌ Automation failed"
+            exit 1
+          fi

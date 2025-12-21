@@ -1,0 +1,52 @@
+repositories:
+  - name: backend
+    owner: myorg
+    repo: backend-service
+    primary: true
+    automation:
+      enabled: true
+      auto_deploy: true
+      tags:
+        needs_planning: "needs-planning"
+        plan_review: "plan-review"
+        needs_implementation: "needs-implementation"
+        code_review: "code-review"
+        merge_ready: "merge-ready"
+
+  - name: frontend
+    owner: myorg
+    repo: frontend-app
+    automation:
+      enabled: true
+      auto_deploy: true
+      depends_on:
+        - backend
+
+  - name: infrastructure
+    owner: myorg
+    repo: infrastructure
+    automation:
+      enabled: true
+      auto_deploy: false
+      triggers:
+        - backend
+        - frontend
+
+cross_repo_workflows:
+  - name: full-stack-feature
+    description: "Coordinate feature implementation across backend and frontend"
+    repositories:
+      - backend
+      - frontend
+    coordination: sequential  # or parallel
+
+  - name: infrastructure-update
+    description: "Update infrastructure after service changes"
+    repositories:
+      - backend
+      - frontend
+      - infrastructure
+    coordination: sequential
+    triggers:
+      - on_pr_merge: true
+      - on_tag: true

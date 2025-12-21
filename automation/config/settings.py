@@ -1,0 +1,171 @@
+"""
+Configuration system using Pydantic for type-safe settings management.
+
+This module provides configuration classes for all aspects of the automation system,
+including Git providers, agents, workflows, and tags.
+"""
+
+import os
+import re
+from pathlib import Path
+from typing import Literal, Optional
+
+import yaml
+from pydantic import BaseModel, Field, HttpUrl, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class GitProviderConfig(BaseModel):
+    """Git provider configuration (Gitea or GitHub)."""
+
+    provider_type: Literal["gitea", "github"] = Field(
+        default="gitea", description="Type of Git provider"
+    )
+    mcp_server: Optional[str] = Field(
+        default=None, description="Name of MCP server for Git operations"
+    )
+    base_url: HttpUrl = Field(..., description="Base URL of the Git provider")
+    api_token: SecretStr = Field(..., description="API token for authentication")
+
+
+class RepositoryConfig(BaseModel):
+    """Repository configuration."""
+
+    owner: str = Field(..., description="Repository owner/organization")
+    name: str = Field(..., description="Repository name")
+    default_branch: str = Field(default="main", description="Default branch name")
+
+
+class AgentProviderConfig(BaseModel):
+    """AI agent configuration."""
+
+    provider_type: Literal["claude-local", "claude-api", "openai"] = Field(
+        default="claude-local", description="Type of agent provider"
+    )
+    model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
+    api_key: Optional[SecretStr] = Field(default=None, description="API key for cloud providers")
+    local_mode: bool = Field(
+        default=True, description="Whether to use local Claude Code CLI"
+    )
+
+
+class WorkflowConfig(BaseModel):
+    """Workflow behavior configuration."""
+
+    plans_directory: str = Field(default="plans", description="Directory for plan files")
+    state_directory: str = Field(
+        default=".automation/state", description="Directory for state files"
+    )
+    branching_strategy: Literal["per-agent", "shared"] = Field(
+        default="per-agent", description="Branch creation strategy"
+    )
+    max_concurrent_tasks: int = Field(
+        default=3, ge=1, le=10, description="Maximum concurrent agent tasks"
+    )
+    review_approval_threshold: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="Minimum confidence for auto-approval"
+    )
+
+
+class TagsConfig(BaseModel):
+    """Issue tag/label configuration for workflow stages."""
+
+    needs_planning: str = Field(default="needs-planning", description="Issue needs planning")
+    plan_review: str = Field(default="plan-review", description="Plan is under review")
+    ready_to_implement: str = Field(
+        default="ready-to-implement", description="Plan approved, ready for implementation"
+    )
+    in_progress: str = Field(default="in-progress", description="Implementation in progress")
+    code_review: str = Field(default="code-review", description="Code is under review")
+    merge_ready: str = Field(default="merge-ready", description="Ready to merge")
+    completed: str = Field(default="completed", description="Task completed")
+    needs_attention: str = Field(
+        default="needs-attention", description="Requires human intervention"
+    )
+
+
+class AutomationSettings(BaseSettings):
+    """Main automation system settings.
+
+    This class combines all configuration sections and provides methods
+    for loading from YAML files with environment variable interpolation.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="AUTOMATION_",
+        env_nested_delimiter="__",
+        case_sensitive=False,
+    )
+
+    git_provider: GitProviderConfig
+    repository: RepositoryConfig
+    agent_provider: AgentProviderConfig
+    workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
+    tags: TagsConfig = Field(default_factory=TagsConfig)
+
+    @property
+    def state_dir(self) -> Path:
+        """Get state directory as Path object."""
+        return Path(self.workflow.state_directory)
+
+    @property
+    def plans_dir(self) -> Path:
+        """Get plans directory as Path object."""
+        return Path(self.workflow.plans_directory)
+
+    @classmethod
+    def from_yaml(cls, config_path: str) -> "AutomationSettings":
+        """Load settings from YAML file with environment variable interpolation.
+
+        Supports ${VAR_NAME} syntax for environment variable substitution.
+
+        Args:
+            config_path: Path to YAML configuration file
+
+        Returns:
+            AutomationSettings instance
+
+        Raises:
+            FileNotFoundError: If config file doesn't exist
+            ValueError: If required environment variables are missing
+        """
+        config_file = Path(config_path)
+        if not config_file.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+
+        # Read YAML content
+        with open(config_file, "r") as f:
+            yaml_content = f.read()
+
+        # Interpolate environment variables
+        yaml_content = cls._interpolate_env_vars(yaml_content)
+
+        # Parse YAML
+        config_dict = yaml.safe_load(yaml_content)
+
+        # Create settings instance
+        return cls(**config_dict)
+
+    @staticmethod
+    def _interpolate_env_vars(content: str) -> str:
+        """Interpolate ${VAR_NAME} placeholders with environment variables.
+
+        Args:
+            content: String content with placeholders
+
+        Returns:
+            Content with environment variables substituted
+
+        Raises:
+            ValueError: If a referenced environment variable is not set
+        """
+        pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+
+        def replace_var(match: re.Match[str]) -> str:
+            var_name = match.group(1)
+            value = os.getenv(var_name)
+            if value is None:
+                raise ValueError(f"Environment variable {var_name} is not set")
+            return value
+
+        return pattern.sub(replace_var, content)
