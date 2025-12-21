@@ -22,3 +22,4 @@ build/
 *.swo
 *~
 .DS_Store
+.credentials
