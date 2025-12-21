@@ -75,11 +75,11 @@ jobs:
 
       - name: Process planning issues
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
           AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS: 3
         run: |
           if [ -n "${{ github.event.inputs.issue_number }}" ]; then
@@ -120,11 +120,11 @@ jobs:
 
       - name: Execute tasks
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           automation process-all --tag execute
 
@@ -149,11 +149,11 @@ jobs:
 
       - name: Review PRs
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           automation process-all --tag needs-review
 
@@ -185,11 +185,11 @@ jobs:
 
       - name: Run QA
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           automation process-all --tag requires-qa
 
@@ -214,8 +214,8 @@ jobs:
 
       - name: Run health check
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
         run: |
           automation health-check || echo "Health check completed with warnings"
 

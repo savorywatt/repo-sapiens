@@ -157,7 +157,7 @@ jobs:
       - name: Run automation
         run: |
           docker run --rm \
-            -e AUTOMATION__GIT_PROVIDER__API_TOKEN=${{ secrets.GITEA_TOKEN }} \
+            -e AUTOMATION__GIT_PROVIDER__API_TOKEN=${{ secrets.BUILDER_GITEA_TOKEN }} \
             -v $PWD:/workspace \
             gitea-automation:latest \
             process-issue --issue 123
@@ -400,7 +400,7 @@ For cross-repo artifacts, use Gitea Packages or external storage:
 - name: Publish package
   run: |
     pip install twine
-    twine upload --repository-url ${{ secrets.GITEA_URL }}/api/packages/owner/pypi dist/*
+    twine upload --repository-url ${{ secrets.BUILDER_GITEA_URL }}/api/packages/owner/pypi dist/*
 ```
 
 ## Summary

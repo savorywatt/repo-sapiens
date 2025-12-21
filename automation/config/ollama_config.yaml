@@ -1,0 +1,32 @@
+git_provider:
+  provider_type: gitea
+  base_url: ${BUILDER_GITEA_URL:-http://localhost:3000}
+  api_token: ${BUILDER_GITEA_TOKEN}
+
+repository:
+  owner: ${REPO_OWNER:-savorywatt}
+  name: ${REPO_NAME:-playground}
+  default_branch: main
+
+agent_provider:
+  provider_type: ollama
+  model: ${OLLAMA_MODEL:-llama3.1:8b}
+  base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+  local_mode: true
+
+workflow:
+  plans_directory: plans
+  state_directory: .automation/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 3
+  review_approval_threshold: 0.7
+
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+  in_progress: in-progress
+  code_review: code-review
+  merge_ready: merge-ready
+  completed: completed
+  needs_attention: needs-attention
