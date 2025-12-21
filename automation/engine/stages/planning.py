@@ -37,10 +37,22 @@ class PlanningStage(WorkflowStage):
         """
         log.info("planning_stage_start", issue=issue.number, title=issue.title)
 
+        # Notify user that planning has started
+        await self.git.add_comment(
+            issue.number,
+            "🚀 **Builder Starting**\n\nI'm starting to work on this issue. "
+            "I'll generate a development plan and post it for review.\n\n"
+            "🤖 Posted by Builder Automation"
+        )
+
         try:
             # Generate plan using agent
             plan = await self.agent.generate_plan(issue)
             log.info("plan_generated", plan_id=plan.id)
+
+            # Ensure file_path is set (fallback if agent didn't set it)
+            if not plan.file_path:
+                plan.file_path = f"plans/{issue.number}-{issue.title.lower().replace(' ', '-')}.md"
 
             # Format plan as markdown
             plan_content = self._format_plan(plan, issue)

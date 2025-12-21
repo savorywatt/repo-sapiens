@@ -8,11 +8,18 @@ import structlog
 from automation.config.settings import AutomationSettings
 from automation.engine.state_manager import StateManager
 from automation.engine.stages.base import WorkflowStage
+from automation.engine.stages.approval import ApprovalStage
 from automation.engine.stages.code_review import CodeReviewStage
+from automation.engine.stages.execution import TaskExecutionStage
+from automation.engine.stages.fix_execution import FixExecutionStage
 from automation.engine.stages.implementation import ImplementationStage
 from automation.engine.stages.merge import MergeStage
 from automation.engine.stages.plan_review import PlanReviewStage
 from automation.engine.stages.planning import PlanningStage
+from automation.engine.stages.pr_fix import PRFixStage
+from automation.engine.stages.pr_review import PRReviewStage
+from automation.engine.stages.proposal import ProposalStage
+from automation.engine.stages.qa import QAStage
 from automation.models.domain import Issue, Task
 from automation.processors.dependency_tracker import DependencyTracker
 from automation.providers.base import AgentProvider, GitProvider
@@ -49,6 +56,15 @@ class WorkflowOrchestrator:
 
         # Initialize stages
         self.stages = {
+            # New granular workflow stages
+            "proposal": ProposalStage(git, agent, state, settings),
+            "approval": ApprovalStage(git, agent, state, settings),
+            "task_execution": TaskExecutionStage(git, agent, state, settings),
+            "pr_review": PRReviewStage(git, agent, state, settings),
+            "pr_fix": PRFixStage(git, agent, state, settings),
+            "fix_execution": FixExecutionStage(git, agent, state, settings),
+            "qa": QAStage(git, agent, state, settings),
+            # Legacy stages (kept for compatibility)
             "planning": PlanningStage(git, agent, state, settings),
             "plan_review": PlanReviewStage(git, agent, state, settings),
             "implementation": ImplementationStage(git, agent, state, settings),
@@ -71,6 +87,9 @@ class WorkflowOrchestrator:
         )
 
         log.info("found_issues", count=len(issues))
+
+        # Sort issues by number in ascending order (so tasks are processed 1, 2, 3... not 9, 8, 7...)
+        issues.sort(key=lambda issue: issue.number)
 
         # Process each issue
         for issue in issues:
@@ -276,12 +295,33 @@ class WorkflowOrchestrator:
         """
         tags = self.settings.tags
 
-        if tags.needs_planning in issue.labels:
-            return "planning"
+        # New granular workflow routing
+        if "proposed" in issue.labels:
+            # Proposal issue waiting for approval
+            return "approval"
+        elif "execute" in issue.labels and "task" in issue.labels:
+            # Task ready for execution
+            return "task_execution"
+        elif tags.needs_planning in issue.labels:
+            # New issue needing plan proposal
+            return "proposal"
+        # PR review workflow
+        elif "needs-review" in issue.labels:
+            # PR needs code review
+            return "pr_review"
+        elif "needs-fix" in issue.labels:
+            # PR review complete, create fix proposal
+            return "pr_fix"
+        elif "approved" in issue.labels and "fix-proposal" in issue.labels:
+            # Fix proposal approved, execute fixes
+            return "fix_execution"
+        # QA workflow
+        elif "requires-qa" in issue.labels:
+            # PR/issue needs QA (build and test)
+            return "qa"
+        # Legacy workflow routing (kept for compatibility)
         elif tags.plan_review in issue.labels:
             return "plan_review"
-        elif tags.needs_implementation in issue.labels:
-            return "implementation"
         elif tags.code_review in issue.labels:
             return "code_review"
         elif tags.merge_ready in issue.labels:

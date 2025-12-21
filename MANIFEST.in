@@ -1,0 +1,22 @@
+# Include package data
+include README.md
+include LICENSE
+include QUICK_START.md
+include CI_CD_GUIDE.md
+include .env.example
+include pyproject.toml
+
+# Include automation package
+recursive-include automation *.py
+recursive-include automation/config *.yaml
+
+# Exclude test files
+recursive-exclude tests *
+recursive-exclude automation/config playground_config.yaml
+
+# Exclude development files
+exclude test_*.py
+exclude check_*.py
+exclude *.sh
+exclude docker-compose.yml
+exclude Dockerfile

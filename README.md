@@ -1,6 +1,24 @@
-# Gitea Automation System - Phase 4: Advanced Features
+# Gitea Automation System
 
 A production-ready AI-driven automation system for Gitea with advanced error recovery, parallel execution, multi-repository support, comprehensive monitoring, and intelligent cost optimization.
+
+## 🚀 Quick Start for CI/CD
+
+**Want to run this in CI/CD? It's easy!**
+
+```bash
+# Docker (recommended)
+docker-compose up -d
+
+# Or pip install
+pip install -e .
+automation daemon --interval 60
+```
+
+📚 **See [QUICK_START.md](QUICK_START.md)** for 5-minute setup
+📦 **See [CI_CD_GUIDE.md](CI_CD_GUIDE.md)** for platform-specific guides (GitHub Actions, GitLab CI, Jenkins, etc.)
+
+---
 
 ## Overview
 

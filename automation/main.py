@@ -10,8 +10,9 @@ import structlog
 from automation.config.settings import AutomationSettings
 from automation.engine.orchestrator import WorkflowOrchestrator
 from automation.engine.state_manager import StateManager
-from automation.providers.agent_provider import ClaudeLocalProvider
-from automation.providers.git_provider import GiteaProvider
+from automation.providers.external_agent import ExternalAgentProvider
+from automation.providers.gitea_rest import GiteaRestProvider
+from automation.utils.interactive import InteractiveQAHandler
 from automation.utils.logging_config import configure_logging
 
 log = structlog.get_logger(__name__)
@@ -112,26 +113,37 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
     Returns:
         Initialized WorkflowOrchestrator
     """
-    # Initialize providers
-    git = GiteaProvider(
-        mcp_server=settings.git_provider.mcp_server,
+    # Initialize Gitea REST API provider
+    git = GiteaRestProvider(
         base_url=str(settings.git_provider.base_url),
         token=settings.git_provider.api_token.get_secret_value(),
         owner=settings.repository.owner,
         repo=settings.repository.name,
     )
 
-    agent = ClaudeLocalProvider(
+    # Initialize interactive Q&A handler
+    qa_handler = InteractiveQAHandler(git, poll_interval=30)
+
+    # Initialize external agent provider (claude or goose CLI)
+    agent_type = "claude"  # Could also be "goose"
+    agent = ExternalAgentProvider(
+        agent_type=agent_type,
         model=settings.agent_provider.model,
-        workspace=Path.cwd(),
+        working_dir=str(Path.cwd()),
+        qa_handler=qa_handler,
     )
 
     state = StateManager(settings.state_dir)
 
-    # Connect git provider
+    # Connect providers
     await git.connect()
+    await agent.connect()
 
-    return WorkflowOrchestrator(settings, git, agent, state)
+    # Pass qa_handler to orchestrator
+    orchestrator = WorkflowOrchestrator(settings, git, agent, state)
+    orchestrator.qa_handler = qa_handler
+
+    return orchestrator
 
 
 async def _process_single_issue(settings: AutomationSettings, issue_number: int) -> None:

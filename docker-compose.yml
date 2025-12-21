@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Builder automation service
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gitea-automation:latest
+    container_name: builder-automation
+    environment:
+      # Git provider configuration
+      - AUTOMATION__GIT_PROVIDER__BASE_URL=${GITEA_BASE_URL:-http://gitea:3000}
+      - AUTOMATION__GIT_PROVIDER__API_TOKEN=${GITEA_TOKEN:?GITEA_TOKEN is required}
+
+      # Repository configuration
+      - AUTOMATION__REPOSITORY__OWNER=${REPO_OWNER:-myorg}
+      - AUTOMATION__REPOSITORY__NAME=${REPO_NAME:-myrepo}
+
+      # Agent configuration
+      - AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE=${AGENT_TYPE:-claude-local}
+      - AUTOMATION__AGENT_PROVIDER__MODEL=${AGENT_MODEL:-claude-sonnet-4.5}
+      - AUTOMATION__AGENT_PROVIDER__API_KEY=${CLAUDE_API_KEY:-}
+
+      # Workflow configuration
+      - AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS=${MAX_CONCURRENT:-3}
+      - AUTOMATION__WORKFLOW__BRANCHING_STRATEGY=${BRANCHING_STRATEGY:-per-agent}
+
+      # State directory
+      - AUTOMATION__WORKFLOW__STATE_DIRECTORY=/workspace/.automation/state
+      - AUTOMATION__WORKFLOW__PLANS_DIRECTORY=/workspace/plans
+    volumes:
+      # Mount workspace for file operations
+      - ./workspace:/workspace
+      # Mount config file (optional)
+      - ./automation/config/automation_config.yaml:/app/config/automation_config.yaml:ro
+      # Mount credentials (if using local Claude)
+      - ${HOME}/.config/claude:/home/automation/.config/claude:ro
+    command: >
+      daemon --interval 60
+    restart: unless-stopped
+    networks:
+      - builder-network
+
+  # Optional: Webhook server for real-time processing
+  webhook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gitea-automation:latest
+    container_name: builder-webhook
+    environment:
+      - AUTOMATION__GIT_PROVIDER__BASE_URL=${GITEA_BASE_URL:-http://gitea:3000}
+      - AUTOMATION__GIT_PROVIDER__API_TOKEN=${GITEA_TOKEN:?GITEA_TOKEN is required}
+      - AUTOMATION__REPOSITORY__OWNER=${REPO_OWNER:-myorg}
+      - AUTOMATION__REPOSITORY__NAME=${REPO_NAME:-myrepo}
+    volumes:
+      - ./workspace:/workspace
+      - ./automation/config/automation_config.yaml:/app/config/automation_config.yaml:ro
+    ports:
+      - "8000:8000"
+    command: >
+      uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    networks:
+      - builder-network
+
+networks:
+  builder-network:
+    driver: bridge
