@@ -1,0 +1,196 @@
+name: Build Automation Artifacts
+
+# Build the automation package and Docker image for reuse across workflows
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'automation/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    # Allow manual trigger
+  schedule:
+    # Rebuild daily to keep artifacts fresh
+    - cron: '0 2 * * *'
+
+jobs:
+  # Build Python package
+  build-package:
+    name: Build Python Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel setuptools
+
+      - name: Build package
+        run: |
+          python -m build --wheel --sdist
+          ls -lh dist/
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v3
+        with:
+          name: automation-wheel
+          path: dist/*.whl
+          retention-days: 30
+
+      - name: Upload source dist
+        uses: actions/upload-artifact@v3
+        with:
+          name: automation-sdist
+          path: dist/*.tar.gz
+          retention-days: 30
+
+      - name: Create package metadata
+        run: |
+          cat > package-info.json <<EOF
+          {
+            "version": "$(grep '^version = ' pyproject.toml | cut -d'"' -f2)",
+            "python_version": "3.11",
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "${{ gitea.sha }}",
+            "git_branch": "${{ gitea.ref_name }}"
+          }
+          EOF
+          cat package-info.json
+
+      - name: Upload metadata
+        uses: actions/upload-artifact@v3
+        with:
+          name: package-metadata
+          path: package-info.json
+          retention-days: 30
+
+  # Build Docker image
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: |
+            gitea-automation:latest
+            gitea-automation:${{ gitea.sha }}
+          outputs: type=docker,dest=/tmp/automation-image.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: /tmp/automation-image.tar
+          retention-days: 7
+          # Docker images are large, shorter retention
+
+      - name: Create image metadata
+        run: |
+          cat > image-info.json <<EOF
+          {
+            "image_name": "gitea-automation",
+            "tags": ["latest", "${{ gitea.sha }}"],
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "${{ gitea.sha }}",
+            "git_branch": "${{ gitea.ref_name }}"
+          }
+          EOF
+          cat image-info.json
+
+      - name: Upload image metadata
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-metadata
+          path: image-info.json
+          retention-days: 7
+
+  # Test the built artifacts
+  test-artifacts:
+    name: Test Built Artifacts
+    needs: [build-package, build-docker]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download wheel
+        uses: actions/download-artifact@v3
+        with:
+          name: automation-wheel
+          path: dist/
+
+      - name: Download package metadata
+        uses: actions/download-artifact@v3
+        with:
+          name: package-metadata
+
+      - name: Install from wheel
+        run: |
+          pip install dist/*.whl
+          automation --help
+
+      - name: Test package import
+        run: |
+          python -c "
+          from automation.config.settings import AutomationSettings
+          from automation.engine.orchestrator import WorkflowOrchestrator
+          from automation.providers.gitea_rest import GiteaRestProvider
+          print('✅ Package imports work correctly')
+          "
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: /tmp/
+
+      - name: Load and test Docker image
+        run: |
+          docker load < /tmp/automation-image.tar
+          docker run --rm gitea-automation:latest --help
+          echo "✅ Docker image works correctly"
+
+      - name: Report success
+        run: |
+          echo "### ✅ Artifact Build Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package Version:** $(cat package-info.json | grep version | cut -d'"' -f4)" >> $GITHUB_STEP_SUMMARY
+          echo "**Git Commit:** ${{ gitea.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Date:** $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts available for download:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`automation-wheel\` (Python package)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`automation-sdist\` (Source distribution)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`docker-image\` (Docker container)" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,53 @@
+name: Create Fix Proposal
+
+# Triggers when 'needs-fix' label is added after code review
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-fix-proposal:
+    name: Generate Fix Proposal
+    if: gitea.event.label.name == 'needs-fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITEA_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install automation
+        run: pip install -e .
+
+      - name: Create fix proposal
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: |
+          echo "🔧 Creating fix proposal for issue/PR #${{ gitea.event.issue.number }}"
+          automation process-issue --issue ${{ gitea.event.issue.number }}
+
+      - name: Comment on completion
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITEA_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🔧 **Fix proposal created!**\n\nReview the proposed fixes and add the `approved` label to apply them.\n\n🤖 Posted by Builder Automation'
+            })
