@@ -13,17 +13,40 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to check recent commits
+
+      - name: Check for recent changes in main
+        id: check_changes
+        run: |
+          # Get the timestamp of the latest commit on main
+          latest_commit_time=$(git log -1 --format=%ct origin/main)
+          current_time=$(date +%s)
+          time_diff=$((current_time - latest_commit_time))
+
+          # 10 minutes in seconds = 600
+          if [ $time_diff -lt 600 ]; then
+            echo "has_recent_changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Recent changes detected (${time_diff}s ago)"
+          else
+            echo "has_recent_changes=false" >> $GITHUB_OUTPUT
+            minutes_ago=$((time_diff / 60))
+            echo "⏭️  No recent changes (last commit ${minutes_ago} minutes ago). Skipping workflow."
+          fi
 
       - name: Setup Python
+        if: steps.check_changes.outputs.has_recent_changes == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
 
       - name: Install dependencies
+        if: steps.check_changes.outputs.has_recent_changes == 'true'
         run: pip install -e .
 
       - name: Process all pending issues
+        if: steps.check_changes.outputs.has_recent_changes == 'true'
         env:
           GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
@@ -33,11 +56,12 @@ jobs:
           automation process-all --log-level INFO
 
       - name: Check for stale workflows
+        if: steps.check_changes.outputs.has_recent_changes == 'true'
         run: |
           automation check-stale --max-age-hours 24
 
       - name: Upload state artifacts
-        if: always()
+        if: always() && steps.check_changes.outputs.has_recent_changes == 'true'
         uses: actions/upload-artifact@v3
         with:
           name: workflow-state
