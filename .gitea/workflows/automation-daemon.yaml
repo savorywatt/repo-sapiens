@@ -16,22 +16,29 @@ jobs:
         with:
           fetch-depth: 0  # Need full history to check recent commits
 
-      - name: Check for recent changes in main
+      - name: Check for recent activity
         id: check_changes
+        env:
+          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
         run: |
-          # Get the timestamp of the latest commit on main
-          latest_commit_time=$(git log -1 --format=%ct origin/main)
+          # Check both git commits and recent issue updates
           current_time=$(date +%s)
-          time_diff=$((current_time - latest_commit_time))
+          cutoff_time=$((current_time - 600))  # 10 minutes ago
 
-          # 10 minutes in seconds = 600
-          if [ $time_diff -lt 600 ]; then
+          # Check latest commit
+          latest_commit_time=$(git log -1 --format=%ct origin/main 2>/dev/null || echo 0)
+
+          # Check for recently updated issues via API
+          recent_issues=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
+            "http://100.89.157.127:3000/api/v1/repos/Foxshirestudios/builder/issues?state=open&since=$(date -d @$cutoff_time -Iseconds 2>/dev/null || date -r $cutoff_time +%Y-%m-%dT%H:%M:%S)" \
+            | jq length 2>/dev/null || echo 0)
+
+          if [ "$latest_commit_time" -gt "$cutoff_time" ] || [ "$recent_issues" -gt 0 ]; then
             echo "has_recent_changes=true" >> $GITHUB_OUTPUT
-            echo "✅ Recent changes detected (${time_diff}s ago)"
+            echo "✅ Recent activity detected (commits or issues updated in last 10 min)"
           else
             echo "has_recent_changes=false" >> $GITHUB_OUTPUT
-            minutes_ago=$((time_diff / 60))
-            echo "⏭️  No recent changes (last commit ${minutes_ago} minutes ago). Skipping workflow."
+            echo "⏭️  No recent activity. Skipping workflow."
           fi
 
       - name: Setup Python
@@ -39,11 +46,13 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Install dependencies
         if: steps.check_changes.outputs.has_recent_changes == 'true'
-        run: pip install -e .
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -e .
 
       - name: Process all pending issues
         if: steps.check_changes.outputs.has_recent_changes == 'true'
@@ -52,13 +61,16 @@ jobs:
           CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: http://100.89.157.127:3000
+          AUTOMATION__REPOSITORY__OWNER: Foxshirestudios
+          AUTOMATION__REPOSITORY__NAME: builder
         run: |
-          automation process-all --log-level INFO
+          .venv/bin/automation process-all --log-level INFO
 
       - name: Check for stale workflows
         if: steps.check_changes.outputs.has_recent_changes == 'true'
         run: |
-          automation check-stale --max-age-hours 24
+          .venv/bin/automation check-stale --max-age-hours 24
 
       - name: Upload state artifacts
         if: always() && steps.check_changes.outputs.has_recent_changes == 'true'
