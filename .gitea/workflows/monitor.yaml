@@ -23,7 +23,7 @@ jobs:
 
       - name: Generate health report
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
         run: |
           automation health-check > health-report.md
 

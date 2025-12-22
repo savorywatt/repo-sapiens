@@ -25,10 +25,10 @@ jobs:
 
       - name: Process all pending issues
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           automation process-all --log-level INFO
 

@@ -39,13 +39,16 @@ class RepositoryConfig(BaseModel):
 class AgentProviderConfig(BaseModel):
     """AI agent configuration."""
 
-    provider_type: Literal["claude-local", "claude-api", "openai"] = Field(
+    provider_type: Literal["claude-local", "claude-api", "openai", "ollama"] = Field(
         default="claude-local", description="Type of agent provider"
     )
     model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
     api_key: Optional[SecretStr] = Field(default=None, description="API key for cloud providers")
     local_mode: bool = Field(
         default=True, description="Whether to use local Claude Code CLI"
+    )
+    base_url: Optional[str] = Field(
+        default="http://localhost:11434", description="Base URL for Ollama or custom API endpoints"
     )
 
 

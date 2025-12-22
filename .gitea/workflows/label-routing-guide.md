@@ -243,20 +243,20 @@ All workflows use these environment variables:
 
 ```yaml
 env:
-  AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.GITEA_URL }}
-  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+  AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
+  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
   AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
   AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
 ```
 
 ## Required Secrets
 
 Set these in your Gitea repository settings (Settings → Secrets):
 
-- `GITEA_URL` - Your Gitea instance URL (e.g., `http://gitea:3000`)
-- `GITEA_TOKEN` - Gitea API token with repo permissions
-- `CLAUDE_API_KEY` - Claude API key for AI operations
+- `BUILDER_GITEA_URL` - Your Gitea instance URL (e.g., `http://gitea:3000`)
+- `BUILDER_GITEA_TOKEN` - Gitea API token with repo permissions
+- `BUILDER_CLAUDE_API_KEY` - Claude API key for AI operations
 
 ## Testing Workflows
 

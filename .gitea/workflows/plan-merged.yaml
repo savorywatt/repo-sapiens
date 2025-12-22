@@ -47,10 +47,10 @@ jobs:
       - name: Generate prompts from plans
         if: steps.detect-plans.outputs.has_changes == 'true'
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           # Process each changed plan file
           echo "${{ steps.detect-plans.outputs.plan_files }}" | while read -r plan_file; do

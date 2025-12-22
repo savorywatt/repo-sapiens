@@ -124,14 +124,24 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
     # Initialize interactive Q&A handler
     qa_handler = InteractiveQAHandler(git, poll_interval=30)
 
-    # Initialize external agent provider (claude or goose CLI)
-    agent_type = "claude"  # Could also be "goose"
-    agent = ExternalAgentProvider(
-        agent_type=agent_type,
-        model=settings.agent_provider.model,
-        working_dir=str(Path.cwd()),
-        qa_handler=qa_handler,
-    )
+    # Initialize agent provider based on configuration
+    if settings.agent_provider.provider_type == "ollama":
+        from automation.providers.ollama import OllamaProvider
+        agent = OllamaProvider(
+            base_url=settings.agent_provider.base_url,
+            model=settings.agent_provider.model,
+            working_dir=str(Path.cwd()),
+            qa_handler=qa_handler,
+        )
+    else:
+        # Use external agent provider (claude or goose CLI)
+        agent_type = "claude" if "claude" in settings.agent_provider.provider_type else "goose"
+        agent = ExternalAgentProvider(
+            agent_type=agent_type,
+            model=settings.agent_provider.model,
+            working_dir=str(Path.cwd()),
+            qa_handler=qa_handler,
+        )
 
     state = StateManager(settings.state_dir)
 
