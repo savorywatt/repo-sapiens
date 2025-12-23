@@ -52,10 +52,10 @@ automation = "automation.main:cli"
 builder = "automation.main:cli"
 
 [project.urls]
-Homepage = "http://100.89.157.127:3000/Foxshirestudios/builder"
-Documentation = "http://100.89.157.127:3000/Foxshirestudios/builder#readme"
-Repository = "http://100.89.157.127:3000/Foxshirestudios/builder"
-"Bug Tracker" = "http://100.89.157.127:3000/Foxshirestudios/builder/issues"
+Homepage = "http://100.89.157.127:3000/shireadmin/repo-agent"
+Documentation = "http://100.89.157.127:3000/shireadmin/repo-agent#readme"
+Repository = "http://100.89.157.127:3000/shireadmin/repo-agent"
+"Bug Tracker" = "http://100.89.157.127:3000/shireadmin/repo-agent/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]
