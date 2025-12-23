@@ -1,8 +1,24 @@
 [project]
-name = "gitea-automation"
-version = "0.1.0"
-description = "AI-driven automation system for Gitea"
+name = "builder-automation"
+dynamic = ["version"]
+description = "AI-driven automation system for Git workflows"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    {name = "Builder Automation Team", email = "builder@example.com"}
+]
+keywords = ["gitea", "automation", "ai", "workflow", "builder", "ci-cd", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
 dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
@@ -11,13 +27,15 @@ dependencies = [
     "click>=8.1.0",
     "pyyaml>=6.0",
     "aiofiles>=23.2.0",
-    "prometheus-client>=0.19.0",
-    "fastapi>=0.109.0",
-    "uvicorn>=0.27.0",
-    "plotly>=5.18.0",
 ]
 
 [project.optional-dependencies]
+monitoring = [
+    "prometheus-client>=0.19.0",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+]
+analytics = ["plotly>=5.18.0"]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
@@ -27,9 +45,31 @@ dev = [
     "ruff>=0.1.8",
     "mypy>=1.7.0",
 ]
+all = ["builder-automation[monitoring,analytics]"]
 
 [project.scripts]
 automation = "automation.main:cli"
+builder = "automation.main:cli"
+
+[project.urls]
+Homepage = "http://100.89.157.127:3000/Foxshirestudios/builder"
+Documentation = "http://100.89.157.127:3000/Foxshirestudios/builder#readme"
+Repository = "http://100.89.157.127:3000/Foxshirestudios/builder"
+"Bug Tracker" = "http://100.89.157.127:3000/Foxshirestudios/builder/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "automation.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["automation*"]
+
+[tool.setuptools.package-data]
+automation = ["config/*.yaml", "py.typed"]
 
 [tool.black]
 line-length = 100
@@ -53,13 +93,3 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-
-[build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["automation"]
-
-[tool.setuptools.package-data]
-automation = ["config/*.yaml"]
