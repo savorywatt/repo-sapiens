@@ -1,6 +1,8 @@
-# Gitea Automation System
+# repo-sapiens
 
-A production-ready AI-driven automation system for Gitea with advanced error recovery, parallel execution, multi-repository support, comprehensive monitoring, and intelligent cost optimization.
+> *The evolved, intelligent way to manage repositories*
+
+A production-ready AI-driven automation system for Git workflows with advanced error recovery, parallel execution, multi-repository support, comprehensive monitoring, and intelligent cost optimization.
 
 ## 🚀 Quick Start for CI/CD
 
@@ -52,9 +54,12 @@ Phase 4 adds enterprise-grade features for production readiness:
 ### Installation
 
 ```bash
-# Clone repository
-git clone https://gitea.example.com/owner/builder.git
-cd builder
+# Install from PyPI
+pip install repo-sapiens
+
+# Or install from source
+git clone https://github.com/savorywatt/repo-sapiens.git
+cd repo-sapiens
 
 # Install dependencies
 pip install -e .
@@ -329,7 +334,9 @@ automation --log-level DEBUG process-issue --issue 42 --stage planning
 
 ## Contributing
 
-This is a Phase 3 implementation focused on CI/CD integration. The system is designed to be extended with:
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+This system is designed to be extended with:
 
 - Additional workflow stages
 - Different git providers (GitHub, GitLab)
@@ -337,13 +344,25 @@ This is a Phase 3 implementation focused on CI/CD integration. The system is des
 - Enhanced error recovery
 - Performance optimizations
 
+For bugs, feature requests, or questions, please [open an issue](https://github.com/savorywatt/repo-sapiens/issues) on GitHub.
+
+## Links
+
+- **GitHub Repository**: [https://github.com/savorywatt/repo-sapiens](https://github.com/savorywatt/repo-sapiens)
+- **Issue Tracker**: [https://github.com/savorywatt/repo-sapiens/issues](https://github.com/savorywatt/repo-sapiens/issues)
+- **PyPI Package**: [https://pypi.org/project/repo-sapiens/](https://pypi.org/project/repo-sapiens/)
+
+## Author
+
+Maintained by [@savorywatt](https://github.com/savorywatt)
+
 ## License
 
-[Specify your license here]
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Support
 
 For issues and questions:
-- Create an issue in the repository
+- Create an issue on [GitHub Issues](https://github.com/savorywatt/repo-sapiens/issues)
 - Check the documentation in `docs/`
-- Review workflow logs in Gitea Actions
+- Review workflow logs in Actions

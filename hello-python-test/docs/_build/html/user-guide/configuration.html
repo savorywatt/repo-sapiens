@@ -1,0 +1,218 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuration &mdash; repo-sapiens 0.0.2 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=e3a6060d"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Workflows and Patterns" href="workflows.html" />
+    <link rel="prev" title="Overview" href="overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2980B9" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            repo-sapiens
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#current-configuration">Current Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment Variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#python-configuration">Python Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#future-configuration-guide">Future Configuration Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#best-practices-upcoming">Best Practices (Upcoming)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next Steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="workflows.html">Workflows and Patterns</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/core.html">Core Module API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/modules.html">Module Index</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer-guide/contributing.html">Contributing Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer-guide/development.html">Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer-guide/testing.html">Testing Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Resources</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../release-notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions (FAQ)</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Home</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2980B9" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">repo-sapiens</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Configuration</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/savorywatt/repo-sapiens/blob/main/docs/source/user-guide/configuration.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="configuration">
+<h1>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h1>
+<section id="current-configuration">
+<h2>Current Configuration<a class="headerlink" href="#current-configuration" title="Link to this heading"></a></h2>
+<p>In the current placeholder release (v0.0.2), configuration is minimal. The package provides basic core functionality without complex configuration requirements.</p>
+</section>
+<section id="basic-usage">
+<h2>Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading"></a></h2>
+<p>No configuration is required for basic functionality:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">repo_sapiens</span><span class="w"> </span><span class="kn">import</span> <span class="n">greet</span><span class="p">,</span> <span class="n">get_greeting</span>
+
+<span class="c1"># Functions work immediately after import</span>
+<span class="n">greet</span><span class="p">(</span><span class="s2">&quot;User&quot;</span><span class="p">)</span>
+<span class="n">message</span> <span class="o">=</span> <span class="n">get_greeting</span><span class="p">(</span><span class="s2">&quot;Developer&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="environment-variables">
+<h2>Environment Variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
+<p>Currently, no environment variables are required or used by repo-sapiens.</p>
+<p>In future releases, configuration will support:</p>
+<ul class="simple">
+<li><p>Environment-based settings</p></li>
+<li><p>Configuration files (YAML, TOML)</p></li>
+<li><p>Credential management</p></li>
+<li><p>Custom workflow definitions</p></li>
+</ul>
+</section>
+<section id="python-configuration">
+<h2>Python Configuration<a class="headerlink" href="#python-configuration" title="Link to this heading"></a></h2>
+<p>You can configure the package behavior through Python:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">repo_sapiens</span><span class="w"> </span><span class="kn">import</span> <span class="n">__version__</span>
+
+<span class="c1"># Check version</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Version: </span><span class="si">{</span><span class="n">__version__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="future-configuration-guide">
+<h2>Future Configuration Guide<a class="headerlink" href="#future-configuration-guide" title="Link to this heading"></a></h2>
+<p>When the full release is available, this section will include:</p>
+<ul class="simple">
+<li><p>Configuration file format and location</p></li>
+<li><p>Environment variable reference</p></li>
+<li><p>Environment-specific settings (dev, staging, production)</p></li>
+<li><p>Custom credential providers</p></li>
+<li><p>Advanced workflow configuration</p></li>
+<li><p>Template system settings</p></li>
+<li><p>Git integration configuration</p></li>
+</ul>
+</section>
+<section id="best-practices-upcoming">
+<h2>Best Practices (Upcoming)<a class="headerlink" href="#best-practices-upcoming" title="Link to this heading"></a></h2>
+<p>Once released, best practices will include:</p>
+<ul class="simple">
+<li><p>Using environment variables for secrets</p></li>
+<li><p>Structuring configuration files</p></li>
+<li><p>Managing multiple environments</p></li>
+<li><p>Credential security</p></li>
+<li><p>Workflow optimization</p></li>
+</ul>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>See <a class="reference internal" href="workflows.html"><span class="doc">Workflows and Patterns</span></a> for usage patterns</p></li>
+<li><p>Check <a class="reference internal" href="../api/core.html"><span class="doc">Core Module API</span></a> for available functions</p></li>
+<li><p>Review the <a class="reference internal" href="../developer-guide/contributing.html"><span class="doc">Contributing Guide</span></a> to help develop these features</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Full configuration support will be available in the complete release. This guide will be expanded to cover all configuration options.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="overview.html" class="btn btn-neutral float-left" title="Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="workflows.html" class="btn btn-neutral float-right" title="Workflows and Patterns" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, savorywatt.
+      <span class="lastupdated">Last updated on Dec 23, 2025.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

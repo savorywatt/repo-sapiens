@@ -1,0 +1,134 @@
+{# Documentation deployment workflow #}
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Deploy Documentation') | safe_label }}
+
+on:
+  push:
+    branches:
+      - {{ main_branch | default('main') | safe_identifier }}
+    paths:
+      - 'docs/**'
+      - '*.md'
+      - 'mkdocs.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Documentation
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    {% if use_github_pages | default(true) -%}
+    environment:
+      name: github-pages
+      url: ${{ '{{' }} steps.deployment.outputs.page_url {{ '}}' }}
+    {%- endif %}
+
+    steps:
+      {{ base.checkout_step(fetch_depth=0) }}
+
+      {{ base.setup_python_step(version=python_version | default('3.11')) }}
+
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          {% if docs_tool | default('mkdocs') == 'mkdocs' -%}
+          pip install mkdocs mkdocs-material mkdocstrings[python] mkdocs-git-revision-date-localized-plugin
+          {%- elif docs_tool == 'sphinx' -%}
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+          {%- else -%}
+          pip install -r {{ docs_requirements | default('docs/requirements.txt') }}
+          {%- endif %}
+
+      - name: Configure Git for version info
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      {% if docs_tool | default('mkdocs') == 'mkdocs' -%}
+      - name: Build documentation with MkDocs
+        run: |
+          mkdocs build --strict --verbose
+          echo "Documentation built in site/ directory"
+
+      - name: Add custom domain CNAME
+        if: ${{ '{{' }} vars.DOCS_CUSTOM_DOMAIN {{ '}}' }}
+        run: |
+          echo "${{ '{{' }} vars.DOCS_CUSTOM_DOMAIN {{ '}}' }}" > site/CNAME
+
+      {% elif docs_tool == 'sphinx' -%}
+      - name: Build documentation with Sphinx
+        run: |
+          cd docs
+          make html
+          echo "Documentation built in docs/_build/html directory"
+
+      - name: Move Sphinx output
+        run: |
+          mkdir -p site
+          cp -r docs/_build/html/* site/
+
+      {% endif -%}
+      - name: Add .nojekyll file
+        run: |
+          touch site/.nojekyll
+          echo "Created .nojekyll to disable Jekyll processing"
+
+      - name: Create deployment metadata
+        run: |
+          cat > site/deployment-info.json <<EOF
+          {
+            "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "${{ '{{' }} github.sha {{ '}}' }}",
+            "branch": "${{ '{{' }} github.ref_name {{ '}}' }}",
+            "version": "${{ '{{' }} github.ref_name {{ '}}' }}"
+          }
+          EOF
+
+      {% if use_github_pages | default(true) -%}
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'site'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      {% else -%}
+      - name: Deploy to custom location
+        run: |
+          # Custom deployment logic here
+          # Example: rsync to server, upload to S3, etc.
+          echo "Deploy to: {{ deploy_target | default('custom-server') }}"
+          {% if deploy_command -%}
+          {{ deploy_command }}
+          {%- else -%}
+          echo "No custom deployment command specified"
+          {%- endif %}
+
+      {% endif -%}
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "Documentation deployment completed"
+          echo "Site size: $(du -sh site | cut -f1)"
+          {% if use_github_pages | default(true) -%}
+          echo "URL: ${{ '{{' }} steps.deployment.outputs.page_url {{ '}}' }}"
+          {% endif -%}

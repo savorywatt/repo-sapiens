@@ -1,0 +1,27 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Mark Stale Issues') | safe_label }}
+
+on:
+  schedule:
+    - cron: '{{ cron_schedule | default("0 0 * * *") }}'
+  workflow_dispatch:
+
+{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+
+jobs:
+  stale:
+    name: Mark Stale Issues and PRs
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      - name: Mark stale items
+        uses: actions/stale@v8
+        with:
+          repo-token: ${{ '{{' }} secrets.GITEA_TOKEN {{ '}}' }}
+          stale-issue-message: '{{ stale_message | default("This issue has been automatically marked as stale due to inactivity.") }}'
+          stale-pr-message: '{{ stale_pr_message | default("This pull request has been automatically marked as stale due to inactivity.") }}'
+          stale-issue-label: '{{ stale_label | default("stale") | safe_label }}'
+          stale-pr-label: '{{ stale_pr_label | default("stale") | safe_label }}'
+          days-before-stale: {{ days_before_stale | default(60) | int }}
+          days-before-close: {{ days_before_close | default(7) | int }}

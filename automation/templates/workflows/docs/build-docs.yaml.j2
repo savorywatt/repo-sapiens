@@ -1,0 +1,50 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Build Documentation') | safe_label }}
+
+on:
+  push:
+    branches:
+      {% for branch in trigger_branches | default(['main']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+    paths:
+      - 'docs/**'
+      - '{{ docs_source | default("src/**/*.py") }}'
+  pull_request:
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+
+jobs:
+  build-docs:
+    name: Build Documentation
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step(version=python_version | default('3.11')) }}
+
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[docs]
+
+      - name: Build documentation
+        run: |
+          cd {{ docs_dir | default('docs/') }}
+          {% if doc_tool | default('sphinx') == 'sphinx' -%}
+          sphinx-build -W -b html {{ source_dir | default('source/') }} {{ build_dir | default('build/html') }}
+          {%- elif doc_tool == 'mkdocs' -%}
+          mkdocs build --strict
+          {%- endif %}
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: {{ docs_dir | default('docs/') }}{{ build_dir | default('build/html') }}
+          retention-days: {{ artifact_retention_days | default(7) | int }}
