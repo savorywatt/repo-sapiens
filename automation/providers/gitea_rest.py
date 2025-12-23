@@ -1,6 +1,7 @@
 """Gitea provider implementation using direct REST API calls."""
 
 from datetime import datetime
+from typing import Any
 
 import httpx
 import structlog
@@ -434,7 +435,7 @@ class GiteaRestProvider(GitProvider):
 
         return label_ids
 
-    def _parse_issue(self, data: dict[str, any]) -> Issue:
+    def _parse_issue(self, data: dict[str, Any]) -> Issue:
         """Parse issue data from API response."""
         return Issue(
             id=data["id"],
@@ -449,7 +450,7 @@ class GiteaRestProvider(GitProvider):
             url=data["html_url"],
         )
 
-    def _parse_comment(self, data: dict[str, any]) -> Comment:
+    def _parse_comment(self, data: dict[str, Any]) -> Comment:
         """Parse comment data from API response."""
         return Comment(
             id=data["id"],
@@ -458,7 +459,7 @@ class GiteaRestProvider(GitProvider):
             created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
         )
 
-    def _parse_pull_request(self, data: dict[str, any]) -> PullRequest:
+    def _parse_pull_request(self, data: dict[str, Any]) -> PullRequest:
         """Parse pull request data from API response."""
         return PullRequest(
             id=data["id"],

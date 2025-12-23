@@ -10,6 +10,9 @@ include pyproject.toml
 recursive-include automation *.py
 recursive-include automation/config *.yaml
 
+# Include type checking marker (PEP 561)
+include automation/py.typed
+
 # Exclude test files
 recursive-exclude tests *
 recursive-exclude automation/config playground_config.yaml

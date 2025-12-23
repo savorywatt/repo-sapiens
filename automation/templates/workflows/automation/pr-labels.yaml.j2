@@ -1,0 +1,35 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Auto-label Pull Requests') | safe_label }}
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+
+jobs:
+  label-pr:
+    name: Label Pull Request
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step() }}
+
+      - name: Install repo-agent
+        run: pip install repo-agent
+
+      - name: Auto-label PR
+        env:
+          GITEA_TOKEN: ${{ '{{' }} secrets.GITEA_TOKEN {{ '}}' }}
+        run: |
+          repo-agent labels auto-pr \
+            --url {{ gitea_url | safe_url }} \
+            --owner {{ gitea_owner | safe_identifier }} \
+            --repo {{ gitea_repo | safe_identifier }} \
+            --pr ${{ '{{' }} github.event.pull_request.number {{ '}}' }} \
+            {% if label_rules -%}
+            --rules {{ label_rules }}
+            {%- endif %}

@@ -1,0 +1,139 @@
+{# Tag management workflow for creating and managing Git tags #}
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Manage Git Tags') | safe_label }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - create
+          - delete
+          - list
+        default: 'list'
+      tag_name:
+        description: 'Tag name (required for create/delete)'
+        required: false
+        type: string
+      target_ref:
+        description: 'Target commit/branch (for create)'
+        required: false
+        type: string
+        default: 'main'
+      message:
+        description: 'Tag message (annotated tag)'
+        required: false
+        type: string
+      force:
+        description: 'Force tag creation/deletion'
+        required: false
+        type: boolean
+        default: false
+
+{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+
+permissions:
+  contents: write
+
+jobs:
+  manage-tags:
+    name: Manage Tags
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      {{ base.checkout_step(fetch_depth=0) }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+
+      - name: List tags
+        if: github.event.inputs.action == 'list'
+        run: |
+          echo "Existing tags:"
+          git tag -l -n3
+          echo ""
+          echo "Total tags: $(git tag | wc -l)"
+
+      - name: Validate tag name
+        if: github.event.inputs.action != 'list'
+        run: |
+          TAG_NAME="${{ '{{' }} github.event.inputs.tag_name {{ '}}' }}"
+          if [ -z "$TAG_NAME" ]; then
+            echo "Error: Tag name is required for create/delete actions"
+            exit 1
+          fi
+          # Validate tag name format (basic semver or custom)
+          if ! echo "$TAG_NAME" | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?(\+[a-zA-Z0-9.-]+)?$|^[a-zA-Z0-9._/-]+$'; then
+            echo "Warning: Tag name doesn't follow semver or standard format: $TAG_NAME"
+          fi
+
+      - name: Create tag
+        if: github.event.inputs.action == 'create'
+        run: |
+          TAG_NAME="${{ '{{' }} github.event.inputs.tag_name {{ '}}' }}"
+          TARGET_REF="${{ '{{' }} github.event.inputs.target_ref {{ '}}' }}"
+          MESSAGE="${{ '{{' }} github.event.inputs.message {{ '}}' }}"
+          FORCE="${{ '{{' }} github.event.inputs.force {{ '}}' }}"
+
+          # Check if tag already exists
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            if [ "$FORCE" = "true" ]; then
+              echo "Tag $TAG_NAME exists, forcing update..."
+              git tag -d "$TAG_NAME" || true
+              git push origin ":refs/tags/$TAG_NAME" || true
+            else
+              echo "Error: Tag $TAG_NAME already exists. Use force=true to update."
+              exit 1
+            fi
+          fi
+
+          # Create tag
+          if [ -n "$MESSAGE" ]; then
+            # Annotated tag with message
+            git tag -a "$TAG_NAME" -m "$MESSAGE" "$TARGET_REF"
+            echo "Created annotated tag: $TAG_NAME"
+          else
+            # Lightweight tag
+            git tag "$TAG_NAME" "$TARGET_REF"
+            echo "Created lightweight tag: $TAG_NAME"
+          fi
+
+          # Push tag
+          git push origin "refs/tags/$TAG_NAME"
+          echo "Pushed tag: $TAG_NAME"
+
+      - name: Delete tag
+        if: github.event.inputs.action == 'delete'
+        run: |
+          TAG_NAME="${{ '{{' }} github.event.inputs.tag_name {{ '}}' }}"
+
+          # Check if tag exists
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Warning: Tag $TAG_NAME does not exist"
+            exit 0
+          fi
+
+          # Delete local tag
+          git tag -d "$TAG_NAME"
+          echo "Deleted local tag: $TAG_NAME"
+
+          # Delete remote tag
+          git push origin ":refs/tags/$TAG_NAME"
+          echo "Deleted remote tag: $TAG_NAME"
+
+      - name: Tag summary
+        if: always()
+        run: |
+          echo "Action performed: ${{ '{{' }} github.event.inputs.action {{ '}}' }}"
+          if [ "${{ '{{' }} github.event.inputs.action {{ '}}' }}" != "list" ]; then
+            echo "Tag name: ${{ '{{' }} github.event.inputs.tag_name {{ '}}' }}"
+          fi
+          echo ""
+          echo "Recent tags:"
+          git tag -l -n1 | tail -10

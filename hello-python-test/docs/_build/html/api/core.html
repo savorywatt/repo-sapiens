@@ -1,0 +1,359 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Core Module API &mdash; repo-sapiens 0.0.2 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=e3a6060d"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Module Index" href="modules.html" />
+    <link rel="prev" title="Workflows and Patterns" href="../user-guide/workflows.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search"  style="background: #2980B9" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            repo-sapiens
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting-started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user-guide/overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user-guide/configuration.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user-guide/workflows.html">Workflows and Patterns</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Core Module API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-repo_sapiens.core">Module Reference</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#repo_sapiens.core.greet"><code class="docutils literal notranslate"><span class="pre">greet()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#repo_sapiens.core.get_greeting"><code class="docutils literal notranslate"><span class="pre">get_greeting()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#functions">Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#greet">greet</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id0"><code class="docutils literal notranslate"><span class="pre">greet()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#get-greeting">get_greeting</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">get_greeting()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#module-0">Full Module Documentation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id2"><code class="docutils literal notranslate"><span class="pre">greet()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3"><code class="docutils literal notranslate"><span class="pre">get_greeting()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#type-hints">Type Hints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Module Index</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer-guide/contributing.html">Contributing Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer-guide/development.html">Development Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developer-guide/testing.html">Testing Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Additional Resources</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../release-notes.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq.html">Frequently Asked Questions (FAQ)</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Home</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu"  style="background: #2980B9" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">repo-sapiens</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Core Module API</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/savorywatt/repo-sapiens/blob/main/docs/source/api/core.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="core-module-api">
+<h1>Core Module API<a class="headerlink" href="#core-module-api" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">repo_sapiens.core</span></code> module provides foundational functionality.</p>
+<section id="module-repo_sapiens.core">
+<span id="module-reference"></span><h2>Module Reference<a class="headerlink" href="#module-repo_sapiens.core" title="Link to this heading"></a></h2>
+<p>Core functionality for hello-python-test package.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="repo_sapiens.core.greet">
+<span class="sig-prename descclassname"><span class="pre">repo_sapiens.core.</span></span><span class="sig-name descname"><span class="pre">greet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/repo_sapiens/core.html#greet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#repo_sapiens.core.greet" title="Link to this definition"></a></dt>
+<dd><p>Print a greeting message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – Optional name to greet. Defaults to “World” if not provided.</p>
+</dd>
+</dl>
+<div class="admonition-examples admonition">
+<p class="admonition-title">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">greet</span><span class="p">()</span>
+<span class="go">Hello, World!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Python&quot;</span><span class="p">)</span>
+<span class="go">Hello, Python!</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="repo_sapiens.core.get_greeting">
+<span class="sig-prename descclassname"><span class="pre">repo_sapiens.core.</span></span><span class="sig-name descname"><span class="pre">get_greeting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'World'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="../_modules/repo_sapiens/core.html#get_greeting"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#repo_sapiens.core.get_greeting" title="Link to this definition"></a></dt>
+<dd><p>Generate a greeting message string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – The name to include in the greeting. Defaults to “World”.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A greeting message string.</p>
+</dd>
+</dl>
+<div class="admonition-examples admonition">
+<p class="admonition-title">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">get_greeting</span><span class="p">()</span>
+<span class="go">&#39;Hello, World!&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">get_greeting</span><span class="p">(</span><span class="s2">&quot;Python&quot;</span><span class="p">)</span>
+<span class="go">&#39;Hello, Python!&#39;</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading"></a></h2>
+<section id="greet">
+<h3>greet<a class="headerlink" href="#greet" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="id0">
+<span class="sig-prename descclassname"><span class="pre">repo_sapiens.core.</span></span><span class="sig-name descname"><span class="pre">greet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/repo_sapiens/core.html#greet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id0" title="Link to this definition"></a></dt>
+<dd><p>Print a greeting message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – Optional name to greet. Defaults to “World” if not provided.</p>
+</dd>
+</dl>
+<div class="admonition-examples admonition">
+<p class="admonition-title">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">greet</span><span class="p">()</span>
+<span class="go">Hello, World!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Python&quot;</span><span class="p">)</span>
+<span class="go">Hello, Python!</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<p>Print a greeting message to stdout.</p>
+<p><strong>Parameters:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> (str, optional): The name to include in the greeting. If not provided, defaults to “World”.</p></li>
+</ul>
+<p><strong>Returns:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">None</span></code></p></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">repo_sapiens</span><span class="w"> </span><span class="kn">import</span> <span class="n">greet</span>
+
+<span class="n">greet</span><span class="p">()</span>  <span class="c1"># Output: Hello, World!</span>
+<span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Alice&quot;</span><span class="p">)</span>  <span class="c1"># Output: Hello, Alice!</span>
+</pre></div>
+</div>
+</section>
+<section id="get-greeting">
+<h3>get_greeting<a class="headerlink" href="#get-greeting" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="id1">
+<span class="sig-prename descclassname"><span class="pre">repo_sapiens.core.</span></span><span class="sig-name descname"><span class="pre">get_greeting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'World'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="../_modules/repo_sapiens/core.html#get_greeting"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id1" title="Link to this definition"></a></dt>
+<dd><p>Generate a greeting message string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – The name to include in the greeting. Defaults to “World”.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A greeting message string.</p>
+</dd>
+</dl>
+<div class="admonition-examples admonition">
+<p class="admonition-title">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">get_greeting</span><span class="p">()</span>
+<span class="go">&#39;Hello, World!&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">get_greeting</span><span class="p">(</span><span class="s2">&quot;Python&quot;</span><span class="p">)</span>
+<span class="go">&#39;Hello, Python!&#39;</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<p>Generate a greeting message as a string.</p>
+<p><strong>Parameters:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> (str): The name to include in the greeting. Defaults to “World”.</p></li>
+</ul>
+<p><strong>Returns:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">str</span></code>: The greeting message.</p></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">repo_sapiens</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_greeting</span>
+
+<span class="n">msg</span> <span class="o">=</span> <span class="n">get_greeting</span><span class="p">()</span>  <span class="c1"># Returns: &quot;Hello, World!&quot;</span>
+<span class="n">msg</span> <span class="o">=</span> <span class="n">get_greeting</span><span class="p">(</span><span class="s2">&quot;Bob&quot;</span><span class="p">)</span>  <span class="c1"># Returns: &quot;Hello, Bob!&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="module-0">
+<span id="full-module-documentation"></span><h2>Full Module Documentation<a class="headerlink" href="#module-0" title="Link to this heading"></a></h2>
+<p>Core functionality for hello-python-test package.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="id2">
+<span class="sig-prename descclassname"><span class="pre">repo_sapiens.core.</span></span><span class="sig-name descname"><span class="pre">greet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/repo_sapiens/core.html#greet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id2" title="Link to this definition"></a></dt>
+<dd><p>Print a greeting message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – Optional name to greet. Defaults to “World” if not provided.</p>
+</dd>
+</dl>
+<div class="admonition-examples admonition">
+<p class="admonition-title">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">greet</span><span class="p">()</span>
+<span class="go">Hello, World!</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Python&quot;</span><span class="p">)</span>
+<span class="go">Hello, Python!</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="id3">
+<span class="sig-prename descclassname"><span class="pre">repo_sapiens.core.</span></span><span class="sig-name descname"><span class="pre">get_greeting</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'World'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="reference internal" href="../_modules/repo_sapiens/core.html#get_greeting"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id3" title="Link to this definition"></a></dt>
+<dd><p>Generate a greeting message string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – The name to include in the greeting. Defaults to “World”.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A greeting message string.</p>
+</dd>
+</dl>
+<div class="admonition-examples admonition">
+<p class="admonition-title">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">get_greeting</span><span class="p">()</span>
+<span class="go">&#39;Hello, World!&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">get_greeting</span><span class="p">(</span><span class="s2">&quot;Python&quot;</span><span class="p">)</span>
+<span class="go">&#39;Hello, Python!&#39;</span>
+</pre></div>
+</div>
+</div>
+</dd></dl>
+
+</section>
+<section id="type-hints">
+<h2>Type Hints<a class="headerlink" href="#type-hints" title="Link to this heading"></a></h2>
+<p>All functions are fully type-hinted for IDE support:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">greet</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_greeting</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;World&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+</pre></div>
+</div>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../user-guide/overview.html"><span class="doc">Overview</span></a> for an overview of features</p></li>
+<li><p><a class="reference internal" href="../user-guide/workflows.html"><span class="doc">Workflows and Patterns</span></a> for usage patterns</p></li>
+<li><p><a class="reference internal" href="../developer-guide/development.html"><span class="doc">Development Guide</span></a> for development information</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../user-guide/workflows.html" class="btn btn-neutral float-left" title="Workflows and Patterns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="modules.html" class="btn btn-neutral float-right" title="Module Index" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, savorywatt.
+      <span class="lastupdated">Last updated on Dec 23, 2025.
+      </span></p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

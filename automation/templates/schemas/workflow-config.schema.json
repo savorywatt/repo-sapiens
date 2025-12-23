@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workflow Template Variables Schema",
+  "description": "Validation schema for workflow template context variables",
+  "type": "object",
+  "required": ["gitea_url", "gitea_owner", "gitea_repo"],
+  "properties": {
+    "gitea_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Gitea instance URL"
+    },
+    "gitea_owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "description": "Repository owner"
+    },
+    "gitea_repo": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "description": "Repository name"
+    },
+    "workflow_name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Custom workflow name"
+    },
+    "runner": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "default": "ubuntu-latest"
+    },
+    "python_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "default": "3.11"
+    },
+    "trigger_branches": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "minItems": 1,
+      "default": ["main"]
+    },
+    "labels_file": {
+      "type": "string",
+      "default": ".github/labels.yaml"
+    },
+    "package_name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$"
+    }
+  },
+  "additionalProperties": true
+}

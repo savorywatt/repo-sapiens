@@ -1,0 +1,1067 @@
+# Getting Started with repo-sapiens
+
+Welcome to repo-sapiens, an intelligent repository automation and management system powered by AI. This guide will help you get up and running in minutes.
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Installation](#installation)
+3. [Quick Start (5 minutes)](#quick-start-5-minutes)
+4. [Configuration](#configuration)
+5. [Basic Workflows](#basic-workflows)
+6. [Common Tasks](#common-tasks)
+7. [Troubleshooting](#troubleshooting)
+8. [Next Steps](#next-steps)
+
+---
+
+## Introduction
+
+### What is repo-sapiens?
+
+repo-sapiens is an AI-driven automation system that transforms repository management from manual processes to intelligent, automated workflows. It helps you:
+
+- **Automate issue processing** - Convert GitHub/Gitea issues into complete, tested implementations
+- **Manage complex workflows** - Coordinate multi-step processes across repositories
+- **Maintain code quality** - Automated planning, implementation, and code review
+- **Scale efficiently** - Handle multiple repositories and concurrent tasks
+- **Monitor everything** - Real-time health checks and comprehensive logging
+
+### Key Features
+
+- **Intelligent Planning**: Automatically generate development plans from issue descriptions
+- **AI Implementation**: Execute tasks using Claude or other AI agents
+- **Automated Code Review**: Review and test implementations before merge
+- **State Management**: Track workflow progress with atomic, reliable state updates
+- **Webhook Support**: Real-time event processing from your Git provider
+- **Health Monitoring**: Built-in health checks and failure detection
+- **Cost Optimization**: Intelligent AI model selection based on task complexity
+- **Multi-Repository Support**: Coordinate workflows across multiple repositories
+- **Parallel Execution**: Execute independent tasks concurrently
+- **CI/CD Integration**: Native support for GitHub Actions, Gitea Actions, and more
+
+### Use Cases
+
+- **Feature Development**: Automate feature implementation from issue to deployment
+- **Bug Triage**: Automatically classify, analyze, and attempt fixes for bug reports
+- **Code Maintenance**: Keep dependencies updated, refactor code, optimize performance
+- **Documentation**: Generate and maintain API documentation automatically
+- **Quality Assurance**: Continuous testing and code quality improvements
+- **DevOps Automation**: Manage infrastructure and deployment workflows
+
+---
+
+## Installation
+
+### Prerequisites
+
+Before installing repo-sapiens, ensure you have:
+
+- **Python 3.11 or higher** - Check with: `python --version` or `python3 --version`
+- **Git** - Check with: `git --version`
+- **Access to a Git provider** - GitHub, Gitea, or GitLab
+- **API tokens** - From your Git provider (and optionally from Claude API or other AI providers)
+
+### Installing from PyPI
+
+The easiest way to install repo-sapiens is from PyPI:
+
+```bash
+# Install the base package
+pip install repo-sapiens
+
+# Verify installation
+repo-sapiens --version
+```
+
+### Installing from Source
+
+For development or to use the latest features:
+
+```bash
+# Clone the repository
+git clone https://github.com/savorywatt/repo-sapiens.git
+cd repo-sapiens
+
+# Install in development mode
+pip install -e .
+
+# Verify installation
+automation --version
+```
+
+### Optional Dependencies
+
+repo-sapiens supports optional feature groups:
+
+```bash
+# Install with monitoring support (Prometheus, health checks)
+pip install repo-sapiens[monitoring]
+
+# Install with analytics features (Plotly dashboards)
+pip install repo-sapiens[analytics]
+
+# Install development tools (pytest, black, mypy)
+pip install repo-sapiens[dev]
+
+# Install everything
+pip install repo-sapiens[all]
+```
+
+### Checking Your Installation
+
+```bash
+# Display help and available commands
+automation --help
+
+# Expected output:
+# Usage: automation [OPTIONS] COMMAND [ARGS]...
+#
+#   Gitea automation system CLI.
+#
+# Options:
+#   --config TEXT     Path to configuration file
+#   --log-level TEXT  Logging level
+#   --help            Show this message and exit.
+#
+# Commands:
+#   credentials      Manage credentials
+#   daemon          Run in daemon mode, polling for new issues
+#   list-plans      List all active plans
+#   process-issue   Process a single issue manually
+#   process-all     Process all issues with optional tag filter
+#   process-plan    Process entire plan end-to-end
+#   show-plan       Show detailed plan status
+```
+
+---
+
+## Quick Start (5 minutes)
+
+This section gets you from zero to running your first automation in 5 minutes.
+
+### Step 1: Create a Configuration File
+
+Copy the default configuration template:
+
+```bash
+# From the source directory
+cp automation/config/automation_config.yaml ./my_config.yaml
+
+# Or create a new one with this basic template:
+cat > my_config.yaml << 'EOF'
+git_provider:
+  provider_type: gitea
+  base_url: https://your-gitea-instance.com
+  api_token: "${GITEA_API_TOKEN}"
+
+repository:
+  owner: your-org
+  name: your-repo
+  default_branch: main
+
+agent_provider:
+  provider_type: claude-api
+  model: claude-opus-4-5
+  api_key: "${CLAUDE_API_KEY}"
+
+workflow:
+  plans_directory: plans
+  state_directory: .automation/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 3
+
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+EOF
+```
+
+### Step 2: Set Up Credentials
+
+You have three options for managing credentials. Choose the one that fits your environment:
+
+#### Option A: Environment Variables (Simplest)
+
+```bash
+# For the current session (recommended for testing)
+export GITEA_API_TOKEN="your-gitea-token-here"
+export CLAUDE_API_KEY="your-claude-api-key-here"
+
+# Verify configuration loads correctly
+automation --config my_config.yaml list-plans
+```
+
+#### Option B: Keyring (Recommended for Desktop)
+
+```bash
+# Store credentials securely (encrypted by OS)
+automation credentials set gitea/api_token --backend keyring
+# Enter your Gitea token when prompted
+
+automation credentials set claude/api_key --backend keyring
+# Enter your Claude API key when prompted
+
+# Update your config to use keyring references
+cat > my_config.yaml << 'EOF'
+git_provider:
+  api_token: "@keyring:gitea/api_token"
+
+agent_provider:
+  api_key: "@keyring:claude/api_key"
+# ... rest of config
+EOF
+```
+
+#### Option C: Encrypted File (For Headless Servers)
+
+```bash
+# Set a master password (use a strong password!)
+export AUTOMATION_MASTER_PASSWORD="your-secure-password"
+
+# Store credentials
+automation credentials set gitea/api_token --backend encrypted
+automation credentials set claude/api_key --backend encrypted
+
+# Update config to use encrypted references
+# api_token: "@encrypted:gitea/api_token"
+```
+
+### Step 3: Run Your First Command
+
+List active automation plans:
+
+```bash
+automation --config my_config.yaml list-plans
+```
+
+Expected output:
+
+```
+Active Plans (0):
+
+(No active plans found yet - this is normal for a fresh setup!)
+```
+
+### Step 4: Process Your First Issue
+
+Create or find an issue in your repository, then process it:
+
+```bash
+# Process a specific issue (replace 1 with your issue number)
+automation --config my_config.yaml process-issue --issue 1
+
+# Watch the output:
+# ✓ Loading issue #1...
+# ✓ Generating development plan...
+# ✓ Creating plan file (plans/1-feature.md)...
+# ✓ Generating prompt issues...
+# ✓ Processing tasks...
+# ✓ Creating pull request...
+# ✅ Issue #1 processed successfully
+```
+
+### Step 5: Check the Results
+
+View the generated plan and track progress:
+
+```bash
+# List all active plans
+automation --config my_config.yaml list-plans
+
+# View status of a specific plan
+automation --config my_config.yaml show-plan --plan-id 1
+
+# Expected output:
+# 📋 Plan 1 Status
+#
+# Overall Status: in_progress
+# Created: 2025-12-23T10:15:30
+# Updated: 2025-12-23T10:30:45
+#
+# Stages:
+#   ✅ planning: completed
+#   ⏳ implementation: in_progress
+#   ⏳ code_review: pending
+#   ⏳ merge: pending
+#
+# Tasks (8):
+#   ✅ task-1: completed
+#   🔄 task-2: in_progress
+#   ⏳ task-3: pending
+#   ...
+```
+
+---
+
+## Configuration
+
+### Configuration File Structure
+
+The `automation_config.yaml` file controls all aspects of repo-sapiens behavior. Here's the complete structure:
+
+```yaml
+# Git Provider Configuration
+# Supports: gitea, github
+git_provider:
+  provider_type: gitea
+  mcp_server: null  # Optional: Name of MCP server for git ops
+  base_url: https://your-gitea-instance.com
+  api_token: "${GITEA_API_TOKEN}"  # See credential options below
+
+# Repository Configuration
+repository:
+  owner: your-organization
+  name: your-repository
+  default_branch: main  # Default: main
+
+# AI Agent Configuration
+# Supports: claude-api, claude-local, openai, ollama
+agent_provider:
+  provider_type: claude-api
+  model: claude-opus-4-5
+  api_key: "${CLAUDE_API_KEY}"  # Optional: required for API providers
+  local_mode: false  # Set to true to use local Claude Code CLI
+  base_url: null  # Optional: for Ollama or custom endpoints
+
+# Workflow Behavior
+workflow:
+  plans_directory: plans  # Where to store generated plans
+  state_directory: .automation/state  # Where to track progress
+  branching_strategy: per-agent  # or: shared
+  max_concurrent_tasks: 3  # 1-10 recommended
+  review_approval_threshold: 0.8  # 0.0-1.0 confidence for auto-approval
+
+# Issue Labels for Workflow Stages
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+  in_progress: in-progress
+  review_ready: review-ready
+  deployed: deployed
+```
+
+### Environment Variables
+
+All configuration values can be overridden using environment variables with the `AUTOMATION__` prefix. Use double underscores to indicate nesting:
+
+```bash
+# Git provider settings
+export AUTOMATION__GIT_PROVIDER__BASE_URL="https://your-gitea.com"
+export AUTOMATION__GIT_PROVIDER__API_TOKEN="your-token"
+
+# Repository settings
+export AUTOMATION__REPOSITORY__OWNER="myorg"
+export AUTOMATION__REPOSITORY__NAME="myrepo"
+
+# Agent settings
+export AUTOMATION__AGENT_PROVIDER__MODEL="claude-sonnet-4.5"
+export AUTOMATION__AGENT_PROVIDER__API_KEY="your-api-key"
+
+# Workflow settings
+export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="5"
+export AUTOMATION__WORKFLOW__PLANS_DIRECTORY="./my_plans"
+
+# Logging level
+export AUTOMATION__LOG_LEVEL="DEBUG"
+```
+
+Use environment variables to:
+- Override config file values
+- Keep secrets out of version control
+- Support different environments (dev, staging, production)
+
+### Credential Management Options
+
+repo-sapiens supports three secure credential storage methods:
+
+#### 1. Keyring (Recommended for Desktop)
+
+**Best for**: Local development on macOS, Linux, or Windows
+
+Uses your operating system's native credential storage:
+- macOS: Keychain
+- Linux: Secret Service (GNOME/KDE)
+- Windows: Credential Manager
+
+**Setup**:
+
+```bash
+# Store a credential
+automation credentials set gitea/api_token --backend keyring
+# Enter your token at the interactive prompt
+
+# Reference in config
+git_provider:
+  api_token: "@keyring:gitea/api_token"
+
+# Verify it works
+automation --config my_config.yaml list-plans
+```
+
+**Pros**:
+- Secure OS-level encryption
+- Biometric support (Touch ID, Windows Hello)
+- Persists across reboots
+- No password management needed
+
+**Cons**:
+- Only works on machines with graphical environments
+- Not suitable for CI/CD (unless running on desktop)
+
+#### 2. Environment Variables (Recommended for CI/CD)
+
+**Best for**: GitHub Actions, GitLab CI, Gitea Actions, Jenkins
+
+**Setup**:
+
+```bash
+# For current session (testing)
+export GITEA_API_TOKEN="your-token"
+export CLAUDE_API_KEY="your-api-key"
+
+# Reference in config
+git_provider:
+  api_token: "${GITEA_API_TOKEN}"
+
+agent_provider:
+  api_key: "${CLAUDE_API_KEY}"
+```
+
+**In CI/CD platforms** (example: Gitea Actions):
+
+```yaml
+name: Automation Workflow
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  automate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Run automation
+        env:
+          GITEA_API_TOKEN: ${{ secrets.GITEA_API_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: automation --config my_config.yaml process-all
+```
+
+**Pros**:
+- Native CI/CD support
+- No additional setup
+- Simple and reliable
+- Standard across all platforms
+
+**Cons**:
+- Not persisted locally
+- Less secure than keyring for unattended access
+- Requires CI/CD secret management
+
+#### 3. Encrypted File (For Headless Servers)
+
+**Best for**: Self-hosted servers, Docker containers
+
+**Setup**:
+
+```bash
+# Set a master password (use a strong password!)
+export AUTOMATION_MASTER_PASSWORD="your-very-secure-password-here"
+
+# Store credentials
+automation credentials set gitea/api_token --backend encrypted
+automation credentials set claude/api_key --backend encrypted
+
+# Reference in config
+git_provider:
+  api_token: "@encrypted:gitea/api_token"
+
+agent_provider:
+  api_key: "@encrypted:claude/api_key"
+```
+
+**For Docker**:
+
+```dockerfile
+FROM python:3.11-slim
+
+# ... install repo-sapiens ...
+
+# Store encrypted credentials during build
+ARG AUTOMATION_MASTER_PASSWORD
+RUN AUTOMATION_MASTER_PASSWORD=$AUTOMATION_MASTER_PASSWORD \
+    automation credentials set gitea/api_token --backend encrypted \
+    && automation credentials set claude/api_key --backend encrypted
+
+# Master password provided at runtime
+ENV AUTOMATION_MASTER_PASSWORD=<runtime-secret>
+
+CMD ["automation", "--config", "my_config.yaml", "daemon", "--interval", "60"]
+```
+
+**Pros**:
+- Works on any system (no graphical UI needed)
+- File-based persistence
+- Container-friendly
+
+**Cons**:
+- Requires master password management
+- Less secure if master password is compromised
+- Requires storing encrypted files in version control
+
+### Choosing a Credential Method
+
+Use this decision tree:
+
+```
+Are you running on a personal/development machine?
+├─ Yes → Use Keyring (most secure, easiest)
+└─ No
+    ├─ Is this CI/CD? → Use Environment Variables
+    └─ Is this a headless server? → Use Encrypted File
+```
+
+---
+
+## Basic Workflows
+
+### Workflow 1: Automating Issue Processing
+
+Process a single issue from creation to implementation:
+
+```bash
+# Step 1: Identify an issue you want to automate
+# (Look in your repository for issues labeled "needs-planning")
+
+# Step 2: Process the issue
+automation --config my_config.yaml process-issue --issue 42
+
+# Step 3: Monitor progress
+automation --config my_config.yaml show-plan --plan-id 42
+
+# Step 4: The automation will:
+#   ✅ Generate a development plan
+#   ✅ Create a plan document (plans/42-*.md)
+#   ✅ Generate prompt issues for each task
+#   ✅ Execute tasks with AI agents
+#   ✅ Run code review
+#   ✅ Create a pull request
+```
+
+**Configuration for Issue Processing**:
+
+```yaml
+# In my_config.yaml
+workflow:
+  plans_directory: plans  # Plans stored here
+  state_directory: .automation/state  # Progress tracked here
+  branching_strategy: per-agent  # One branch per AI agent
+  max_concurrent_tasks: 3  # How many tasks to run in parallel
+
+tags:
+  needs_planning: needs-planning
+  ready_to_implement: ready-to-implement
+```
+
+### Workflow 2: Using Daemon Mode
+
+Run continuous automation that processes new issues automatically:
+
+```bash
+# Start the daemon (runs indefinitely)
+automation --config my_config.yaml daemon --interval 60
+
+# Output:
+# 🤖 Starting daemon mode (polling every 60s)
+# 🔄 Polling for issues...
+# ✅ Poll complete. Waiting 60s...
+# 🔄 Polling for issues...
+# (processes any new issues automatically)
+
+# Stop with Ctrl+C
+# 👋 Shutting down daemon...
+```
+
+**Daemon Configuration**:
+
+```yaml
+# In my_config.yaml
+workflow:
+  # Issues will be automatically discovered and processed
+  # based on their labels
+  tags:
+    needs_planning: needs-planning  # Issues with this label are processed
+```
+
+**Running in the Background** (Linux/macOS):
+
+```bash
+# Using nohup
+nohup automation --config my_config.yaml daemon --interval 60 > automation.log 2>&1 &
+
+# Using systemd (create /etc/systemd/system/automation.service)
+[Unit]
+Description=repo-sapiens Automation Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=automation
+ExecStart=/usr/local/bin/automation --config /etc/automation/config.yaml daemon
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+# Enable and start
+sudo systemctl enable automation
+sudo systemctl start automation
+sudo systemctl status automation
+```
+
+### Workflow 3: Webhook Integration
+
+Real-time event processing when issues are created or updated:
+
+```bash
+# Start the webhook server (optional, for real-time processing)
+automation webhook-server --host 0.0.0.0 --port 8000
+
+# Output:
+# Uvicorn running on http://0.0.0.0:8000
+# Webhook endpoint: POST /webhook/gitea
+```
+
+**Configure Webhook in Gitea**:
+
+1. Go to Repository Settings → Webhooks
+2. Add Webhook:
+   - **URL**: `https://your-server.com:8000/webhook/gitea`
+   - **Content Type**: `application/json`
+   - **Events**: Issues, Pushes
+   - **Active**: Yes
+
+**Webhook Server Configuration**:
+
+```yaml
+# In my_config.yaml
+webhook:
+  host: 0.0.0.0
+  port: 8000
+  secret: "${WEBHOOK_SECRET}"  # Optional: validates webhook signature
+```
+
+---
+
+## Common Tasks
+
+### Task 1: List Active Plans
+
+View all automation plans currently in progress:
+
+```bash
+automation --config my_config.yaml list-plans
+
+# Output:
+# Active Plans (3):
+#
+#   • Plan 42: in_progress
+#   • Plan 43: completed
+#   • Plan 44: failed
+```
+
+### Task 2: Process a Specific Issue
+
+Manually trigger automation for a single issue:
+
+```bash
+automation --config my_config.yaml process-issue --issue 42
+
+# Or with custom configuration
+automation --config my_config.yaml \
+  --log-level DEBUG \
+  process-issue --issue 42
+
+# Output:
+# ✓ Loading configuration...
+# ✓ Connecting to Gitea...
+# ✓ Fetching issue #42...
+# ✓ Generating development plan...
+# ✓ Creating plan file (plans/42-feature.md)
+# ✓ Processing tasks...
+# ✓ Creating pull request...
+# ✅ Issue #42 processed successfully
+```
+
+### Task 3: Check System Health
+
+Verify all connections and dependencies are working:
+
+```bash
+automation health-check
+
+# Output:
+# 🏥 System Health Check
+#
+# Git Provider:     ✅ Connected
+# Agent Provider:   ✅ Connected
+# State Directory:  ✅ Accessible
+# Credentials:      ✅ Valid
+# Network:          ✅ Online
+#
+# Status: All systems operational
+```
+
+### Task 4: View Detailed Plan Status
+
+Get complete status of a plan including all stages and tasks:
+
+```bash
+automation --config my_config.yaml show-plan --plan-id 42
+
+# Output:
+# 📋 Plan 42 Status
+#
+# Overall Status: in_progress
+# Created: 2025-12-23T10:15:30
+# Updated: 2025-12-23T10:30:45
+#
+# Stages:
+#   ✅ planning: completed
+#   🔄 implementation: in_progress
+#   ⏳ code_review: pending
+#   ⏳ merge: pending
+#
+# Tasks (8):
+#   ✅ task-1: completed (duration: 45s)
+#   🔄 task-2: in_progress (elapsed: 23s)
+#   ⏳ task-3: pending
+#   ⏳ task-4: pending
+```
+
+### Task 5: View Logs
+
+Enable debug logging to troubleshoot issues:
+
+```bash
+# Enable debug logging for a single command
+automation --log-level DEBUG \
+  --config my_config.yaml \
+  process-issue --issue 42
+
+# Logs show:
+# 2025-12-23 10:15:30 INFO Loading configuration: my_config.yaml
+# 2025-12-23 10:15:31 DEBUG Connecting to Git provider: https://gitea.com
+# 2025-12-23 10:15:32 DEBUG Git provider connected successfully
+# 2025-12-23 10:15:33 DEBUG Fetching issue #42 from repository
+# 2025-12-23 10:15:34 DEBUG Issue #42: "Add dark mode support"
+# ...
+```
+
+**Available Log Levels**:
+- `DEBUG` - Detailed diagnostic information
+- `INFO` - General informational messages
+- `WARNING` - Warning messages
+- `ERROR` - Error messages
+
+### Task 6: Process All Issues with a Tag
+
+Batch process multiple issues at once:
+
+```bash
+# Process all issues with a specific label
+automation --config my_config.yaml process-all --tag needs-planning
+
+# Process all issues (ignores tags)
+automation --config my_config.yaml process-all
+
+# Monitor multi-issue processing
+# (Each issue processed sequentially or in parallel based on settings)
+```
+
+---
+
+## Troubleshooting
+
+### Common Errors and Solutions
+
+#### Error: "Configuration file not found"
+
+**Problem**: `Error: Configuration file not found: my_config.yaml`
+
+**Solutions**:
+
+```bash
+# Check file exists
+ls -la my_config.yaml
+
+# Use absolute path
+automation --config /full/path/to/my_config.yaml list-plans
+
+# Use default location
+cp my_config.yaml automation/config/automation_config.yaml
+automation list-plans  # Uses default config
+```
+
+#### Error: "API token not found"
+
+**Problem**: `Error: API token not found or invalid`
+
+**Solutions**:
+
+```bash
+# Check environment variable
+echo $GITEA_API_TOKEN
+# Should output your token
+
+# Or set it
+export GITEA_API_TOKEN="your-token-here"
+
+# Or use keyring
+automation credentials set gitea/api_token --backend keyring
+# And reference it: api_token: "@keyring:gitea/api_token"
+
+# Verify credentials are set up
+automation credentials test
+```
+
+#### Error: "Connection refused"
+
+**Problem**: `Connection refused` when connecting to Git provider
+
+**Solutions**:
+
+```bash
+# Check URL in config
+grep base_url my_config.yaml
+
+# Test connectivity
+curl https://your-gitea-instance.com/api/v1/user
+
+# Verify network access
+ping your-gitea-instance.com
+
+# Check if VPN/proxy is required
+# (Configure in environment or config as needed)
+```
+
+#### Error: "Plan file not found"
+
+**Problem**: `FileNotFoundError: plan file not found`
+
+**Solutions**:
+
+```bash
+# Check plans directory exists
+ls -la plans/
+
+# Create it if missing
+mkdir -p plans
+
+# Or change in config
+workflow:
+  plans_directory: ./my_plans  # Your custom directory
+```
+
+#### Error: "State file conflict"
+
+**Problem**: `Error: State file is locked (another process is running)`
+
+**Solutions**:
+
+```bash
+# Wait for the other process to complete
+# (Check process list)
+ps aux | grep automation
+
+# Or remove stale lock file
+rm -f .automation/state/*.lock
+
+# Check permissions on state directory
+ls -la .automation/state/
+chmod 755 .automation/state
+```
+
+### Debug Logging
+
+Enable detailed logging to diagnose issues:
+
+```bash
+# Enable debug logging with file output
+automation --log-level DEBUG \
+  --config my_config.yaml \
+  process-issue --issue 42 \
+  > automation-debug.log 2>&1
+
+# View the log
+tail -f automation-debug.log
+
+# Search for errors
+grep ERROR automation-debug.log
+
+# View timing information
+grep -E "(Started|Completed)" automation-debug.log
+```
+
+### Enable Structured Logging
+
+The system uses structured logging (JSON format) for easier analysis:
+
+```bash
+# Logs are automatically formatted as JSON
+# View with jq for pretty printing
+tail -f automation.log | jq '.'
+
+# Filter by log level
+tail -f automation.log | jq 'select(.level=="ERROR")'
+
+# Filter by module
+tail -f automation.log | jq 'select(.module=="orchestrator")'
+```
+
+### Getting Help
+
+When you need assistance:
+
+1. **Check the FAQ** - See docs/FAQ.md for common questions
+2. **Review logs** - Enable debug logging and check error messages
+3. **Test credentials** - Run `automation credentials test`
+4. **Test health** - Run `automation health-check`
+5. **Open an issue** - https://github.com/savorywatt/repo-sapiens/issues
+6. **Check documentation** - https://github.com/savorywatt/repo-sapiens#readme
+
+---
+
+## Next Steps
+
+### Advanced Configuration
+
+Once you're comfortable with the basics, explore:
+
+- **Custom Templates**: Modify plan and prompt templates in `automation/templates/`
+- **Workflow Customization**: Adjust stages and workflow behavior in configuration
+- **Multiple Repositories**: Configure automation for multiple repos simultaneously
+- **Cost Optimization**: Fine-tune AI model selection for cost/quality tradeoff
+- **Monitoring**: Enable Prometheus metrics for production deployments
+
+See: [Advanced Configuration Guide](advanced-config.md)
+
+### CI/CD Integration
+
+Set up automated workflows:
+
+- **GitHub Actions**: Trigger automation on issue events
+- **Gitea Actions**: Native integration with Gitea workflows
+- **GitLab CI**: Schedule automation jobs
+- **Jenkins**: Integrate with Jenkins pipelines
+
+See: [CI/CD Integration Guide](ci-cd-usage.md)
+
+### Template Customization
+
+Customize how plans and prompts are generated:
+
+- **Plan Templates**: Modify `automation/templates/plan.j2`
+- **Prompt Templates**: Modify `automation/templates/prompt.j2`
+- **Custom Stages**: Add custom workflow stages
+- **Custom Tags**: Define custom issue labels and their meaning
+
+See: [Template Customization Guide](template-customization.md)
+
+### Monitoring and Observability
+
+Monitor production deployments:
+
+- **Prometheus Metrics**: Expose metrics for Prometheus scraping
+- **Health Checks**: Automated monitoring endpoints
+- **Alerting**: Set up alerts for failures
+- **Dashboards**: Create dashboards from metrics
+
+See: [Monitoring Guide](monitoring.md)
+
+### Production Deployment
+
+Deploy to production safely:
+
+- **Docker**: Use Docker for containerized deployments
+- **Kubernetes**: Deploy to Kubernetes clusters
+- **Security**: Hardening and security best practices
+- **High Availability**: Multi-instance setup with shared state
+- **Backup & Recovery**: State backup and disaster recovery
+
+See: [Production Deployment Guide](deployment.md)
+
+### API Reference
+
+Integrate with other systems:
+
+- **REST API**: HTTP API for integrations
+- **Event Webhooks**: Custom event processing
+- **Python SDK**: Use repo-sapiens as a library
+- **Plugin System**: Extend functionality with plugins
+
+See: [API Reference](api-reference.md)
+
+---
+
+## Key Resources
+
+- **Homepage**: https://github.com/savorywatt/repo-sapiens
+- **Documentation**: https://github.com/savorywatt/repo-sapiens#readme
+- **Issue Tracker**: https://github.com/savorywatt/repo-sapiens/issues
+- **PyPI Package**: https://pypi.org/project/repo-sapiens/
+- **Discussions**: https://github.com/savorywatt/repo-sapiens/discussions
+
+## Quick Command Reference
+
+```bash
+# Installation
+pip install repo-sapiens
+
+# Basic commands
+automation --help                                # Show all commands
+automation list-plans                            # List active plans
+automation show-plan --plan-id 42               # View plan status
+automation process-issue --issue 42             # Process one issue
+automation process-all                          # Process all issues
+automation daemon --interval 60                 # Run continuous automation
+automation health-check                         # Check system health
+
+# Credentials management
+automation credentials test                     # Verify credentials work
+automation credentials set gitea/api_token      # Store a credential
+automation credentials get gitea/api_token      # Retrieve a credential
+
+# Configuration
+automation --config custom_config.yaml list-plans  # Use custom config
+automation --log-level DEBUG process-issue --issue 42  # Debug logging
+```
+
+## Support
+
+Having trouble? Here's how to get help:
+
+1. **Check the docs** - Most questions are answered in the documentation
+2. **Review logs** - Enable debug logging to see what's happening
+3. **Test credentials** - Run `automation credentials test`
+4. **Health check** - Run `automation health-check`
+5. **Open an issue** - Include logs and your configuration (without secrets!)
+
+---
+
+**Ready to go?** Start with [Quick Start (5 minutes)](#quick-start-5-minutes) above, or see the [Configuration](#configuration) section for detailed setup instructions.
+
+**Have questions?** Check [Troubleshooting](#troubleshooting) or [Getting Help](#getting-help).
+
+**Want advanced features?** Explore [Next Steps](#next-steps) for CI/CD, monitoring, and more.

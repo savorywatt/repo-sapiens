@@ -28,7 +28,7 @@ log = structlog.get_logger(__name__)
 )
 @click.option("--log-level", default="INFO", help="Logging level")
 @click.pass_context
-def cli(ctx: click.Context, config: str, log_level: str) -> None:  # type: ignore[misc]
+def cli(ctx: click.Context, config: str, log_level: str) -> None:
     """Gitea automation system CLI."""
     # Configure logging
     configure_logging(log_level)

@@ -1,0 +1,56 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Run Tests') | safe_label }}
+
+on:
+  push:
+    branches:
+      {% for branch in trigger_branches | default(['main', 'develop']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+  pull_request:
+    branches:
+      {% for branch in pr_branches | default(['main']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+  workflow_dispatch:
+
+{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    strategy:
+      matrix:
+        python-version:
+          {% for version in python_versions | default(['3.11', '3.12']) -%}
+          - '{{ version | safe_identifier }}'
+          {% endfor %}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step(version='${{ matrix.python-version }}') }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[test]
+
+      - name: Run tests with coverage
+        run: |
+          pytest {{ test_path | default('tests/') }} \
+            --cov={{ package_name | safe_identifier }} \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under={{ coverage_threshold | default(80) | int }} \
+            -v
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-${{ '{{' }} matrix.python-version {{ '}}' }}
