@@ -7,9 +7,11 @@ from pathlib import Path
 import click
 import structlog
 
+from automation.cli.credentials import credentials_group
 from automation.config.settings import AutomationSettings
 from automation.engine.orchestrator import WorkflowOrchestrator
 from automation.engine.state_manager import StateManager
+from automation.exceptions import ConfigurationError, RepoSapiensError
 from automation.providers.external_agent import ExternalAgentProvider
 from automation.providers.gitea_rest import GiteaRestProvider
 from automation.utils.interactive import InteractiveQAHandler
@@ -26,7 +28,7 @@ log = structlog.get_logger(__name__)
 )
 @click.option("--log-level", default="INFO", help="Logging level")
 @click.pass_context
-def cli(ctx: click.Context, config: str, log_level: str) -> None:
+def cli(ctx: click.Context, config: str, log_level: str) -> None:  # type: ignore[misc]
     """Gitea automation system CLI."""
     # Configure logging
     configure_logging(log_level)
@@ -39,8 +41,15 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
 
     try:
         settings = AutomationSettings.from_yaml(str(config_path))
+    except ConfigurationError as e:
+        click.echo(f"Error: {e.message}", err=True)
+        log.debug("config_error", exc_info=True)
+        sys.exit(1)
+    except FileNotFoundError as e:
+        raise ConfigurationError(f"Configuration file not found: {config}") from e
     except Exception as e:
-        click.echo(f"Error loading configuration: {e}", err=True)
+        click.echo(f"Unexpected error loading configuration: {e}", err=True)
+        log.error("config_error_unexpected", exc_info=True)
         sys.exit(1)
 
     ctx.obj = {"settings": settings}
@@ -51,17 +60,41 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
 @click.pass_context
 def process_issue(ctx: click.Context, issue: int) -> None:
     """Process a single issue manually."""
-    settings = ctx.obj["settings"]
-    asyncio.run(_process_single_issue(settings, issue))
+    try:
+        settings = ctx.obj["settings"]
+        asyncio.run(_process_single_issue(settings, issue))
+    except RepoSapiensError as e:
+        click.echo(f"Error: {e.message}", err=True)
+        log.debug("process_issue_error", exc_info=True)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        click.echo("\nInterrupted by user", err=True)
+        sys.exit(130)
+    except Exception as e:
+        click.echo(f"Unexpected error: {e}", err=True)
+        log.error("process_issue_unexpected", exc_info=True)
+        sys.exit(1)
 
 
 @cli.command()
 @click.option("--tag", help="Process issues with specific tag")
 @click.pass_context
-def process_all(ctx: click.Context, tag: str) -> None:
+def process_all(ctx: click.Context, tag: str | None) -> None:
     """Process all issues with optional tag filter."""
-    settings = ctx.obj["settings"]
-    asyncio.run(_process_all_issues(settings, tag))
+    try:
+        settings = ctx.obj["settings"]
+        asyncio.run(_process_all_issues(settings, tag))
+    except RepoSapiensError as e:
+        click.echo(f"Error: {e.message}", err=True)
+        log.debug("process_all_error", exc_info=True)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        click.echo("\nInterrupted by user", err=True)
+        sys.exit(130)
+    except Exception as e:
+        click.echo(f"Unexpected error: {e}", err=True)
+        log.error("process_all_unexpected", exc_info=True)
+        sys.exit(1)
 
 
 @cli.command()
@@ -69,8 +102,20 @@ def process_all(ctx: click.Context, tag: str) -> None:
 @click.pass_context
 def process_plan(ctx: click.Context, plan_id: str) -> None:
     """Process entire plan end-to-end."""
-    settings = ctx.obj["settings"]
-    asyncio.run(_process_plan(settings, plan_id))
+    try:
+        settings = ctx.obj["settings"]
+        asyncio.run(_process_plan(settings, plan_id))
+    except RepoSapiensError as e:
+        click.echo(f"Error: {e.message}", err=True)
+        log.debug("process_plan_error", exc_info=True)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        click.echo("\nInterrupted by user", err=True)
+        sys.exit(130)
+    except Exception as e:
+        click.echo(f"Unexpected error: {e}", err=True)
+        log.error("process_plan_unexpected", exc_info=True)
+        sys.exit(1)
 
 
 @cli.command()
@@ -104,6 +149,10 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
     asyncio.run(_show_plan_status(settings, plan_id))
 
 
+# Add credentials management command group
+cli.add_command(credentials_group)
+
+
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:
     """Create and initialize orchestrator.
 
@@ -127,6 +176,7 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
     # Initialize agent provider based on configuration
     if settings.agent_provider.provider_type == "ollama":
         from automation.providers.ollama import OllamaProvider
+
         agent = OllamaProvider(
             base_url=settings.agent_provider.base_url,
             model=settings.agent_provider.model,
@@ -219,23 +269,27 @@ async def _daemon_mode(settings: AutomationSettings, interval: int) -> None:
         interval: Polling interval in seconds
     """
     log.info("daemon_mode_started", interval=interval)
-    click.echo(f"🤖 Starting daemon mode (polling every {interval}s)")
+    click.echo(f"Starting daemon mode (polling every {interval}s)")
 
     orchestrator = await _create_orchestrator(settings)
 
     while True:
         try:
-            click.echo(f"🔄 Polling for issues...")
+            click.echo("Polling for issues...")
             await orchestrator.process_all_issues()
-            click.echo(f"✅ Poll complete. Waiting {interval}s...")
+            click.echo(f"Poll complete. Waiting {interval}s...")
 
         except KeyboardInterrupt:
-            click.echo("\n👋 Shutting down daemon...")
+            click.echo("\nShutting down daemon...")
             break
 
+        except RepoSapiensError as e:
+            log.error("daemon_error", error=e.message, exc_info=True)
+            click.echo(f"Error: {e.message}", err=True)
+
         except Exception as e:
-            log.error("daemon_error", error=str(e), exc_info=True)
-            click.echo(f"❌ Error: {e}", err=True)
+            log.error("daemon_error_unexpected", error=str(e), exc_info=True)
+            click.echo(f"Unexpected error: {e}", err=True)
 
         await asyncio.sleep(interval)
 

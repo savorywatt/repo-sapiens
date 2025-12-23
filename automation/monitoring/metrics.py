@@ -3,11 +3,13 @@ Metrics collection for monitoring workflow performance.
 Integrates with Prometheus for metrics export.
 """
 
-from prometheus_client import Counter, Histogram, Gauge, Info, generate_latest
-from functools import wraps
-from typing import Any, Callable
 import time
+from collections.abc import Callable
+from functools import wraps
+from typing import Any
+
 import structlog
+from prometheus_client import Counter, Gauge, Histogram, Info, generate_latest
 
 log = structlog.get_logger(__name__)
 
@@ -25,9 +27,7 @@ workflow_duration = Histogram(
     buckets=(1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600),
 )
 
-active_workflows = Gauge(
-    "automation_active_workflows", "Number of currently active workflows"
-)
+active_workflows = Gauge("automation_active_workflows", "Number of currently active workflows")
 
 # API call metrics
 api_calls = Counter(
@@ -56,9 +56,7 @@ task_duration = Histogram(
 )
 
 # Error metrics
-errors_total = Counter(
-    "automation_errors_total", "Total errors", ["error_type", "stage"]
-)
+errors_total = Counter("automation_errors_total", "Total errors", ["error_type", "stage"])
 
 recovery_attempts = Counter(
     "automation_recovery_attempts_total",
@@ -76,9 +74,7 @@ estimated_cost = Gauge(
     "automation_estimated_cost_dollars", "Estimated cost in dollars", ["component"]
 )
 
-token_usage = Counter(
-    "automation_token_usage_total", "Total tokens used", ["model", "operation"]
-)
+token_usage = Counter("automation_token_usage_total", "Total tokens used", ["model", "operation"])
 
 # System info
 system_info = Info("automation_system", "Automation system information")
@@ -112,9 +108,7 @@ class MetricsCollector:
     @staticmethod
     def record_recovery_attempt(recovery_type: str, success: bool) -> None:
         """Record recovery attempt."""
-        recovery_attempts.labels(
-            recovery_type=recovery_type, success=str(success)
-        ).inc()
+        recovery_attempts.labels(recovery_type=recovery_type, success=str(success)).inc()
 
     @staticmethod
     def update_active_workflows(count: int) -> None:
@@ -164,7 +158,7 @@ def measure_duration(stage: str) -> Callable[[Callable], Callable]:
             try:
                 result = await func(*args, **kwargs)
                 return result
-            except Exception as e:
+            except Exception:
                 status = "failed"
                 raise
             finally:
@@ -195,14 +189,12 @@ def measure_api_call(provider: str, method: str) -> Callable[[Callable], Callabl
             try:
                 result = await func(*args, **kwargs)
                 return result
-            except Exception as e:
+            except Exception:
                 status = "error"
                 raise
             finally:
                 duration = time.time() - start
-                api_call_duration.labels(provider=provider, method=method).observe(
-                    duration
-                )
+                api_call_duration.labels(provider=provider, method=method).observe(duration)
                 MetricsCollector.record_api_call(provider, method, status)
 
         return wrapper
@@ -222,7 +214,7 @@ def measure_task(task_type: str) -> Callable[[Callable], Callable]:
             try:
                 result = await func(*args, **kwargs)
                 return result
-            except Exception as e:
+            except Exception:
                 status = "failed"
                 raise
             finally:

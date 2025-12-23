@@ -8,7 +8,7 @@ entities of the automation system, including issues, tasks, plans, and reviews.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class IssueState(str, Enum):
@@ -38,7 +38,7 @@ class Issue:
     title: str
     body: str
     state: IssueState
-    labels: List[str]
+    labels: list[str]
     created_at: datetime
     updated_at: datetime
     author: str
@@ -89,8 +89,8 @@ class Task:
     prompt_issue_id: int
     title: str
     description: str
-    dependencies: List[str] = field(default_factory=list)
-    context: Dict[str, Any] = field(default_factory=dict)
+    dependencies: list[str] = field(default_factory=list)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -98,10 +98,10 @@ class TaskResult:
     """Result of executing a task."""
 
     success: bool
-    branch: Optional[str] = None
-    commits: List[str] = field(default_factory=list)
-    files_changed: List[str] = field(default_factory=list)
-    error: Optional[str] = None
+    branch: str | None = None
+    commits: list[str] = field(default_factory=list)
+    files_changed: list[str] = field(default_factory=list)
+    error: str | None = None
     execution_time: float = 0.0
 
 
@@ -112,8 +112,8 @@ class Plan:
     id: str
     title: str
     description: str
-    tasks: List[Task]
-    file_path: Optional[str] = None
+    tasks: list[Task]
+    file_path: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
 
 
@@ -122,7 +122,7 @@ class Review:
     """Code review result."""
 
     approved: bool
-    comments: List[str] = field(default_factory=list)
-    issues_found: List[str] = field(default_factory=list)
-    suggestions: List[str] = field(default_factory=list)
+    comments: list[str] = field(default_factory=list)
+    issues_found: list[str] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
     confidence_score: float = 0.0

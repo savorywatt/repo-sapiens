@@ -1,7 +1,6 @@
 """Helper utility functions."""
 
 import re
-from typing import Any, Dict
 
 
 def slugify(text: str) -> str:
@@ -28,7 +27,7 @@ def slugify(text: str) -> str:
     return text
 
 
-def parse_issue_reference(text: str) -> Dict[str, Any]:
+def parse_issue_reference(text: str) -> dict[str, int]:
     """Parse issue reference from text (e.g., '#42' or 'issue-42').
 
     Args:

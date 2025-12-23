@@ -42,7 +42,7 @@ class PlanningStage(WorkflowStage):
             issue.number,
             "🚀 **Builder Starting**\n\nI'm starting to work on this issue. "
             "I'll generate a development plan and post it for review.\n\n"
-            "🤖 Posted by Builder Automation"
+            "🤖 Posted by Builder Automation",
         )
 
         try:
@@ -84,9 +84,7 @@ class PlanningStage(WorkflowStage):
             )
 
             # Update issue labels
-            labels = [
-                label for label in issue.labels if label != self.settings.tags.needs_planning
-            ]
+            labels = [label for label in issue.labels if label != self.settings.tags.needs_planning]
             labels.append(self.settings.tags.plan_review)
             await self.git.update_issue(issue.number, labels=labels)
 

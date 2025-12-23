@@ -31,16 +31,13 @@ class MergeStage(WorkflowStage):
             state = await self.state.load_state(plan_id)
             tasks_state = state.get("tasks", {})
 
-            all_ready = all(
-                task.get("status") == "merge_ready"
-                for task in tasks_state.values()
-            )
+            all_ready = all(task.get("status") == "merge_ready" for task in tasks_state.values())
 
             if not all_ready:
                 log.warning("not_all_tasks_ready", plan_id=plan_id)
                 await self.git.add_comment(
                     issue.number,
-                    "⏳ Not all tasks are merge-ready yet. Waiting for remaining tasks..."
+                    "⏳ Not all tasks are merge-ready yet. Waiting for remaining tasks...",
                 )
                 return
 
@@ -80,8 +77,7 @@ class MergeStage(WorkflowStage):
             for task_data in tasks_state.values():
                 if task_issue_num := task_data.get("issue_number"):
                     await self.git.add_comment(
-                        task_issue_num,
-                        f"✅ Task included in pull request: {pr_link}"
+                        task_issue_num, f"✅ Task included in pull request: {pr_link}"
                     )
                     await self.git.update_issue(task_issue_num, state="closed")
 
@@ -89,7 +85,7 @@ class MergeStage(WorkflowStage):
             await self.git.add_comment(
                 issue.number,
                 f"🎉 Pull request created: {pr_link}\n\n"
-                f"All tasks have been completed and merged."
+                f"All tasks have been completed and merged.",
             )
             await self.git.update_issue(issue.number, state="closed")
 
@@ -101,7 +97,7 @@ class MergeStage(WorkflowStage):
                     "integration_branch": integration_branch,
                     "pr_number": pr.number,
                     "pr_url": pr.url,
-                }
+                },
             )
 
             log.info("merge_stage_completed", plan_id=plan_id, pr=pr.number)
@@ -114,6 +110,7 @@ class MergeStage(WorkflowStage):
     def _extract_plan_id(self, issue_body: str) -> str:
         """Extract plan ID from issue body."""
         import re
+
         match = re.search(r"plan #(\d+)", issue_body)
         if not match:
             # Try alternative pattern
@@ -139,7 +136,7 @@ This pull request implements the complete development plan #{plan_id}.
 
         # Add task summary
         body += f"- **Total tasks:** {len(tasks_state)}\n"
-        body += f"- **Status:** All tasks completed and reviewed\n"
+        body += "- **Status:** All tasks completed and reviewed\n"
         body += f"- **Branching strategy:** {self.settings.workflow.branching_strategy}\n\n"
 
         # List all tasks

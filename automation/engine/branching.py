@@ -1,7 +1,6 @@
 """Branching strategies for workflow execution."""
 
 from abc import ABC, abstractmethod
-from typing import List
 
 import structlog
 
@@ -42,7 +41,7 @@ class BranchingStrategy(ABC):
     async def create_integration(
         self,
         plan_id: str,
-        task_branches: List[str],
+        task_branches: list[str],
     ) -> str:
         """Create integration branch for merging.
 
@@ -95,7 +94,7 @@ class PerPlanStrategy(BranchingStrategy):
     async def create_integration(
         self,
         plan_id: str,
-        task_branches: List[str],
+        task_branches: list[str],
     ) -> str:
         """Integration branch is the plan branch.
 
@@ -151,7 +150,7 @@ class PerAgentStrategy(BranchingStrategy):
     async def create_integration(
         self,
         plan_id: str,
-        task_branches: List[str],
+        task_branches: list[str],
     ) -> str:
         """Merge all task branches into integration branch.
 

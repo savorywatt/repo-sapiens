@@ -3,11 +3,13 @@ Analytics dashboard for monitoring automation system.
 Provides REST API and HTML dashboard for metrics visualization.
 """
 
+from datetime import datetime, timedelta
+from typing import Any
+
+import structlog
 from fastapi import FastAPI, Response
 from fastapi.responses import HTMLResponse
-from typing import Any, Dict, List
-from datetime import datetime, timedelta
-import structlog
+
 from automation.monitoring.metrics import MetricsCollector
 
 log = structlog.get_logger(__name__)
@@ -210,7 +212,7 @@ async def dashboard() -> str:
 
 
 @app.get("/api/metrics/summary")
-async def metrics_summary() -> Dict[str, Any]:
+async def metrics_summary() -> dict[str, Any]:
     """Get summary metrics."""
     # In a real implementation, would fetch from Prometheus or internal state
     return {
@@ -224,7 +226,7 @@ async def metrics_summary() -> Dict[str, Any]:
 
 
 @app.get("/api/metrics/workflows")
-async def workflow_metrics() -> Dict[str, Any]:
+async def workflow_metrics() -> dict[str, Any]:
     """Get detailed workflow metrics."""
     # Mock data - in production would query actual metrics
     now = datetime.now()
@@ -267,7 +269,7 @@ async def workflow_metrics() -> Dict[str, Any]:
 
 
 @app.get("/api/metrics/tasks")
-async def task_metrics() -> Dict[str, Any]:
+async def task_metrics() -> dict[str, Any]:
     """Get task execution metrics."""
     return {
         "total_tasks": 450,
@@ -284,7 +286,7 @@ async def task_metrics() -> Dict[str, Any]:
 
 
 @app.get("/api/metrics/performance")
-async def performance_metrics() -> Dict[str, Any]:
+async def performance_metrics() -> dict[str, Any]:
     """Get performance metrics."""
     return {
         "cache_stats": {
@@ -312,7 +314,7 @@ async def performance_metrics() -> Dict[str, Any]:
 
 
 @app.get("/api/metrics/costs")
-async def cost_metrics() -> Dict[str, Any]:
+async def cost_metrics() -> dict[str, Any]:
     """Get cost metrics."""
     return {
         "total_estimated_cost": 45.50,
@@ -338,7 +340,7 @@ async def cost_metrics() -> Dict[str, Any]:
 
 
 @app.get("/api/health")
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 

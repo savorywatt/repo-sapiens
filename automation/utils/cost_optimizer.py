@@ -3,9 +3,10 @@ Cost optimization for AI model selection.
 Intelligently selects models based on task complexity to minimize costs.
 """
 
-from typing import Any, Dict, List, Optional
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -28,7 +29,7 @@ class ModelCosts:
 
 
 # Current pricing as of 2025 (example values)
-MODEL_PRICING: Dict[ModelTier, ModelCosts] = {
+MODEL_PRICING: dict[ModelTier, ModelCosts] = {
     ModelTier.FAST: ModelCosts(input_cost=0.25, output_cost=1.25),
     ModelTier.BALANCED: ModelCosts(input_cost=3.00, output_cost=15.00),
     ModelTier.ADVANCED: ModelCosts(input_cost=15.00, output_cost=75.00),
@@ -192,8 +193,8 @@ class CostOptimizer:
         )
 
     async def estimate_cost(
-        self, plan: Any, estimated_tokens: Optional[Dict[str, int]] = None
-    ) -> Dict[str, float]:
+        self, plan: Any, estimated_tokens: dict[str, int] | None = None
+    ) -> dict[str, float]:
         """
         Estimate total cost for plan execution.
 
@@ -257,8 +258,8 @@ class CostOptimizer:
         return costs
 
     def get_cost_savings_recommendations(
-        self, actual_costs: Dict[str, float], estimated_costs: Dict[str, float]
-    ) -> List[str]:
+        self, actual_costs: dict[str, float], estimated_costs: dict[str, float]
+    ) -> list[str]:
         """
         Generate cost savings recommendations.
 
@@ -273,9 +274,7 @@ class CostOptimizer:
 
         # Check if we're over budget
         if actual_costs["total"] > estimated_costs["total"] * 1.2:
-            recommendations.append(
-                "Consider breaking down complex tasks into smaller subtasks"
-            )
+            recommendations.append("Consider breaking down complex tasks into smaller subtasks")
             recommendations.append("Review task descriptions for clarity")
 
         # Check implementation costs
@@ -294,8 +293,7 @@ class CostOptimizer:
         # Check if we're using expensive models too often
         if actual_costs["implementation"] > actual_costs["total"] * 0.8:
             recommendations.append(
-                "High proportion of advanced model usage - "
-                "review task complexity assessments"
+                "High proportion of advanced model usage - " "review task complexity assessments"
             )
 
         return recommendations

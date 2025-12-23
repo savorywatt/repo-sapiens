@@ -60,23 +60,24 @@ class CodeReviewStage(WorkflowStage):
             await self.git.add_comment(issue.number, review_comment)
 
             # 7. Update based on approval
-            if review.approved and review.confidence_score >= self.settings.workflow.review_approval_threshold:
+            if (
+                review.approved
+                and review.confidence_score >= self.settings.workflow.review_approval_threshold
+            ):
                 # Approved - mark as merge-ready
                 labels = [
-                    label for label in issue.labels
-                    if label != self.settings.tags.code_review
+                    label for label in issue.labels if label != self.settings.tags.code_review
                 ]
                 labels.append(self.settings.tags.merge_ready)
                 await self.git.update_issue(issue.number, labels=labels)
 
                 await self.state.mark_task_status(
-                    plan_id,
-                    task_id,
-                    "merge_ready",
-                    {"review_confidence": review.confidence_score}
+                    plan_id, task_id, "merge_ready", {"review_confidence": review.confidence_score}
                 )
 
-                log.info("code_review_approved", task_id=task_id, confidence=review.confidence_score)
+                log.info(
+                    "code_review_approved", task_id=task_id, confidence=review.confidence_score
+                )
 
             else:
                 # Not approved - keep in review or create follow-up
@@ -84,10 +85,12 @@ class CodeReviewStage(WorkflowStage):
                     await self.git.add_comment(
                         issue.number,
                         "❌ Review identified issues that need addressing. "
-                        "Please review the comments above and make necessary changes."
+                        "Please review the comments above and make necessary changes.",
                     )
 
-                log.warning("code_review_rejected", task_id=task_id, confidence=review.confidence_score)
+                log.warning(
+                    "code_review_rejected", task_id=task_id, confidence=review.confidence_score
+                )
 
             # 8. Update state
             await self.state.mark_stage_complete(
@@ -97,7 +100,7 @@ class CodeReviewStage(WorkflowStage):
                     "task_id": task_id,
                     "approved": review.approved,
                     "confidence": review.confidence_score,
-                }
+                },
             )
 
             log.info("code_review_stage_completed", task_id=task_id)
@@ -110,21 +113,27 @@ class CodeReviewStage(WorkflowStage):
     def _extract_task_id(self, issue_body: str) -> str:
         """Extract task ID from issue body."""
         import re
+
         match = re.search(r"Task ID.*:\s*(\S+)", issue_body)
         return match.group(1) if match else ""
 
     def _extract_plan_id(self, issue_body: str) -> str:
         """Extract plan ID from issue body."""
         import re
+
         match = re.search(r"plan #(\d+)", issue_body)
         return match.group(1) if match else ""
 
     def _format_review_comment(self, review: "Review") -> str:
         """Format review results as comment."""
         if review.approved:
-            comment = f"✅ **Code Review: APPROVED** (Confidence: {review.confidence_score:.2%})\n\n"
+            comment = (
+                f"✅ **Code Review: APPROVED** (Confidence: {review.confidence_score:.2%})\n\n"
+            )
         else:
-            comment = f"⚠️ **Code Review: NEEDS CHANGES** (Confidence: {review.confidence_score:.2%})\n\n"
+            comment = (
+                f"⚠️ **Code Review: NEEDS CHANGES** (Confidence: {review.confidence_score:.2%})\n\n"
+            )
 
         if review.comments:
             comment += "## Overall Assessment\n\n"

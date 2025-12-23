@@ -1,12 +1,12 @@
 """Integration tests for full workflow."""
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from automation.engine.orchestrator import WorkflowOrchestrator
-from automation.models.domain import Issue, IssueState, Plan, Task, TaskResult, Review
+from automation.models.domain import Issue, IssueState, Plan, Review, Task, TaskResult
 
 
 @pytest.mark.asyncio

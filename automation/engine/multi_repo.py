@@ -3,10 +3,11 @@ Multi-repository orchestration and coordination.
 Enables workflows across multiple repositories with dependency management.
 """
 
-from typing import Any, Dict, List, Optional
-from enum import Enum
 import asyncio
 import time
+from enum import Enum
+from typing import Any
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -32,9 +33,9 @@ class RepositoryStatus(str, Enum):
 class MultiRepoOrchestrator:
     """Orchestrate workflows across multiple repositories."""
 
-    def __init__(self, repo_configs: List[Dict[str, Any]]) -> None:
-        self.repositories: Dict[str, Dict[str, Any]] = {}
-        self.providers: Dict[str, Any] = {}
+    def __init__(self, repo_configs: list[dict[str, Any]]) -> None:
+        self.repositories: dict[str, dict[str, Any]] = {}
+        self.providers: dict[str, Any] = {}
 
         for config in repo_configs:
             repo_name = config["name"]
@@ -55,8 +56,8 @@ class MultiRepoOrchestrator:
         log.info("provider_registered", repo=repo_name)
 
     async def execute_cross_repo_workflow(
-        self, workflow_name: str, trigger_issue: Any, context: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, workflow_name: str, trigger_issue: Any, context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Execute workflow across multiple repositories."""
         log.info("cross_repo_workflow_started", workflow=workflow_name)
 
@@ -67,22 +68,18 @@ class MultiRepoOrchestrator:
         coordination_mode = CoordinationMode(workflow_config.get("coordination", "sequential"))
 
         if coordination_mode == CoordinationMode.SEQUENTIAL:
-            results = await self._execute_sequential(
-                workflow_config, trigger_issue, context or {}
-            )
+            results = await self._execute_sequential(workflow_config, trigger_issue, context or {})
         else:
-            results = await self._execute_parallel(
-                workflow_config, trigger_issue, context or {}
-            )
+            results = await self._execute_parallel(workflow_config, trigger_issue, context or {})
 
         log.info("cross_repo_workflow_complete", workflow=workflow_name, results=results)
         return results
 
     async def _execute_sequential(
-        self, workflow_config: Dict[str, Any], trigger_issue: Any, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, workflow_config: dict[str, Any], trigger_issue: Any, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute workflow sequentially across repos."""
-        results: Dict[str, Any] = {}
+        results: dict[str, Any] = {}
 
         for repo_name in workflow_config["repositories"]:
             if repo_name not in self.providers:
@@ -103,9 +100,7 @@ class MultiRepoOrchestrator:
                 )
 
                 # Wait for completion
-                completed = await self._wait_for_completion(
-                    provider, issue.number, timeout=3600
-                )
+                completed = await self._wait_for_completion(provider, issue.number, timeout=3600)
 
                 if completed:
                     self.repositories[repo_name]["status"] = RepositoryStatus.COMPLETED
@@ -128,8 +123,8 @@ class MultiRepoOrchestrator:
         return results
 
     async def _execute_parallel(
-        self, workflow_config: Dict[str, Any], trigger_issue: Any, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, workflow_config: dict[str, Any], trigger_issue: Any, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute workflow in parallel across repos."""
         tasks = []
         repo_names = []
@@ -139,9 +134,7 @@ class MultiRepoOrchestrator:
                 log.warning("provider_not_registered", repo=repo_name)
                 continue
 
-            tasks.append(
-                self._execute_repo_workflow(repo_name, trigger_issue, context)
-            )
+            tasks.append(self._execute_repo_workflow(repo_name, trigger_issue, context))
             repo_names.append(repo_name)
 
         # Execute all in parallel
@@ -158,8 +151,8 @@ class MultiRepoOrchestrator:
         return results
 
     async def _execute_repo_workflow(
-        self, repo_name: str, trigger_issue: Any, context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, repo_name: str, trigger_issue: Any, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """Execute workflow for a single repository."""
         provider = self.providers[repo_name]
 
@@ -168,14 +161,10 @@ class MultiRepoOrchestrator:
             self.repositories[repo_name]["status"] = RepositoryStatus.IN_PROGRESS
 
             # Create issue in target repo
-            issue = await self._create_cross_repo_issue(
-                provider, trigger_issue, repo_name, context
-            )
+            issue = await self._create_cross_repo_issue(provider, trigger_issue, repo_name, context)
 
             # Wait for completion
-            completed = await self._wait_for_completion(
-                provider, issue.number, timeout=3600
-            )
+            completed = await self._wait_for_completion(provider, issue.number, timeout=3600)
 
             if completed:
                 self.repositories[repo_name]["status"] = RepositoryStatus.COMPLETED
@@ -190,7 +179,7 @@ class MultiRepoOrchestrator:
             return {"status": "failed", "error": str(e)}
 
     async def _create_cross_repo_issue(
-        self, provider: Any, trigger_issue: Any, repo_name: str, context: Dict[str, Any]
+        self, provider: Any, trigger_issue: Any, repo_name: str, context: dict[str, Any]
     ) -> Any:
         """Create issue in target repository for cross-repo workflow."""
         body = self._create_cross_repo_issue_body(trigger_issue, repo_name, context)
@@ -205,7 +194,7 @@ class MultiRepoOrchestrator:
         return issue
 
     def _create_cross_repo_issue_body(
-        self, trigger_issue: Any, repo_name: str, context: Dict[str, Any]
+        self, trigger_issue: Any, repo_name: str, context: dict[str, Any]
     ) -> str:
         """Create body for cross-repo issue."""
         return f"""# Cross-Repository Workflow
@@ -259,28 +248,28 @@ This issue is part of a multi-repository workflow triggered by:
     def _is_workflow_complete(self, issue: Any) -> bool:
         """Check if workflow is complete based on issue state and labels."""
         # Issue is completed if closed or has 'completed' label
-        if hasattr(issue, 'state') and issue.state == "closed":
+        if hasattr(issue, "state") and issue.state == "closed":
             return True
 
-        if hasattr(issue, 'labels'):
+        if hasattr(issue, "labels"):
             return "completed" in issue.labels or "merged" in issue.labels
 
         return False
 
     def _is_workflow_failed(self, issue: Any) -> bool:
         """Check if workflow has failed."""
-        if hasattr(issue, 'labels'):
+        if hasattr(issue, "labels"):
             return "failed" in issue.labels or "needs-attention" in issue.labels
 
         return False
 
-    def _get_workflow_config(self, workflow_name: str) -> Optional[Dict[str, Any]]:
+    def _get_workflow_config(self, workflow_name: str) -> dict[str, Any] | None:
         """Get workflow configuration by name."""
         # In a real implementation, would load from config file
         # For now, return None
         return None
 
-    async def get_repository_status(self, repo_name: str) -> Dict[str, Any]:
+    async def get_repository_status(self, repo_name: str) -> dict[str, Any]:
         """Get status of a repository in the multi-repo workflow."""
         if repo_name not in self.repositories:
             raise ValueError(f"Unknown repository: {repo_name}")
@@ -293,18 +282,14 @@ This issue is part of a multi-repository workflow triggered by:
             "issues": repo["issues"],
         }
 
-    async def get_overall_status(self) -> Dict[str, Any]:
+    async def get_overall_status(self) -> dict[str, Any]:
         """Get overall status of multi-repo orchestration."""
-        statuses = {
-            name: repo["status"].value for name, repo in self.repositories.items()
-        }
+        statuses = {name: repo["status"].value for name, repo in self.repositories.items()}
 
         all_completed = all(
             status == RepositoryStatus.COMPLETED for status in self.repositories.values()
         )
-        any_failed = any(
-            status == RepositoryStatus.FAILED for status in self.repositories.values()
-        )
+        any_failed = any(status == RepositoryStatus.FAILED for status in self.repositories.values())
 
         overall = "completed" if all_completed else "failed" if any_failed else "in_progress"
 

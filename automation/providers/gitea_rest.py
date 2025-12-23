@@ -1,7 +1,6 @@
 """Gitea provider implementation using direct REST API calls."""
 
 from datetime import datetime
-from typing import List, Optional
 
 import httpx
 import structlog
@@ -31,12 +30,12 @@ class GiteaRestProvider(GitProvider):
             owner: Repository owner
             repo: Repository name
         """
-        self.base_url = base_url.rstrip('/')
+        self.base_url = base_url.rstrip("/")
         self.api_base = f"{self.base_url}/api/v1"
         self.token = token
         self.owner = owner
         self.repo = repo
-        self.client: Optional[httpx.AsyncClient] = None
+        self.client: httpx.AsyncClient | None = None
 
     async def connect(self) -> None:
         """Initialize HTTP client."""
@@ -58,9 +57,9 @@ class GiteaRestProvider(GitProvider):
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_issues(
         self,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
         state: str = "open",
-    ) -> List[Issue]:
+    ) -> list[Issue]:
         """Retrieve issues via REST API."""
         log.info("get_issues", labels=labels, state=state)
 
@@ -91,7 +90,7 @@ class GiteaRestProvider(GitProvider):
         self,
         title: str,
         body: str,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
     ) -> Issue:
         """Create issue via REST API."""
         log.info("create_issue", title=title)
@@ -116,10 +115,10 @@ class GiteaRestProvider(GitProvider):
     async def update_issue(
         self,
         issue_number: int,
-        title: Optional[str] = None,
-        body: Optional[str] = None,
-        state: Optional[str] = None,
-        labels: Optional[List[str]] = None,
+        title: str | None = None,
+        body: str | None = None,
+        state: str | None = None,
+        labels: list[str] | None = None,
     ) -> Issue:
         """Update issue via REST API."""
         log.info("update_issue", issue_number=issue_number)
@@ -127,7 +126,9 @@ class GiteaRestProvider(GitProvider):
         # Update labels separately if provided (Gitea requires PUT to labels endpoint)
         if labels is not None:
             label_ids = await self._get_or_create_label_ids(labels)
-            labels_url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}/labels"
+            labels_url = (
+                f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}/labels"
+            )
             labels_response = await self.client.put(labels_url, json={"labels": label_ids})
             labels_response.raise_for_status()
 
@@ -175,11 +176,12 @@ class GiteaRestProvider(GitProvider):
         response.raise_for_status()
 
         import base64
+
         content_data = response.json()
         return base64.b64decode(content_data["content"]).decode("utf-8")
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_comments(self, issue_number: int) -> List[Comment]:
+    async def get_comments(self, issue_number: int) -> list[Comment]:
         """Get all comments for an issue."""
         log.info("get_comments", issue_number=issue_number)
 
@@ -191,7 +193,7 @@ class GiteaRestProvider(GitProvider):
         return [self._parse_comment(comment_data) for comment_data in comments_data]
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_branch(self, branch_name: str) -> Optional[Branch]:
+    async def get_branch(self, branch_name: str) -> Branch | None:
         """Get branch information."""
         log.info("get_branch", branch=branch_name)
 
@@ -202,17 +204,14 @@ class GiteaRestProvider(GitProvider):
             response.raise_for_status()
 
             branch_data = response.json()
-            return Branch(
-                name=branch_data["name"],
-                sha=branch_data["commit"]["id"]
-            )
+            return Branch(name=branch_data["name"], sha=branch_data["commit"]["id"])
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 return None
             raise
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_diff(self, base: str, head: str, pr_number: Optional[int] = None) -> str:
+    async def get_diff(self, base: str, head: str, pr_number: int | None = None) -> str:
         """Get diff between two branches or for a PR.
 
         Args:
@@ -253,11 +252,7 @@ class GiteaRestProvider(GitProvider):
         log.info("merge_branches", source=source, target=target)
 
         url = f"{self.api_base}/repos/{self.owner}/{self.repo}/branches/{target}/merge"
-        data = {
-            "head": source,
-            "base": target,
-            "message": message
-        }
+        data = {"head": source, "base": target, "message": message}
 
         response = await self.client.post(url, json=data)
         response.raise_for_status()
@@ -274,6 +269,7 @@ class GiteaRestProvider(GitProvider):
         log.info("commit_file", path=path, branch=branch)
 
         import base64
+
         url = f"{self.api_base}/repos/{self.owner}/{self.repo}/contents/{path}"
 
         # Try to get existing file SHA
@@ -282,7 +278,9 @@ class GiteaRestProvider(GitProvider):
             existing = await self.client.get(url, params={"ref": branch})
             if existing.status_code == 200:
                 sha = existing.json().get("sha")
-        except:
+        except (httpx.HTTPError, ValueError) as e:
+            # File doesn't exist yet or response parsing failed, which is fine
+            log.debug("file_not_exists", url=url, error=str(e))
             pass
 
         data = {
@@ -330,7 +328,7 @@ class GiteaRestProvider(GitProvider):
         body: str,
         head: str,
         base: str = "main",
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
     ) -> PullRequest:
         """Create a pull request."""
         log.info("create_pull_request", title=title, head=head, base=base)
@@ -376,7 +374,7 @@ class GiteaRestProvider(GitProvider):
         return self._parse_pull_request(pr_data)
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_pull_request(self, pr_number: int) -> Optional[PullRequest]:
+    async def get_pull_request(self, pr_number: int) -> PullRequest | None:
         """Get a pull request by number.
 
         Args:
@@ -398,7 +396,7 @@ class GiteaRestProvider(GitProvider):
             log.debug("pr_not_found", pr=pr_number, error=str(e))
             return None
 
-    async def _get_or_create_label_ids(self, label_names: List[str]) -> List[int]:
+    async def _get_or_create_label_ids(self, label_names: list[str]) -> list[int]:
         """Get or create labels and return their IDs.
 
         Args:
@@ -427,7 +425,7 @@ class GiteaRestProvider(GitProvider):
                 create_data = {
                     "name": name,
                     "color": "ededed",  # Default gray color
-                    "description": f"Auto-created label: {name}"
+                    "description": f"Auto-created label: {name}",
                 }
                 create_response = await self.client.post(create_url, json=create_data)
                 create_response.raise_for_status()
@@ -436,7 +434,7 @@ class GiteaRestProvider(GitProvider):
 
         return label_ids
 
-    def _parse_issue(self, data: dict) -> Issue:
+    def _parse_issue(self, data: dict[str, any]) -> Issue:
         """Parse issue data from API response."""
         return Issue(
             id=data["id"],
@@ -451,7 +449,7 @@ class GiteaRestProvider(GitProvider):
             url=data["html_url"],
         )
 
-    def _parse_comment(self, data: dict) -> Comment:
+    def _parse_comment(self, data: dict[str, any]) -> Comment:
         """Parse comment data from API response."""
         return Comment(
             id=data["id"],
@@ -460,7 +458,7 @@ class GiteaRestProvider(GitProvider):
             created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
         )
 
-    def _parse_pull_request(self, data: dict) -> PullRequest:
+    def _parse_pull_request(self, data: dict[str, any]) -> PullRequest:
         """Parse pull request data from API response."""
         return PullRequest(
             id=data["id"],

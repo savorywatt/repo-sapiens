@@ -3,10 +3,11 @@ Advanced workflow recovery with multiple strategies.
 Handles different failure types with appropriate recovery mechanisms.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-from enum import Enum
 import asyncio
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Any
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -36,7 +37,7 @@ class RecoveryStrategy(ABC):
         self.recovery = recovery_manager
 
     @abstractmethod
-    async def execute(self, plan_id: str, checkpoint_data: Dict[str, Any]) -> None:
+    async def execute(self, plan_id: str, checkpoint_data: dict[str, Any]) -> None:
         """Execute recovery strategy."""
         pass
 
@@ -50,9 +51,17 @@ class RetryRecoveryStrategy(RecoveryStrategy):
     """Retry with exponential backoff for transient errors."""
 
     def can_handle(self, error_type: ErrorType) -> bool:
+        """Check if strategy can handle the error type.
+
+        Args:
+            error_type: Type of error that occurred
+
+        Returns:
+            True if this strategy handles transient API errors or timeouts
+        """
         return error_type in [ErrorType.TRANSIENT_API_ERROR, ErrorType.TIMEOUT]
 
-    async def execute(self, plan_id: str, checkpoint_data: Dict[str, Any]) -> None:
+    async def execute(self, plan_id: str, checkpoint_data: dict[str, Any]) -> None:
         """Retry the failed operation with exponential backoff."""
         operation = checkpoint_data.get("failed_operation")
         attempt = checkpoint_data.get("retry_attempt", 0)
@@ -74,9 +83,17 @@ class ConflictResolutionStrategy(RecoveryStrategy):
     """Attempt to resolve merge conflicts automatically."""
 
     def can_handle(self, error_type: ErrorType) -> bool:
+        """Check if strategy can handle the error type.
+
+        Args:
+            error_type: Type of error that occurred
+
+        Returns:
+            True if this strategy handles merge conflicts
+        """
         return error_type == ErrorType.MERGE_CONFLICT
 
-    async def execute(self, plan_id: str, checkpoint_data: Dict[str, Any]) -> None:
+    async def execute(self, plan_id: str, checkpoint_data: dict[str, Any]) -> None:
         """Resolve merge conflicts using AI assistance."""
         conflict_info = checkpoint_data.get("conflict_details", {})
         log.info("conflict_resolution", plan_id=plan_id, conflicts=len(conflict_info))
@@ -90,9 +107,17 @@ class TestFixRecoveryStrategy(RecoveryStrategy):
     """Fix failing tests automatically."""
 
     def can_handle(self, error_type: ErrorType) -> bool:
+        """Check if strategy can handle the error type.
+
+        Args:
+            error_type: Type of error that occurred
+
+        Returns:
+            True if this strategy handles test failures
+        """
         return error_type == ErrorType.TEST_FAILURE
 
-    async def execute(self, plan_id: str, checkpoint_data: Dict[str, Any]) -> None:
+    async def execute(self, plan_id: str, checkpoint_data: dict[str, Any]) -> None:
         """Attempt to fix failing tests."""
         test_failures = checkpoint_data.get("test_failures", [])
         log.info("test_fix_recovery", plan_id=plan_id, failure_count=len(test_failures))
@@ -106,9 +131,17 @@ class ManualInterventionStrategy(RecoveryStrategy):
     """Fallback strategy that requires manual intervention."""
 
     def can_handle(self, error_type: ErrorType) -> bool:
+        """Check if strategy can handle the error type.
+
+        Args:
+            error_type: Type of error that occurred
+
+        Returns:
+            True for all error types (fallback strategy)
+        """
         return True  # Can handle any error type as fallback
 
-    async def execute(self, plan_id: str, checkpoint_data: Dict[str, Any]) -> None:
+    async def execute(self, plan_id: str, checkpoint_data: dict[str, Any]) -> None:
         """Create issue for manual intervention."""
         log.warning("manual_intervention_required", plan_id=plan_id)
 
@@ -124,8 +157,8 @@ class AdvancedRecovery:
         self,
         state_manager: Any,
         checkpoint_manager: Any,
-        git_provider: Optional[Any] = None,
-        agent_provider: Optional[Any] = None,
+        git_provider: Any | None = None,
+        agent_provider: Any | None = None,
     ) -> None:
         self.state = state_manager
         self.checkpoint = checkpoint_manager
@@ -165,12 +198,10 @@ class AdvancedRecovery:
             log.error("recovery_failed", plan_id=plan_id, error=str(e), exc_info=True)
             return False
         except Exception as e:
-            log.error(
-                "recovery_exception", plan_id=plan_id, error=str(e), exc_info=True
-            )
+            log.error("recovery_exception", plan_id=plan_id, error=str(e), exc_info=True)
             return False
 
-    def _classify_error(self, checkpoint_data: Dict[str, Any]) -> ErrorType:
+    def _classify_error(self, checkpoint_data: dict[str, Any]) -> ErrorType:
         """Classify the error type from checkpoint data."""
         error_type_str = checkpoint_data.get("error_type")
 
@@ -209,7 +240,7 @@ class AdvancedRecovery:
         plan_id: str,
         stage: str,
         error: Exception,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> str:
         """Create a checkpoint when an error occurs."""
         checkpoint_data = {

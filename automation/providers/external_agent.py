@@ -1,17 +1,13 @@
 """External agent provider that runs Claude Code or Goose as CLI tools."""
 
 import asyncio
-import json
 import os
-import subprocess
-import tempfile
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
+from automation.models.domain import Issue, Plan, Review, Task, TaskResult
 from automation.providers.base import AgentProvider
-from automation.models.domain import Issue, Plan, Task, TaskResult, Review
 
 log = structlog.get_logger(__name__)
 
@@ -23,8 +19,8 @@ class ExternalAgentProvider(AgentProvider):
         self,
         agent_type: str = "claude",
         model: str = "claude-sonnet-4.5",
-        working_dir: Optional[str] = None,
-        qa_handler: Optional[Any] = None,
+        working_dir: str | None = None,
+        qa_handler: Any | None = None,
     ):
         """Initialize external agent provider.
 
@@ -38,7 +34,7 @@ class ExternalAgentProvider(AgentProvider):
         self.model = model
         self.working_dir = working_dir or os.getcwd()
         self.qa_handler = qa_handler
-        self.current_issue_number: Optional[int] = None
+        self.current_issue_number: int | None = None
 
     async def connect(self) -> None:
         """Check if the agent CLI is available."""
@@ -46,7 +42,8 @@ class ExternalAgentProvider(AgentProvider):
 
         try:
             result = await asyncio.create_subprocess_exec(
-                cmd, "--version",
+                cmd,
+                "--version",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -63,9 +60,9 @@ class ExternalAgentProvider(AgentProvider):
     async def execute_prompt(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
-        task_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
         """Execute a prompt using the external agent CLI.
 
         Args:
@@ -103,9 +100,9 @@ class ExternalAgentProvider(AgentProvider):
     async def _execute_claude(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]],
-        task_id: Optional[str],
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None,
+        task_id: str | None,
+    ) -> dict[str, Any]:
         """Execute prompt using Claude Code CLI.
 
         Claude Code runs in the current directory and modifies files directly.
@@ -114,11 +111,7 @@ class ExternalAgentProvider(AgentProvider):
         # Using --print for non-interactive output
         # Using --dangerously-skip-permissions to skip permission dialogs
         # For large prompts, pass via stdin to avoid "Argument list too long" error
-        cmd = [
-            "claude",
-            "--print",
-            "--dangerously-skip-permissions"
-        ]
+        cmd = ["claude", "--print", "--dangerously-skip-permissions"]
 
         log.debug("running_claude", cwd=self.working_dir, prompt_length=len(prompt))
 
@@ -130,20 +123,22 @@ class ExternalAgentProvider(AgentProvider):
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await process.communicate(input=prompt.encode('utf-8'))
+        stdout, stderr = await process.communicate(input=prompt.encode("utf-8"))
 
         success = process.returncode == 0
-        output = stdout.decode('utf-8') if stdout else ""
-        error_output = stderr.decode('utf-8') if stderr else ""
+        output = stdout.decode("utf-8") if stdout else ""
+        error_output = stderr.decode("utf-8") if stderr else ""
 
         # Try to detect which files were changed
         # This is a simple heuristic - in practice you might use git diff
         files_changed = self._detect_changed_files(output)
 
-        log.info("claude_execution_complete",
-                 success=success,
-                 output_length=len(output),
-                 error_length=len(error_output))
+        log.info(
+            "claude_execution_complete",
+            success=success,
+            output_length=len(output),
+            error_length=len(error_output),
+        )
 
         return {
             "success": success,
@@ -155,9 +150,9 @@ class ExternalAgentProvider(AgentProvider):
     async def _execute_goose(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]],
-        task_id: Optional[str],
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None,
+        task_id: str | None,
+    ) -> dict[str, Any]:
         """Execute prompt using Goose CLI.
 
         Goose runs in the current directory and modifies files directly.
@@ -177,8 +172,8 @@ class ExternalAgentProvider(AgentProvider):
         stdout, stderr = await process.communicate()
 
         success = process.returncode == 0
-        output = stdout.decode('utf-8') if stdout else ""
-        error_output = stderr.decode('utf-8') if stderr else ""
+        output = stdout.decode("utf-8") if stdout else ""
+        error_output = stderr.decode("utf-8") if stderr else ""
 
         files_changed = self._detect_changed_files(output)
 
@@ -206,7 +201,7 @@ class ExternalAgentProvider(AgentProvider):
             "Saved:",
         ]
 
-        for line in output.split('\n'):
+        for line in output.split("\n"):
             for pattern in patterns:
                 if pattern in line:
                     # Extract filename after the pattern
@@ -270,13 +265,12 @@ Make each task specific and actionable. Include 3-10 tasks that break down the w
         followed by description text.
         """
         import re
-        from automation.models.domain import Task as TaskModel, TaskStatus
 
         tasks = []
-        lines = markdown.split('\n')
+        lines = markdown.split("\n")
 
         # Pattern: ## 1. Task Title or ## Task 1: Title
-        task_pattern = re.compile(r'^##\s+(\d+)[\.\:]\s+(.+?)$')
+        task_pattern = re.compile(r"^##\s+(\d+)[\.\:]\s+(.+?)$")
 
         current_task = None
         current_desc = []
@@ -286,47 +280,49 @@ Make each task specific and actionable. Include 3-10 tasks that break down the w
             if match:
                 # Save previous task
                 if current_task:
-                    current_task['description'] = '\n'.join(current_desc).strip()
+                    current_task["description"] = "\n".join(current_desc).strip()
                     tasks.append(current_task)
 
                 # Start new task
                 task_num = int(match.group(1))
                 title = match.group(2).strip()
                 current_task = {
-                    'id': f"task-{task_num}",
-                    'title': title,
-                    'number': task_num,
-                    'dependencies': [],
+                    "id": f"task-{task_num}",
+                    "title": title,
+                    "number": task_num,
+                    "dependencies": [],
                 }
                 current_desc = []
-            elif current_task and line.strip() and not line.strip().startswith('#'):
+            elif current_task and line.strip() and not line.strip().startswith("#"):
                 # Accumulate description
                 current_desc.append(line)
 
         # Don't forget the last task
         if current_task:
-            current_task['description'] = '\n'.join(current_desc).strip()
+            current_task["description"] = "\n".join(current_desc).strip()
             tasks.append(current_task)
 
         # Return tasks as simple dicts with consistent structure
         # Convert to proper objects that support attribute access
         class TaskDict(dict):
             """Dict that also supports attribute access."""
+
             def __getattr__(self, key):
                 try:
                     return self[key]
                 except KeyError:
                     raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+
             def __setattr__(self, key, value):
                 self[key] = value
 
         task_objects = []
         for t in tasks:
             task_obj = TaskDict(
-                id=t['id'],
-                title=t['title'],
-                description=t.get('description', ''),
-                dependencies=t.get('dependencies', []),
+                id=t["id"],
+                title=t["title"],
+                description=t.get("description", ""),
+                dependencies=t.get("dependencies", []),
             )
             task_objects.append(task_obj)
 
@@ -429,7 +425,7 @@ Please continue with the task using this information.
             error=result.get("error"),
         )
 
-    def _extract_question(self, output: str) -> Optional[str]:
+    def _extract_question(self, output: str) -> str | None:
         """Extract question from agent output."""
         if "BUILDER_QUESTION:" not in output:
             return None

@@ -1,7 +1,6 @@
 """Task execution stage - implements individual tasks."""
 
 import re
-from typing import Optional
 
 import structlog
 
@@ -41,7 +40,7 @@ class TaskExecutionStage(WorkflowStage):
             return
 
         # Extract task number from title "[TASK 1/7] ..."
-        match = re.match(r'\[TASK (\d+)/(\d+)\]', issue.title)
+        match = re.match(r"\[TASK (\d+)/(\d+)\]", issue.title)
         if not match:
             log.error("cannot_parse_task_number", title=issue.title)
             return
@@ -66,7 +65,12 @@ class TaskExecutionStage(WorkflowStage):
             log.error("cannot_find_plan_label", issue=issue.number)
             return
 
-        log.info("task_execution_starting", task=task_num, original=original_issue_number, plan=plan_label)
+        log.info(
+            "task_execution_starting",
+            task=task_num,
+            original=original_issue_number,
+            plan=plan_label,
+        )
 
         try:
             # Create plan-based branch name (all tasks in same plan go to same branch)
@@ -79,7 +83,7 @@ class TaskExecutionStage(WorkflowStage):
                 f"Branch: `{branch_name}`\n"
                 f"Task: {task_num} of {total_tasks}\n\n"
                 f"I'll implement this task and create a pull request when complete.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             # Create branch
@@ -107,19 +111,26 @@ class TaskExecutionStage(WorkflowStage):
             branch_check = subprocess.run(
                 ["git", "rev-parse", f"origin/{branch_name}"],
                 cwd=playground_dir,
-                capture_output=True
+                capture_output=True,
             )
 
             if branch_check.returncode == 0:
                 # Plan branch exists on remote, check it out and pull latest
                 log.info("plan_branch_exists_on_remote", branch=branch_name)
-                subprocess.run(["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
-                              cwd=playground_dir, check=True)
+                subprocess.run(
+                    ["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
+                    cwd=playground_dir,
+                    check=True,
+                )
             else:
                 # Plan branch doesn't exist yet, create from base branch
                 log.info("creating_new_plan_branch", branch=branch_name, base=base_branch)
-                subprocess.run(["git", "checkout", f"origin/{base_branch}"], cwd=playground_dir, check=True)
-                subprocess.run(["git", "checkout", "-B", branch_name], cwd=playground_dir, check=True)
+                subprocess.run(
+                    ["git", "checkout", f"origin/{base_branch}"], cwd=playground_dir, check=True
+                )
+                subprocess.run(
+                    ["git", "checkout", "-B", branch_name], cwd=playground_dir, check=True
+                )
 
             log.info("branch_checked_out", branch=branch_name)
 
@@ -151,6 +162,7 @@ class TaskExecutionStage(WorkflowStage):
             try:
                 # Create task object for agent
                 from automation.models.domain import Task
+
                 task = Task(
                     id=f"task-{issue.number}",
                     prompt_issue_id=issue.number,
@@ -179,7 +191,7 @@ class TaskExecutionStage(WorkflowStage):
                     cwd=playground_dir,
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
 
                 if status_result.stdout.strip():
@@ -189,9 +201,15 @@ class TaskExecutionStage(WorkflowStage):
                     task_title_lower = task_title.lower()
 
                     # Determine commit type based on task title
-                    if "setup" in task_title_lower or "structure" in task_title_lower or "initialize" in task_title_lower:
-                        commit_type = "feat"
-                    elif "implement" in task_title_lower or "add" in task_title_lower or "create" in task_title_lower:
+                    if (
+                        "setup" in task_title_lower
+                        or "structure" in task_title_lower
+                        or "initialize" in task_title_lower
+                    ) or (
+                        "implement" in task_title_lower
+                        or "add" in task_title_lower
+                        or "create" in task_title_lower
+                    ):
                         commit_type = "feat"
                     elif "fix" in task_title_lower or "bug" in task_title_lower:
                         commit_type = "fix"
@@ -206,16 +224,12 @@ class TaskExecutionStage(WorkflowStage):
 
                     commit_message = f"{commit_type}: {task_title} [TASK-{issue.number}]\n\nTask {task_num}/{total_tasks} for {plan_label}\nOriginal issue: #{original_issue_number}"
                     subprocess.run(
-                        ["git", "commit", "-m", commit_message],
-                        cwd=playground_dir,
-                        check=True
+                        ["git", "commit", "-m", commit_message], cwd=playground_dir, check=True
                     )
 
                     # Push to remote
                     subprocess.run(
-                        ["git", "push", "origin", branch_name],
-                        cwd=playground_dir,
-                        check=True
+                        ["git", "push", "origin", branch_name], cwd=playground_dir, check=True
                     )
 
                     log.info("changes_committed_and_pushed", branch=branch_name)
@@ -235,7 +249,9 @@ class TaskExecutionStage(WorkflowStage):
             # Create or get pull request (plan-based, shared across all tasks)
             # Do this AFTER updating issue labels so the checklist reflects the completed task
             pr_title = f"{plan_label.replace('plan-', 'Plan #')}: {original_issue.title}"
-            pr_body = await self._format_plan_pr_body(plan_label, original_issue, task_num, total_tasks)
+            pr_body = await self._format_plan_pr_body(
+                plan_label, original_issue, task_num, total_tasks
+            )
 
             pr = await self.git.create_pull_request(
                 title=pr_title,
@@ -257,7 +273,7 @@ class TaskExecutionStage(WorkflowStage):
                 f"- Review the pull request\n"
                 f"- Merge when satisfied, or comment for changes\n"
                 f"- Task will be closed automatically when PR is merged\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             log.info("task_execution_complete", task=task_num, pr=pr.number)
@@ -269,13 +285,13 @@ class TaskExecutionStage(WorkflowStage):
                 f"❌ **Task Execution Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
             raise
 
-    def _extract_original_issue(self, body: str) -> Optional[int]:
+    def _extract_original_issue(self, body: str) -> int | None:
         """Extract original issue number from task body."""
-        match = re.search(r'\*\*Original Issue\*\*: #(\d+)', body)
+        match = re.search(r"\*\*Original Issue\*\*: #(\d+)", body)
         if match:
             return int(match.group(1))
         return None
@@ -283,7 +299,7 @@ class TaskExecutionStage(WorkflowStage):
     def _extract_description(self, body: str) -> str:
         """Extract task description from body."""
         # Find "## Description" section
-        match = re.search(r'## Description\s+(.+?)(?=\s+##|\Z)', body, re.DOTALL)
+        match = re.search(r"## Description\s+(.+?)(?=\s+##|\Z)", body, re.DOTALL)
         if match:
             return match.group(1).strip()
         return body
@@ -291,27 +307,29 @@ class TaskExecutionStage(WorkflowStage):
     def _extract_dependencies(self, body: str) -> list:
         """Extract dependencies from task body."""
         dependencies = []
-        match = re.search(r'## Dependencies\s+(.+?)(?=\s+##|\Z)', body, re.DOTALL)
+        match = re.search(r"## Dependencies\s+(.+?)(?=\s+##|\Z)", body, re.DOTALL)
         if match:
             dep_section = match.group(1)
             # Find all lines starting with "-"
-            for line in dep_section.split('\n'):
+            for line in dep_section.split("\n"):
                 line = line.strip()
-                if line.startswith('-'):
+                if line.startswith("-"):
                     dependencies.append(line[1:].strip())
         return dependencies
 
     def _slugify(self, text: str) -> str:
         """Convert text to slug format."""
         # Remove [TASK N/M] prefix if present
-        text = re.sub(r'\[TASK \d+/\d+\]\s*', '', text)
+        text = re.sub(r"\[TASK \d+/\d+\]\s*", "", text)
         # Convert to lowercase and replace spaces/special chars with hyphens
         text = text.lower()
-        text = re.sub(r'[^\w\s-]', '', text)
-        text = re.sub(r'[-\s]+', '-', text)
+        text = re.sub(r"[^\w\s-]", "", text)
+        text = re.sub(r"[-\s]+", "-", text)
         return text[:50]  # Limit length
 
-    async def _format_plan_pr_body(self, plan_label: str, original_issue: Issue, current_task_num: str, total_tasks: str) -> str:
+    async def _format_plan_pr_body(
+        self, plan_label: str, original_issue: Issue, current_task_num: str, total_tasks: str
+    ) -> str:
         """Format pull request body for plan implementation.
 
         Shows all tasks and their completion status.
@@ -322,7 +340,7 @@ class TaskExecutionStage(WorkflowStage):
         # Sort by task number
         task_issues = []
         for issue in all_issues:
-            match = re.match(r'\[TASK (\d+)/(\d+)\]', issue.title)
+            match = re.match(r"\[TASK (\d+)/(\d+)\]", issue.title)
             if match:
                 task_issues.append((int(match.group(1)), issue))
 
@@ -344,26 +362,28 @@ class TaskExecutionStage(WorkflowStage):
             task_title = task_issue.title.replace(f"[TASK {task_num}/{total_tasks}] ", "")
             lines.append(f"- [{checkbox}] Task {task_num}: {task_title} (#{task_issue.number})")
 
-        lines.extend([
-            "",
-            "## Implementation Notes",
-            "",
-            "This PR implements the full plan with all tasks committed to a single branch.",
-            "Each task is implemented sequentially and committed separately for easy review.",
-            "",
-            "---",
-            "",
-            f"**Related Issues**: Implements #{original_issue.number}",
-            "",
-            "🤖 Posted by Builder Automation",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Implementation Notes",
+                "",
+                "This PR implements the full plan with all tasks committed to a single branch.",
+                "Each task is implemented sequentially and committed separately for easy review.",
+                "",
+                "---",
+                "",
+                f"**Related Issues**: Implements #{original_issue.number}",
+                "",
+                "🤖 Posted by Builder Automation",
+            ]
+        )
 
         return "\n".join(lines)
 
     def _format_pr_body(self, task_issue: Issue, original_issue: Issue, result) -> str:
         """Format pull request body."""
         lines = [
-            f"# Task Implementation",
+            "# Task Implementation",
             "",
             f"**Task Issue**: #{task_issue.number}",
             f"**Original Issue**: #{original_issue.number} - {original_issue.title}",
@@ -376,29 +396,33 @@ class TaskExecutionStage(WorkflowStage):
 
         dependencies = self._extract_dependencies(task_issue.body)
         if dependencies:
-            lines.extend([
-                "## Dependencies",
-                "",
-                "This task required:",
-            ])
+            lines.extend(
+                [
+                    "## Dependencies",
+                    "",
+                    "This task required:",
+                ]
+            )
             for dep in dependencies:
                 lines.append(f"- {dep}")
             lines.append("")
 
-        lines.extend([
-            "## Implementation",
-            "",
-            "This PR implements the task as specified.",
-            "",
-            "## Testing",
-            "",
-            "Please review and test the implementation.",
-            "",
-            "---",
-            "",
-            f"**Related Issues**: Closes #{task_issue.number}, Implements #{original_issue.number}",
-            "",
-            "🤖 Posted by Builder Automation",
-        ])
+        lines.extend(
+            [
+                "## Implementation",
+                "",
+                "This PR implements the task as specified.",
+                "",
+                "## Testing",
+                "",
+                "Please review and test the implementation.",
+                "",
+                "---",
+                "",
+                f"**Related Issues**: Closes #{task_issue.number}, Implements #{original_issue.number}",
+                "",
+                "🤖 Posted by Builder Automation",
+            ]
+        )
 
         return "\n".join(lines)

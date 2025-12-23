@@ -1,7 +1,6 @@
 """Status reporting for posting updates to issues."""
 
 from datetime import datetime
-from typing import Optional
 
 import structlog
 
@@ -13,7 +12,7 @@ class StatusReporter:
 
     def __init__(self, git):
         """Initialize with git provider.
-        
+
         Args:
             git: GitProvider instance
         """
@@ -21,7 +20,7 @@ class StatusReporter:
 
     async def report_stage_start(self, issue, stage: str) -> None:
         """Report that stage has started.
-        
+
         Args:
             issue: Issue object
             stage: Stage name
@@ -35,11 +34,9 @@ Started: {datetime.now().isoformat()}
         await self.git.add_comment(issue.number, message.strip())
         log.info("status_reported", issue=issue.number, stage=stage, status="started")
 
-    async def report_stage_complete(
-        self, issue, stage: str, details: Optional[str] = None
-    ) -> None:
+    async def report_stage_complete(self, issue, stage: str, details: str | None = None) -> None:
         """Report that stage completed successfully.
-        
+
         Args:
             issue: Issue object
             stage: Stage name
@@ -58,7 +55,7 @@ Completed: {datetime.now().isoformat()}
 
     async def report_stage_failed(self, issue, stage: str, error: str) -> None:
         """Report that stage failed.
-        
+
         Args:
             issue: Issue object
             stage: Stage name

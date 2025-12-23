@@ -3,11 +3,12 @@ Checkpoint management for workflow recovery.
 Provides save points to resume workflows after failures.
 """
 
-from typing import Dict, Any, Optional
-from pathlib import Path
-from datetime import datetime
-import json
 import asyncio
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -19,7 +20,7 @@ class CheckpointManager:
     def __init__(self, checkpoint_dir: str = ".automation/checkpoints") -> None:
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        self._locks: Dict[str, asyncio.Lock] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
 
     def _get_lock(self, plan_id: str) -> asyncio.Lock:
         """Get or create lock for plan."""
@@ -28,7 +29,7 @@ class CheckpointManager:
         return self._locks[plan_id]
 
     async def create_checkpoint(
-        self, plan_id: str, stage: str, checkpoint_data: Dict[str, Any]
+        self, plan_id: str, stage: str, checkpoint_data: dict[str, Any]
     ) -> str:
         """Create a recovery checkpoint."""
         checkpoint_id = f"{plan_id}-{stage}-{int(datetime.now().timestamp())}"
@@ -49,8 +50,8 @@ class CheckpointManager:
         return checkpoint_id
 
     async def get_latest_checkpoint(
-        self, plan_id: str, stage: Optional[str] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, plan_id: str, stage: str | None = None
+    ) -> dict[str, Any] | None:
         """Get the most recent checkpoint for a plan."""
         pattern = f"{plan_id}-{stage}-*" if stage else f"{plan_id}-*"
         checkpoints = sorted(self.checkpoint_dir.glob(f"{pattern}.json"), reverse=True)
@@ -62,7 +63,7 @@ class CheckpointManager:
         log.info("checkpoint_loaded", checkpoint_id=checkpoint_data["checkpoint_id"])
         return checkpoint_data
 
-    async def get_all_checkpoints(self, plan_id: str) -> list[Dict[str, Any]]:
+    async def get_all_checkpoints(self, plan_id: str) -> list[dict[str, Any]]:
         """Get all checkpoints for a plan, ordered by creation time."""
         checkpoints = sorted(self.checkpoint_dir.glob(f"{plan_id}-*.json"), reverse=True)
         return [json.loads(cp.read_text()) for cp in checkpoints]

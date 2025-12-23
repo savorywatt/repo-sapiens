@@ -1,13 +1,13 @@
 """Tests for domain models."""
 
 from datetime import datetime
+
 from automation.models.domain import (
     Issue,
     IssueState,
-    Task,
-    TaskStatus,
     Plan,
     Review,
+    Task,
 )
 
 

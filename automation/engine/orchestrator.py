@@ -1,13 +1,10 @@
 """Workflow orchestrator for managing automation pipeline."""
 
 import asyncio
-from typing import List, Optional
 
 import structlog
 
 from automation.config.settings import AutomationSettings
-from automation.engine.state_manager import StateManager
-from automation.engine.stages.base import WorkflowStage
 from automation.engine.stages.approval import ApprovalStage
 from automation.engine.stages.code_review import CodeReviewStage
 from automation.engine.stages.execution import TaskExecutionStage
@@ -20,6 +17,7 @@ from automation.engine.stages.pr_fix import PRFixStage
 from automation.engine.stages.pr_review import PRReviewStage
 from automation.engine.stages.proposal import ProposalStage
 from automation.engine.stages.qa import QAStage
+from automation.engine.state_manager import StateManager
 from automation.models.domain import Issue, Task
 from automation.processors.dependency_tracker import DependencyTracker
 from automation.providers.base import AgentProvider, GitProvider
@@ -72,7 +70,7 @@ class WorkflowOrchestrator:
             "merge": MergeStage(git, agent, state, settings),
         }
 
-    async def process_all_issues(self, tag: Optional[str] = None) -> None:
+    async def process_all_issues(self, tag: str | None = None) -> None:
         """Process all open issues, optionally filtered by tag.
 
         Args:
@@ -177,7 +175,7 @@ class WorkflowOrchestrator:
 
         log.info("plan_processing_completed", plan_id=plan_id)
 
-    async def execute_parallel_tasks(self, tasks: List[Task], plan_id: str) -> None:
+    async def execute_parallel_tasks(self, tasks: list[Task], plan_id: str) -> None:
         """Execute tasks in parallel respecting dependencies.
 
         Uses dependency tracker to determine execution order and runs
@@ -218,9 +216,7 @@ class WorkflowOrchestrator:
                     break
 
                 # No ready tasks but still pending - shouldn't happen after validation
-                raise RuntimeError(
-                    f"Deadlock detected in task execution for plan {plan_id}"
-                )
+                raise RuntimeError(f"Deadlock detected in task execution for plan {plan_id}")
 
             # Execute ready tasks in parallel (up to max_concurrent_tasks)
             max_concurrent = self.settings.workflow.max_concurrent_tasks
@@ -284,7 +280,7 @@ class WorkflowOrchestrator:
         # Execute code review stage
         await self.stages["code_review"].execute(issue)
 
-    def _determine_stage(self, issue: Issue) -> Optional[str]:
+    def _determine_stage(self, issue: Issue) -> str | None:
         """Determine which stage to execute based on issue labels.
 
         Args:

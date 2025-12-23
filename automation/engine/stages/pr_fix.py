@@ -1,8 +1,5 @@
 """PR fix stage - creates fix proposal from review comments."""
 
-import re
-from typing import Optional
-
 import structlog
 
 from automation.engine.stages.base import WorkflowStage
@@ -52,10 +49,10 @@ class PRFixStage(WorkflowStage):
                 log.warning("no_review_comment_found", issue=issue.number)
                 await self.git.add_comment(
                     issue.number,
-                    f"⚠️ **No Review Feedback Found**\n\n"
-                    f"Cannot create fix proposal without review comments.\n"
-                    f"Please ensure the PR has been reviewed first.\n\n"
-                    f"🤖 Posted by Builder Automation"
+                    "⚠️ **No Review Feedback Found**\n\n"
+                    "Cannot create fix proposal without review comments.\n"
+                    "Please ensure the PR has been reviewed first.\n\n"
+                    "🤖 Posted by Builder Automation",
                 )
                 return
 
@@ -79,16 +76,13 @@ class PRFixStage(WorkflowStage):
             # Create fix proposal issue
             fix_issue_title = f"[FIX PROPOSAL] Address review feedback for PR #{pr_number}"
             fix_issue_body = self._format_fix_proposal(
-                pr_number,
-                pr_title,
-                branch_name,
-                review_comment.body
+                pr_number, pr_title, branch_name, review_comment.body
             )
 
             fix_issue = await self.git.create_issue(
                 title=fix_issue_title,
                 body=fix_issue_body,
-                labels=["fix-proposal", plan_label, "awaiting-approval"]
+                labels=["fix-proposal", plan_label, "awaiting-approval"],
             )
 
             log.info("fix_proposal_created", fix_issue=fix_issue.number, pr=pr_number)
@@ -99,7 +93,7 @@ class PRFixStage(WorkflowStage):
                 f"🔧 **Fix Proposal Created**\n\n"
                 f"Created fix proposal: #{fix_issue.number}\n\n"
                 f"Review the proposal and add `approved` label to proceed with fixes.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             # Update labels
@@ -114,16 +108,12 @@ class PRFixStage(WorkflowStage):
                 f"❌ **Fix Proposal Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please try again.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
             raise
 
     def _format_fix_proposal(
-        self,
-        pr_number: int,
-        pr_title: str,
-        branch_name: str,
-        review_feedback: str
+        self, pr_number: int, pr_title: str, branch_name: str, review_feedback: str
     ) -> str:
         """Format fix proposal issue body."""
         lines = [

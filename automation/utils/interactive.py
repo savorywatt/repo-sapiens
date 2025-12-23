@@ -2,7 +2,6 @@
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional
 
 import structlog
 
@@ -28,9 +27,9 @@ class InteractiveQAHandler:
         self,
         issue_number: int,
         question: str,
-        context: Optional[str] = None,
+        context: str | None = None,
         timeout_minutes: int = 60,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Post a question to the issue and wait for user response.
 
         Args:
@@ -101,7 +100,7 @@ class InteractiveQAHandler:
         issue_number: int,
         task_name: str,
         status: str,
-        details: Optional[str] = None,
+        details: str | None = None,
     ) -> None:
         """Report progress on a task to the issue.
 
@@ -116,7 +115,7 @@ class InteractiveQAHandler:
         message = self._format_progress_report(task_name, status, details)
         await self.git.add_comment(issue_number, message)
 
-    def _format_question(self, question: str, context: Optional[str]) -> str:
+    def _format_question(self, question: str, context: str | None) -> str:
         """Format a question for posting."""
         parts = [
             "## 🤔 Builder Question",
@@ -127,18 +126,22 @@ class InteractiveQAHandler:
         ]
 
         if context:
-            parts.extend([
-                "",
-                f"**Context:** {context}",
-            ])
+            parts.extend(
+                [
+                    "",
+                    f"**Context:** {context}",
+                ]
+            )
 
-        parts.extend([
-            "",
-            "---",
-            "*Please reply to this comment with your answer. The agent will continue once you respond.*",
-            "",
-            "🤖 Posted by Builder Automation",
-        ])
+        parts.extend(
+            [
+                "",
+                "---",
+                "*Please reply to this comment with your answer. The agent will continue once you respond.*",
+                "",
+                "🤖 Posted by Builder Automation",
+            ]
+        )
 
         return "\n".join(parts)
 
@@ -159,7 +162,7 @@ class InteractiveQAHandler:
         self,
         task_name: str,
         status: str,
-        details: Optional[str],
+        details: str | None,
     ) -> str:
         """Format a progress report."""
         status_icons = {
@@ -180,15 +183,19 @@ class InteractiveQAHandler:
         ]
 
         if details:
-            parts.extend([
-                "",
-                f"**Details:** {details}",
-            ])
+            parts.extend(
+                [
+                    "",
+                    f"**Details:** {details}",
+                ]
+            )
 
-        parts.extend([
-            "",
-            "🤖 Posted by Builder Automation",
-        ])
+        parts.extend(
+            [
+                "",
+                "🤖 Posted by Builder Automation",
+            ]
+        )
 
         return "\n".join(parts)
 

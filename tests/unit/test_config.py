@@ -1,7 +1,5 @@
 """Tests for configuration."""
 
-import os
-import pytest
 from automation.config.settings import AutomationSettings
 
 

@@ -3,12 +3,14 @@ Caching layer for performance optimization.
 Provides async cache with TTL support and function decorators.
 """
 
-from functools import wraps
-from typing import Any, Callable, Dict, Optional, TypeVar, cast
+import asyncio
 import hashlib
 import json
-import asyncio
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from functools import wraps
+from typing import Any, TypeVar
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -20,14 +22,14 @@ class AsyncCache:
     """Async cache with TTL support."""
 
     def __init__(self, ttl_seconds: int = 300, max_size: int = 1000) -> None:
-        self._cache: Dict[str, tuple[Any, datetime]] = {}
+        self._cache: dict[str, tuple[Any, datetime]] = {}
         self._ttl = timedelta(seconds=ttl_seconds)
         self._max_size = max_size
         self._lock = asyncio.Lock()
         self._hits = 0
         self._misses = 0
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache."""
         async with self._lock:
             if key in self._cache:
@@ -81,7 +83,7 @@ class AsyncCache:
         del self._cache[oldest_key]
         log.debug("cache_evicted", key=oldest_key)
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total_requests = self._hits + self._misses
         hit_rate = self._hits / total_requests if total_requests > 0 else 0.0
@@ -120,9 +122,7 @@ def cached(ttl_seconds: int = 300, key_prefix: str = "") -> Callable[[Callable],
                 "args": str(args),  # Simple string representation
                 "kwargs": str(sorted(kwargs.items())),
             }
-            key = hashlib.md5(
-                json.dumps(key_data, sort_keys=True).encode()
-            ).hexdigest()
+            key = hashlib.md5(json.dumps(key_data, sort_keys=True).encode()).hexdigest()
 
             # Try cache first
             cached_value = await cache.get(key)
@@ -160,7 +160,7 @@ class CacheManager:
     """Manage multiple named caches."""
 
     def __init__(self) -> None:
-        self._caches: Dict[str, AsyncCache] = {}
+        self._caches: dict[str, AsyncCache] = {}
         self._lock = asyncio.Lock()
 
     async def get_cache(
@@ -181,7 +181,7 @@ class CacheManager:
                 await cache.clear()
             log.info("all_caches_cleared", count=len(self._caches))
 
-    async def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+    async def get_all_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all caches."""
         stats = {}
         for name, cache in self._caches.items():

@@ -1,14 +1,11 @@
 """Ollama provider for local AI inference."""
 
-import asyncio
-import json
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 import structlog
 
-from automation.models.domain import Issue, Plan, Task, TaskResult, Review
+from automation.models.domain import Issue, Plan, Review, Task, TaskResult
 from automation.providers.base import AgentProvider
 
 log = structlog.get_logger(__name__)
@@ -21,8 +18,8 @@ class OllamaProvider(AgentProvider):
         self,
         base_url: str = "http://localhost:11434",
         model: str = "llama3.1:8b",
-        working_dir: Optional[str] = None,
-        qa_handler: Optional[Any] = None,
+        working_dir: str | None = None,
+        qa_handler: Any | None = None,
     ):
         """Initialize Ollama provider.
 
@@ -36,7 +33,7 @@ class OllamaProvider(AgentProvider):
         self.model = model
         self.working_dir = working_dir or "."
         self.qa_handler = qa_handler
-        self.current_issue_number: Optional[int] = None
+        self.current_issue_number: int | None = None
         self.client = httpx.AsyncClient(timeout=300.0)  # 5 minute timeout
 
     async def connect(self) -> None:
@@ -57,7 +54,7 @@ class OllamaProvider(AgentProvider):
                     "model_not_found",
                     model=self.model,
                     available=model_names,
-                    message=f"Model {self.model} not found. Run: ollama pull {self.model}"
+                    message=f"Model {self.model} not found. Run: ollama pull {self.model}",
                 )
             else:
                 log.info("ollama_model_ready", model=self.model)
@@ -65,8 +62,7 @@ class OllamaProvider(AgentProvider):
         except httpx.ConnectError:
             log.error("ollama_not_running", url=self.base_url)
             raise RuntimeError(
-                f"Ollama not running at {self.base_url}. "
-                "Start it with: ollama serve"
+                f"Ollama not running at {self.base_url}. " "Start it with: ollama serve"
             )
         except Exception as e:
             log.error("ollama_connection_failed", error=str(e))
@@ -75,9 +71,9 @@ class OllamaProvider(AgentProvider):
     async def execute_prompt(
         self,
         prompt: str,
-        context: Optional[Dict[str, Any]] = None,
-        task_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
         """Execute a prompt using Ollama.
 
         Args:
@@ -101,7 +97,7 @@ class OllamaProvider(AgentProvider):
                     "options": {
                         "temperature": 0.7,
                         "top_p": 0.9,
-                    }
+                    },
                 },
             )
             response.raise_for_status()
@@ -113,7 +109,7 @@ class OllamaProvider(AgentProvider):
                 "prompt_executed",
                 task_id=task_id,
                 output_length=len(output),
-                tokens=result.get("eval_count", 0)
+                tokens=result.get("eval_count", 0),
             )
 
             return {
@@ -149,7 +145,7 @@ class OllamaProvider(AgentProvider):
             "File:",
         ]
 
-        for line in output.split('\n'):
+        for line in output.split("\n"):
             for pattern in patterns:
                 if pattern in line:
                     # Extract filename after the pattern
@@ -221,10 +217,10 @@ IMPORTANT:
         import re
 
         tasks = []
-        lines = markdown.split('\n')
+        lines = markdown.split("\n")
 
         # Pattern: ## 1. Task Title or ## Task 1: Title
-        task_pattern = re.compile(r'^##\s+(\d+)[\.\:]\s+(.+?)$')
+        task_pattern = re.compile(r"^##\s+(\d+)[\.\:]\s+(.+?)$")
 
         current_task = None
         current_desc = []
@@ -234,26 +230,26 @@ IMPORTANT:
             if match:
                 # Save previous task
                 if current_task:
-                    current_task['description'] = '\n'.join(current_desc).strip()
+                    current_task["description"] = "\n".join(current_desc).strip()
                     tasks.append(current_task)
 
                 # Start new task
                 task_num = int(match.group(1))
                 title = match.group(2).strip()
                 current_task = {
-                    'id': f"task-{task_num}",
-                    'title': title,
-                    'number': task_num,
-                    'dependencies': [],
+                    "id": f"task-{task_num}",
+                    "title": title,
+                    "number": task_num,
+                    "dependencies": [],
                 }
                 current_desc = []
-            elif current_task and line.strip() and not line.strip().startswith('#'):
+            elif current_task and line.strip() and not line.strip().startswith("#"):
                 # Accumulate description
                 current_desc.append(line)
 
         # Don't forget the last task
         if current_task:
-            current_task['description'] = '\n'.join(current_desc).strip()
+            current_task["description"] = "\n".join(current_desc).strip()
             tasks.append(current_task)
 
         # Convert to task objects with attribute access
@@ -263,16 +259,17 @@ IMPORTANT:
                     return self[key]
                 except KeyError:
                     raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+
             def __setattr__(self, key, value):
                 self[key] = value
 
         task_objects = []
         for t in tasks:
             task_obj = TaskDict(
-                id=t['id'],
-                title=t['title'],
-                description=t.get('description', ''),
-                dependencies=t.get('dependencies', []),
+                id=t["id"],
+                title=t["title"],
+                description=t.get("description", ""),
+                dependencies=t.get("dependencies", []),
             )
             task_objects.append(task_obj)
 
@@ -374,7 +371,7 @@ Start your response with either "APPROVE" or "REQUEST_CHANGES".
         output = result.get("output", "")
 
         # Check if approved
-        approved = "APPROVE" in output.upper().split('\n')[0]
+        approved = "APPROVE" in output.upper().split("\n")[0]
 
         return Review(
             approved=approved,
@@ -411,7 +408,7 @@ Provide the resolved content without conflict markers (<<<<<<, ======, >>>>>>).
 
         For Ollama, we can use the tasks already parsed from the plan.
         """
-        return plan.tasks if hasattr(plan, 'tasks') else []
+        return plan.tasks if hasattr(plan, "tasks") else []
 
     async def __aenter__(self):
         """Async context manager entry."""

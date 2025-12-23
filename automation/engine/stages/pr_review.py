@@ -1,7 +1,6 @@
 """PR review stage - performs code review on pull requests."""
 
 import re
-from typing import Optional
 
 import structlog
 
@@ -59,7 +58,7 @@ class PRReviewStage(WorkflowStage):
                 f"Reviewing PR #{pr.number}\n"
                 f"Branch: `{pr.head}`\n\n"
                 f"I'll analyze the code and provide feedback.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             # Build context for agent
@@ -128,9 +127,9 @@ Be constructive and specific in your feedback.
                 # No issues found
                 await self.git.add_comment(
                     issue.number,
-                    f"✅ **Code Review Complete**\n\n"
-                    f"The code looks good! No issues found.\n\n"
-                    f"🤖 Posted by Builder Automation"
+                    "✅ **Code Review Complete**\n\n"
+                    "The code looks good! No issues found.\n\n"
+                    "🤖 Posted by Builder Automation",
                 )
 
                 # Update labels: remove 'needs-review', add 'approved'
@@ -146,7 +145,7 @@ Be constructive and specific in your feedback.
                 if comments:
                     # Post review summary
                     summary_lines = [
-                        f"📝 **Code Review Complete**\n",
+                        "📝 **Code Review Complete**\n",
                         f"Found {len(comments)} items to address:\n",
                     ]
 
@@ -156,16 +155,15 @@ Be constructive and specific in your feedback.
                         )
                         summary_lines.append(f"   - {comment['issue']}")
 
-                    summary_lines.extend([
-                        "\n\n---\n",
-                        "Please address these items. When ready, add the `needs-fix` label to create fix tasks.\n\n",
-                        "🤖 Posted by Builder Automation"
-                    ])
-
-                    await self.git.add_comment(
-                        issue.number,
-                        "\n".join(summary_lines)
+                    summary_lines.extend(
+                        [
+                            "\n\n---\n",
+                            "Please address these items. When ready, add the `needs-fix` label to create fix tasks.\n\n",
+                            "🤖 Posted by Builder Automation",
+                        ]
                     )
+
+                    await self.git.add_comment(issue.number, "\n".join(summary_lines))
 
                     # Update labels: remove 'needs-review', add 'reviewed'
                     updated_labels = [l for l in issue.labels if l != "needs-review"]
@@ -183,11 +181,11 @@ Be constructive and specific in your feedback.
                 f"❌ **Code Review Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please try again.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
             raise
 
-    async def _get_pr_for_issue(self, issue: Issue) -> Optional[any]:
+    async def _get_pr_for_issue(self, issue: Issue) -> "PullRequest | None":
         """Try to find a PR associated with this issue.
 
         In Gitea, PRs are also issues, so we try to get a PR with the same number.
@@ -211,26 +209,26 @@ Be constructive and specific in your feedback.
             comment = {}
 
             # Extract file
-            file_match = re.search(r'File:\s*(.+)', block)
+            file_match = re.search(r"File:\s*(.+)", block)
             if file_match:
-                comment['file'] = file_match.group(1).strip()
+                comment["file"] = file_match.group(1).strip()
 
             # Extract line
-            line_match = re.search(r'Line:\s*(\d+)', block)
+            line_match = re.search(r"Line:\s*(\d+)", block)
             if line_match:
-                comment['line'] = int(line_match.group(1))
+                comment["line"] = int(line_match.group(1))
 
             # Extract issue
-            issue_match = re.search(r'Issue:\s*(.+?)(?=Suggestion:|$)', block, re.DOTALL)
+            issue_match = re.search(r"Issue:\s*(.+?)(?=Suggestion:|$)", block, re.DOTALL)
             if issue_match:
-                comment['issue'] = issue_match.group(1).strip()
+                comment["issue"] = issue_match.group(1).strip()
 
             # Extract suggestion
-            suggestion_match = re.search(r'Suggestion:\s*(.+)', block, re.DOTALL)
+            suggestion_match = re.search(r"Suggestion:\s*(.+)", block, re.DOTALL)
             if suggestion_match:
-                comment['suggestion'] = suggestion_match.group(1).strip()
+                comment["suggestion"] = suggestion_match.group(1).strip()
 
-            if comment.get('file') and comment.get('issue'):
+            if comment.get("file") and comment.get("issue"):
                 comments.append(comment)
 
         return comments

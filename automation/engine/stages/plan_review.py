@@ -41,6 +41,7 @@ class PlanReviewStage(WorkflowStage):
 
             # 3. Create Plan object for generating prompts
             from automation.models.domain import Plan
+
             plan = Plan(
                 id=plan_id,
                 title=issue.title.replace("[Plan Review] ", ""),
@@ -102,12 +103,14 @@ class PlanReviewStage(WorkflowStage):
     def _extract_plan_id(self, issue_body: str) -> str:
         """Extract plan ID from issue body."""
         import re
+
         match = re.search(r"Original Issue.*#(\d+)", issue_body)
         return match.group(1) if match else ""
 
     def _extract_plan_path(self, issue_body: str) -> str:
         """Extract plan path from issue body."""
         import re
+
         match = re.search(r"Plan File.*`([^`]+)`", issue_body)
         return match.group(1) if match else ""
 
@@ -127,7 +130,7 @@ class PlanReviewStage(WorkflowStage):
 """
 
         if task.dependencies:
-            body += f"""
+            body += """
 ## Dependencies
 
 This task depends on the following tasks being completed:
@@ -135,7 +138,7 @@ This task depends on the following tasks being completed:
             for dep_id in task.dependencies:
                 body += f"- {dep_id}\n"
 
-        body += f"""
+        body += """
 ## Implementation
 
 This task will be automatically implemented by the automation system.

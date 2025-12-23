@@ -3,10 +3,11 @@ HTTP connection pooling for API requests.
 Improves performance through connection reuse and HTTP/2 multiplexing.
 """
 
-from typing import Any, Dict, Optional
-import httpx
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Any
+
+import httpx
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -21,14 +22,14 @@ class HTTPConnectionPool:
         max_connections: int = 10,
         max_keepalive_connections: int = 5,
         timeout: float = 30.0,
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.base_url = base_url
         self.max_connections = max_connections
         self.max_keepalive_connections = max_keepalive_connections
         self.timeout = timeout
         self.headers = headers or {}
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
@@ -127,7 +128,7 @@ class ConnectionPoolManager:
     """Manage multiple connection pools."""
 
     def __init__(self) -> None:
-        self._pools: Dict[str, HTTPConnectionPool] = {}
+        self._pools: dict[str, HTTPConnectionPool] = {}
         self._lock = asyncio.Lock()
 
     async def get_pool(
@@ -136,7 +137,7 @@ class ConnectionPoolManager:
         base_url: str,
         max_connections: int = 10,
         timeout: float = 30.0,
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
     ) -> HTTPConnectionPool:
         """Get or create a named connection pool."""
         async with self._lock:
@@ -179,7 +180,7 @@ async def get_pool(
     base_url: str,
     max_connections: int = 10,
     timeout: float = 30.0,
-    headers: Optional[Dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
 ) -> HTTPConnectionPool:
     """Get a named connection pool from the global manager."""
     return await _pool_manager.get_pool(

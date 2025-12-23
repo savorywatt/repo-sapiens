@@ -2,13 +2,15 @@
 Tests for parallel executor and task scheduler.
 """
 
-import pytest
 import asyncio
+
+import pytest
+
 from automation.engine.parallel_executor import (
-    ParallelExecutor,
     ExecutionTask,
-    TaskScheduler,
+    ParallelExecutor,
     TaskPriority,
+    TaskScheduler,
 )
 
 
@@ -47,10 +49,7 @@ async def test_execute_parallel_tasks():
     """Test executing multiple tasks in parallel."""
     executor = ParallelExecutor(max_workers=3)
 
-    tasks = [
-        ExecutionTask(id=f"task-{i}", func=simple_task, args=(i,))
-        for i in range(5)
-    ]
+    tasks = [ExecutionTask(id=f"task-{i}", func=simple_task, args=(i,)) for i in range(5)]
 
     results = await executor.execute_tasks(tasks)
 

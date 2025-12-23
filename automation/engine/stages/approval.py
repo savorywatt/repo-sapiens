@@ -58,7 +58,9 @@ class ApprovalStage(WorkflowStage):
                     if not self._is_bot_comment(comment.body):
                         approved = True
                         approver = comment.author
-                        log.info("approval_detected_via_comment", issue=issue.number, approver=approver)
+                        log.info(
+                            "approval_detected_via_comment", issue=issue.number, approver=approver
+                        )
                         break
 
         if not approved:
@@ -71,7 +73,8 @@ class ApprovalStage(WorkflowStage):
             # Extract original issue number from title
             # Format: "[PROPOSAL] Plan for #42: ..."
             import re
-            match = re.search(r'#(\d+)', issue.title)
+
+            match = re.search(r"#(\d+)", issue.title)
             if not match:
                 log.error("cannot_parse_original_issue", title=issue.title)
                 return
@@ -92,7 +95,7 @@ class ApprovalStage(WorkflowStage):
                 issue.number,
                 f"✅ **Plan Approved by @{approver}**\n\n"
                 f"Creating project and {len(tasks)} task issues...\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             # Create task issues
@@ -112,8 +115,8 @@ class ApprovalStage(WorkflowStage):
             for task_issue in task_issues:
                 # Extract just the title without [TASK N/M] prefix
                 title = task_issue.title
-                if ']' in title:
-                    title = title.split(']', 1)[1].strip()
+                if "]" in title:
+                    title = title.split("]", 1)[1].strip()
                 task_lines.append(f"- [#{task_issue.number}]({task_issue.url}): {title}")
 
             # Update original issue with detailed summary
@@ -126,20 +129,19 @@ class ApprovalStage(WorkflowStage):
                 "",
             ]
             comment_parts.extend(task_lines)
-            comment_parts.extend([
-                "",
-                "**Next Steps:**",
-                "- Review individual task issues above",
-                "- Change any task label from `ready` to `execute` to start implementation",
-                "- Tasks will be executed in dependency order",
-                "",
-                "🤖 Posted by Builder Automation"
-            ])
-
-            await self.git.add_comment(
-                original_issue_number,
-                "\n".join(comment_parts)
+            comment_parts.extend(
+                [
+                    "",
+                    "**Next Steps:**",
+                    "- Review individual task issues above",
+                    "- Change any task label from `ready` to `execute` to start implementation",
+                    "- Tasks will be executed in dependency order",
+                    "",
+                    "🤖 Posted by Builder Automation",
+                ]
             )
+
+            await self.git.add_comment(original_issue_number, "\n".join(comment_parts))
 
             # Remove awaiting-approval, add in-progress
             updated_labels = [l for l in original_issue.labels if l != "awaiting-approval"]
@@ -153,10 +155,12 @@ class ApprovalStage(WorkflowStage):
                 f"✅ **Proposal Executed**\n\n"
                 f"Created {len(task_issues)} task issues.\n"
                 f"Keeping this proposal open for reference.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
-            log.info("approval_stage_complete", original=original_issue_number, tasks=len(task_issues))
+            log.info(
+                "approval_stage_complete", original=original_issue_number, tasks=len(task_issues)
+            )
 
         except Exception as e:
             log.error("approval_stage_failed", issue=issue.number, error=str(e), exc_info=True)
@@ -164,7 +168,7 @@ class ApprovalStage(WorkflowStage):
                 issue.number,
                 f"❌ **Approval Processing Failed**\n\n"
                 f"Error: {str(e)}\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
             raise
 
@@ -185,9 +189,9 @@ class ApprovalStage(WorkflowStage):
         import re
 
         # Split by task headings
-        task_pattern = r'### (\d+)\.\s+(.+?)(?:\(requires: (.+?)\))?$'
+        task_pattern = r"### (\d+)\.\s+(.+?)(?:\(requires: (.+?)\))?$"
 
-        lines = body.split('\n')
+        lines = body.split("\n")
         current_task = None
 
         for i, line in enumerate(lines):
@@ -203,17 +207,17 @@ class ApprovalStage(WorkflowStage):
                 # Parse dependencies
                 dependencies = []
                 if deps_str:
-                    dependencies = [d.strip() for d in deps_str.split(',')]
+                    dependencies = [d.strip() for d in deps_str.split(",")]
 
                 current_task = {
-                    'number': task_num,
-                    'title': title,
-                    'description': '',
-                    'dependencies': dependencies,
+                    "number": task_num,
+                    "title": title,
+                    "description": "",
+                    "dependencies": dependencies,
                 }
-            elif current_task and line.strip() and not line.startswith('#'):
+            elif current_task and line.strip() and not line.startswith("#"):
                 # Accumulate description
-                current_task['description'] += line + '\n'
+                current_task["description"] += line + "\n"
 
         if current_task:
             tasks.append(current_task)
@@ -244,8 +248,8 @@ class ApprovalStage(WorkflowStage):
 
             project_data = response.json()
             return {
-                'id': project_data.get('id'),
-                'html_url': project_data.get('html_url'),
+                "id": project_data.get("id"),
+                "html_url": project_data.get("html_url"),
             }
         except Exception as e:
             log.warning("project_creation_failed", error=str(e))
@@ -268,30 +272,34 @@ class ApprovalStage(WorkflowStage):
             "",
             "## Description",
             "",
-            task['description'].strip(),
+            task["description"].strip(),
             "",
         ]
 
-        if task['dependencies']:
-            body_parts.extend([
-                "## Dependencies",
-                "",
-                "This task requires:",
-            ])
-            for dep in task['dependencies']:
+        if task["dependencies"]:
+            body_parts.extend(
+                [
+                    "## Dependencies",
+                    "",
+                    "This task requires:",
+                ]
+            )
+            for dep in task["dependencies"]:
                 body_parts.append(f"- {dep}")
             body_parts.append("")
 
-        body_parts.extend([
-            "## Execution",
-            "",
-            "**To execute this task:**",
-            f"- Change this issue's label from `ready` to `execute`",
-            "- Builder will create a branch and implement the task",
-            "- A pull request will be created for review",
-            "",
-            "🤖 Posted by Builder Automation",
-        ])
+        body_parts.extend(
+            [
+                "## Execution",
+                "",
+                "**To execute this task:**",
+                "- Change this issue's label from `ready` to `execute`",
+                "- Builder will create a branch and implement the task",
+                "- A pull request will be created for review",
+                "",
+                "🤖 Posted by Builder Automation",
+            ]
+        )
 
         issue = await self.git.create_issue(
             title=title,

@@ -3,6 +3,7 @@ Tests for cost optimization system.
 """
 
 import pytest
+
 from automation.utils.cost_optimizer import CostOptimizer, ModelTier
 
 

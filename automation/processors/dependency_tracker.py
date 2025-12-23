@@ -1,7 +1,5 @@
 """Dependency tracking for task execution order management."""
 
-from typing import Dict, List, Set
-
 import structlog
 
 from automation.models.domain import Task
@@ -18,8 +16,8 @@ class DependencyTracker:
 
     def __init__(self) -> None:
         """Initialize dependency tracker."""
-        self.tasks: Dict[str, Task] = {}
-        self.status: Dict[str, str] = {}
+        self.tasks: dict[str, Task] = {}
+        self.status: dict[str, str] = {}
 
     def add_task(self, task: Task) -> None:
         """Add task to tracker.
@@ -102,7 +100,7 @@ class DependencyTracker:
         self.status[task_id] = "in_progress"
         log.info("task_in_progress", task_id=task_id)
 
-    def get_ready_tasks(self) -> List[Task]:
+    def get_ready_tasks(self) -> list[Task]:
         """Get all tasks ready for execution.
 
         Returns:
@@ -124,7 +122,7 @@ class DependencyTracker:
         """
         return any(status == "pending" for status in self.status.values())
 
-    def get_blocked_tasks(self) -> List[Task]:
+    def get_blocked_tasks(self) -> list[Task]:
         """Get tasks that are blocked by failed dependencies.
 
         Returns:
@@ -144,7 +142,7 @@ class DependencyTracker:
 
         return blocked
 
-    def get_in_progress_tasks(self) -> List[Task]:
+    def get_in_progress_tasks(self) -> list[Task]:
         """Get tasks currently in progress.
 
         Returns:
@@ -169,8 +167,8 @@ class DependencyTracker:
 
         def has_cycle(
             task_id: str,
-            visited: Set[str],
-            rec_stack: Set[str],
+            visited: set[str],
+            rec_stack: set[str],
         ) -> bool:
             """Detect cycles using DFS with recursion stack."""
             visited.add(task_id)
@@ -199,7 +197,7 @@ class DependencyTracker:
             rec_stack.remove(task_id)
             return False
 
-        visited: Set[str] = set()
+        visited: set[str] = set()
 
         for task_id in self.tasks:
             if task_id not in visited:
@@ -209,7 +207,7 @@ class DependencyTracker:
         log.info("dependencies_validated", task_count=len(self.tasks))
         return True
 
-    def get_execution_order(self) -> List[List[str]]:
+    def get_execution_order(self) -> list[list[str]]:
         """Get task execution order as list of batches.
 
         Each batch contains tasks that can be executed in parallel.
@@ -227,8 +225,8 @@ class DependencyTracker:
         # Validate first
         self.validate_dependencies()
 
-        batches: List[List[str]] = []
-        completed: Set[str] = set()
+        batches: list[list[str]] = []
+        completed: set[str] = set()
         remaining = set(self.tasks.keys())
 
         while remaining:
@@ -244,9 +242,7 @@ class DependencyTracker:
             if not ready_in_batch:
                 # This shouldn't happen if validation passed, but just in case
                 log.error("execution_order_deadlock", remaining=list(remaining))
-                raise RuntimeError(
-                    f"Deadlock in execution order. Remaining tasks: {remaining}"
-                )
+                raise RuntimeError(f"Deadlock in execution order. Remaining tasks: {remaining}")
 
             # Add batch
             batches.append(ready_in_batch)
@@ -269,13 +265,13 @@ class DependencyTracker:
         """
         return self.status.get(task_id, "unknown")
 
-    def get_summary(self) -> Dict[str, int]:
+    def get_summary(self) -> dict[str, int]:
         """Get summary of task statuses.
 
         Returns:
             Dictionary mapping status to count
         """
-        summary: Dict[str, int] = {
+        summary: dict[str, int] = {
             "pending": 0,
             "in_progress": 0,
             "completed": 0,

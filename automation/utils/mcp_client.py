@@ -1,8 +1,7 @@
 """MCP (Model Context Protocol) client for communicating with MCP servers."""
 
 import asyncio
-import json
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
@@ -28,7 +27,7 @@ class MCPClient:
             server_name: Name of the MCP server to connect to
         """
         self.server_name = server_name
-        self._process: Optional[asyncio.subprocess.Process] = None
+        self._process: asyncio.subprocess.Process | None = None
         self._request_id = 0
         self._connected = False
 
@@ -44,7 +43,7 @@ class MCPClient:
         self._connected = True
         log.info("mcp_connected", server=self.server_name)
 
-    async def call_tool(self, tool_name: str, **kwargs: Any) -> Dict[str, Any]:
+    async def call_tool(self, tool_name: str, **kwargs: Any) -> dict[str, Any]:
         """Call an MCP tool with arguments.
 
         Args:
@@ -102,7 +101,7 @@ class MCPClient:
             )
             raise
 
-    async def _send_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def _send_request(self, request: dict[str, Any]) -> dict[str, Any]:
         """Send JSON-RPC request to MCP server.
 
         Args:
@@ -142,7 +141,7 @@ class MockMCPClient(MCPClient):
     This client returns predefined responses for testing purposes.
     """
 
-    def __init__(self, server_name: str, responses: Optional[Dict[str, Any]] = None):
+    def __init__(self, server_name: str, responses: dict[str, Any] | None = None):
         """Initialize mock MCP client.
 
         Args:
@@ -151,9 +150,9 @@ class MockMCPClient(MCPClient):
         """
         super().__init__(server_name)
         self.responses = responses or {}
-        self.calls: list[Dict[str, Any]] = []
+        self.calls: list[dict[str, Any]] = []
 
-    async def _send_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    async def _send_request(self, request: dict[str, Any]) -> dict[str, Any]:
         """Return mock response based on tool name."""
         # Record the call
         self.calls.append(request)

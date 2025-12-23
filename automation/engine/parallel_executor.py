@@ -4,9 +4,11 @@ Implements intelligent task scheduling with concurrency controls.
 """
 
 import asyncio
-from typing import Any, Callable, Dict, List, Optional, Set
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -29,10 +31,10 @@ class ExecutionTask:
     func: Callable[..., Any]
     args: tuple = field(default_factory=tuple)
     kwargs: dict = field(default_factory=dict)
-    dependencies: Set[str] = field(default_factory=set)
+    dependencies: set[str] = field(default_factory=set)
     priority: int = TaskPriority.NORMAL
     timeout: float = 3600.0  # 1 hour default timeout
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -42,7 +44,7 @@ class TaskResult:
     task_id: str
     success: bool
     result: Any = None
-    error: Optional[Exception] = None
+    error: Exception | None = None
     execution_time: float = 0.0
 
 
@@ -53,30 +55,24 @@ class ParallelExecutor:
         self.max_workers = max_workers
         self.semaphore = asyncio.Semaphore(max_workers)
 
-    async def execute_tasks(self, tasks: List[ExecutionTask]) -> Dict[str, TaskResult]:
+    async def execute_tasks(self, tasks: list[ExecutionTask]) -> dict[str, TaskResult]:
         """Execute tasks in parallel respecting dependencies and limits."""
-        results: Dict[str, TaskResult] = {}
+        results: dict[str, TaskResult] = {}
         pending = {task.id: task for task in tasks}
-        completed: Set[str] = set()
-        failed: Set[str] = set()
-        in_progress: Set[str] = set()
+        completed: set[str] = set()
+        failed: set[str] = set()
+        in_progress: set[str] = set()
 
         log.info("parallel_execution_started", total_tasks=len(tasks), max_workers=self.max_workers)
 
         while pending or in_progress:
             # Find ready tasks (no unmet dependencies)
-            ready = [
-                task
-                for task in pending.values()
-                if not (task.dependencies - completed)
-            ]
+            ready = [task for task in pending.values() if not (task.dependencies - completed)]
 
             if not ready and not in_progress:
                 # Check if we're deadlocked or have failed dependencies
                 remaining_ids = set(pending.keys())
-                blocked_by_failures = any(
-                    task.dependencies & failed for task in pending.values()
-                )
+                blocked_by_failures = any(task.dependencies & failed for task in pending.values())
 
                 if blocked_by_failures:
                     log.error(
@@ -111,9 +107,7 @@ class ParallelExecutor:
                     del pending[task.id]
 
                 # Wait for at least one task to complete
-                done, _ = await asyncio.wait(
-                    batch_tasks, return_when=asyncio.FIRST_COMPLETED
-                )
+                done, _ = await asyncio.wait(batch_tasks, return_when=asyncio.FIRST_COMPLETED)
 
                 # Process completed tasks
                 for completed_task in done:
@@ -173,7 +167,7 @@ class ParallelExecutor:
                     execution_time=execution_time,
                 )
 
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 execution_time = time.time() - start_time
                 log.error("task_timeout", task_id=task.id, timeout=task.timeout)
                 return TaskResult(
@@ -200,7 +194,7 @@ class TaskScheduler:
     def __init__(self, executor: ParallelExecutor) -> None:
         self.executor = executor
 
-    def optimize_execution_order(self, tasks: List[ExecutionTask]) -> List[ExecutionTask]:
+    def optimize_execution_order(self, tasks: list[ExecutionTask]) -> list[ExecutionTask]:
         """Optimize task execution order for minimum cost and time."""
         # Build dependency graph
         graph = self._build_dependency_graph(tasks)
@@ -217,11 +211,9 @@ class TaskScheduler:
 
         return tasks
 
-    def _build_dependency_graph(
-        self, tasks: List[ExecutionTask]
-    ) -> Dict[str, Dict[str, Any]]:
+    def _build_dependency_graph(self, tasks: list[ExecutionTask]) -> dict[str, dict[str, Any]]:
         """Build dependency graph from tasks."""
-        graph: Dict[str, Dict[str, Any]] = {}
+        graph: dict[str, dict[str, Any]] = {}
 
         for task in tasks:
             graph[task.id] = {
@@ -238,7 +230,7 @@ class TaskScheduler:
 
         return graph
 
-    def _find_critical_path(self, graph: Dict[str, Dict[str, Any]]) -> Set[str]:
+    def _find_critical_path(self, graph: dict[str, dict[str, Any]]) -> set[str]:
         """
         Find critical path through task graph using Critical Path Method (CPM).
         Returns set of task IDs on the critical path.
@@ -246,13 +238,13 @@ class TaskScheduler:
         # For simplicity, we'll use a basic implementation
         # In production, would implement full CPM with estimated task durations
 
-        critical_tasks: Set[str] = set()
+        critical_tasks: set[str] = set()
 
         # Find leaf nodes (no dependents)
         leaves = [tid for tid, node in graph.items() if not node["dependents"]]
 
         # For each leaf, trace back to find longest path
-        def find_longest_path(task_id: str, visited: Set[str]) -> int:
+        def find_longest_path(task_id: str, visited: set[str]) -> int:
             if task_id in visited:
                 return 0
 
@@ -293,9 +285,7 @@ class TaskScheduler:
 
         return critical_tasks
 
-    async def execute_with_optimization(
-        self, tasks: List[ExecutionTask]
-    ) -> Dict[str, TaskResult]:
+    async def execute_with_optimization(self, tasks: list[ExecutionTask]) -> dict[str, TaskResult]:
         """Execute tasks with optimization."""
         optimized_tasks = self.optimize_execution_order(tasks)
         return await self.executor.execute_tasks(optimized_tasks)

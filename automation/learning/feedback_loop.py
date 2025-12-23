@@ -3,11 +3,12 @@ Learning system for continuous improvement.
 Learns from past executions to improve prompts and task selection.
 """
 
-from typing import Any, Dict, List, Optional
-from pathlib import Path
-from datetime import datetime
-import json
 import asyncio
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 import structlog
 
 log = structlog.get_logger(__name__)
@@ -26,8 +27,8 @@ class FeedbackLoop:
         task_id: str,
         prompt: str,
         result: Any,
-        review: Optional[Any] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        review: Any | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """
         Record task execution for learning.
@@ -56,9 +57,7 @@ class FeedbackLoop:
 
         log.info("feedback_recorded", task_id=task_id, success=feedback["success"])
 
-    async def improve_prompt(
-        self, task: Any, base_prompt: str
-    ) -> str:
+    async def improve_prompt(self, task: Any, base_prompt: str) -> str:
         """
         Improve prompt based on historical data.
 
@@ -83,9 +82,7 @@ class FeedbackLoop:
             return self._build_default_prompt(task, base_prompt)
 
         # Build improved prompt with learned patterns
-        improved_prompt = self._build_prompt_with_patterns(
-            task, base_prompt, successful_patterns
-        )
+        improved_prompt = self._build_prompt_with_patterns(task, base_prompt, successful_patterns)
 
         log.info(
             "prompt_improved",
@@ -98,9 +95,9 @@ class FeedbackLoop:
 
     async def _find_similar_tasks(
         self, task: Any, similarity_threshold: float = 0.7
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find similar historical tasks."""
-        similar: List[Dict[str, Any]] = []
+        similar: list[dict[str, Any]] = []
         task_description = getattr(task, "description", "") or ""
 
         for feedback_file in self.feedback_dir.glob("*.json"):
@@ -123,7 +120,7 @@ class FeedbackLoop:
 
         return similar[:10]  # Return top 10 most similar
 
-    def _calculate_similarity(self, task: Any, feedback: Dict[str, Any]) -> float:
+    def _calculate_similarity(self, task: Any, feedback: dict[str, Any]) -> float:
         """
         Calculate similarity between task and historical feedback.
 
@@ -157,10 +154,10 @@ class FeedbackLoop:
         return min(score, 1.0)
 
     def _extract_successful_patterns(
-        self, similar_tasks: List[Dict[str, Any]], success_threshold: float = 0.8
-    ) -> List[str]:
+        self, similar_tasks: list[dict[str, Any]], success_threshold: float = 0.8
+    ) -> list[str]:
         """Extract patterns from successful executions."""
-        patterns: List[str] = []
+        patterns: list[str] = []
 
         for task in similar_tasks:
             # Only consider highly successful tasks
@@ -190,9 +187,7 @@ Description:
 Please implement this task following best practices.
 """
 
-    def _build_prompt_with_patterns(
-        self, task: Any, base_prompt: str, patterns: List[str]
-    ) -> str:
+    def _build_prompt_with_patterns(self, task: Any, base_prompt: str, patterns: list[str]) -> str:
         """Build prompt incorporating learned patterns."""
         task_description = getattr(task, "description", "")
         task_title = getattr(task, "title", "")
@@ -200,9 +195,7 @@ Please implement this task following best practices.
         # Analyze patterns to extract common successful elements
         common_elements = self._analyze_patterns(patterns)
 
-        enhanced_instructions = "\n".join(
-            f"- {element}" for element in common_elements
-        )
+        enhanced_instructions = "\n".join(f"- {element}" for element in common_elements)
 
         return f"""{base_prompt}
 
@@ -217,7 +210,7 @@ Based on successful past executions, please ensure:
 Please implement this task following these learned best practices.
 """
 
-    def _analyze_patterns(self, patterns: List[str]) -> List[str]:
+    def _analyze_patterns(self, patterns: list[str]) -> list[str]:
         """
         Analyze patterns to extract common successful elements.
 
@@ -241,7 +234,7 @@ Please implement this task following these learned best practices.
 
         return elements[:5]  # Top 5 elements
 
-    async def get_learning_stats(self) -> Dict[str, Any]:
+    async def get_learning_stats(self) -> dict[str, Any]:
         """Get statistics about the learning system."""
         total_executions = 0
         successful_executions = 0

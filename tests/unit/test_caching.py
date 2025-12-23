@@ -2,9 +2,11 @@
 Tests for caching system.
 """
 
-import pytest
 import asyncio
-from automation.utils.caching import AsyncCache, cached, CacheKeyBuilder
+
+import pytest
+
+from automation.utils.caching import AsyncCache, CacheKeyBuilder, cached
 
 
 @pytest.mark.asyncio

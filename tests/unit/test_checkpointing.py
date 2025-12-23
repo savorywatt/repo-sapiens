@@ -3,6 +3,7 @@ Tests for checkpoint management system.
 """
 
 import pytest
+
 from automation.engine.checkpointing import CheckpointManager
 
 
@@ -32,12 +33,8 @@ async def test_get_latest_checkpoint(temp_checkpoint_dir):
     manager = CheckpointManager(str(temp_checkpoint_dir))
 
     # Create multiple checkpoints
-    await manager.create_checkpoint(
-        "test-plan", "planning", {"step": 1}
-    )
-    await manager.create_checkpoint(
-        "test-plan", "implementation", {"step": 2}
-    )
+    await manager.create_checkpoint("test-plan", "planning", {"step": 1})
+    await manager.create_checkpoint("test-plan", "implementation", {"step": 2})
 
     # Get latest checkpoint for plan
     latest = await manager.get_latest_checkpoint("test-plan")
@@ -52,12 +49,8 @@ async def test_get_latest_checkpoint_by_stage(temp_checkpoint_dir):
     """Test retrieving latest checkpoint for specific stage."""
     manager = CheckpointManager(str(temp_checkpoint_dir))
 
-    await manager.create_checkpoint(
-        "test-plan", "planning", {"data": "planning"}
-    )
-    await manager.create_checkpoint(
-        "test-plan", "implementation", {"data": "implementation"}
-    )
+    await manager.create_checkpoint("test-plan", "planning", {"data": "planning"})
+    await manager.create_checkpoint("test-plan", "implementation", {"data": "implementation"})
 
     # Get latest checkpoint for planning stage
     latest = await manager.get_latest_checkpoint("test-plan", "planning")

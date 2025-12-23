@@ -1,6 +1,5 @@
 """Proposal stage - creates plan proposal issue for user review."""
 
-from pathlib import Path
 import structlog
 
 from automation.engine.stages.base import WorkflowStage
@@ -33,7 +32,7 @@ class ProposalStage(WorkflowStage):
             "📋 **Generating Plan Proposal**\n\n"
             "I'm analyzing your requirements and creating a development plan.\n"
             "I'll post a proposal issue for your review shortly.\n\n"
-            "🤖 Posted by Builder Automation"
+            "🤖 Posted by Builder Automation",
         )
 
         try:
@@ -81,7 +80,7 @@ class ProposalStage(WorkflowStage):
                 f"1. Review the proposed plan at [#{proposal_issue.number}]({proposal_issue.url})\n"
                 f"2. Comment `ok` on the proposal to approve\n"
                 f"3. I'll then create a project and task issues for execution\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             # Update labels on original issue
@@ -101,7 +100,7 @@ class ProposalStage(WorkflowStage):
                 issue.number,
                 f"❌ **Plan Generation Failed**\n\n"
                 f"Error: {str(e)}\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
             raise
 
@@ -120,27 +119,31 @@ class ProposalStage(WorkflowStage):
         ]
 
         if plan.tasks:
-            lines.extend([
-                "## Tasks",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Tasks",
+                    "",
+                ]
+            )
             for i, task in enumerate(plan.tasks, 1):
-                lines.extend([
-                    f"### Task {i}: {task.title}",
-                    "",
-                    f"**ID**: {task.id}",
-                    f"**Dependencies**: {', '.join(task.dependencies) if task.dependencies else 'None'}",
-                    "",
-                    task.description,
-                    "",
-                ])
+                lines.extend(
+                    [
+                        f"### Task {i}: {task.title}",
+                        "",
+                        f"**ID**: {task.id}",
+                        f"**Dependencies**: {', '.join(task.dependencies) if task.dependencies else 'None'}",
+                        "",
+                        task.description,
+                        "",
+                    ]
+                )
 
         return "\n".join(lines)
 
     def _format_proposal_body(self, plan, issue: Issue, plan_path: str) -> str:
         """Format proposal issue body."""
         lines = [
-            f"# Development Plan Proposal",
+            "# Development Plan Proposal",
             "",
             f"**Original Issue**: [#{issue.number}]({issue.url}) - {issue.title}",
             f"**Plan File**: `{plan_path}`",
@@ -156,34 +159,40 @@ class ProposalStage(WorkflowStage):
         ]
 
         if plan.tasks:
-            lines.extend([
-                "## Proposed Tasks",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Proposed Tasks",
+                    "",
+                ]
+            )
             for i, task in enumerate(plan.tasks, 1):
                 deps = f" (requires: {', '.join(task.dependencies)})" if task.dependencies else ""
-                lines.extend([
-                    f"### {i}. {task.title}{deps}",
-                    "",
-                    task.description,
-                    "",
-                ])
+                lines.extend(
+                    [
+                        f"### {i}. {task.title}{deps}",
+                        "",
+                        task.description,
+                        "",
+                    ]
+                )
 
-        lines.extend([
-            "---",
-            "",
-            "## Approval",
-            "",
-            "**To approve this plan:**",
-            "- Comment `ok`, `approve`, or `lgtm` on this issue",
-            "",
-            "**Once approved, I will:**",
-            "1. Create a project board for tracking",
-            "2. Create individual task issues for each step",
-            "3. Link all tasks to the original issue",
-            "4. Wait for you to mark tasks as `execute` when ready",
-            "",
-            "🤖 Posted by Builder Automation",
-        ])
+        lines.extend(
+            [
+                "---",
+                "",
+                "## Approval",
+                "",
+                "**To approve this plan:**",
+                "- Comment `ok`, `approve`, or `lgtm` on this issue",
+                "",
+                "**Once approved, I will:**",
+                "1. Create a project board for tracking",
+                "2. Create individual task issues for each step",
+                "3. Link all tasks to the original issue",
+                "4. Wait for you to mark tasks as `execute` when ready",
+                "",
+                "🤖 Posted by Builder Automation",
+            ]
+        )
 
         return "\n".join(lines)

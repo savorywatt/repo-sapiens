@@ -6,7 +6,6 @@ for Git operations (Gitea, GitHub) and AI agents (Claude, OpenAI).
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
 
 from automation.models.domain import (
     Branch,
@@ -26,9 +25,9 @@ class GitProvider(ABC):
     @abstractmethod
     async def get_issues(
         self,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
         state: str = "open",
-    ) -> List[Issue]:
+    ) -> list[Issue]:
         """Retrieve issues from repository.
 
         Args:
@@ -57,7 +56,7 @@ class GitProvider(ABC):
         self,
         title: str,
         body: str,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
     ) -> Issue:
         """Create a new issue.
 
@@ -75,10 +74,10 @@ class GitProvider(ABC):
     async def update_issue(
         self,
         issue_number: int,
-        title: Optional[str] = None,
-        body: Optional[str] = None,
-        labels: Optional[List[str]] = None,
-        state: Optional[str] = None,
+        title: str | None = None,
+        body: str | None = None,
+        labels: list[str] | None = None,
+        state: str | None = None,
     ) -> Issue:
         """Update issue fields.
 
@@ -108,7 +107,7 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_comments(self, issue_number: int) -> List[Comment]:
+    async def get_comments(self, issue_number: int) -> list[Comment]:
         """Retrieve all comments for an issue.
 
         Args:
@@ -133,7 +132,7 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_branch(self, branch_name: str) -> Optional[Branch]:
+    async def get_branch(self, branch_name: str) -> Branch | None:
         """Get branch information.
 
         Args:
@@ -180,7 +179,7 @@ class GitProvider(ABC):
         body: str,
         head: str,
         base: str,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
     ) -> PullRequest:
         """Create a pull request.
 
@@ -247,7 +246,7 @@ class AgentProvider(ABC):
         pass
 
     @abstractmethod
-    async def generate_prompts(self, plan: Plan) -> List[Task]:
+    async def generate_prompts(self, plan: Plan) -> list[Task]:
         """Break plan into executable tasks.
 
         Args:

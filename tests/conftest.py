@@ -150,7 +150,11 @@ class MockTask:
     """Mock task for testing cost optimizer."""
 
     def __init__(
-        self, description: str = "", dependencies: list = None, context: dict = None, task_id: str = "test-task"
+        self,
+        description: str = "",
+        dependencies: list = None,
+        context: dict = None,
+        task_id: str = "test-task",
     ):
         self.description = description
         self.dependencies = dependencies or []

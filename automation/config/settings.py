@@ -8,24 +8,35 @@ including Git providers, agents, workflows, and tags.
 import os
 import re
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, HttpUrl, SecretStr
+from pydantic import BaseModel, Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from automation.config.credential_fields import CredentialSecret
+from automation.exceptions import ConfigurationError
 
 
 class GitProviderConfig(BaseModel):
-    """Git provider configuration (Gitea or GitHub)."""
+    """Git provider configuration (Gitea or GitHub).
+
+    Supports credential references:
+    - api_token: "@keyring:gitea/api_token"
+    - api_token: "${GITEA_API_TOKEN}"
+    - api_token: "@encrypted:gitea/api_token"
+    """
 
     provider_type: Literal["gitea", "github"] = Field(
         default="gitea", description="Type of Git provider"
     )
-    mcp_server: Optional[str] = Field(
+    mcp_server: str | None = Field(
         default=None, description="Name of MCP server for Git operations"
     )
     base_url: HttpUrl = Field(..., description="Base URL of the Git provider")
-    api_token: SecretStr = Field(..., description="API token for authentication")
+    api_token: CredentialSecret = Field(
+        ..., description="API token for authentication (supports @keyring:, ${ENV}, @encrypted:)"
+    )
 
 
 class RepositoryConfig(BaseModel):
@@ -37,17 +48,24 @@ class RepositoryConfig(BaseModel):
 
 
 class AgentProviderConfig(BaseModel):
-    """AI agent configuration."""
+    """AI agent configuration.
+
+    Supports credential references for api_key:
+    - api_key: "@keyring:claude/api_key"
+    - api_key: "${CLAUDE_API_KEY}"
+    - api_key: "@encrypted:claude/api_key"
+    """
 
     provider_type: Literal["claude-local", "claude-api", "openai", "ollama"] = Field(
         default="claude-local", description="Type of agent provider"
     )
     model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
-    api_key: Optional[SecretStr] = Field(default=None, description="API key for cloud providers")
-    local_mode: bool = Field(
-        default=True, description="Whether to use local Claude Code CLI"
+    api_key: CredentialSecret | None = Field(
+        default=None,
+        description="API key for cloud providers (supports @keyring:, ${ENV}, @encrypted:)",
     )
-    base_url: Optional[str] = Field(
+    local_mode: bool = Field(default=True, description="Whether to use local Claude Code CLI")
+    base_url: str | None = Field(
         default="http://localhost:11434", description="Base URL for Ollama or custom API endpoints"
     )
 
@@ -129,25 +147,44 @@ class AutomationSettings(BaseSettings):
             AutomationSettings instance
 
         Raises:
-            FileNotFoundError: If config file doesn't exist
-            ValueError: If required environment variables are missing
+            ConfigurationError: If config file is invalid or missing required fields
         """
         config_file = Path(config_path)
         if not config_file.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+            raise ConfigurationError(f"Configuration file not found: {config_path}")
 
-        # Read YAML content
-        with open(config_file, "r") as f:
-            yaml_content = f.read()
+        try:
+            # Read YAML content
+            with open(config_file) as f:
+                yaml_content = f.read()
+        except OSError as e:
+            raise ConfigurationError(f"Cannot read configuration file: {config_path}") from e
 
-        # Interpolate environment variables
-        yaml_content = cls._interpolate_env_vars(yaml_content)
+        try:
+            # Interpolate environment variables
+            yaml_content = cls._interpolate_env_vars(yaml_content)
+        except ValueError as e:
+            raise ConfigurationError(
+                f"Invalid environment variable reference in config: {e}"
+            ) from e
 
-        # Parse YAML
-        config_dict = yaml.safe_load(yaml_content)
+        try:
+            # Parse YAML
+            config_dict = yaml.safe_load(yaml_content)
+            if not isinstance(config_dict, dict):
+                raise ConfigurationError(
+                    "Configuration must be a YAML object, not a list or scalar"
+                )
+        except yaml.YAMLError as e:
+            raise ConfigurationError(f"Invalid YAML syntax in {config_path}: {e}") from e
 
-        # Create settings instance
-        return cls(**config_dict)
+        try:
+            # Create settings instance
+            return cls(**config_dict)
+        except TypeError as e:
+            raise ConfigurationError(f"Missing or invalid configuration fields: {e}") from e
+        except Exception as e:
+            raise ConfigurationError(f"Failed to validate configuration: {e}") from e
 
     @staticmethod
     def _interpolate_env_vars(content: str) -> str:
@@ -165,6 +202,17 @@ class AutomationSettings(BaseSettings):
         pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
         def replace_var(match: re.Match[str]) -> str:
+            """Replace matched placeholder with environment variable value.
+
+            Args:
+                match: Regex match object containing the variable name
+
+            Returns:
+                Environment variable value
+
+            Raises:
+                ValueError: If the environment variable is not set
+            """
             var_name = match.group(1)
             value = os.getenv(var_name)
             if value is None:

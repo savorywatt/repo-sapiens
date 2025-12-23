@@ -1,7 +1,6 @@
 """Gitea provider implementation using MCP."""
 
 from datetime import datetime
-from typing import List, Optional
 
 import structlog
 
@@ -46,9 +45,9 @@ class GiteaProvider(GitProvider):
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_issues(
         self,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
         state: str = "open",
-    ) -> List[Issue]:
+    ) -> list[Issue]:
         """Retrieve issues via MCP."""
         log.info("get_issues", labels=labels, state=state)
 
@@ -85,7 +84,7 @@ class GiteaProvider(GitProvider):
         self,
         title: str,
         body: str,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
     ) -> Issue:
         """Create issue via MCP."""
         log.info("create_issue", title=title)
@@ -105,10 +104,10 @@ class GiteaProvider(GitProvider):
     async def update_issue(
         self,
         issue_number: int,
-        title: Optional[str] = None,
-        body: Optional[str] = None,
-        labels: Optional[List[str]] = None,
-        state: Optional[str] = None,
+        title: str | None = None,
+        body: str | None = None,
+        labels: list[str] | None = None,
+        state: str | None = None,
     ) -> Issue:
         """Update issue via MCP with retry."""
         log.info("update_issue", issue=issue_number)
@@ -147,7 +146,7 @@ class GiteaProvider(GitProvider):
         return self._parse_comment(result)
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_comments(self, issue_number: int) -> List[Comment]:
+    async def get_comments(self, issue_number: int) -> list[Comment]:
         """Retrieve all comments for an issue."""
         log.info("get_comments", issue_number=issue_number)
 
@@ -177,7 +176,7 @@ class GiteaProvider(GitProvider):
         return self._parse_branch(result)
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_branch(self, branch_name: str) -> Optional[Branch]:
+    async def get_branch(self, branch_name: str) -> Branch | None:
         """Get branch information."""
         log.info("get_branch", branch=branch_name)
 
@@ -236,7 +235,7 @@ class GiteaProvider(GitProvider):
         body: str,
         head: str,
         base: str,
-        labels: Optional[List[str]] = None,
+        labels: list[str] | None = None,
     ) -> PullRequest:
         """Create a pull request."""
         log.info("create_pull_request", title=title, head=head, base=base)

@@ -1,12 +1,12 @@
 """Webhook server for real-time Gitea event processing."""
 
 import re
-from typing import Dict
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request
 
 from automation.config.settings import AutomationSettings
+from automation.exceptions import ConfigurationError, RepoSapiensError
 
 log = structlog.get_logger(__name__)
 
@@ -21,8 +21,15 @@ orchestrator = None
 async def startup():
     """Initialize on startup."""
     global settings
-    settings = AutomationSettings.from_yaml("automation/config/automation_config.yaml")
-    log.info("webhook_server_started")
+    try:
+        settings = AutomationSettings.from_yaml("automation/config/automation_config.yaml")
+        log.info("webhook_server_started")
+    except ConfigurationError as e:
+        log.error("webhook_startup_failed", error=e.message, exc_info=True)
+        raise
+    except Exception as e:
+        log.error("webhook_startup_unexpected", error=str(e), exc_info=True)
+        raise
 
 
 @app.post("/webhook/gitea")
@@ -47,12 +54,15 @@ async def gitea_webhook(request: Request):
 
         return {"status": "success", "event_type": event_type}
 
+    except RepoSapiensError as e:
+        log.error("webhook_processing_failed", error=e.message, exc_info=True)
+        raise HTTPException(status_code=422, detail=e.message)
     except Exception as e:
-        log.error("webhook_processing_failed", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        log.error("webhook_processing_unexpected", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-async def handle_issue_event(payload: Dict):
+async def handle_issue_event(payload: dict):
     """Handle issue event from webhook."""
     action = payload.get("action")
     issue_data = payload.get("issue", {})
@@ -68,7 +78,7 @@ async def handle_issue_event(payload: Dict):
     log.info("issue_event_processed", issue=issue_number, action=action)
 
 
-async def handle_push_event(payload: Dict):
+async def handle_push_event(payload: dict):
     """Handle push event from webhook."""
     ref = payload.get("ref")
     commits = payload.get("commits", [])
@@ -90,10 +100,10 @@ async def handle_push_event(payload: Dict):
 
 def extract_plan_id(file_path: str) -> str:
     """Extract plan ID from file path.
-    
+
     Args:
         file_path: Path like 'plans/42-feature.md'
-        
+
     Returns:
         Plan ID like '42' or None
     """

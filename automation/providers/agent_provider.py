@@ -6,7 +6,7 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import structlog
 
@@ -72,7 +72,7 @@ class ClaudeLocalProvider(AgentProvider):
         log.info("plan_generated", plan_id=plan_id, length=len(plan_content))
         return plan
 
-    async def generate_prompts(self, plan: Plan) -> List[Task]:
+    async def generate_prompts(self, plan: Plan) -> list[Task]:
         """Break plan into executable tasks.
 
         Args:
@@ -270,9 +270,7 @@ class ClaudeLocalProvider(AgentProvider):
             return output
 
         except FileNotFoundError:
-            raise RuntimeError(
-                "Claude Code CLI not found. Please install Claude Code CLI."
-            )
+            raise RuntimeError("Claude Code CLI not found. Please install Claude Code CLI.")
 
     def _build_planning_prompt(self, issue: Issue) -> str:
         """Build prompt for plan generation.
@@ -347,7 +345,7 @@ Plan Context:
 """
 
         if dependencies_info:
-            prompt += f"""
+            prompt += """
 Completed Dependencies:
 """
             for dep in dependencies_info:
@@ -439,7 +437,7 @@ Resolved content:
         # Simple extraction - in practice, may need more sophisticated parsing
         return output.strip()
 
-    def _extract_tasks_from_plan(self, plan_content: str, plan_id: str) -> List[Task]:
+    def _extract_tasks_from_plan(self, plan_content: str, plan_id: str) -> list[Task]:
         """Parse tasks from plan markdown content.
 
         Args:
@@ -481,7 +479,7 @@ Resolved content:
         log.info("tasks_extracted", count=len(tasks))
         return tasks
 
-    def _extract_commits(self, output: str) -> List[str]:
+    def _extract_commits(self, output: str) -> list[str]:
         """Extract commit SHAs from Claude output.
 
         Args:
@@ -495,7 +493,7 @@ Resolved content:
         commits = re.findall(sha_pattern, output)
         return commits
 
-    def _extract_files_changed(self, output: str) -> List[str]:
+    def _extract_files_changed(self, output: str) -> list[str]:
         """Extract list of files changed from Claude output.
 
         Args:
@@ -510,7 +508,7 @@ Resolved content:
         files = re.findall(file_pattern, output, re.IGNORECASE)
         return files
 
-    def _parse_review_output(self, output: str) -> Dict[str, Any]:
+    def _parse_review_output(self, output: str) -> dict[str, Any]:
         """Parse review output as JSON.
 
         Args:

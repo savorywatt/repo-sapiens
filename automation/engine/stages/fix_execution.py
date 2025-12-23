@@ -3,7 +3,6 @@
 import re
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import structlog
 
@@ -43,7 +42,7 @@ class FixExecutionStage(WorkflowStage):
             return
 
         # Extract PR number from title
-        match = re.search(r'PR #(\d+)', issue.title)
+        match = re.search(r"PR #(\d+)", issue.title)
         if not match:
             log.error("cannot_parse_pr_number", title=issue.title)
             return
@@ -63,7 +62,9 @@ class FixExecutionStage(WorkflowStage):
 
         branch_name = f"{plan_label}-implementation"
 
-        log.info("fix_execution_starting", fix_proposal=issue.number, pr=pr_number, branch=branch_name)
+        log.info(
+            "fix_execution_starting", fix_proposal=issue.number, pr=pr_number, branch=branch_name
+        )
 
         try:
             # Notify start
@@ -73,7 +74,7 @@ class FixExecutionStage(WorkflowStage):
                 f"Branch: `{branch_name}`\n"
                 f"PR: #{pr_number}\n\n"
                 f"I'll implement the fixes and push to the branch.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
 
             # Checkout branch in playground repo
@@ -85,8 +86,11 @@ class FixExecutionStage(WorkflowStage):
 
             # Fetch and checkout
             subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)
-            subprocess.run(["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
-                          cwd=playground_dir, check=True)
+            subprocess.run(
+                ["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
+                cwd=playground_dir,
+                check=True,
+            )
 
             log.info("branch_checked_out", branch=branch_name)
 
@@ -153,23 +157,19 @@ Focus on addressing the feedback completely and correctly.
                     cwd=playground_dir,
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
 
                 if status_result.stdout.strip():
                     # Commit changes
                     commit_message = f"fix: Address review feedback [FIX-{issue.number}]\n\nFixes from code review on PR #{pr_number}\nFix proposal: #{issue.number}"
                     subprocess.run(
-                        ["git", "commit", "-m", commit_message],
-                        cwd=playground_dir,
-                        check=True
+                        ["git", "commit", "-m", commit_message], cwd=playground_dir, check=True
                     )
 
                     # Push to remote
                     subprocess.run(
-                        ["git", "push", "origin", branch_name],
-                        cwd=playground_dir,
-                        check=True
+                        ["git", "push", "origin", branch_name], cwd=playground_dir, check=True
                     )
 
                     log.info("fixes_committed_and_pushed", branch=branch_name)
@@ -181,7 +181,7 @@ Focus on addressing the feedback completely and correctly.
                         f"All review feedback has been addressed.\n"
                         f"Changes have been pushed to branch `{branch_name}`.\n\n"
                         f"Please review PR #{pr_number} again.\n\n"
-                        f"🤖 Posted by Builder Automation"
+                        f"🤖 Posted by Builder Automation",
                     )
 
                     # Close fix proposal
@@ -193,7 +193,7 @@ Focus on addressing the feedback completely and correctly.
                         f"🔧 **Fixes Applied**\n\n"
                         f"Review feedback has been addressed via fix proposal #{issue.number}.\n"
                         f"Please review the updates.\n\n"
-                        f"🤖 Posted by Builder Automation"
+                        f"🤖 Posted by Builder Automation",
                     )
 
                     log.info("fix_execution_complete", fix_proposal=issue.number, pr=pr_number)
@@ -201,10 +201,10 @@ Focus on addressing the feedback completely and correctly.
                     log.warning("no_changes_to_commit", fix_proposal=issue.number)
                     await self.git.add_comment(
                         issue.number,
-                        f"⚠️ **No Changes Made**\n\n"
-                        f"The agent didn't make any changes.\n"
-                        f"Please review the feedback and try again.\n\n"
-                        f"🤖 Posted by Builder Automation"
+                        "⚠️ **No Changes Made**\n\n"
+                        "The agent didn't make any changes.\n"
+                        "Please review the feedback and try again.\n\n"
+                        "🤖 Posted by Builder Automation",
                     )
 
             finally:
@@ -218,14 +218,14 @@ Focus on addressing the feedback completely and correctly.
                 f"❌ **Fix Implementation Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Builder Automation"
+                f"🤖 Posted by Builder Automation",
             )
             raise
 
     def _extract_feedback(self, body: str) -> str:
         """Extract review feedback section from fix proposal body."""
         # Find "## Review Feedback" section
-        match = re.search(r'## Review Feedback\s+(.+?)(?=\s+##|$)', body, re.DOTALL)
+        match = re.search(r"## Review Feedback\s+(.+?)(?=\s+##|$)", body, re.DOTALL)
         if match:
             return match.group(1).strip()
         return body

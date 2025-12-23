@@ -1,4 +1,4 @@
-"""Builder Automation - AI-driven automation system for Git workflows."""
+"""repo-sapiens - Intelligent repository automation and management tool."""
 
 from automation.__version__ import __version__
 
