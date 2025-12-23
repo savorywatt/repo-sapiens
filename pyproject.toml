@@ -1,5 +1,5 @@
 [project]
-name = "builder-automation"
+name = "repo-agent"
 dynamic = ["version"]
 description = "AI-driven automation system for Git workflows"
 readme = "README.md"
@@ -45,7 +45,7 @@ dev = [
     "ruff>=0.1.8",
     "mypy>=1.7.0",
 ]
-all = ["builder-automation[monitoring,analytics]"]
+all = ["repo-agent[monitoring,analytics]"]
 
 [project.scripts]
 automation = "automation.main:cli"
