@@ -10,6 +10,7 @@ Security Model:
 import json
 import logging
 from pathlib import Path
+from typing import cast
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -61,6 +62,7 @@ class EncryptedFileBackend:
         self.salt = salt or self._load_or_generate_salt()
 
         # Derive encryption key from password
+        self.fernet: Fernet | None
         if master_password:
             self.fernet = self._create_fernet(master_password, self.salt)
         else:
@@ -82,7 +84,7 @@ class EncryptedFileBackend:
         """Check if cryptography package is available."""
         try:
             # Test import
-            from cryptography.fernet import Fernet
+            from cryptography.fernet import Fernet  # noqa: F401
 
             return True
         except ImportError:
@@ -178,7 +180,9 @@ class EncryptedFileBackend:
             decrypted_data = self.fernet.decrypt(encrypted_data)
 
             # Parse JSON
-            credentials = json.loads(decrypted_data.decode("utf-8"))
+            credentials = cast(
+                dict[str, dict[str, str]], json.loads(decrypted_data.decode("utf-8"))
+            )
 
             self._credentials_cache = credentials
             return credentials

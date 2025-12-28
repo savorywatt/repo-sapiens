@@ -1,7 +1,7 @@
 """MCP (Model Context Protocol) client for communicating with MCP servers."""
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -90,7 +90,7 @@ class MCPClient:
                 raise MCPError(f"MCP tool {tool_name} failed: {error_msg}")
 
             log.debug("mcp_response", tool=tool_name, request_id=self._request_id)
-            return response.get("result", {})
+            return cast(dict[str, Any], response.get("result", {}))
 
         except Exception as e:
             log.error(

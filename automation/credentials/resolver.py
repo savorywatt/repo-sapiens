@@ -213,7 +213,7 @@ class CredentialResolver:
                 f"Environment variable not set: {var_name}",
                 reference=reference,
                 suggestion=(
-                    f"Set the environment variable:\n" f"  export {var_name}='your-credential-here'"
+                    f"Set the environment variable:\n  export {var_name}='your-credential-here'"
                 ),
             )
 
@@ -283,10 +283,7 @@ class CredentialResolver:
             return True
 
         # Long alphanumeric or base64-like
-        if len(value) > 20 and value.replace("-", "").replace("_", "").isalnum():
-            return True
-
-        return False
+        return len(value) > 20 and value.replace("-", "").replace("_", "").isalnum()
 
     def clear_cache(self) -> None:
         """Clear resolved credentials cache.

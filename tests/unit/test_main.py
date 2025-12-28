@@ -1,14 +1,11 @@
 """Tests for automation.main CLI module."""
 
-import asyncio
-import sys
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from automation.exceptions import ConfigurationError, RepoSapiensError
+from automation.exceptions import RepoSapiensError
 from automation.main import cli
 
 
@@ -44,9 +41,7 @@ class TestCLIBasics:
 
     def test_cli_missing_config(self, cli_runner):
         """Test CLI handles missing config file."""
-        result = cli_runner.invoke(
-            cli, ["--config", "/nonexistent/file.yaml", "list-plans"]
-        )
+        result = cli_runner.invoke(cli, ["--config", "/nonexistent/file.yaml", "list-plans"])
         # Should fail because config doesn't exist
         assert result.exit_code == 1
         assert "Configuration file not found" in result.output
@@ -133,10 +128,7 @@ class TestAsyncMainFunctions:
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=["plan-1", "plan-2"])
         mock_state.load_state = AsyncMock(
-            side_effect=[
-                {"status": "active"},
-                {"status": "completed"}
-            ]
+            side_effect=[{"status": "active"}, {"status": "completed"}]
         )
 
         with patch("automation.main.StateManager", return_value=mock_state):
@@ -157,7 +149,7 @@ class TestAsyncMainFunctions:
                 "created_at": "2024-01-01",
                 "updated_at": "2024-01-02",
                 "stages": {"planning": {"status": "completed"}},
-                "tasks": {"task-1": {"status": "completed"}}
+                "tasks": {"task-1": {"status": "completed"}},
             }
         )
 
@@ -190,10 +182,11 @@ class TestAsyncMainFunctions:
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator), \
-             patch("automation.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
-             patch("automation.main.click.echo"):
-
+        with (
+            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("automation.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("automation.main.click.echo"),
+        ):
             mock_sleep.side_effect = KeyboardInterrupt()
 
             with pytest.raises(KeyboardInterrupt):
@@ -205,14 +198,13 @@ class TestAsyncMainFunctions:
         from automation.main import _daemon_mode
 
         mock_orchestrator = AsyncMock()
-        mock_orchestrator.process_all_issues = AsyncMock(
-            side_effect=RepoSapiensError("Test error")
-        )
+        mock_orchestrator.process_all_issues = AsyncMock(side_effect=RepoSapiensError("Test error"))
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator), \
-             patch("automation.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep, \
-             patch("automation.main.click.echo"):
-
+        with (
+            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("automation.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("automation.main.click.echo"),
+        ):
             mock_sleep.side_effect = KeyboardInterrupt()
 
             with pytest.raises(KeyboardInterrupt):

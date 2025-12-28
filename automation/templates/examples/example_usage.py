@@ -8,11 +8,9 @@ to generate workflow files.
 Requirements:
     pip install jinja2>=3.1.3 pydantic>=2.0.0 pyyaml>=6.0
 """
+
 import sys
 from pathlib import Path
-
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from automation.rendering import WorkflowRenderer, render_workflow
 from automation.rendering.validators import (
@@ -20,6 +18,9 @@ from automation.rendering.validators import (
     LabelSyncConfig,
     PyPIPublishConfig,
 )
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 
 def example_quick_render():
@@ -72,7 +73,7 @@ def example_batch_generation():
     print("=" * 70)
 
     renderer = WorkflowRenderer()
-    output_dir = Path("/tmp/workflows-example")
+    output_dir = Path("/tmp/workflows-example")  # nosec B108 # Example code, not production usage
 
     configs = {
         "ci/build": CIBuildConfig(

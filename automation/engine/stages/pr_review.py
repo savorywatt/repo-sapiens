@@ -5,7 +5,7 @@ import re
 import structlog
 
 from automation.engine.stages.base import WorkflowStage
-from automation.models.domain import Issue
+from automation.models.domain import Issue, PullRequest
 
 log = structlog.get_logger(__name__)
 
@@ -133,7 +133,7 @@ Be constructive and specific in your feedback.
                 )
 
                 # Update labels: remove 'needs-review', add 'approved'
-                updated_labels = [l for l in issue.labels if l != "needs-review"]
+                updated_labels = [label for label in issue.labels if label != "needs-review"]
                 updated_labels.append("approved")
                 await self.git.update_issue(issue.number, labels=updated_labels)
 
@@ -158,7 +158,10 @@ Be constructive and specific in your feedback.
                     summary_lines.extend(
                         [
                             "\n\n---\n",
-                            "Please address these items. When ready, add the `needs-fix` label to create fix tasks.\n\n",
+                            (
+                                "Please address these items. When ready, "
+                                "add the `needs-fix` label to create fix tasks.\n\n"
+                            ),
                             "🤖 Posted by Builder Automation",
                         ]
                     )
@@ -166,7 +169,7 @@ Be constructive and specific in your feedback.
                     await self.git.add_comment(issue.number, "\n".join(summary_lines))
 
                     # Update labels: remove 'needs-review', add 'reviewed'
-                    updated_labels = [l for l in issue.labels if l != "needs-review"]
+                    updated_labels = [label for label in issue.labels if label != "needs-review"]
                     updated_labels.append("reviewed")
                     await self.git.update_issue(issue.number, labels=updated_labels)
 

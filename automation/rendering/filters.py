@@ -65,24 +65,23 @@ def safe_identifier(value: Any, max_length: int = 100) -> str:
     if value is None:
         raise ValueError("Identifier cannot be None")
 
-    if not isinstance(value, str):
-        value = str(value)
+    str_value: str = str(value) if not isinstance(value, str) else value
 
-    if not value:
+    if not str_value:
         raise ValueError("Identifier cannot be empty")
 
-    if len(value) > max_length:
-        raise ValueError(f"Identifier too long: {len(value)} > {max_length}")
+    if len(str_value) > max_length:
+        raise ValueError(f"Identifier too long: {len(str_value)} > {max_length}")
 
     # Allow GitHub Actions expressions (they're safe because they're template literals)
-    if value.startswith("${{") and value.endswith("}}"):
-        return value
+    if str_value.startswith("${{") and str_value.endswith("}}"):
+        return str_value
 
     # Allow alphanumeric, hyphens, underscores, dots (for domains)
-    if not re.match(r"^[a-zA-Z0-9._-]+$", value):
-        raise ValueError(f"Invalid identifier characters: {value}")
+    if not re.match(r"^[a-zA-Z0-9._-]+$", str_value):
+        raise ValueError(f"Invalid identifier characters: {str_value}")
 
-    return value
+    return str_value
 
 
 def safe_label(value: Any, max_length: int = 50) -> str:
@@ -105,20 +104,22 @@ def safe_label(value: Any, max_length: int = 50) -> str:
     if value is None:
         raise ValueError("Label cannot be None")
 
-    if not isinstance(value, str):
-        value = str(value)
+    str_value: str = str(value) if not isinstance(value, str) else value
 
-    if not value:
+    # Strip whitespace first for validation
+    str_value = str_value.strip()
+
+    if not str_value:
         raise ValueError("Label cannot be empty")
 
-    if len(value) > max_length:
-        raise ValueError(f"Label too long: {len(value)} > {max_length}")
+    if len(str_value) > max_length:
+        raise ValueError(f"Label too long: {len(str_value)} > {max_length}")
 
     # Disallow YAML-sensitive characters and control characters
-    if re.search(r"[:\n\r\t\{\}\[\]&*#?|<>=!%@`]", value):
-        raise ValueError(f"Label contains invalid characters: {value}")
+    if re.search(r"[:\n\r\t\{\}\[\]&*#?|<>=!%@`]", str_value):
+        raise ValueError(f"Label contains invalid characters: {str_value}")
 
-    return value.strip()
+    return str_value
 
 
 def yaml_string(value: Any) -> str:

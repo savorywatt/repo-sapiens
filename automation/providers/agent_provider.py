@@ -4,7 +4,7 @@ import asyncio
 import json
 import re
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +27,7 @@ class ClaudeLocalProvider(AgentProvider):
     def __init__(
         self,
         model: str = "claude-sonnet-4.5",
-        workspace: Path = Path.cwd(),
+        workspace: Path | None = None,
     ):
         """Initialize Claude provider.
 
@@ -36,7 +36,7 @@ class ClaudeLocalProvider(AgentProvider):
             workspace: Workspace directory for code operations
         """
         self.model = model
-        self.workspace = workspace
+        self.workspace = workspace if workspace is not None else Path.cwd()
 
     async def generate_plan(self, issue: Issue) -> Plan:
         """Generate development plan from issue.
@@ -65,7 +65,7 @@ class ClaudeLocalProvider(AgentProvider):
             description=issue.body,
             tasks=[],  # Will be populated by generate_prompts
             file_path=f"plans/{plan_id}-{slugify(issue.title)}.md",
-            created_at=datetime.now(),
+            created_at=datetime.now(UTC),
             issue_number=issue.number,
         )
 
@@ -269,8 +269,8 @@ class ClaudeLocalProvider(AgentProvider):
 
             return output
 
-        except FileNotFoundError:
-            raise RuntimeError("Claude Code CLI not found. Please install Claude Code CLI.")
+        except FileNotFoundError as e:
+            raise RuntimeError("Claude Code CLI not found. Please install Claude Code CLI.") from e
 
     def _build_planning_prompt(self, issue: Issue) -> str:
         """Build prompt for plan generation.
@@ -376,7 +376,7 @@ Commit your changes with descriptive commit messages.
 
         return f"""Review the following code changes:
 
-Task: {task_info.get('title', 'Unknown')}
+Task: {task_info.get("title", "Unknown")}
 
 Diff:
 {diff}
@@ -411,13 +411,13 @@ Provide your review in JSON format:
         """
         return f"""Resolve the following merge conflict:
 
-File: {conflict_info.get('file')}
+File: {conflict_info.get("file")}
 
 Conflict:
-{conflict_info.get('conflict_content')}
+{conflict_info.get("conflict_content")}
 
 Base version:
-{conflict_info.get('base_content', '')}
+{conflict_info.get("base_content", "")}
 
 Please provide the resolved file content, keeping the best parts from both versions
 and ensuring the code remains functional.

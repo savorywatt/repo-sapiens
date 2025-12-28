@@ -155,7 +155,7 @@ class UnsupportedHostError(GitDiscoveryError):
         """
         super().__init__(
             message=f"Unsupported Git host: {host}",
-            hint=(f"This tool only supports Gitea repositories.\n" f"Remote URL: {url}"),
+            hint=(f"This tool only supports Gitea repositories.\nRemote URL: {url}"),
         )
         self.host = host
         self.url = url

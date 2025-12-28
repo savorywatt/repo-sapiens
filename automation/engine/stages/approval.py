@@ -54,14 +54,12 @@ class ApprovalStage(WorkflowStage):
         if not approved:
             for comment in comments:
                 comment_lower = comment.body.lower().strip()
-                if any(keyword in comment_lower for keyword in self.APPROVAL_KEYWORDS):
-                    if not self._is_bot_comment(comment.body):
-                        approved = True
-                        approver = comment.author
-                        log.info(
-                            "approval_detected_via_comment", issue=issue.number, approver=approver
-                        )
-                        break
+                has_keyword = any(keyword in comment_lower for keyword in self.APPROVAL_KEYWORDS)
+                if has_keyword and not self._is_bot_comment(comment.body):
+                    approved = True
+                    approver = comment.author
+                    log.info("approval_detected_via_comment", issue=issue.number, approver=approver)
+                    break
 
         if not approved:
             log.debug("not_yet_approved", issue=issue.number)
@@ -144,7 +142,9 @@ class ApprovalStage(WorkflowStage):
             await self.git.add_comment(original_issue_number, "\n".join(comment_parts))
 
             # Remove awaiting-approval, add in-progress
-            updated_labels = [l for l in original_issue.labels if l != "awaiting-approval"]
+            updated_labels = [
+                label for label in original_issue.labels if label != "awaiting-approval"
+            ]
             updated_labels.append("in-progress")
             await self.git.update_issue(original_issue_number, labels=updated_labels)
 
@@ -194,7 +194,7 @@ class ApprovalStage(WorkflowStage):
         lines = body.split("\n")
         current_task = None
 
-        for i, line in enumerate(lines):
+        for line in lines:
             match = re.match(task_pattern, line)
             if match:
                 if current_task:

@@ -59,11 +59,11 @@ class OllamaProvider(AgentProvider):
             else:
                 log.info("ollama_model_ready", model=self.model)
 
-        except httpx.ConnectError:
+        except httpx.ConnectError as e:
             log.error("ollama_not_running", url=self.base_url)
             raise RuntimeError(
-                f"Ollama not running at {self.base_url}. " "Start it with: ollama serve"
-            )
+                f"Ollama not running at {self.base_url}. Start it with: ollama serve"
+            ) from e
         except Exception as e:
             log.error("ollama_connection_failed", error=str(e))
             raise
@@ -180,7 +180,8 @@ Create a detailed, actionable development plan following this EXACT format:
 # Tasks
 
 ## 1. [First Task Title]
-[Detailed description of what needs to be done for this task. Be specific about files, components, and implementation details.]
+[Detailed description of what needs to be done for this task. Be specific
+about files, components, and implementation details.]
 
 ## 2. [Second Task Title]
 [Detailed description]
@@ -257,8 +258,10 @@ IMPORTANT:
             def __getattr__(self, key):
                 try:
                     return self[key]
-                except KeyError:
-                    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+                except KeyError as e:
+                    raise AttributeError(
+                        f"'{type(self).__name__}' object has no attribute '{key}'"
+                    ) from e
 
             def __setattr__(self, key, value):
                 self[key] = value
@@ -293,16 +296,16 @@ IMPORTANT:
 
         prompt = f"""You are implementing a software development task.
 
-**Project**: {original_issue.get('title', 'Unknown')}
-{original_issue.get('body', '')}
+**Project**: {original_issue.get("title", "Unknown")}
+{original_issue.get("body", "")}
 
-**Your Task ({context.get('task_number')}/{context.get('total_tasks')})**: {task.title}
+**Your Task ({context.get("task_number")}/{context.get("total_tasks")})**: {task.title}
 
 {task.description}
 
 **Context**:
-- Branch: {context.get('branch', 'main')}
-- Working directory: {context.get('workspace', '.')}
+- Branch: {context.get("branch", "main")}
+- Working directory: {context.get("workspace", ".")}
 
 **Instructions**:
 Describe the EXACT implementation steps and code changes needed for this task.
@@ -350,7 +353,7 @@ Focus on making this task complete and working.
         """
         prompt = f"""You are a senior code reviewer. Review this code change.
 
-**Context**: {context.get('description', 'Code review')}
+**Context**: {context.get("description", "Code review")}
 
 **Changes**:
 ```diff
@@ -390,11 +393,11 @@ Start your response with either "APPROVE" or "REQUEST_CHANGES".
         """
         prompt = f"""Resolve this merge conflict.
 
-**File**: {conflict_info.get('file', 'unknown')}
+**File**: {conflict_info.get("file", "unknown")}
 
 **Conflict**:
 ```
-{conflict_info.get('content', '')}
+{conflict_info.get("content", "")}
 ```
 
 Provide the resolved content without conflict markers (<<<<<<, ======, >>>>>>).

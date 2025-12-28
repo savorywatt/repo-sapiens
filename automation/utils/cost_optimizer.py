@@ -293,7 +293,7 @@ class CostOptimizer:
         # Check if we're using expensive models too often
         if actual_costs["implementation"] > actual_costs["total"] * 0.8:
             recommendations.append(
-                "High proportion of advanced model usage - " "review task complexity assessments"
+                "High proportion of advanced model usage - review task complexity assessments"
             )
 
         return recommendations

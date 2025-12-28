@@ -11,6 +11,7 @@ Key Components:
     - ClaudeLocalProvider: Local Claude Code CLI
     - ExternalAgentProvider: External Claude/Goose CLI
     - OllamaProvider: Ollama local inference
+    - ReActAgentProvider: ReAct agent using Ollama + local tools
 
 Git Providers Support:
     - Issue management (create, read, update, comment)
@@ -29,4 +30,15 @@ Example:
     >>> from automation.providers import GiteaRestProvider, ClaudeLocalProvider
     >>> git = GiteaRestProvider(base_url="...", token="...", owner="...", repo="...")
     >>> agent = ClaudeLocalProvider(model="claude-opus", working_dir=".")
+
+    >>> from automation.agents import ReActAgentProvider
+    >>> react = ReActAgentProvider(working_dir=".")
+    >>> result = await react.execute_task(task, {})
 """
+
+from automation.providers.base import AgentProvider, GitProvider
+
+__all__ = [
+    "AgentProvider",
+    "GitProvider",
+]

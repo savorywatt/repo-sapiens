@@ -231,7 +231,7 @@ def test_credentials(master_password: str | None):
         click.echo("  Install with: pip install keyring")
 
     # Test environment backend
-    env_backend = EnvironmentBackend()
+    _env_backend = EnvironmentBackend()  # Initialized for availability check
     click.echo("Environment backend: ", nl=False)
     click.echo(click.style("Available", fg="green"))
 

@@ -5,15 +5,16 @@ Security demonstration for the template system.
 This script demonstrates the security features that prevent various
 attack vectors in the template rendering system.
 """
+
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from automation.rendering import SecureTemplateEngine
 from automation.rendering.filters import safe_identifier, safe_url
 from automation.rendering.security import check_rendered_output
 from automation.rendering.validators import validate_template_context
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 
 def demo_sandboxed_execution():
@@ -66,14 +67,14 @@ def demo_input_validation():
 
     for url in safe_urls:
         try:
-            result = safe_url(url)
+            safe_url(url)
             print(f"  PASS: {url}")
         except ValueError as e:
             print(f"  FAIL: {url} - {e}")
 
     for url in dangerous_urls:
         try:
-            result = safe_url(url)
+            safe_url(url)
             print(f"  FAIL: {url} should have been blocked")
         except ValueError:
             print(f"  PASS: Blocked {url}")
@@ -85,14 +86,14 @@ def demo_input_validation():
 
     for identifier in safe_ids:
         try:
-            result = safe_identifier(identifier)
+            safe_identifier(identifier)
             print(f"  PASS: {identifier}")
         except ValueError as e:
             print(f"  FAIL: {identifier} - {e}")
 
     for identifier in dangerous_ids:
         try:
-            result = safe_identifier(identifier)
+            safe_identifier(identifier)
             print(f"  FAIL: {identifier} should have been blocked")
         except ValueError:
             print(f"  PASS: Blocked {identifier}")
@@ -117,7 +118,7 @@ def demo_path_validation():
         safe_paths = ["safe.yaml.j2"]
         for path in safe_paths:
             try:
-                validated = engine.validate_template_path(path)
+                engine.validate_template_path(path)
                 print(f"  PASS: {path}")
             except Exception as e:
                 print(f"  FAIL: {path} - {e}")
@@ -132,7 +133,7 @@ def demo_path_validation():
         ]
         for path in dangerous_paths:
             try:
-                validated = engine.validate_template_path(path)
+                engine.validate_template_path(path)
                 print(f"  FAIL: {path} should have been blocked")
             except Exception:
                 print(f"  PASS: Blocked {path}")

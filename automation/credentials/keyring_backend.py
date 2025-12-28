@@ -7,6 +7,7 @@ Platform Support:
 """
 
 import logging
+from typing import cast
 
 try:
     import keyring
@@ -89,7 +90,7 @@ class KeyringBackend:
         try:
             # Namespace credentials under 'builder' to avoid conflicts
             full_service = f"builder/{service}"
-            credential = keyring.get_password(full_service, key)
+            credential = cast(str | None, keyring.get_password(full_service, key))
 
             if credential is not None:
                 logger.debug(f"Retrieved credential from keyring: {service}/{key}")

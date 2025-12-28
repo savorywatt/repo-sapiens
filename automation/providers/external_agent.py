@@ -21,6 +21,7 @@ class ExternalAgentProvider(AgentProvider):
         model: str = "claude-sonnet-4.5",
         working_dir: str | None = None,
         qa_handler: Any | None = None,
+        goose_config: dict[str, Any] | None = None,
     ):
         """Initialize external agent provider.
 
@@ -29,11 +30,13 @@ class ExternalAgentProvider(AgentProvider):
             model: Model to use
             working_dir: Working directory for agent execution
             qa_handler: Interactive Q&A handler for agent questions
+            goose_config: Goose-specific configuration (toolkit, temperature, etc.)
         """
         self.agent_type = agent_type
         self.model = model
         self.working_dir = working_dir or os.getcwd()
         self.qa_handler = qa_handler
+        self.goose_config = goose_config or {}
         self.current_issue_number: int | None = None
 
     async def connect(self) -> None:
@@ -53,9 +56,9 @@ class ExternalAgentProvider(AgentProvider):
                 log.info("agent_cli_available", agent=self.agent_type)
             else:
                 log.warning("agent_cli_check_failed", agent=self.agent_type, code=result.returncode)
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             log.error("agent_cli_not_found", agent=self.agent_type)
-            raise RuntimeError(f"{cmd} CLI not found in PATH")
+            raise RuntimeError(f"{cmd} CLI not found in PATH") from e
 
     async def execute_prompt(
         self,
@@ -156,26 +159,60 @@ class ExternalAgentProvider(AgentProvider):
         """Execute prompt using Goose CLI.
 
         Goose runs in the current directory and modifies files directly.
+        Uses 'goose session start' to run a one-shot session.
         """
-        # Goose can accept prompts directly
-        cmd = ["goose", "run", prompt]
+        # Build Goose command with configuration options
+        cmd = ["goose", "session", "start"]
 
-        log.debug("running_goose", cmd=cmd, cwd=self.working_dir)
+        # Add model if specified
+        if self.model:
+            cmd.extend(["--model", self.model])
+
+        # Add toolkit
+        toolkit = self.goose_config.get("toolkit", "default")
+        cmd.extend(["--toolkit", toolkit])
+
+        # Add temperature if specified
+        if "temperature" in self.goose_config:
+            temp = self.goose_config["temperature"]
+            cmd.extend(["--temperature", str(temp)])
+
+        # Add LLM provider if specified
+        if "llm_provider" in self.goose_config:
+            provider = self.goose_config["llm_provider"]
+            cmd.extend(["--provider", provider])
+
+        # Pass prompt via stdin for large prompts
+        log.debug(
+            "running_goose",
+            cmd=" ".join(cmd),
+            cwd=self.working_dir,
+            prompt_length=len(prompt),
+            config=self.goose_config,
+        )
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=self.working_dir,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout, stderr = await process.communicate()
+        stdout, stderr = await process.communicate(input=prompt.encode("utf-8"))
 
         success = process.returncode == 0
         output = stdout.decode("utf-8") if stdout else ""
         error_output = stderr.decode("utf-8") if stderr else ""
 
         files_changed = self._detect_changed_files(output)
+
+        log.info(
+            "goose_execution_complete",
+            success=success,
+            output_length=len(output),
+            error_length=len(error_output),
+        )
 
         return {
             "success": success,
@@ -310,8 +347,10 @@ Make each task specific and actionable. Include 3-10 tasks that break down the w
             def __getattr__(self, key):
                 try:
                     return self[key]
-                except KeyError:
-                    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'")
+                except KeyError as e:
+                    raise AttributeError(
+                        f"'{type(self).__name__}' object has no attribute '{key}'"
+                    ) from e
 
             def __setattr__(self, key, value):
                 self[key] = value
@@ -343,7 +382,7 @@ For each task, provide:
 Format as JSON list.
 """
 
-        result = await self.execute_prompt(prompt)
+        await self.execute_prompt(prompt)
 
         # Would parse JSON and create Task objects
         # Simplified for now
@@ -357,19 +396,23 @@ Format as JSON list.
         # Get original issue context
         original_issue = context.get("original_issue", {})
 
-        prompt = f"""You are implementing Task {context.get('task_number')} of {context.get('total_tasks')} for a development project.
+        task_num = context.get("task_number")
+        total_tasks = context.get("total_tasks")
+        prompt = f"""You are implementing Task {task_num} of {total_tasks} """
+        prompt += """for a development project.
 
-**Original Project**: {original_issue.get('title', 'Unknown')}
-{original_issue.get('body', '')}
+**Original Project**: """
+        prompt += f"""{original_issue.get("title", "Unknown")}
+{original_issue.get("body", "")}
 
-**Your Task ({context.get('task_number')}/{context.get('total_tasks')})**: {task.title}
+**Your Task ({context.get("task_number")}/{context.get("total_tasks")})**: {task.title}
 
 **Task Description**:
 {task.description}
 
 **Context**:
-- Branch: {context.get('branch', 'main')}
-- Working directory: {context.get('workspace', '.')}
+- Branch: {context.get("branch", "main")}
+- Working directory: {context.get("workspace", ".")}
 
 **CRITICAL Instructions**:
 1. You MUST create or modify actual files for this task
@@ -444,7 +487,7 @@ Please continue with the task using this information.
 {diff}
 
 Context:
-{context.get('description', '')}
+{context.get("description", "")}
 
 Please provide:
 1. Overall assessment (approve/request changes)
@@ -469,10 +512,10 @@ Be concise and focus on critical issues.
         """Resolve merge conflict."""
         prompt = f"""Resolve the following merge conflict:
 
-File: {conflict_info.get('file', 'unknown')}
+File: {conflict_info.get("file", "unknown")}
 
 Conflict markers:
-{conflict_info.get('content', '')}
+{conflict_info.get("content", "")}
 
 Please provide the resolved content without conflict markers.
 """

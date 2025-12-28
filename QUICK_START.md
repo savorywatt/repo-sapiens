@@ -2,14 +2,43 @@
 
 Get the builder automation running in 5 minutes!
 
-## Option 1: Docker (Easiest)
+## Option 1: One-Command Setup (Recommended)
+
+```bash
+# 1. Install
+pip install repo-agent
+
+# 2. Navigate to your Git repository
+cd /path/to/your/repo
+
+# 3. Initialize (interactive setup)
+repo-agent init
+
+# 4. Done! Now run the daemon
+repo-agent daemon --interval 60
+```
+
+**That's it!** The init command will:
+- Auto-discover your repository configuration
+- **Detect and let you choose your AI agent** (Claude Code or Goose AI)
+- **Select LLM provider** (for Goose: OpenAI, Anthropic, Ollama, OpenRouter, Groq)
+- Prompt for credentials
+- Store them securely
+- Generate config file
+- Guide you through Gitea Actions secrets setup
+
+💡 **New to agent selection?** See [AGENT_COMPARISON.md](docs/AGENT_COMPARISON.md) to choose between Claude and Goose!
+
+---
+
+## Option 2: Docker (Easiest for CI/CD)
 
 ```bash
 # 1. Copy environment file
 cp .env.example .env
 
 # 2. Edit with your credentials
-nano .env  # Set GITEA_TOKEN, CLAUDE_API_KEY, etc.
+nano .env  # Set GITEA_TOKEN, CLAUDE_API_KEY (or OPENAI_API_KEY for Goose), etc.
 
 # 3. Run!
 docker-compose up -d
@@ -22,7 +51,7 @@ docker-compose logs -f builder
 
 ---
 
-## Option 2: Local Installation
+## Option 3: Local Installation
 
 ```bash
 # 1. Run setup script
@@ -42,7 +71,7 @@ automation process-all
 
 ---
 
-## Option 3: Direct Docker Run
+## Option 4: Direct Docker Run
 
 ```bash
 docker run -it \
@@ -97,7 +126,11 @@ AUTOMATION__REPOSITORY__NAME=myrepo
 
 **Optional:**
 ```bash
-AUTOMATION__AGENT_PROVIDER__API_KEY=sk-ant-xxx  # For Claude API
+# For Claude API
+AUTOMATION__AGENT_PROVIDER__API_KEY=sk-ant-xxx
+# Or for Goose with OpenAI
+AUTOMATION__AGENT_PROVIDER__API_KEY=sk-proj-xxx
+
 AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS=3
 ```
 
@@ -164,7 +197,7 @@ The builder automation:
 1. **Monitors** Gitea for issues with specific labels
 2. **Creates** development plans using AI
 3. **Breaks down** plans into executable tasks
-4. **Implements** tasks using Claude Code
+4. **Implements** tasks using your chosen AI agent (Claude Code or Goose AI)
 5. **Reviews** code changes automatically
 6. **Runs** QA (builds and tests)
 7. **Merges** completed work

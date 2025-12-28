@@ -387,7 +387,7 @@ class TestCredentialReferencePatterns:
         set_resolver(mock_resolver)
 
         # These don't match standard patterns but should still be passed to resolver
-        result = resolve_credential_string("@unknown:service/key")
+        resolve_credential_string("@unknown:service/key")
 
         # Resolver gets called with the literal value
         mock_resolver.resolve.assert_called_once_with("@unknown:service/key")
@@ -399,7 +399,7 @@ class TestCredentialReferencePatterns:
         set_resolver(mock_resolver)
 
         # Missing slash - treated as literal
-        result = resolve_credential_string("@keyring:servicekeyw")
+        resolve_credential_string("@keyring:servicekeyw")
 
         mock_resolver.resolve.assert_called_once()
 
@@ -410,7 +410,7 @@ class TestCredentialReferencePatterns:
         set_resolver(mock_resolver)
 
         # Lowercase - pattern doesn't match, treated as literal
-        result = resolve_credential_string("${lowercase_var}")
+        resolve_credential_string("${lowercase_var}")
 
         mock_resolver.resolve.assert_called_once_with("${lowercase_var}")
 
@@ -659,5 +659,5 @@ class TestBackendCompatibility:
 
         # Generic exceptions are not caught by the credential error handler
         # They will propagate as-is
-        with pytest.raises(Exception):
+        with pytest.raises(Exception):  # noqa: B017
             resolve_credential_string("@keyring:service/key")

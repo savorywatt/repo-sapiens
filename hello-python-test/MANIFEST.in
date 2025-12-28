@@ -1,3 +1,0 @@
-include README.md
-include LICENSE
-include src/hello_python_test/py.typed

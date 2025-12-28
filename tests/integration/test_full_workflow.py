@@ -1,6 +1,6 @@
 """Integration tests for full workflow."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -26,8 +26,8 @@ async def test_complete_workflow(mock_settings, state_manager):
         body="Implement test feature",
         state=IssueState.OPEN,
         labels=["needs-planning"],
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         author="testuser",
         url="https://example.com/issues/1",
     )
@@ -54,7 +54,7 @@ async def test_complete_workflow(mock_settings, state_manager):
             ),
         ],
         file_path="plans/1-test-feature.md",
-        created_at=datetime.now(),
+        created_at=datetime.now(UTC),
         issue_number=1,
     )
 
@@ -86,8 +86,8 @@ async def test_complete_workflow(mock_settings, state_manager):
         body="Review plan",
         state=IssueState.OPEN,
         labels=["plan-review"],
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         author="bot",
         url="https://example.com/issues/2",
     )
@@ -157,7 +157,7 @@ async def test_parallel_task_execution(mock_settings, state_manager):
     assert mock_agent.execute_task.call_count == 3
 
     # Verify state shows all tasks completed
-    state = await state_manager.load_state("1")
-    for task in tasks:
+    _state = await state_manager.load_state("1")
+    for _task in tasks:
         # Tasks may not all be in state if mocking isn't perfect, but verify logic
         pass

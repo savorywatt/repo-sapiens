@@ -6,7 +6,7 @@ features to prevent template injection and other attacks.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from jinja2 import (
     FileSystemLoader,
@@ -132,8 +132,8 @@ class SecureTemplateEngine:
         # Ensure the resolved path is within template_dir
         try:
             requested_path.relative_to(self.template_dir)
-        except ValueError:
-            raise ValueError(f"Template path escapes template directory: {template_path}")
+        except ValueError as e:
+            raise ValueError(f"Template path escapes template directory: {template_path}") from e
 
         # Ensure file exists
         if not requested_path.exists():
@@ -174,7 +174,7 @@ class SecureTemplateEngine:
 
         # Load and render template
         template = self.env.get_template(template_path)
-        rendered = template.render(**context)
+        rendered = cast(str, template.render(**context))
 
         return rendered
 

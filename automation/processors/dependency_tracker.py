@@ -200,9 +200,8 @@ class DependencyTracker:
         visited: set[str] = set()
 
         for task_id in self.tasks:
-            if task_id not in visited:
-                if has_cycle(task_id, visited, set()):
-                    raise ValueError(f"Circular dependency detected involving task {task_id}")
+            if task_id not in visited and has_cycle(task_id, visited, set()):
+                raise ValueError(f"Circular dependency detected involving task {task_id}")
 
         log.info("dependencies_validated", task_count=len(self.tasks))
         return True

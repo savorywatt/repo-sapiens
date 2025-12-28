@@ -4,6 +4,7 @@ Improves performance through connection reuse and HTTP/2 multiplexing.
 """
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -105,7 +106,7 @@ class HTTPConnectionPool:
         return await self._client.delete(path, **kwargs)
 
     @asynccontextmanager
-    async def request(self, method: str, path: str, **kwargs: Any):
+    async def request(self, method: str, path: str, **kwargs: Any) -> AsyncIterator[httpx.Response]:
         """Context manager for making requests."""
         if self._client is None:
             await self.initialize()

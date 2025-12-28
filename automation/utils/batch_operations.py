@@ -119,7 +119,8 @@ class ParallelBatchProcessor:
             elif isinstance(batch_result, list):
                 results.extend(batch_result)
             else:
-                results.append(batch_result)
+                # After exception check, batch_result must be of type R
+                results.append(batch_result)  # type: ignore[arg-type]  # Safe after exception check
 
         log.info("parallel_batch_processing_complete", total_results=len(results))
         return results
@@ -145,7 +146,7 @@ class BatchOperations:
             tasks = [self.git.create_issue(**issue_data) for issue_data in batch]
             return await asyncio.gather(*tasks)
 
-        results = await self.batch_processor.process_batches(issues_data, create_batch)
+        results: list[Any] = await self.batch_processor.process_batches(issues_data, create_batch)
 
         log.info("issues_created", count=len(results))
         return results
@@ -161,7 +162,7 @@ class BatchOperations:
             ]
             return await asyncio.gather(*tasks)
 
-        results = await self.batch_processor.process_batches(updates, update_batch)
+        results: list[Any] = await self.batch_processor.process_batches(updates, update_batch)
 
         log.info("issues_updated", count=len(results))
         return results
@@ -176,7 +177,7 @@ class BatchOperations:
             ]
             return await asyncio.gather(*tasks)
 
-        results = await self.batch_processor.process_batches(comments, comment_batch)
+        results: list[Any] = await self.batch_processor.process_batches(comments, comment_batch)
 
         log.info("comments_added", count=len(results))
         return results
@@ -189,7 +190,7 @@ class BatchOperations:
             tasks = [self.git.get_issue(issue_num) for issue_num in batch]
             return await asyncio.gather(*tasks)
 
-        results = await self.batch_processor.process_batches(issue_numbers, get_batch)
+        results: list[Any] = await self.batch_processor.process_batches(issue_numbers, get_batch)
 
         log.info("issues_retrieved", count=len(results))
         return results

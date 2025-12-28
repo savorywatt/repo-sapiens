@@ -190,11 +190,7 @@ class TestExternalServiceError:
         """Test ExternalServiceError with response text."""
         message = "API error"
         response_text = "Internal server error"
-        error = ExternalServiceError(
-            message,
-            status_code=500,
-            response_text=response_text
-        )
+        error = ExternalServiceError(message, status_code=500, response_text=response_text)
 
         assert error.response_text == response_text
         assert error.status_code == 500
@@ -204,11 +200,7 @@ class TestExternalServiceError:
         message = "Request failed"
         status_code = 400
         response_text = "Bad request"
-        error = ExternalServiceError(
-            message,
-            status_code=status_code,
-            response_text=response_text
-        )
+        error = ExternalServiceError(message, status_code=status_code, response_text=response_text)
 
         assert error.status_code == status_code
         assert error.response_text == response_text

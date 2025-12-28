@@ -228,11 +228,6 @@ class TestAllTemplates:
                 rendered = renderer.render_workflow(template_name, config)
                 workflow = yaml.safe_load(rendered)
 
-                # Check for env vars at workflow level or job level
-                has_env = "env" in workflow or any(
-                    "env" in job for job in workflow.get("jobs", {}).values()
-                )
-
                 # Some templates might not have env at root level but should still be valid
                 assert workflow is not None, f"{template_name}: Invalid YAML structure"
                 assert "jobs" in workflow, f"{template_name}: Missing jobs section"
@@ -242,7 +237,7 @@ class TestAllTemplates:
 
     def test_all_templates_use_security_filters(self, renderer, base_config):
         """Test that all templates use security filters for user input."""
-        config = WorkflowConfig(
+        _config = WorkflowConfig(
             **base_config,
             workflow_name="Test Workflow",
             package_name="test-package",
@@ -321,7 +316,8 @@ class TestAllTemplates:
                                 # This is informational - some variables may be safe without filters
                                 # but we log them for review
                                 print(
-                                    f"Warning: {template_name} has {var_name} without explicit security filter"
+                                    f"Warning: {template_name} has {var_name} "
+                                    "without explicit security filter"
                                 )
 
             except Exception as e:
@@ -342,7 +338,7 @@ class TestAllTemplates:
         assert all(path.exists() for path in results.values())
 
         # Validate each output file
-        for template_name, output_path in results.items():
+        for _template_name, output_path in results.items():
             content = output_path.read_text()
             workflow = yaml.safe_load(content)
 

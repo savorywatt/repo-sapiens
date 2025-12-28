@@ -6,10 +6,10 @@ with security validation and error handling.
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .engine import SecureTemplateEngine
-from .validators import WorkflowConfig, validate_template_context
+from .validators import WorkflowConfig
 
 __all__ = [
     "SecureTemplateEngine",

@@ -6,6 +6,7 @@ for Git operations (Gitea, GitHub) and AI agents (Claude, OpenAI).
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from automation.models.domain import (
     Branch,
@@ -258,7 +259,7 @@ class AgentProvider(ABC):
         pass
 
     @abstractmethod
-    async def execute_task(self, task: Task, context: dict) -> TaskResult:
+    async def execute_task(self, task: Task, context: dict[str, Any]) -> TaskResult:
         """Execute a development task.
 
         Args:
@@ -271,7 +272,7 @@ class AgentProvider(ABC):
         pass
 
     @abstractmethod
-    async def review_code(self, diff: str, context: dict) -> Review:
+    async def review_code(self, diff: str, context: dict[str, Any]) -> Review:
         """Review code changes.
 
         Args:
@@ -284,7 +285,7 @@ class AgentProvider(ABC):
         pass
 
     @abstractmethod
-    async def resolve_conflict(self, conflict_info: dict) -> str:
+    async def resolve_conflict(self, conflict_info: dict[str, Any]) -> str:
         """Resolve merge conflict.
 
         Args:

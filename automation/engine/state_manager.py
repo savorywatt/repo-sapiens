@@ -7,10 +7,11 @@ state to disk with support for atomic updates via transactions.
 
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiofiles
 import structlog
@@ -21,7 +22,7 @@ log = structlog.get_logger(__name__)
 class StateManager:
     """Manage workflow state with atomic file operations."""
 
-    def __init__(self, state_dir: str):
+    def __init__(self, state_dir: str | Path):
         self.state_dir = Path(state_dir)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self._locks: dict[str, asyncio.Lock] = {}
@@ -48,14 +49,14 @@ class StateManager:
 
             async with aiofiles.open(state_path) as f:
                 content = await f.read()
-                return json.loads(content)
+                return cast(dict[str, Any], json.loads(content))
 
     async def save_state(self, plan_id: str, state: dict[str, Any]) -> None:
         """Atomically save state for plan_id."""
         state_path = self._get_state_path(plan_id)
 
         async with self._get_lock(plan_id):
-            state["updated_at"] = datetime.now().isoformat()
+            state["updated_at"] = datetime.now(UTC).isoformat()
             state["status"] = self._calculate_overall_status(state)
             await self._write_state(state_path, state)
 
@@ -69,7 +70,7 @@ class StateManager:
         tmp_path.replace(path)
 
     @asynccontextmanager
-    async def transaction(self, plan_id: str):
+    async def transaction(self, plan_id: str) -> AsyncIterator[dict[str, Any]]:
         """Context manager for atomic state updates."""
         async with self._get_lock(plan_id):
             state = await self.load_state(plan_id)
@@ -85,8 +86,8 @@ class StateManager:
         return {
             "plan_id": plan_id,
             "status": "pending",
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
             "stages": {
                 "planning": {"status": "pending", "data": {}},
                 "plan_review": {"status": "pending", "data": {}},
@@ -117,19 +118,21 @@ class StateManager:
 
         return "pending"
 
-    async def mark_stage_complete(self, plan_id: str, stage: str, data: dict | None = None) -> None:
+    async def mark_stage_complete(
+        self, plan_id: str, stage: str, data: dict[str, Any] | None = None
+    ) -> None:
         """Mark a stage as completed."""
         async with self.transaction(plan_id) as state:
             if stage in state["stages"]:
                 state["stages"][stage]["status"] = "completed"
-                state["stages"][stage]["completed_at"] = datetime.now().isoformat()
+                state["stages"][stage]["completed_at"] = datetime.now(UTC).isoformat()
                 if data:
                     state["stages"][stage]["data"] = data
 
         log.info("stage_completed", plan_id=plan_id, stage=stage)
 
     async def mark_task_status(
-        self, plan_id: str, task_id: str, status: str, data: dict | None = None
+        self, plan_id: str, task_id: str, status: str, data: dict[str, Any] | None = None
     ) -> None:
         """Update task status."""
         async with self.transaction(plan_id) as state:
@@ -137,7 +140,7 @@ class StateManager:
                 state["tasks"][task_id] = {}
 
             state["tasks"][task_id]["status"] = status
-            state["tasks"][task_id]["updated_at"] = datetime.now().isoformat()
+            state["tasks"][task_id]["updated_at"] = datetime.now(UTC).isoformat()
             if data:
                 state["tasks"][task_id]["data"] = data
 

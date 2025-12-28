@@ -1,7 +1,7 @@
 """Interactive Q&A system for agent-to-user communication via issue comments."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import structlog
 
@@ -53,23 +53,26 @@ class InteractiveQAHandler:
         log.info("question_posted", issue=issue_number, comment_id=question_comment.id)
 
         # Wait for response
-        timeout = datetime.now() + timedelta(minutes=timeout_minutes)
+        timeout = datetime.now(UTC) + timedelta(minutes=timeout_minutes)
 
-        while datetime.now() < timeout:
+        while datetime.now(UTC) < timeout:
             # Get all comments since our question
             comments = await self.git.get_comments(issue_number)
 
             # Look for responses after our question
             for comment in comments:
-                if comment.created_at > question_time and comment.id != question_comment.id:
-                    # Check if this is a response (doesn't start with bot markers)
-                    if not self._is_bot_comment(comment.body):
-                        log.info(
-                            "user_response_received",
-                            issue=issue_number,
-                            comment_id=comment.id,
-                        )
-                        return comment.body
+                if (
+                    comment.created_at > question_time
+                    and comment.id != question_comment.id
+                    and not self._is_bot_comment(comment.body)
+                ):
+                    # This is a user response (doesn't start with bot markers)
+                    log.info(
+                        "user_response_received",
+                        issue=issue_number,
+                        comment_id=comment.id,
+                    )
+                    return comment.body
 
             # Wait before polling again
             await asyncio.sleep(self.poll_interval)
@@ -137,7 +140,10 @@ class InteractiveQAHandler:
             [
                 "",
                 "---",
-                "*Please reply to this comment with your answer. The agent will continue once you respond.*",
+                (
+                    "*Please reply to this comment with your answer. "
+                    "The agent will continue once you respond.*"
+                ),
                 "",
                 "🤖 Posted by Builder Automation",
             ]

@@ -147,7 +147,7 @@ For real-time processing instead of cron-based:
    ```bash
    # On server
    uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
-   
+
    # Or with systemd service
    sudo systemctl enable automation-webhook
    sudo systemctl start automation-webhook

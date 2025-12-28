@@ -86,7 +86,8 @@ class WorkflowOrchestrator:
 
         log.info("found_issues", count=len(issues))
 
-        # Sort issues by number in ascending order (so tasks are processed 1, 2, 3... not 9, 8, 7...)
+        # Sort issues by number in ascending order
+        # (so tasks are processed 1, 2, 3... not 9, 8, 7...)
         issues.sort(key=lambda issue: issue.number)
 
         # Process each issue
@@ -242,7 +243,7 @@ class WorkflowOrchestrator:
                 )
 
                 # Update tracker based on results
-                for task, result in zip(batch, results):
+                for task, result in zip(batch, results, strict=False):
                     if isinstance(result, Exception):
                         tracker.mark_failed(task.id)
                         log.error(

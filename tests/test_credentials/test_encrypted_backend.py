@@ -29,7 +29,7 @@ class TestEncryptedFileBackend:
 
     def test_salt_generation(self, temp_path):
         """Test salt is generated and persisted."""
-        backend = EncryptedFileBackend(temp_path, "password")
+        _backend = EncryptedFileBackend(temp_path, "password")
 
         salt_file = temp_path.parent / "credentials.salt"
         assert salt_file.exists()
