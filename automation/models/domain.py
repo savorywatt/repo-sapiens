@@ -103,6 +103,7 @@ class TaskResult:
     files_changed: list[str] = field(default_factory=list)
     error: str | None = None
     execution_time: float = 0.0
+    output: str | None = None  # Agent's final answer/output
 
 
 @dataclass
