@@ -9,17 +9,34 @@ include pyproject.toml
 # Include automation package
 recursive-include automation *.py
 recursive-include automation/config *.yaml
+recursive-include automation/templates *.j2 *.json
 
 # Include type checking marker (PEP 561)
 include automation/py.typed
 
 # Exclude test files
 recursive-exclude tests *
-recursive-exclude automation/config playground_config.yaml
+recursive-exclude hello-python-test *
 
-# Exclude development files
+# Exclude config files with sensitive data
+recursive-exclude automation/config playground_config.yaml
+recursive-exclude automation/config ollama_config.yaml
+
+# Exclude development scripts
 exclude test_*.py
 exclude check_*.py
+exclude add_tasks_to_project.py
+exclude create_labels.py
+exclude find_execute_task.py
+exclude setup_workflow_labels.py
+exclude transfer_repos_to_org.py
+exclude verify_credentials.py
+
+# Exclude development files
 exclude *.sh
 exclude docker-compose.yml
 exclude Dockerfile
+
+# Exclude agent logs and plans
+recursive-exclude agents *
+recursive-exclude plans *

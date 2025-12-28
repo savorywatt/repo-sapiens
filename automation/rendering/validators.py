@@ -110,8 +110,9 @@ class WorkflowConfig(BaseModel):
             import warnings
 
             warnings.warn(
-                f"Using insecure HTTP for Gitea URL: {v}. " "Consider using HTTPS in production.",
+                f"Using insecure HTTP for Gitea URL: {v}. Consider using HTTPS in production.",
                 UserWarning,
+                stacklevel=2,
             )
 
         # Remove trailing slash for consistency
@@ -216,11 +217,11 @@ def validate_template_context(context: dict[str, Any]) -> None:
             raise ValueError(f"Null byte detected in field '{key}'")
 
     # Validate no excessively long values (DoS prevention)
-    MAX_VALUE_LENGTH = 10000
+    max_value_length = 10000
     for key, value in context.items():
-        if isinstance(value, str) and len(value) > MAX_VALUE_LENGTH:
+        if isinstance(value, str) and len(value) > max_value_length:
             raise ValueError(
-                f"Value for '{key}' exceeds maximum length " f"({len(value)} > {MAX_VALUE_LENGTH})"
+                f"Value for '{key}' exceeds maximum length ({len(value)} > {max_value_length})"
             )
 
     # Recursively check nested structures
@@ -228,11 +229,10 @@ def validate_template_context(context: dict[str, Any]) -> None:
         if isinstance(obj, dict):
             for k, v in obj.items():
                 check_nested(v, f"{path}.{k}" if path else k)
-        elif isinstance(obj, (list, tuple)):
+        elif isinstance(obj, list | tuple):
             for i, item in enumerate(obj):
                 check_nested(item, f"{path}[{i}]")
-        elif isinstance(obj, str):
-            if "\0" in obj:
-                raise ValueError(f"Null byte in nested value at {path}")
+        elif isinstance(obj, str) and "\0" in obj:
+            raise ValueError(f"Null byte in nested value at {path}")
 
     check_nested(context)

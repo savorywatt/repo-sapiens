@@ -3,7 +3,7 @@
 import structlog
 
 from automation.engine.stages.base import WorkflowStage
-from automation.models.domain import Issue
+from automation.models.domain import Issue, Task
 
 log = structlog.get_logger(__name__)
 
@@ -34,7 +34,7 @@ class PlanReviewStage(WorkflowStage):
                 raise ValueError("Could not extract plan_path from issue")
 
             log.info("reading_plan", path=plan_path)
-            plan_content = await self.git.get_file(
+            await self.git.get_file(
                 path=plan_path,
                 ref=self.settings.repository.default_branch,
             )

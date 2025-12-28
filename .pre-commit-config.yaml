@@ -1,0 +1,120 @@
+# Pre-commit hooks configuration for repo-sapiens
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+default_language_version:
+  python: python3.13
+
+# Automatically fix issues when possible
+default_stages: [pre-commit]
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        exclude: ^tests/.*snapshots/.*
+      - id: end-of-file-fixer
+        name: Fix end of files
+        exclude: ^tests/.*snapshots/.*
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: check-docstring-first
+        name: Check docstring is first
+      - id: debug-statements
+        name: Check for debugger imports
+      - id: check-ast
+        name: Check Python AST
+      - id: mixed-line-ending
+        name: Check mixed line endings
+        args: ['--fix=lf']
+
+  # Ruff - Fast Python linter and formatter (replaces Black, flake8, isort, and more)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      - id: ruff
+        name: Lint with Ruff
+        args: ['--fix', '--exit-non-zero-on-fix']
+      - id: ruff-format
+        name: Format code with Ruff
+
+  # MyPy - Static type checker
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Type check with MyPy
+        additional_dependencies:
+          - pydantic>=2.5.0
+          - pydantic-settings>=2.1.0
+          - types-PyYAML
+          - types-aiofiles
+        args: ['--ignore-missing-imports', '--allow-untyped-decorators', '--no-strict-optional', '--allow-untyped-calls', '--allow-incomplete-defs', '--allow-untyped-defs']
+        # Only check automation/ directory to avoid slow performance
+        files: ^automation/(config|git|rendering|credentials|cli)/
+        exclude: ^tests/
+
+  # Bandit - Security linter
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        name: Security scan with Bandit
+        args:
+          - '-c'
+          - 'pyproject.toml'
+        additional_dependencies: ['bandit[toml]']
+        # Run on source code, exclude tests
+        files: ^automation/
+        exclude: ^tests/
+
+  # pyupgrade - Automatically upgrade syntax for newer Python versions
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.0
+    hooks:
+      - id: pyupgrade
+        name: Upgrade Python syntax
+        args: ['--py311-plus']
+
+  # Check for common security issues in dependencies
+  # Note: Disabled by default as it can be slow and may have API rate limits
+  # Uncomment to enable dependency security checks
+  # - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
+  #   rev: v1.3.3
+  #   hooks:
+  #     - id: python-safety-dependencies-check
+  #       name: Check dependency security
+  #       files: pyproject.toml
+
+  # Validate pyproject.toml
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.16
+    hooks:
+      - id: validate-pyproject
+        name: Validate pyproject.toml
+
+  # Check for secrets (API keys, passwords, etc.)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detect secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: ^\.venv/|^venv/|^\.git/
+
+# Configuration for specific hooks
+# Additional configuration is in pyproject.toml

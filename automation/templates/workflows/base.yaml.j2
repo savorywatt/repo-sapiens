@@ -40,3 +40,18 @@ env:
   GITEA_OWNER: {{ owner | safe_identifier }}
   GITEA_REPO: {{ repo | safe_identifier }}
 {%- endmacro %}
+
+{% macro github_env_vars(url, owner, repo) -%}
+env:
+  GITHUB_URL: {{ url | safe_url }}
+  GITHUB_OWNER: {{ owner | safe_identifier }}
+  GITHUB_REPO: {{ repo | safe_identifier }}
+{%- endmacro %}
+
+{% macro git_env_vars(provider_type, url, owner, repo) -%}
+{%- if provider_type == 'github' -%}
+{{ github_env_vars(url, owner, repo) }}
+{%- else -%}
+{{ gitea_env_vars(url, owner, repo) }}
+{%- endif -%}
+{%- endmacro %}

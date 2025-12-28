@@ -5,7 +5,7 @@ This document illustrates the complete automation workflow.
 ## High-Level Flow
 
 ```
-Issue Created → Planning → Plan Review → Prompt Generation → 
+Issue Created → Planning → Plan Review → Prompt Generation →
 Implementation → Code Review → Merge → Pull Request
 ```
 

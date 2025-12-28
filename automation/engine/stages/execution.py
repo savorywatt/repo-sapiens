@@ -88,11 +88,11 @@ class TaskExecutionStage(WorkflowStage):
 
             # Create branch
             base_branch = self.settings.repository.default_branch
-            branch = await self.git.create_branch(branch_name, from_branch=base_branch)
+            await self.git.create_branch(branch_name, from_branch=base_branch)
             log.info("branch_created", branch=branch_name)
 
             # Checkout branch locally in the playground repo
-            import subprocess
+            import subprocess  # nosec B404 # Required for git operations with controlled input
             from pathlib import Path
 
             # Assume playground repo is in ../playground relative to builder
@@ -105,10 +105,10 @@ class TaskExecutionStage(WorkflowStage):
             log.info("checking_out_branch", branch=branch_name, path=str(playground_dir))
 
             # Fetch latest from remote
-            subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)
+            subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
 
             # Check if the plan branch exists on remote
-            branch_check = subprocess.run(
+            branch_check = subprocess.run(  # nosec B603 B607 # Git command with controlled input
                 ["git", "rev-parse", f"origin/{branch_name}"],
                 cwd=playground_dir,
                 capture_output=True,
@@ -117,7 +117,7 @@ class TaskExecutionStage(WorkflowStage):
             if branch_check.returncode == 0:
                 # Plan branch exists on remote, check it out and pull latest
                 log.info("plan_branch_exists_on_remote", branch=branch_name)
-                subprocess.run(
+                subprocess.run(  # nosec B603 B607 # Git command with controlled input
                     ["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
                     cwd=playground_dir,
                     check=True,
@@ -125,10 +125,10 @@ class TaskExecutionStage(WorkflowStage):
             else:
                 # Plan branch doesn't exist yet, create from base branch
                 log.info("creating_new_plan_branch", branch=branch_name, base=base_branch)
-                subprocess.run(
+                subprocess.run(  # nosec B603 B607 # Git command with controlled input
                     ["git", "checkout", f"origin/{base_branch}"], cwd=playground_dir, check=True
                 )
-                subprocess.run(
+                subprocess.run(  # nosec B603 B607 # Git command with controlled input
                     ["git", "checkout", "-B", branch_name], cwd=playground_dir, check=True
                 )
 
@@ -183,10 +183,10 @@ class TaskExecutionStage(WorkflowStage):
                 log.info("committing_changes", branch=branch_name)
 
                 # Git add all changes
-                subprocess.run(["git", "add", "."], cwd=playground_dir, check=True)
+                subprocess.run(["git", "add", "."], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
 
                 # Check if there are changes to commit
-                status_result = subprocess.run(
+                status_result = subprocess.run(  # nosec B603 B607 # Git command with controlled input
                     ["git", "status", "--porcelain"],
                     cwd=playground_dir,
                     capture_output=True,
@@ -222,13 +222,17 @@ class TaskExecutionStage(WorkflowStage):
                     else:
                         commit_type = "feat"
 
-                    commit_message = f"{commit_type}: {task_title} [TASK-{issue.number}]\n\nTask {task_num}/{total_tasks} for {plan_label}\nOriginal issue: #{original_issue_number}"
-                    subprocess.run(
+                    commit_message = (
+                        f"{commit_type}: {task_title} [TASK-{issue.number}]\n\n"
+                        f"Task {task_num}/{total_tasks} for {plan_label}\n"
+                        f"Original issue: #{original_issue_number}"
+                    )
+                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
                         ["git", "commit", "-m", commit_message], cwd=playground_dir, check=True
                     )
 
                     # Push to remote
-                    subprocess.run(
+                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
                         ["git", "push", "origin", branch_name], cwd=playground_dir, check=True
                     )
 
@@ -242,7 +246,7 @@ class TaskExecutionStage(WorkflowStage):
 
             # Update task issue labels FIRST (before PR update so checklist is accurate)
             # Update labels: remove 'execute', add 'review'
-            updated_labels = [l for l in issue.labels if l != "execute"]
+            updated_labels = [label for label in issue.labels if label != "execute"]
             updated_labels.append("review")
             await self.git.update_issue(issue.number, labels=updated_labels)
 
@@ -419,7 +423,10 @@ class TaskExecutionStage(WorkflowStage):
                 "",
                 "---",
                 "",
-                f"**Related Issues**: Closes #{task_issue.number}, Implements #{original_issue.number}",
+                (
+                    f"**Related Issues**: Closes #{task_issue.number}, "
+                    f"Implements #{original_issue.number}"
+                ),
                 "",
                 "🤖 Posted by Builder Automation",
             ]

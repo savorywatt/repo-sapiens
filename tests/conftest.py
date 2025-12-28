@@ -1,6 +1,6 @@
 """Pytest configuration and shared fixtures."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -35,8 +35,8 @@ def sample_issue() -> Issue:
         body="We need login, signup, and password reset functionality.",
         state=IssueState.OPEN,
         labels=["needs-planning"],
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         author="testuser",
         url="https://gitea.example.com/owner/repo/issues/42",
     )
@@ -64,7 +64,7 @@ def sample_plan() -> Plan:
         description="Complete authentication system",
         tasks=[],
         file_path="plans/42-user-authentication.md",
-        created_at=datetime.now(),
+        created_at=datetime.now(UTC),
     )
 
 

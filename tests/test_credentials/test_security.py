@@ -34,7 +34,7 @@ class TestCredentialSecurity:
             pytest.skip("Permission test only for Unix")
 
         file_path = tmp_path / "credentials.enc"
-        backend = EncryptedFileBackend(file_path, "password")
+        _backend = EncryptedFileBackend(file_path, "password")
 
         salt_file = file_path.parent / "credentials.salt"
 
@@ -152,7 +152,7 @@ class TestCredentialSecurity:
         resolver = CredentialResolver()
 
         # Resolve the credential
-        value = resolver.resolve("${SECRET_TOKEN}")
+        _value = resolver.resolve("${SECRET_TOKEN}")
 
         # Exception messages should not contain the actual value
         try:

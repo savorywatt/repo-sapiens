@@ -86,7 +86,12 @@ class SecurityAudit:
     Tracks suspicious activity and potential security issues.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize security audit logger.
+
+        Creates an empty event log for tracking security-related events
+        during template rendering operations.
+        """
         self.events: list[dict[str, Any]] = []
 
     def log_event(

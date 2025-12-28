@@ -87,7 +87,6 @@ class MultiRepoOrchestrator:
                 results[repo_name] = {"status": "skipped", "reason": "no_provider"}
                 continue
 
-            repo = self.repositories[repo_name]
             provider = self.providers[repo_name]
 
             try:
@@ -142,7 +141,7 @@ class MultiRepoOrchestrator:
 
         # Combine results
         results = {}
-        for repo_name, result in zip(repo_names, results_list):
+        for repo_name, result in zip(repo_names, results_list, strict=False):
             if isinstance(result, Exception):
                 results[repo_name] = {"status": "failed", "error": str(result)}
             else:
@@ -201,7 +200,7 @@ class MultiRepoOrchestrator:
 
 This issue is part of a multi-repository workflow triggered by:
 - Original Issue: {trigger_issue.title} (#{trigger_issue.number})
-- Original Repository: {context.get('source_repo', 'unknown')}
+- Original Repository: {context.get("source_repo", "unknown")}
 - Target Repository: {repo_name}
 
 ## Context
@@ -210,7 +209,7 @@ This issue is part of a multi-repository workflow triggered by:
 
 ## Additional Context
 
-{context.get('additional_context', 'No additional context provided.')}
+{context.get("additional_context", "No additional context provided.")}
 
 ---
 *This issue was automatically created by the multi-repository orchestrator.*

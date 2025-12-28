@@ -84,8 +84,7 @@ class MergeStage(WorkflowStage):
             # 8. Update plan issue
             await self.git.add_comment(
                 issue.number,
-                f"🎉 Pull request created: {pr_link}\n\n"
-                f"All tasks have been completed and merged.",
+                f"🎉 Pull request created: {pr_link}\n\nAll tasks have been completed and merged.",
             )
             await self.git.update_issue(issue.number, state="closed")
 
@@ -119,8 +118,6 @@ class MergeStage(WorkflowStage):
 
     def _get_plan_title(self, state: dict) -> str:
         """Get plan title from state."""
-        # Try to get from planning stage data
-        planning = state.get("stages", {}).get("planning", {})
         # Fallback to plan_id
         return f"Plan {state.get('plan_id', 'unknown')}"
 

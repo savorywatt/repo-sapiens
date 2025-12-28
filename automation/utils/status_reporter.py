@@ -1,6 +1,7 @@
 """Status reporting for posting updates to issues."""
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 
@@ -10,7 +11,7 @@ log = structlog.get_logger(__name__)
 class StatusReporter:
     """Report workflow status back to issues."""
 
-    def __init__(self, git):
+    def __init__(self, git: Any) -> None:
         """Initialize with git provider.
 
         Args:
@@ -18,7 +19,7 @@ class StatusReporter:
         """
         self.git = git
 
-    async def report_stage_start(self, issue, stage: str) -> None:
+    async def report_stage_start(self, issue: Any, stage: str) -> None:
         """Report that stage has started.
 
         Args:
@@ -29,12 +30,14 @@ class StatusReporter:
 
 Stage: **{stage}**
 Status: ⏳ In Progress
-Started: {datetime.now().isoformat()}
+Started: {datetime.now(UTC).isoformat()}
 """
         await self.git.add_comment(issue.number, message.strip())
         log.info("status_reported", issue=issue.number, stage=stage, status="started")
 
-    async def report_stage_complete(self, issue, stage: str, details: str | None = None) -> None:
+    async def report_stage_complete(
+        self, issue: Any, stage: str, details: str | None = None
+    ) -> None:
         """Report that stage completed successfully.
 
         Args:
@@ -46,14 +49,14 @@ Started: {datetime.now().isoformat()}
 
 Stage: **{stage}**
 Status: ✅ Completed
-Completed: {datetime.now().isoformat()}
+Completed: {datetime.now(UTC).isoformat()}
 
-{details or ''}
+{details or ""}
 """
         await self.git.add_comment(issue.number, message.strip())
         log.info("status_reported", issue=issue.number, stage=stage, status="completed")
 
-    async def report_stage_failed(self, issue, stage: str, error: str) -> None:
+    async def report_stage_failed(self, issue: Any, stage: str, error: str) -> None:
         """Report that stage failed.
 
         Args:
@@ -65,7 +68,7 @@ Completed: {datetime.now().isoformat()}
 
 Stage: **{stage}**
 Status: ❌ Failed
-Failed: {datetime.now().isoformat()}
+Failed: {datetime.now(UTC).isoformat()}
 
 **Error:**
 ```

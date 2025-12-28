@@ -626,14 +626,14 @@ class TestMemoryUsage:
 
         # Parse and check memory (basic check)
 
-        initial_objects = len(gc.get_objects()) if "gc" in dir() else 0
+        _initial_objects = len(gc.get_objects()) if "gc" in dir() else 0
 
         settings = AutomationSettings.from_yaml(str(config_path))
         assert settings is not None
 
     def test_state_file_memory_growth(self, tmp_path):
         """Profile memory growth when handling large state files."""
-        state_manager = StateManager(str(tmp_path / "state"))
+        _state_manager = StateManager(str(tmp_path / "state"))
 
         # Create progressively larger state
         for size in [10, 50, 100]:

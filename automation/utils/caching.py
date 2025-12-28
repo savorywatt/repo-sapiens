@@ -7,7 +7,7 @@ import asyncio
 import hashlib
 import json
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from typing import Any, TypeVar
 
@@ -34,7 +34,7 @@ class AsyncCache:
         async with self._lock:
             if key in self._cache:
                 value, timestamp = self._cache[key]
-                if datetime.now() - timestamp < self._ttl:
+                if datetime.now(UTC) - timestamp < self._ttl:
                     self._hits += 1
                     log.debug("cache_hit", key=key)
                     return value
@@ -53,7 +53,7 @@ class AsyncCache:
             if len(self._cache) >= self._max_size:
                 await self._evict_oldest()
 
-            self._cache[key] = (value, datetime.now())
+            self._cache[key] = (value, datetime.now(UTC))
             log.debug("cache_set", key=key)
 
     async def delete(self, key: str) -> bool:
@@ -98,7 +98,9 @@ class AsyncCache:
         }
 
 
-def cached(ttl_seconds: int = 300, key_prefix: str = "") -> Callable[[Callable], Callable]:
+def cached(
+    ttl_seconds: int = 300, key_prefix: str = ""
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator for caching async function results.
 
@@ -122,7 +124,9 @@ def cached(ttl_seconds: int = 300, key_prefix: str = "") -> Callable[[Callable],
                 "args": str(args),  # Simple string representation
                 "kwargs": str(sorted(kwargs.items())),
             }
-            key = hashlib.md5(json.dumps(key_data, sort_keys=True).encode()).hexdigest()
+            key = hashlib.md5(
+                json.dumps(key_data, sort_keys=True).encode(), usedforsecurity=False
+            ).hexdigest()
 
             # Try cache first
             cached_value = await cache.get(key)
@@ -148,7 +152,7 @@ class CacheKeyBuilder:
     def build_key(*parts: Any) -> str:
         """Build cache key from parts."""
         key_str = ":".join(str(part) for part in parts)
-        return hashlib.md5(key_str.encode()).hexdigest()
+        return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()
 
     @staticmethod
     def build_namespaced_key(namespace: str, *parts: Any) -> str:

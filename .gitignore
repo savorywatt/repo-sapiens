@@ -1,25 +1,43 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# Virtual environments
 venv/
 env/
 .env
-.venv
-.automation/state/*.json
-.automation/state/*.tmp
-*.log
+.venv/
+test_venv/
+
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
+coverage_output.txt
+
+# Build artifacts
 dist/
 build/
 *.egg-info/
+
+# Type checking / Linting
 .mypy_cache/
 .ruff_cache/
+
+# Editor files
 *.swp
 *.swo
 *~
 .DS_Store
+
+# Project state
+.automation/
+.benchmarks/
+.builder/
 .credentials
+
+# Secrets baseline (keep in repo for detect-secrets)
+# .secrets.baseline

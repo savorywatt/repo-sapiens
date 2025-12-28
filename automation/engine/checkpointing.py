@@ -5,7 +5,7 @@ Provides save points to resume workflows after failures.
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,13 +32,13 @@ class CheckpointManager:
         self, plan_id: str, stage: str, checkpoint_data: dict[str, Any]
     ) -> str:
         """Create a recovery checkpoint."""
-        checkpoint_id = f"{plan_id}-{stage}-{int(datetime.now().timestamp())}"
+        checkpoint_id = f"{plan_id}-{stage}-{int(datetime.now(UTC).timestamp())}"
 
         checkpoint = {
             "checkpoint_id": checkpoint_id,
             "plan_id": plan_id,
             "stage": stage,
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "data": checkpoint_data,
         }
 
@@ -80,7 +80,7 @@ class CheckpointManager:
         Clean up checkpoints older than max_age_days.
         Returns number of checkpoints deleted.
         """
-        cutoff = datetime.now().timestamp() - (max_age_days * 24 * 3600)
+        cutoff = datetime.now(UTC).timestamp() - (max_age_days * 24 * 3600)
         deleted = 0
 
         for checkpoint_file in self.checkpoint_dir.glob("*.json"):

@@ -3,7 +3,7 @@
 import structlog
 
 from automation.engine.stages.base import WorkflowStage
-from automation.models.domain import Issue
+from automation.models.domain import Issue, Review
 
 log = structlog.get_logger(__name__)
 
@@ -127,13 +127,11 @@ class CodeReviewStage(WorkflowStage):
     def _format_review_comment(self, review: "Review") -> str:
         """Format review results as comment."""
         if review.approved:
-            comment = (
-                f"✅ **Code Review: APPROVED** (Confidence: {review.confidence_score:.2%})\n\n"
-            )
+            status = "✅ **Code Review: APPROVED**"
+            comment = f"{status} (Confidence: {review.confidence_score:.2%})\n\n"
         else:
-            comment = (
-                f"⚠️ **Code Review: NEEDS CHANGES** (Confidence: {review.confidence_score:.2%})\n\n"
-            )
+            status = "⚠️ **Code Review: NEEDS CHANGES**"
+            comment = f"{status} (Confidence: {review.confidence_score:.2%})\n\n"
 
         if review.comments:
             comment += "## Overall Assessment\n\n"

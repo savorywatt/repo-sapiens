@@ -24,7 +24,9 @@ automation daemon --interval 60
 
 ## Overview
 
-This automation system transforms Gitea issues into fully implemented features through an AI-powered workflow that includes planning, implementation, code review, and deployment.
+This automation system transforms Git issues into fully implemented features through an AI-powered workflow that includes planning, implementation, code review, and deployment.
+
+**Supports both GitHub and Gitea** - Works seamlessly with GitHub repositories and GitHub Actions, or Gitea repositories with Gitea Actions.
 
 ### Phase 4 Enhancements
 
@@ -40,11 +42,18 @@ Phase 4 adds enterprise-grade features for production readiness:
 
 ## Features
 
+- **Multi-Platform Git Support**: Works with both **GitHub** and **Gitea**
+  - Auto-detects provider from repository
+  - GitHub Actions or Gitea Actions workflows
+  - Platform-specific API integration
 - **Automated Planning**: Generate development plans from issue descriptions
 - **Task Decomposition**: Break plans into manageable, executable tasks
-- **AI Implementation**: Execute tasks using Claude AI agents
+- **Multi-Agent AI**: Execute tasks using **Claude Code** or **Goose AI** with multiple LLM backends
+  - **Claude Code**: Best-in-class coding with Anthropic models
+  - **Goose AI**: Flexible provider choice (OpenAI, Anthropic, Ollama, OpenRouter, Groq, Databricks)
+  - Switch between agents or use different providers per repository
 - **Code Review**: Automated code review before merging
-- **CI/CD Integration**: Full Gitea Actions workflows for automation
+- **CI/CD Integration**: Full GitHub Actions or Gitea Actions workflows
 - **State Management**: Track workflow progress with atomic state updates
 - **Webhook Support**: Real-time event processing via webhooks
 - **Health Monitoring**: Automated health checks and failure detection
@@ -70,6 +79,27 @@ pip install -e ".[dev]"
 
 ### Configuration
 
+**Recommended: One-Command Setup**
+
+```bash
+# Initialize in your Git repository (interactive)
+repo-agent init
+```
+
+This will:
+- Auto-discover your Git repository configuration (GitHub or Gitea)
+- **Detect and select AI agent** (Claude Code or Goose AI)
+- **Choose LLM provider** (for Goose: OpenAI, Anthropic, Ollama, OpenRouter, Groq)
+- Prompt for credentials and store them securely
+- Generate configuration file
+- Help set up GitHub Actions or Gitea Actions secrets
+
+📚 **Agent Selection Help**:
+- See [AGENT_COMPARISON.md](docs/AGENT_COMPARISON.md) to choose between Claude and Goose
+- See [GOOSE_SETUP.md](docs/GOOSE_SETUP.md) for Goose-specific configuration
+
+**Manual Setup (Alternative)**
+
 1. Copy and edit configuration:
    ```bash
    cp automation/config/automation_config.yaml automation/config/my_config.yaml
@@ -83,7 +113,7 @@ pip install -e ".[dev]"
 
 3. Test configuration:
    ```bash
-   automation --config automation/config/my_config.yaml list-active-plans
+   repo-agent --config automation/config/my_config.yaml list-plans
    ```
 
 ### Basic Usage
@@ -131,9 +161,9 @@ automation/
 
 ## CI/CD Integration
 
-### Gitea Actions Workflows
+### GitHub Actions / Gitea Actions Workflows
 
-The system includes five Gitea Actions workflows:
+The system includes workflow templates that work with both GitHub Actions and Gitea Actions:
 
 1. **automation-trigger.yaml**: Processes issues based on labels
 2. **plan-merged.yaml**: Generates prompts when plans merge
@@ -143,14 +173,20 @@ The system includes five Gitea Actions workflows:
 
 ### Setup
 
-1. Configure secrets in Gitea repository settings:
-   - `GITEA_TOKEN`: Gitea API token with repo access
-   - `CLAUDE_API_KEY`: Anthropic Claude API key
+1. Configure secrets in your repository settings:
+   - **For GitHub**: `GITHUB_TOKEN` (automatically provided) or personal access token
+   - **For Gitea**: `GITEA_TOKEN` (Gitea API token with repo access)
+   - **For Claude Code**: `CLAUDE_API_KEY` (Anthropic Claude API key)
+   - **For Goose**: Provider-specific key (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, etc.)
 
 2. Workflows trigger automatically on:
    - Issue events (opened, labeled, etc.)
    - Plan file merges to main
    - Scheduled intervals (cron)
+
+3. Workflow files location:
+   - **GitHub**: `.github/workflows/`
+   - **Gitea**: `.gitea/workflows/`
 
 See [CI/CD Usage Guide](docs/ci-cd-usage.md) for detailed instructions.
 
@@ -301,6 +337,16 @@ cat .automation/state/42.json | jq .
 
 ## Documentation
 
+### Getting Started
+- [Quick Start Guide](QUICK_START.md) - 5-minute setup walkthrough
+- [Credential Quick Start](docs/CREDENTIAL_QUICK_START.md) - Secure credential management
+
+### AI Agent Selection
+- [Agent Comparison](docs/AGENT_COMPARISON.md) - **Choose between Claude Code and Goose AI**
+- [Goose Setup Guide](docs/GOOSE_SETUP.md) - Complete Goose AI configuration guide
+- [INIT Command Guide](docs/INIT_COMMAND_GUIDE.md) - Using `repo-agent init`
+
+### Advanced Configuration
 - [Secrets Setup Guide](docs/secrets-setup.md) - Configure CI/CD secrets
 - [CI/CD Usage Guide](docs/ci-cd-usage.md) - Using workflows and CLI
 - [Phase 3 Implementation Plan](plans/automation/phase-3-gitea-actions.md) - Detailed implementation guide
@@ -339,10 +385,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 This system is designed to be extended with:
 
 - Additional workflow stages
-- Different git providers (GitHub, GitLab)
+- Additional git providers (GitLab, Bitbucket, etc.)
 - Alternative AI agents (OpenAI, local models)
 - Enhanced error recovery
 - Performance optimizations
+
+**Note**: GitHub and Gitea are fully supported. GitLab and other providers can be added following the provider pattern in `automation/providers/`.
 
 For bugs, feature requests, or questions, please [open an issue](https://github.com/savorywatt/repo-sapiens/issues) on GitHub.
 

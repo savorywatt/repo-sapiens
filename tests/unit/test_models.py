@@ -1,6 +1,6 @@
 """Tests for domain models."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from automation.models.domain import (
     Issue,
@@ -20,8 +20,8 @@ def test_issue_creation():
         body="Description",
         state=IssueState.OPEN,
         labels=["bug", "priority-high"],
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         author="testuser",
         url="https://gitea.test.com/issues/42",
     )
@@ -71,7 +71,7 @@ def test_plan_creation():
         description="Plan description",
         tasks=tasks,
         file_path="plans/42-feature.md",
-        created_at=datetime.now(),
+        created_at=datetime.now(UTC),
     )
 
     assert plan.id == "42"

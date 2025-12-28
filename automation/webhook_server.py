@@ -26,10 +26,10 @@ async def startup():
         log.info("webhook_server_started")
     except ConfigurationError as e:
         log.error("webhook_startup_failed", error=e.message, exc_info=True)
-        raise
+        raise ConfigurationError(e.message) from e
     except Exception as e:
         log.error("webhook_startup_unexpected", error=str(e), exc_info=True)
-        raise
+        raise RuntimeError(f"Webhook startup failed: {e}") from e
 
 
 @app.post("/webhook/gitea")
@@ -56,10 +56,10 @@ async def gitea_webhook(request: Request):
 
     except RepoSapiensError as e:
         log.error("webhook_processing_failed", error=e.message, exc_info=True)
-        raise HTTPException(status_code=422, detail=e.message)
+        raise HTTPException(status_code=422, detail=e.message) from e
     except Exception as e:
         log.error("webhook_processing_unexpected", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 async def handle_issue_event(payload: dict):
@@ -120,4 +120,4 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)  # nosec B104 # Development server binding

@@ -1,7 +1,0 @@
-# Documentation build requirements
-sphinx>=6.0
-sphinx-rtd-theme>=1.2.0
-sphinx-autobuild>=2021.3.14
-sphinx-autodoc-typehints>=1.22.0
-sphinx-copybutton>=0.5.1
-sphinx-inline-tabs>=2022.1.1

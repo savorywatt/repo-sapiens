@@ -5,7 +5,7 @@ Learns from past executions to improve prompts and task selection.
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +47,7 @@ class FeedbackLoop:
             "execution_time": getattr(result, "execution_time", 0.0),
             "review_score": getattr(review, "confidence_score", 0.0) if review else 0.0,
             "issues_found": len(getattr(review, "issues_found", [])) if review else 0,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "metadata": metadata or {},
         }
 
@@ -98,7 +98,6 @@ class FeedbackLoop:
     ) -> list[dict[str, Any]]:
         """Find similar historical tasks."""
         similar: list[dict[str, Any]] = []
-        task_description = getattr(task, "description", "") or ""
 
         for feedback_file in self.feedback_dir.glob("*.json"):
             try:
@@ -277,7 +276,7 @@ Please implement this task following these learned best practices.
         Returns:
             Number of feedback files deleted
         """
-        cutoff = datetime.now().timestamp() - (max_age_days * 24 * 3600)
+        cutoff = datetime.now(UTC).timestamp() - (max_age_days * 24 * 3600)
         deleted = 0
 
         async with self._lock:

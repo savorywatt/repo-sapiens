@@ -3,7 +3,7 @@ Analytics dashboard for monitoring automation system.
 Provides REST API and HTML dashboard for metrics visualization.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -94,7 +94,9 @@ async def dashboard() -> str:
         <div class="container">
             <h1>Automation System Analytics</h1>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <div style="display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                        gap: 15px;">
                 <div class="metric-card">
                     <div class="metric-title">Active Workflows</div>
                     <div class="metric-value" id="active-workflows">-</div>
@@ -126,7 +128,8 @@ async def dashboard() -> str:
                     const response = await fetch('/api/metrics/summary');
                     const data = await response.json();
 
-                    document.getElementById('active-workflows').textContent = data.active_workflows || 0;
+                    document.getElementById('active-workflows').textContent =
+                        data.active_workflows || 0;
                     document.getElementById('success-rate').textContent =
                         (data.success_rate * 100).toFixed(1) + '%';
                     document.getElementById('avg-duration').textContent =
@@ -229,7 +232,7 @@ async def metrics_summary() -> dict[str, Any]:
 async def workflow_metrics() -> dict[str, Any]:
     """Get detailed workflow metrics."""
     # Mock data - in production would query actual metrics
-    now = datetime.now()
+    now = datetime.now(UTC)
 
     timeline = [
         {
@@ -342,7 +345,7 @@ async def cost_metrics() -> dict[str, Any]:
 @app.get("/api/health")
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now(UTC).isoformat()}
 
 
 @app.get("/metrics")
@@ -355,4 +358,4 @@ async def prometheus_metrics() -> Response:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)  # nosec B104 # Development server binding

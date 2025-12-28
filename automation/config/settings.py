@@ -47,6 +47,17 @@ class RepositoryConfig(BaseModel):
     default_branch: str = Field(default="main", description="Default branch name")
 
 
+class GooseConfig(BaseModel):
+    """Goose-specific configuration options."""
+
+    toolkit: str = Field(default="default", description="Goose toolkit to use")
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="LLM temperature")
+    max_tokens: int = Field(default=4096, ge=1, description="Maximum tokens for response")
+    llm_provider: str | None = Field(
+        default=None, description="LLM provider (openai, anthropic, ollama, etc.)"
+    )
+
+
 class AgentProviderConfig(BaseModel):
     """AI agent configuration.
 
@@ -54,19 +65,31 @@ class AgentProviderConfig(BaseModel):
     - api_key: "@keyring:claude/api_key"
     - api_key: "${CLAUDE_API_KEY}"
     - api_key: "@encrypted:claude/api_key"
+    - api_key: "@keyring:openai/api_key" (for Goose with OpenAI)
     """
 
-    provider_type: Literal["claude-local", "claude-api", "openai", "ollama"] = Field(
-        default="claude-local", description="Type of agent provider"
-    )
+    provider_type: Literal[
+        "claude-local",
+        "claude-api",
+        "goose-local",
+        "goose-api",
+        "openai",
+        "ollama",
+    ] = Field(default="claude-local", description="Type of agent provider")
     model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
     api_key: CredentialSecret | None = Field(
         default=None,
         description="API key for cloud providers (supports @keyring:, ${ENV}, @encrypted:)",
     )
-    local_mode: bool = Field(default=True, description="Whether to use local Claude Code CLI")
+    local_mode: bool = Field(
+        default=True, description="Whether to use local CLI (Claude Code or Goose)"
+    )
     base_url: str | None = Field(
         default="http://localhost:11434", description="Base URL for Ollama or custom API endpoints"
+    )
+    goose_config: GooseConfig | None = Field(
+        default=None,
+        description="Goose-specific configuration (only used with goose-local/goose-api)",
     )
 
 

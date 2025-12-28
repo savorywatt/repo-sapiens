@@ -1,7 +1,7 @@
 """Fix execution stage - implements fixes from approved proposals."""
 
 import re
-import subprocess
+import subprocess  # nosec B404 # Required for git operations with controlled input
 from pathlib import Path
 
 import structlog
@@ -85,8 +85,8 @@ class FixExecutionStage(WorkflowStage):
             log.info("checking_out_branch", branch=branch_name, path=str(playground_dir))
 
             # Fetch and checkout
-            subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)
-            subprocess.run(
+            subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
+            subprocess.run(  # nosec B603 B607 # Git command with controlled input
                 ["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
                 cwd=playground_dir,
                 check=True,
@@ -149,10 +149,10 @@ Focus on addressing the feedback completely and correctly.
                 log.info("committing_fixes", branch=branch_name)
 
                 # Git add all changes
-                subprocess.run(["git", "add", "."], cwd=playground_dir, check=True)
+                subprocess.run(["git", "add", "."], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
 
                 # Check if there are changes to commit
-                status_result = subprocess.run(
+                status_result = subprocess.run(  # nosec B603 B607 # Git command with controlled input
                     ["git", "status", "--porcelain"],
                     cwd=playground_dir,
                     capture_output=True,
@@ -162,13 +162,17 @@ Focus on addressing the feedback completely and correctly.
 
                 if status_result.stdout.strip():
                     # Commit changes
-                    commit_message = f"fix: Address review feedback [FIX-{issue.number}]\n\nFixes from code review on PR #{pr_number}\nFix proposal: #{issue.number}"
-                    subprocess.run(
+                    commit_message = (
+                        f"fix: Address review feedback [FIX-{issue.number}]\n\n"
+                        f"Fixes from code review on PR #{pr_number}\n"
+                        f"Fix proposal: #{issue.number}"
+                    )
+                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
                         ["git", "commit", "-m", commit_message], cwd=playground_dir, check=True
                     )
 
                     # Push to remote
-                    subprocess.run(
+                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
                         ["git", "push", "origin", branch_name], cwd=playground_dir, check=True
                     )
 

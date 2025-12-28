@@ -4,6 +4,7 @@ We welcome contributions to repo-sapiens! This document provides guidelines and 
 
 ## Table of Contents
 
+- [Contributor License Agreement](#contributor-license-agreement)
 - [Development Setup](#development-setup)
 - [Code Style](#code-style)
 - [Testing Requirements](#testing-requirements)
@@ -11,6 +12,48 @@ We welcome contributions to repo-sapiens! This document provides guidelines and 
 - [Code Review Guidelines](#code-review-guidelines)
 - [Release Process](#release-process)
 - [Getting Help](#getting-help)
+
+## Contributor License Agreement
+
+**Before contributing code, you must agree to our Contributor License Agreement (CLA).**
+
+### Why We Have a CLA
+
+The CLA protects both you and the project by:
+- Confirming you have the right to contribute your code
+- Ensuring the project can distribute your contributions under the MIT License
+- Protecting all users of the project from legal issues
+- Clarifying that you retain ownership of your contributions
+
+### Quick Summary
+
+Our CLA is simple and developer-friendly:
+- **You keep ownership** of your contributions
+- **You grant us permission** to use and distribute your code under MIT License
+- **Standard open source agreement** similar to Apache, Django, and other major projects
+- **No separate signing required** - just add `Signed-off-by` to your commits
+
+### How to Sign
+
+We use the Developer Certificate of Origin (DCO) sign-off process. Simply add a sign-off line to each commit:
+
+```bash
+git commit -s -m "feat: your commit message"
+```
+
+This automatically adds:
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+**All commits in your pull request must include this sign-off.**
+
+### Read the Full Agreement
+
+Please read the complete CLA before contributing:
+- [CONTRIBUTOR_LICENSE_AGREEMENT.md](CONTRIBUTOR_LICENSE_AGREEMENT.md)
+
+If you have questions, open an issue or contact the maintainers.
 
 ## Development Setup
 
@@ -187,9 +230,64 @@ The project is configured to check:
 - Comprehensions (C4)
 - And more (see `pyproject.toml`)
 
-### Pre-commit Workflow
+### Pre-commit Hooks (Automated Quality Checks)
 
-We recommend running these checks before committing:
+We use **pre-commit** to automatically run code quality checks before each commit. This ensures consistent code quality and catches issues early.
+
+#### Initial Setup
+
+Install pre-commit hooks (one-time setup):
+
+```bash
+# Install pre-commit package
+pip install pre-commit
+
+# Install the git hooks
+pre-commit install
+```
+
+#### What Gets Checked Automatically
+
+When you commit, pre-commit automatically runs:
+- **Black**: Code formatting (auto-fixes)
+- **Ruff**: Fast linting and import sorting (auto-fixes when possible)
+- **MyPy**: Type checking on changed files
+- **Bandit**: Security vulnerability scanning
+- **pyupgrade**: Automatic syntax upgrades for Python 3.11+
+- **File checks**: Trailing whitespace, EOF newlines, YAML/JSON/TOML syntax
+- **Secrets detection**: Prevents committing API keys, passwords, etc.
+
+#### Manual Pre-commit Runs
+
+Run hooks manually on all files:
+
+```bash
+# Run all hooks on all files
+pre-commit run --all-files
+
+# Run all hooks on staged files only
+pre-commit run
+
+# Run a specific hook
+pre-commit run black --all-files
+pre-commit run ruff --all-files
+pre-commit run mypy --all-files
+```
+
+#### Bypassing Hooks (Emergency Only)
+
+In rare cases where you need to bypass hooks:
+
+```bash
+# Skip all pre-commit hooks (use with caution!)
+git commit --no-verify -m "emergency fix"
+```
+
+**Warning**: Only bypass hooks when absolutely necessary. CI/CD will still run all checks.
+
+#### Manual Workflow (Alternative)
+
+If you prefer to run tools manually instead of using pre-commit:
 
 ```bash
 # Format code
@@ -201,8 +299,23 @@ ruff check --fix automation/ tests/
 # Type checking
 mypy automation/
 
+# Security scanning
+bandit -c pyproject.toml -r automation/
+
 # Run tests
 pytest tests/ -v
+```
+
+#### Updating Pre-commit Hooks
+
+Update hooks to latest versions:
+
+```bash
+# Update all hooks to latest versions
+pre-commit autoupdate
+
+# Update a specific hook
+pre-commit autoupdate --repo https://github.com/psf/black
 ```
 
 ## Testing Requirements
@@ -379,15 +492,30 @@ Add an entry to the "Unreleased" section at the top of `CHANGELOG.md`:
 
 ### Submit the Pull Request
 
-1. Push your branch: `git push origin feature/add-github-provider`
-2. Open a pull request on GitHub/Gitea
-3. Fill in the PR template with:
+1. **Ensure all commits are signed off**: Every commit must include `Signed-off-by` (see [CLA](#contributor-license-agreement))
+   ```bash
+   # Check your commits have sign-off
+   git log --show-signature
+
+   # If missing, amend your commits
+   git commit --amend -s
+   ```
+
+2. Push your branch: `git push origin feature/add-github-provider`
+
+3. Open a pull request on GitHub/Gitea
+
+4. Fill in the PR template with:
    - Description of changes
    - Motivation and context
    - Type of change (feature/fix/refactor/docs)
    - How to test
    - Checklist of completed items
-4. Request review from maintainers
+   - **Confirmation that all commits are signed off**
+
+5. Request review from maintainers
+
+**Note**: Pull requests with unsigned commits will not be accepted. Please ensure all commits include the `Signed-off-by` line as required by our [CLA](#contributor-license-agreement).
 
 ## Code Review Guidelines
 
@@ -527,11 +655,13 @@ git push upstream --tags
 
 ### Release Checklist
 
+- [ ] All pre-commit hooks pass: `pre-commit run --all-files`
 - [ ] All tests pass: `pytest tests/ -v`
 - [ ] Coverage is acceptable: `pytest --cov=automation`
 - [ ] Code is formatted: `black automation/ tests/`
 - [ ] Linting passes: `ruff check automation/`
 - [ ] Type checking passes: `mypy automation/`
+- [ ] Security scan passes: `bandit -c pyproject.toml -r automation/`
 - [ ] Version updated in `automation/__version__.py`
 - [ ] `CHANGELOG.md` is updated
 - [ ] Git tag is created and pushed

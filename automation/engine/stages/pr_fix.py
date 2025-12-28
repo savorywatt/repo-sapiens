@@ -97,7 +97,7 @@ class PRFixStage(WorkflowStage):
             )
 
             # Update labels
-            updated_labels = [l for l in issue.labels if l != "needs-fix"]
+            updated_labels = [label for label in issue.labels if label != "needs-fix"]
             updated_labels.append("fix-proposed")
             await self.git.update_issue(issue.number, labels=updated_labels)
 

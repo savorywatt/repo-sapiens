@@ -17,10 +17,10 @@ from typing import Literal
 
 try:
     import git
-    from git.exc import GitCommandError, InvalidGitRepositoryError
+    from git.exc import InvalidGitRepositoryError
 except ImportError as e:
     raise ImportError(
-        "GitPython is required for Git discovery. " "Install it with: pip install gitpython"
+        "GitPython is required for Git discovery. Install it with: pip install gitpython"
     ) from e
 
 from automation.git.exceptions import (
@@ -74,8 +74,8 @@ class GitDiscovery:
         if self._repo is None:
             try:
                 self._repo = git.Repo(self.repo_path, search_parent_directories=True)
-            except InvalidGitRepositoryError:
-                raise NotGitRepositoryError(str(self.repo_path))
+            except InvalidGitRepositoryError as e:
+                raise NotGitRepositoryError(str(self.repo_path)) from e
 
         return self._repo
 
@@ -153,8 +153,7 @@ class GitDiscovery:
                 if remote.name == remote_name:
                     return remote
             raise ValueError(
-                f"Remote '{remote_name}' not found. "
-                f"Available: {', '.join(r.name for r in remotes)}"
+                f"Remote '{remote_name}' not found. Available: {', '.join(r.name for r in remotes)}"
             )
 
         # Single remote - use it
@@ -251,11 +250,95 @@ class GitDiscovery:
         return RepositoryInfo(
             owner=parser.owner,
             repo=parser.repo,
-            base_url=parser.base_url,
+            base_url=parser.base_url,  # type: ignore[arg-type]  # Pydantic validates str to HttpUrl
             remote_name=remote.name,
             ssh_url=parser.ssh_url,
             https_url=parser.https_url,
         )
+
+    def detect_provider_type(self, remote_name: str | None = None) -> Literal["github", "gitea"]:
+        """Detect Git provider type (GitHub or Gitea) from remote URL.
+
+        Args:
+            remote_name: Specific remote name (optional)
+
+        Returns:
+            Provider type: "github" or "gitea"
+
+        Raises:
+            NotGitRepositoryError: If not a Git repository
+            NoRemotesError: If no remotes configured
+
+        Example:
+            >>> discovery = GitDiscovery()
+            >>> provider = discovery.detect_provider_type()
+            >>> print(provider)
+            github
+        """
+        remote = self.get_remote(remote_name, allow_multiple=True)
+        url_lower = remote.url.lower()
+
+        # Check for GitHub
+        if "github.com" in url_lower:
+            return "github"
+
+        # Check for GitHub Enterprise (common patterns)
+        if "github" in url_lower and ("enterprise" in url_lower or "ghe" in url_lower):
+            return "github"
+
+        # Default to Gitea (self-hosted)
+        return "gitea"
+
+    def detect_git_config(self, remote_name: str | None = None) -> dict[str, str]:
+        """Detect Git provider configuration.
+
+        Detects repository configuration and returns a dictionary suitable
+        for generating configuration files. Automatically detects if the
+        remote is GitHub or Gitea.
+
+        Args:
+            remote_name: Specific remote name (optional)
+
+        Returns:
+            Dictionary with config values:
+                - provider_type: "github" or "gitea"
+                - base_url: Provider instance URL
+                - owner: Repository owner
+                - repo: Repository name
+
+        Raises:
+            NotGitRepositoryError: If not a Git repository
+            NoRemotesError: If no remotes configured
+            MultipleRemotesError: If multiple remotes and none specified
+            InvalidGitUrlError: If URL format invalid
+
+        Example:
+            >>> discovery = GitDiscovery()
+            >>> config = discovery.detect_git_config()
+            >>> print(config)
+            {
+                'provider_type': 'github',
+                'base_url': 'https://github.com',
+                'owner': 'myorg',
+                'repo': 'myrepo'
+            }
+        """
+        info = self.parse_repository(remote_name, allow_multiple=False)
+        provider_type = self.detect_provider_type(remote_name)
+
+        # For GitHub, use api.github.com for API calls
+        base_url = str(info.base_url)
+        if provider_type == "github" and base_url == "https://github.com":
+            api_url = "https://api.github.com"
+        else:
+            api_url = base_url
+
+        return {
+            "provider_type": provider_type,
+            "base_url": api_url,
+            "owner": info.owner,
+            "repo": info.repo,
+        }
 
     def detect_gitea_config(self, remote_name: str | None = None) -> dict[str, str]:
         """Detect Gitea configuration for .builder/config.toml

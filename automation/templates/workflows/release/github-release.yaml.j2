@@ -13,7 +13,7 @@ on:
         required: true
         type: string
 
-{{ base.gitea_env_vars(gitea_url, gitea_owner, gitea_repo) }}
+{{ base.git_env_vars(provider_type | default('gitea'), git_url, git_owner, git_repo) }}
 
 jobs:
   release:

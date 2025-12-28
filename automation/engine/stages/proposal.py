@@ -45,7 +45,7 @@ class ProposalStage(WorkflowStage):
                 plan.file_path = f"plans/{issue.number}-{issue.title.lower().replace(' ', '-')}.md"
 
             # Format plan as markdown
-            plan_content = self._format_plan_markdown(plan, issue)
+            _plan_content = self._format_plan_markdown(plan, issue)
 
             # TODO: Fix Gitea file commit API - currently returns 422
             # For now, skip committing plan file - it's in the proposal issue body anyway
@@ -74,17 +74,21 @@ class ProposalStage(WorkflowStage):
             await self.git.add_comment(
                 issue.number,
                 f"✅ **Plan Proposal Created**\n\n"
-                f"I've created a development plan proposal: [#{proposal_issue.number}]({proposal_issue.url})\n\n"
+                f"I've created a development plan proposal: "
+                f"[#{proposal_issue.number}]({proposal_issue.url})\n\n"
                 f"**Blocked by**: #{proposal_issue.number}\n\n"
                 f"**Next Steps:**\n"
-                f"1. Review the proposed plan at [#{proposal_issue.number}]({proposal_issue.url})\n"
+                f"1. Review the proposed plan at "
+                f"[#{proposal_issue.number}]({proposal_issue.url})\n"
                 f"2. Comment `ok` on the proposal to approve\n"
                 f"3. I'll then create a project and task issues for execution\n\n"
                 f"🤖 Posted by Builder Automation",
             )
 
             # Update labels on original issue
-            updated_labels = [l for l in issue.labels if l != self.settings.tags.needs_planning]
+            updated_labels = [
+                label for label in issue.labels if label != self.settings.tags.needs_planning
+            ]
             updated_labels.append("awaiting-approval")
 
             await self.git.update_issue(
@@ -131,7 +135,10 @@ class ProposalStage(WorkflowStage):
                         f"### Task {i}: {task.title}",
                         "",
                         f"**ID**: {task.id}",
-                        f"**Dependencies**: {', '.join(task.dependencies) if task.dependencies else 'None'}",
+                        (
+                            f"**Dependencies**: "
+                            f"{', '.join(task.dependencies) if task.dependencies else 'None'}"
+                        ),
                         "",
                         task.description,
                         "",
