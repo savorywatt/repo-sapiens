@@ -124,7 +124,7 @@ jobs:
 
       # Use automation
       - name: Run automation
-        run: automation process-issue --issue 123
+        run: sapiens process-issue --issue 123
 ```
 
 ### Example 2: Using Docker Artifact

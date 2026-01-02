@@ -65,7 +65,7 @@ jobs:
           AUTOMATION__REPOSITORY__OWNER: Foxshirestudios
           AUTOMATION__REPOSITORY__NAME: builder
         run: |
-          .venv/bin/automation process-all --log-level INFO
+          .venv/bin/sapiens process-all --log-level INFO
 
       - name: Check for stale workflows
         if: steps.check_changes.outputs.has_recent_changes == 'true'

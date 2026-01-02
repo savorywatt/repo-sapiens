@@ -14,7 +14,7 @@ docker-compose up -d
 
 # Or pip install
 pip install -e .
-automation daemon --interval 60
+sapiens daemon --interval 60
 ```
 
 📚 **See [Getting Started](docs/GETTING_STARTED.md)** for setup guide
@@ -83,7 +83,7 @@ pip install -e ".[dev]"
 
 ```bash
 # Initialize in your Git repository (interactive)
-automation init
+sapiens init
 ```
 
 This will:
@@ -113,26 +113,29 @@ This will:
 
 3. Test configuration:
    ```bash
-   automation --config repo_sapiens/config/my_config.yaml list-plans
+   sapiens --config repo_sapiens/config/my_config.yaml list-plans
    ```
 
 ### Basic Usage
 
 ```bash
 # List active plans
-automation list-active-plans
+sapiens list-active-plans
 
 # Process a specific issue
-automation process-issue --issue 42 --stage planning
+sapiens process-issue --issue 42 --stage planning
 
 # Generate prompts from plan
-automation generate-prompts --plan-file plans/42-feature.md --plan-id 42
+sapiens generate-prompts --plan-file plans/42-feature.md --plan-id 42
 
 # Check system health
-automation health-check
+sapiens health-check
 
 # Check for stale workflows
-automation check-stale --max-age-hours 24
+sapiens check-stale --max-age-hours 24
+
+# Interactive ReAct agent (local AI with Ollama, uses qwen3:latest by default)
+sapiens react --repl --ollama-url http://localhost:11434
 ```
 
 ## Architecture
@@ -196,10 +199,10 @@ Optional webhook server for real-time event processing:
 
 ```bash
 # Run webhook server
-uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
+uvicorn repo_sapiens.webhook_server:app --host 0.0.0.0 --port 8000
 
 # Or with gunicorn for production
-gunicorn automation.webhook_server:app -w 4 -k uvicorn.workers.UvicornWorker
+gunicorn repo_sapiens.webhook_server:app -w 4 -k uvicorn.workers.UvicornWorker
 ```
 
 Configure webhook in Gitea:
@@ -216,7 +219,7 @@ Configure webhook in Gitea:
 pytest tests/ -v
 
 # Run with coverage
-pytest tests/ --cov=automation --cov-report=html
+pytest tests/ --cov=repo_sapiens --cov-report=html
 
 # Run specific test file
 pytest tests/unit/test_state_manager.py -v
@@ -316,20 +319,20 @@ State updates are atomic using file locking and temporary files.
 
 ```bash
 # Generate health report
-automation health-check
+sapiens health-check
 
 # Check for failures
-automation check-failures --since-hours 24
+sapiens check-failures --since-hours 24
 
 # Check for stale workflows
-automation check-stale --max-age-hours 24
+sapiens check-stale --max-age-hours 24
 ```
 
 ### Viewing State
 
 ```bash
 # List active plans
-automation list-active-plans
+sapiens list-active-plans
 
 # View state file directly
 cat .automation/state/42.json | jq .
@@ -344,7 +347,7 @@ cat .automation/state/42.json | jq .
 ### AI Agent Selection
 - [Agent Comparison](docs/AGENT_COMPARISON.md) - **Choose between Claude Code and Goose AI**
 - [Goose Setup Guide](docs/GOOSE_SETUP.md) - Complete Goose AI configuration guide
-- [INIT Command Guide](docs/INIT_COMMAND_GUIDE.md) - Using `automation init`
+- [INIT Command Guide](docs/INIT_COMMAND_GUIDE.md) - Using `sapiens init`
 
 ### Advanced Configuration
 - [Secrets Setup Guide](docs/secrets-setup.md) - Configure CI/CD secrets
@@ -375,7 +378,7 @@ cat .automation/state/42.json | jq .
 Enable detailed logging:
 
 ```bash
-automation --log-level DEBUG process-issue --issue 42 --stage planning
+sapiens --log-level DEBUG process-issue --issue 42 --stage planning
 ```
 
 ## Contributing

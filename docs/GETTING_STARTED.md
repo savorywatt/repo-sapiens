@@ -87,7 +87,7 @@ cd repo-sapiens
 pip install -e .
 
 # Verify installation
-automation --version
+sapiens --version
 ```
 
 ### Optional Dependencies
@@ -112,10 +112,10 @@ pip install repo-sapiens[all]
 
 ```bash
 # Display help and available commands
-automation --help
+sapiens --help
 
 # Expected output:
-# Usage: automation [OPTIONS] COMMAND [ARGS]...
+# Usage: sapiens [OPTIONS] COMMAND [ARGS]...
 #
 #   Gitea automation system CLI.
 #
@@ -190,17 +190,17 @@ export GITEA_API_TOKEN="your-gitea-token-here"
 export CLAUDE_API_KEY="your-claude-api-key-here"
 
 # Verify configuration loads correctly
-automation --config my_config.yaml list-plans
+sapiens --config my_config.yaml list-plans
 ```
 
 #### Option B: Keyring (Recommended for Desktop)
 
 ```bash
 # Store credentials securely (encrypted by OS)
-automation credentials set gitea/api_token --backend keyring
+sapiens credentials set gitea/api_token --backend keyring
 # Enter your Gitea token when prompted
 
-automation credentials set claude/api_key --backend keyring
+sapiens credentials set claude/api_key --backend keyring
 # Enter your Claude API key when prompted
 
 # Update your config to use keyring references
@@ -218,11 +218,11 @@ EOF
 
 ```bash
 # Set a master password (use a strong password!)
-export AUTOMATION_MASTER_PASSWORD="your-secure-password"
+export SAPIENS_MASTER_PASSWORD="your-secure-password"
 
 # Store credentials
-automation credentials set gitea/api_token --backend encrypted
-automation credentials set claude/api_key --backend encrypted
+sapiens credentials set gitea/api_token --backend encrypted
+sapiens credentials set claude/api_key --backend encrypted
 
 # Update config to use encrypted references
 # api_token: "@encrypted:gitea/api_token"
@@ -233,7 +233,7 @@ automation credentials set claude/api_key --backend encrypted
 List active automation plans:
 
 ```bash
-automation --config my_config.yaml list-plans
+sapiens --config my_config.yaml list-plans
 ```
 
 Expected output:
@@ -250,7 +250,7 @@ Create or find an issue in your repository, then process it:
 
 ```bash
 # Process a specific issue (replace 1 with your issue number)
-automation --config my_config.yaml process-issue --issue 1
+sapiens --config my_config.yaml process-issue --issue 1
 
 # Watch the output:
 # ✓ Loading issue #1...
@@ -268,10 +268,10 @@ View the generated plan and track progress:
 
 ```bash
 # List all active plans
-automation --config my_config.yaml list-plans
+sapiens --config my_config.yaml list-plans
 
 # View status of a specific plan
-automation --config my_config.yaml show-plan --plan-id 1
+sapiens --config my_config.yaml show-plan --plan-id 1
 
 # Expected output:
 # 📋 Plan 1 Status
@@ -345,27 +345,27 @@ tags:
 
 ### Environment Variables
 
-All configuration values can be overridden using environment variables with the `AUTOMATION__` prefix. Use double underscores to indicate nesting:
+All configuration values can be overridden using environment variables with the `SAPIENS__` prefix. Use double underscores to indicate nesting:
 
 ```bash
 # Git provider settings
-export AUTOMATION__GIT_PROVIDER__BASE_URL="https://your-gitea.com"
-export AUTOMATION__GIT_PROVIDER__API_TOKEN="your-token"
+export SAPIENS__GIT_PROVIDER__BASE_URL="https://your-gitea.com"
+export SAPIENS__GIT_PROVIDER__API_TOKEN="your-token"
 
 # Repository settings
-export AUTOMATION__REPOSITORY__OWNER="myorg"
-export AUTOMATION__REPOSITORY__NAME="myrepo"
+export SAPIENS__REPOSITORY__OWNER="myorg"
+export SAPIENS__REPOSITORY__NAME="myrepo"
 
 # Agent settings
-export AUTOMATION__AGENT_PROVIDER__MODEL="claude-sonnet-4.5"
-export AUTOMATION__AGENT_PROVIDER__API_KEY="your-api-key"
+export SAPIENS__AGENT_PROVIDER__MODEL="claude-sonnet-4.5"
+export SAPIENS__AGENT_PROVIDER__API_KEY="your-api-key"
 
 # Workflow settings
-export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="5"
-export AUTOMATION__WORKFLOW__PLANS_DIRECTORY="./my_plans"
+export SAPIENS__WORKFLOW__MAX_CONCURRENT_TASKS="5"
+export SAPIENS__WORKFLOW__PLANS_DIRECTORY="./my_plans"
 
 # Logging level
-export AUTOMATION__LOG_LEVEL="DEBUG"
+export SAPIENS__LOG_LEVEL="DEBUG"
 ```
 
 Use environment variables to:
@@ -390,7 +390,7 @@ Uses your operating system's native credential storage:
 
 ```bash
 # Store a credential
-automation credentials set gitea/api_token --backend keyring
+sapiens credentials set gitea/api_token --backend keyring
 # Enter your token at the interactive prompt
 
 # Reference in config
@@ -398,7 +398,7 @@ git_provider:
   api_token: "@keyring:gitea/api_token"
 
 # Verify it works
-automation --config my_config.yaml list-plans
+sapiens --config my_config.yaml list-plans
 ```
 
 **Pros**:
@@ -454,7 +454,7 @@ jobs:
         env:
           GITEA_API_TOKEN: ${{ secrets.GITEA_API_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-        run: automation --config my_config.yaml process-all
+        run: sapiens --config my_config.yaml process-all
 ```
 
 **Pros**:
@@ -476,11 +476,11 @@ jobs:
 
 ```bash
 # Set a master password (use a strong password!)
-export AUTOMATION_MASTER_PASSWORD="your-very-secure-password-here"
+export SAPIENS_MASTER_PASSWORD="your-very-secure-password-here"
 
 # Store credentials
-automation credentials set gitea/api_token --backend encrypted
-automation credentials set claude/api_key --backend encrypted
+sapiens credentials set gitea/api_token --backend encrypted
+sapiens credentials set claude/api_key --backend encrypted
 
 # Reference in config
 git_provider:
@@ -498,15 +498,15 @@ FROM python:3.11-slim
 # ... install repo-sapiens ...
 
 # Store encrypted credentials during build
-ARG AUTOMATION_MASTER_PASSWORD
-RUN AUTOMATION_MASTER_PASSWORD=$AUTOMATION_MASTER_PASSWORD \
-    automation credentials set gitea/api_token --backend encrypted \
-    && automation credentials set claude/api_key --backend encrypted
+ARG SAPIENS_MASTER_PASSWORD
+RUN SAPIENS_MASTER_PASSWORD=$SAPIENS_MASTER_PASSWORD \
+    sapiens credentials set gitea/api_token --backend encrypted \
+    && sapiens credentials set claude/api_key --backend encrypted
 
 # Master password provided at runtime
-ENV AUTOMATION_MASTER_PASSWORD=<runtime-secret>
+ENV SAPIENS_MASTER_PASSWORD=<runtime-secret>
 
-CMD ["automation", "--config", "my_config.yaml", "daemon", "--interval", "60"]
+CMD ["sapiens", "--config", "my_config.yaml", "daemon", "--interval", "60"]
 ```
 
 **Pros**:
@@ -544,10 +544,10 @@ Process a single issue from creation to implementation:
 # (Look in your repository for issues labeled "needs-planning")
 
 # Step 2: Process the issue
-automation --config my_config.yaml process-issue --issue 42
+sapiens --config my_config.yaml process-issue --issue 42
 
 # Step 3: Monitor progress
-automation --config my_config.yaml show-plan --plan-id 42
+sapiens --config my_config.yaml show-plan --plan-id 42
 
 # Step 4: The automation will:
 #   ✅ Generate a development plan
@@ -579,7 +579,7 @@ Run continuous automation that processes new issues automatically:
 
 ```bash
 # Start the daemon (runs indefinitely)
-automation --config my_config.yaml daemon --interval 60
+sapiens --config my_config.yaml daemon --interval 60
 
 # Output:
 # 🤖 Starting daemon mode (polling every 60s)
@@ -607,17 +607,17 @@ workflow:
 
 ```bash
 # Using nohup
-nohup automation --config my_config.yaml daemon --interval 60 > automation.log 2>&1 &
+nohup sapiens --config my_config.yaml daemon --interval 60 > sapiens.log 2>&1 &
 
-# Using systemd (create /etc/systemd/system/automation.service)
+# Using systemd (create /etc/systemd/system/sapiens.service)
 [Unit]
 Description=repo-sapiens Automation Daemon
 After=network.target
 
 [Service]
 Type=simple
-User=automation
-ExecStart=/usr/local/bin/automation --config /etc/automation/config.yaml daemon
+User=sapiens
+ExecStart=/usr/local/bin/sapiens --config /etc/sapiens/config.yaml daemon
 Restart=always
 RestartSec=10
 
@@ -625,9 +625,9 @@ RestartSec=10
 WantedBy=multi-user.target
 
 # Enable and start
-sudo systemctl enable automation
-sudo systemctl start automation
-sudo systemctl status automation
+sudo systemctl enable sapiens
+sudo systemctl start sapiens
+sudo systemctl status sapiens
 ```
 
 ### Workflow 3: Webhook Integration
@@ -636,7 +636,7 @@ Real-time event processing when issues are created or updated:
 
 ```bash
 # Start the webhook server (optional, for real-time processing)
-automation webhook-server --host 0.0.0.0 --port 8000
+sapiens webhook-server --host 0.0.0.0 --port 8000
 
 # Output:
 # Uvicorn running on http://0.0.0.0:8000
@@ -671,7 +671,7 @@ webhook:
 View all automation plans currently in progress:
 
 ```bash
-automation --config my_config.yaml list-plans
+sapiens --config my_config.yaml list-plans
 
 # Output:
 # Active Plans (3):
@@ -686,10 +686,10 @@ automation --config my_config.yaml list-plans
 Manually trigger automation for a single issue:
 
 ```bash
-automation --config my_config.yaml process-issue --issue 42
+sapiens --config my_config.yaml process-issue --issue 42
 
 # Or with custom configuration
-automation --config my_config.yaml \
+sapiens --config my_config.yaml \
   --log-level DEBUG \
   process-issue --issue 42
 
@@ -709,7 +709,7 @@ automation --config my_config.yaml \
 Verify all connections and dependencies are working:
 
 ```bash
-automation health-check
+sapiens health-check
 
 # Output:
 # 🏥 System Health Check
@@ -728,7 +728,7 @@ automation health-check
 Get complete status of a plan including all stages and tasks:
 
 ```bash
-automation --config my_config.yaml show-plan --plan-id 42
+sapiens --config my_config.yaml show-plan --plan-id 42
 
 # Output:
 # 📋 Plan 42 Status
@@ -756,7 +756,7 @@ Enable debug logging to troubleshoot issues:
 
 ```bash
 # Enable debug logging for a single command
-automation --log-level DEBUG \
+sapiens --log-level DEBUG \
   --config my_config.yaml \
   process-issue --issue 42
 
@@ -781,10 +781,10 @@ Batch process multiple issues at once:
 
 ```bash
 # Process all issues with a specific label
-automation --config my_config.yaml process-all --tag needs-planning
+sapiens --config my_config.yaml process-all --tag needs-planning
 
 # Process all issues (ignores tags)
-automation --config my_config.yaml process-all
+sapiens --config my_config.yaml process-all
 
 # Monitor multi-issue processing
 # (Each issue processed sequentially or in parallel based on settings)
@@ -807,11 +807,11 @@ automation --config my_config.yaml process-all
 ls -la my_config.yaml
 
 # Use absolute path
-automation --config /full/path/to/my_config.yaml list-plans
+sapiens --config /full/path/to/my_config.yaml list-plans
 
 # Use default location
 cp my_config.yaml repo_sapiens/config/automation_config.yaml
-automation list-plans  # Uses default config
+sapiens list-plans  # Uses default config
 ```
 
 #### Error: "API token not found"
@@ -829,11 +829,11 @@ echo $GITEA_API_TOKEN
 export GITEA_API_TOKEN="your-token-here"
 
 # Or use keyring
-automation credentials set gitea/api_token --backend keyring
+sapiens credentials set gitea/api_token --backend keyring
 # And reference it: api_token: "@keyring:gitea/api_token"
 
 # Verify credentials are set up
-automation credentials test
+sapiens credentials test
 ```
 
 #### Error: "Connection refused"
@@ -883,7 +883,7 @@ workflow:
 ```bash
 # Wait for the other process to complete
 # (Check process list)
-ps aux | grep automation
+ps aux | grep sapiens
 
 # Or remove stale lock file
 rm -f .automation/state/*.lock
@@ -899,19 +899,19 @@ Enable detailed logging to diagnose issues:
 
 ```bash
 # Enable debug logging with file output
-automation --log-level DEBUG \
+sapiens --log-level DEBUG \
   --config my_config.yaml \
   process-issue --issue 42 \
-  > automation-debug.log 2>&1
+  > sapiens-debug.log 2>&1
 
 # View the log
-tail -f automation-debug.log
+tail -f sapiens-debug.log
 
 # Search for errors
-grep ERROR automation-debug.log
+grep ERROR sapiens-debug.log
 
 # View timing information
-grep -E "(Started|Completed)" automation-debug.log
+grep -E "(Started|Completed)" sapiens-debug.log
 ```
 
 ### Enable Structured Logging
@@ -921,13 +921,13 @@ The system uses structured logging (JSON format) for easier analysis:
 ```bash
 # Logs are automatically formatted as JSON
 # View with jq for pretty printing
-tail -f automation.log | jq '.'
+tail -f sapiens.log | jq '.'
 
 # Filter by log level
-tail -f automation.log | jq 'select(.level=="ERROR")'
+tail -f sapiens.log | jq 'select(.level=="ERROR")'
 
 # Filter by module
-tail -f automation.log | jq 'select(.module=="orchestrator")'
+tail -f sapiens.log | jq 'select(.module=="orchestrator")'
 ```
 
 ### Getting Help
@@ -936,8 +936,8 @@ When you need assistance:
 
 1. **Check the FAQ** - See docs/FAQ.md for common questions
 2. **Review logs** - Enable debug logging and check error messages
-3. **Test credentials** - Run `automation credentials test`
-4. **Test health** - Run `automation health-check`
+3. **Test credentials** - Run `sapiens credentials test`
+4. **Test health** - Run `sapiens health-check`
 5. **Open an issue** - https://github.com/savorywatt/repo-sapiens/issues
 6. **Check documentation** - https://github.com/savorywatt/repo-sapiens#readme
 
@@ -1030,22 +1030,27 @@ See: [API Reference](api-reference.md)
 pip install repo-sapiens
 
 # Basic commands
-automation --help                                # Show all commands
-automation list-plans                            # List active plans
-automation show-plan --plan-id 42               # View plan status
-automation process-issue --issue 42             # Process one issue
-automation process-all                          # Process all issues
-automation daemon --interval 60                 # Run continuous automation
-automation health-check                         # Check system health
+sapiens --help                                # Show all commands
+sapiens list-plans                            # List active plans
+sapiens show-plan --plan-id 42               # View plan status
+sapiens process-issue --issue 42             # Process one issue
+sapiens process-all                          # Process all issues
+sapiens daemon --interval 60                 # Run continuous automation
+sapiens health-check                         # Check system health
+
+# ReAct agent (local execution with Ollama, default model: qwen3:latest)
+sapiens react --repl                         # Interactive REPL mode
+sapiens react "task description"             # Run single task
+sapiens react --repl --model qwen3:latest    # Use specific model
 
 # Credentials management
-automation credentials test                     # Verify credentials work
-automation credentials set gitea/api_token      # Store a credential
-automation credentials get gitea/api_token      # Retrieve a credential
+sapiens credentials test                     # Verify credentials work
+sapiens credentials set gitea/api_token      # Store a credential
+sapiens credentials get gitea/api_token      # Retrieve a credential
 
 # Configuration
-automation --config custom_config.yaml list-plans  # Use custom config
-automation --log-level DEBUG process-issue --issue 42  # Debug logging
+sapiens --config custom_config.yaml list-plans  # Use custom config
+sapiens --log-level DEBUG process-issue --issue 42  # Debug logging
 ```
 
 ## Support
@@ -1054,8 +1059,8 @@ Having trouble? Here's how to get help:
 
 1. **Check the docs** - Most questions are answered in the documentation
 2. **Review logs** - Enable debug logging to see what's happening
-3. **Test credentials** - Run `automation credentials test`
-4. **Health check** - Run `automation health-check`
+3. **Test credentials** - Run `sapiens credentials test`
+4. **Health check** - Run `sapiens health-check`
 5. **Open an issue** - Include logs and your configuration (without secrets!)
 
 ---

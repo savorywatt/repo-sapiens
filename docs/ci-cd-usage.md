@@ -40,7 +40,7 @@ All workflows are located in `.gitea/workflows/`:
 
 1. Workflow triggers on issue event
 2. Examines issue labels to determine stage
-3. Calls appropriate `automation` CLI command
+3. Calls appropriate `sapiens` CLI command
 4. Reports success/failure
 
 **Label to Stage Mapping:**
@@ -166,7 +166,7 @@ The automation system provides several commands designed for CI/CD:
 Process specific issue at given stage.
 
 ```bash
-automation process-issue --issue 42 --stage planning
+sapiens process-issue --issue 42 --stage planning
 ```
 
 **Options:**
@@ -178,7 +178,7 @@ automation process-issue --issue 42 --stage planning
 ```yaml
 - name: Process issue
   run: |
-    automation process-issue \
+    sapiens process-issue \
       --issue ${{ github.event.issue.number }} \
       --stage planning
 ```
@@ -188,7 +188,7 @@ automation process-issue --issue 42 --stage planning
 Generate prompt issues from plan file.
 
 ```bash
-automation generate-prompts --plan-file plans/42-feature.md --plan-id 42
+sapiens generate-prompts --plan-file plans/42-feature.md --plan-id 42
 ```
 
 **Options:**
@@ -199,7 +199,7 @@ automation generate-prompts --plan-file plans/42-feature.md --plan-id 42
 ```yaml
 - name: Generate prompts
   run: |
-    automation generate-prompts \
+    sapiens generate-prompts \
       --plan-file "$plan_file" \
       --plan-id "$plan_id"
 ```
@@ -209,13 +209,13 @@ automation generate-prompts --plan-file plans/42-feature.md --plan-id 42
 Process all pending issues.
 
 ```bash
-automation process-all
+sapiens process-all
 ```
 
 **Usage in Workflows:**
 ```yaml
 - name: Process all pending
-  run: automation process-all --log-level INFO
+  run: sapiens process-all --log-level INFO
 ```
 
 ### list-active-plans
@@ -223,7 +223,7 @@ automation process-all
 List all active workflow plans.
 
 ```bash
-automation list-active-plans
+sapiens list-active-plans
 ```
 
 **Output:**
@@ -240,7 +240,7 @@ Active Plans:
 Check for stale workflows.
 
 ```bash
-automation check-stale --max-age-hours 24
+sapiens check-stale --max-age-hours 24
 ```
 
 **Options:**
@@ -251,7 +251,7 @@ automation check-stale --max-age-hours 24
 Generate health check report.
 
 ```bash
-automation health-check
+sapiens health-check
 ```
 
 **Output:**
@@ -274,7 +274,7 @@ Generated: 2025-12-20T10:30:00
 Check for workflow failures.
 
 ```bash
-automation check-failures --since-hours 24
+sapiens check-failures --since-hours 24
 ```
 
 **Options:**
@@ -376,7 +376,7 @@ export GITEA_TOKEN="your-token"
 export CLAUDE_API_KEY="your-key"
 
 # Run command
-automation process-issue --issue 42 --stage planning
+sapiens process-issue --issue 42 --stage planning
 ```
 
 ### State Inspection

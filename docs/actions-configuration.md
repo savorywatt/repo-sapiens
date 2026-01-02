@@ -17,7 +17,7 @@ The system includes five workflow files in `.gitea/workflows/`:
 **Process:**
 1. Checks issue labels
 2. Determines which stage to execute
-3. Calls `automation process-issue` with appropriate stage
+3. Calls `sapiens process-issue` with appropriate stage
 4. Reports success/failure
 
 **Configuration:**
@@ -43,7 +43,7 @@ elif 'custom-label' in labels:
 **Process:**
 1. Detects changed plan files
 2. Extracts plan ID from filename
-3. Calls `automation generate-prompts` for each plan
+3. Calls `sapiens generate-prompts` for each plan
 4. Lists active plans for visibility
 
 **Configuration:**
@@ -107,7 +107,7 @@ schedule:
 ```yaml
 # Check different time window
 - name: Check for failures
-  run: automation check-failures --since-hours 48
+  run: sapiens check-failures --since-hours 48
 ```
 
 ### 5. test.yaml
@@ -254,7 +254,7 @@ jobs:
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
-          automation custom-command --option value
+          sapiens custom-command --option value
 ```
 
 ### Adding Custom CLI Command
@@ -338,7 +338,7 @@ Cache more than just pip:
   run: |
     # DON'T: echo ${{ secrets.GITEA_TOKEN }}
     # DO: Use secret without logging
-    automation process-issue --issue 42
+    sapiens process-issue --issue 42
   env:
     GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
 ```
@@ -410,7 +410,7 @@ Then:
 ```yaml
 - name: Run with debug
   if: ${{ github.event.inputs.debug == 'true' }}
-  run: automation --log-level DEBUG process-all
+  run: sapiens --log-level DEBUG process-all
 ```
 
 ## Monitoring
@@ -428,7 +428,7 @@ Add metrics step:
 ```yaml
 - name: Collect metrics
   run: |
-    automation health-check | tee health.txt
+    sapiens health-check | tee health.txt
     # Send to monitoring system
 ```
 
