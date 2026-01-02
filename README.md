@@ -260,8 +260,9 @@ docker run -it repo-sapiens --help
 | [Gitea Tutorial](docs/GITEA_NEW_REPO_TUTORIAL.md) | New Gitea repo setup |
 | [Architecture](docs/ARCHITECTURE.md) | System architecture |
 | [Error Handling](docs/ERROR_HANDLING.md) | Error handling patterns |
-| [Deployment Guide](DEPLOYMENT_GUIDE.md) | Production deployment |
-| [Contributing](CONTRIBUTING.md) | Contribution guidelines |
+| [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) | Production deployment |
+| [Developer Setup](docs/DEVELOPER_SETUP.md) | Development environment setup |
+| [Contributing](docs/CONTRIBUTING.md) | Contribution guidelines |
 | [Changelog](CHANGELOG.md) | Version history |
 
 ## Troubleshooting
@@ -291,10 +292,10 @@ sapiens --log-level DEBUG process-issue --issue 42
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 Before contributing, please:
-1. Read the [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md)
+1. Read the [Contributor License Agreement](docs/CONTRIBUTOR_LICENSE_AGREEMENT.md)
 2. Sign off your commits with `git commit -s`
 3. Ensure tests pass and code quality checks succeed
 
