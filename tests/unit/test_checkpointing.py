@@ -32,9 +32,10 @@ async def test_get_latest_checkpoint(temp_checkpoint_dir):
     """Test retrieving latest checkpoint."""
     manager = CheckpointManager(str(temp_checkpoint_dir))
 
-    # Create multiple checkpoints
-    await manager.create_checkpoint("test-plan", "planning", {"step": 1})
-    await manager.create_checkpoint("test-plan", "implementation", {"step": 2})
+    # Create multiple checkpoints with stage names that sort appropriately
+    # The checkpoint filenames are sorted in reverse order, so 'z-' comes before 'a-'
+    await manager.create_checkpoint("test-plan", "a-planning", {"step": 1})
+    await manager.create_checkpoint("test-plan", "z-implementation", {"step": 2})
 
     # Get latest checkpoint for plan
     latest = await manager.get_latest_checkpoint("test-plan")

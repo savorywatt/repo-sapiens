@@ -20,6 +20,14 @@ def temp_state_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def temp_checkpoint_dir(tmp_path: Path) -> Path:
+    """Temporary checkpoint directory."""
+    checkpoint_dir = tmp_path / "checkpoints"
+    checkpoint_dir.mkdir()
+    return checkpoint_dir
+
+
+@pytest.fixture
 def state_manager(temp_state_dir: Path) -> StateManager:
     """StateManager instance with temp directory."""
     return StateManager(str(temp_state_dir))
