@@ -1,26 +1,23 @@
 # Include package data
 include README.md
 include LICENSE
-include QUICK_START.md
-include CI_CD_GUIDE.md
-include .env.example
 include pyproject.toml
 
-# Include automation package
-recursive-include automation *.py
-recursive-include automation/config *.yaml
-recursive-include automation/templates *.j2 *.json
+# Include repo_sapiens package
+recursive-include repo_sapiens *.py
+recursive-include repo_sapiens/config *.yaml
+recursive-include repo_sapiens/templates *.j2 *.json
 
 # Include type checking marker (PEP 561)
-include automation/py.typed
+include repo_sapiens/py.typed
 
 # Exclude test files
 recursive-exclude tests *
 recursive-exclude hello-python-test *
 
 # Exclude config files with sensitive data
-recursive-exclude automation/config playground_config.yaml
-recursive-exclude automation/config ollama_config.yaml
+recursive-exclude repo_sapiens/config playground_config.yaml
+recursive-exclude repo_sapiens/config ollama_config.yaml
 
 # Exclude development scripts
 exclude test_*.py

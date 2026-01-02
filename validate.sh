@@ -1,10 +1,10 @@
 #!/bin/bash
-# Validation script for builder automation package
+# Validation script for repo-sapiens package
 
 set -e
 
-echo "🔍 Validating builder automation package"
-echo "========================================"
+echo "🔍 Validating repo-sapiens package"
+echo "==================================="
 echo
 
 # Colors
@@ -33,7 +33,7 @@ fi
 
 # Check if package is installed
 echo -n "Checking package installation... "
-if python3 -c "import automation" 2>/dev/null; then
+if python3 -c "import repo_sapiens" 2>/dev/null; then
     echo -e "${GREEN}✓${NC} Package installed"
 else
     echo -e "${RED}✗${NC} Package not installed"
@@ -43,7 +43,7 @@ fi
 
 # Check CLI command
 echo -n "Checking CLI command... "
-if command -v automation &> /dev/null; then
+if command -v sapiens &> /dev/null; then
     echo -e "${GREEN}✓${NC} CLI available"
 else
     echo -e "${RED}✗${NC} CLI not found"
@@ -68,7 +68,7 @@ except ImportError as e:
 
 # Check configuration template
 echo -n "Checking configuration template... "
-if [ -f "automation/config/automation_config.yaml" ]; then
+if [ -f "repo_sapiens/config/automation_config.yaml" ]; then
     echo -e "${GREEN}✓${NC} Config template exists"
 else
     echo -e "${YELLOW}⚠${NC} Config template not found"
@@ -84,7 +84,7 @@ fi
 
 # Check documentation
 echo -n "Checking documentation... "
-if [ -f "QUICK_START.md" ] && [ -f "CI_CD_GUIDE.md" ]; then
+if [ -f "README.md" ] && [ -f "DEPLOYMENT_GUIDE.md" ]; then
     echo -e "${GREEN}✓${NC} Documentation complete"
 else
     echo -e "${YELLOW}⚠${NC} Some documentation missing"
@@ -92,7 +92,7 @@ fi
 
 # Test CLI help
 echo -n "Testing CLI help command... "
-if automation --help &>/dev/null; then
+if sapiens --help &>/dev/null; then
     echo -e "${GREEN}✓${NC} CLI working"
 else
     echo -e "${RED}✗${NC} CLI error"
@@ -104,10 +104,10 @@ echo -n "Testing module imports... "
 python3 <<EOF
 import sys
 try:
-    from automation.config.settings import AutomationSettings
-    from automation.engine.orchestrator import WorkflowOrchestrator
-    from automation.providers.gitea_rest import GiteaRestProvider
-    from automation.providers.external_agent import ExternalAgentProvider
+    from repo_sapiens.config.settings import AutomationSettings
+    from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
+    from repo_sapiens.providers.gitea_rest import GiteaRestProvider
+    from repo_sapiens.providers.external_agent import ExternalAgentProvider
     print("OK")
 except Exception as e:
     print(f"Error: {e}")
@@ -128,6 +128,6 @@ echo
 echo "Next steps:"
 echo "1. Configure .env file: cp .env.example .env"
 echo "2. Docker: docker-compose up -d"
-echo "3. Or run directly: automation daemon --interval 60"
+echo "3. Or run directly: sapiens daemon --interval 60"
 echo
-echo "See QUICK_START.md for more information."
+echo "See README.md for more information."
