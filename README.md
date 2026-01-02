@@ -17,8 +17,8 @@ pip install -e .
 automation daemon --interval 60
 ```
 
-📚 **See [QUICK_START.md](QUICK_START.md)** for 5-minute setup
-📦 **See [CI_CD_GUIDE.md](CI_CD_GUIDE.md)** for platform-specific guides (GitHub Actions, GitLab CI, Jenkins, etc.)
+📚 **See [Getting Started](docs/GETTING_STARTED.md)** for setup guide
+📦 **See [CI/CD Usage](docs/ci-cd-usage.md)** for platform-specific guides
 
 ---
 
@@ -83,7 +83,7 @@ pip install -e ".[dev]"
 
 ```bash
 # Initialize in your Git repository (interactive)
-repo-agent init
+automation init
 ```
 
 This will:
@@ -113,7 +113,7 @@ This will:
 
 3. Test configuration:
    ```bash
-   repo-agent --config automation/config/my_config.yaml list-plans
+   automation --config automation/config/my_config.yaml list-plans
    ```
 
 ### Basic Usage
@@ -344,7 +344,7 @@ cat .automation/state/42.json | jq .
 ### AI Agent Selection
 - [Agent Comparison](docs/AGENT_COMPARISON.md) - **Choose between Claude Code and Goose AI**
 - [Goose Setup Guide](docs/GOOSE_SETUP.md) - Complete Goose AI configuration guide
-- [INIT Command Guide](docs/INIT_COMMAND_GUIDE.md) - Using `repo-agent init`
+- [INIT Command Guide](docs/INIT_COMMAND_GUIDE.md) - Using `automation init`
 
 ### Advanced Configuration
 - [Secrets Setup Guide](docs/secrets-setup.md) - Configure CI/CD secrets

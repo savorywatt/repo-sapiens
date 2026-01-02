@@ -360,4 +360,4 @@ The test suite includes:
 
 ## License
 
-Same as repo-agent project.
+MIT License - see LICENSE file in the repo-sapiens repository.

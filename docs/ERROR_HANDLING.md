@@ -196,7 +196,7 @@ Example output:
 ```
 Credential not found: @keyring:gitea/api_token (reference: @keyring:gitea/api_token)
 Suggestion: Store the credential with:
-  builder credentials set --keyring gitea/api_token
+  automation credentials set --keyring gitea/api_token
 ```
 
 ## Git Operation Error Handling

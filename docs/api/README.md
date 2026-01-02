@@ -1,6 +1,6 @@
 # API Reference
 
-This directory contains comprehensive API documentation for the repo-agent project.
+This directory contains comprehensive API documentation for the repo-sapiens project.
 
 ## Core Modules
 

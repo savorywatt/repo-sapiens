@@ -52,13 +52,13 @@ For production workloads requiring highest quality:
 
 ```bash
 # Navigate to project directory
-cd /home/ross/Workspace/builder
+cd /path/to/repo-sapiens
 
 # Verify git remote
 git remote -v
 
 # If remote not set:
-git remote add origin https://gitea.example.com/your-username/builder.git
+git remote add origin https://gitea.example.com/your-username/repo-sapiens.git
 
 # Push all code
 git add .
@@ -76,8 +76,8 @@ git push -u origin main
 
 #### Required Secrets (All Setups)
 
-**Secret: BUILDER_GITEA_TOKEN**
-- Name: `BUILDER_GITEA_TOKEN`
+**Secret: AUTOMATION__GIT_PROVIDER__API_TOKEN**
+- Name: `AUTOMATION__GIT_PROVIDER__API_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
   1. User Settings → Applications → Generate New Token
@@ -86,24 +86,24 @@ git push -u origin main
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret: BUILDER_GITEA_URL**
-- Name: `BUILDER_GITEA_URL`
+**Secret: AUTOMATION__GIT_PROVIDER__BASE_URL**
+- Name: `AUTOMATION__GIT_PROVIDER__BASE_URL`
 - Value: Your Gitea instance URL (e.g., `https://gitea.example.com`)
 
 #### For Ollama Setup (Recommended for Testing)
 
-**Secret: BUILDER_OLLAMA_BASE_URL**
-- Name: `BUILDER_OLLAMA_BASE_URL`
+**Secret: AUTOMATION__OLLAMA__BASE_URL**
+- Name: `AUTOMATION__OLLAMA__BASE_URL`
 - Value: `http://localhost:11434` (or your Ollama server URL)
 
-**Secret: BUILDER_OLLAMA_MODEL**
-- Name: `BUILDER_OLLAMA_MODEL`
+**Secret: AUTOMATION__OLLAMA__MODEL**
+- Name: `AUTOMATION__OLLAMA__MODEL`
 - Value: `codellama:13b` (or your preferred model)
 
 #### For Claude API Setup (Production)
 
-**Secret: BUILDER_CLAUDE_API_KEY**
-- Name: `BUILDER_CLAUDE_API_KEY`
+**Secret: AUTOMATION__CLAUDE__API_KEY**
+- Name: `AUTOMATION__CLAUDE__API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
   1. Go to https://console.anthropic.com
@@ -222,10 +222,10 @@ For real-time processing instead of cron-based:
 ## Verification Checklist
 
 - [ ] Code pushed to Gitea
-- [ ] Core secrets configured (BUILDER_GITEA_TOKEN, BUILDER_GITEA_URL)
+- [ ] Core secrets configured (AUTOMATION__GIT_PROVIDER__API_TOKEN, AUTOMATION__GIT_PROVIDER__BASE_URL)
 - [ ] AI provider secrets configured:
-  - [ ] **Ollama**: BUILDER_OLLAMA_BASE_URL, BUILDER_OLLAMA_MODEL
-  - [ ] **Claude**: BUILDER_CLAUDE_API_KEY
+  - [ ] **Ollama**: AUTOMATION__OLLAMA__BASE_URL, AUTOMATION__OLLAMA__MODEL
+  - [ ] **Claude**: AUTOMATION__CLAUDE__API_KEY
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
 - [ ] Workflow files present in `.gitea/workflows/`
@@ -254,7 +254,7 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" in workflow logs
 
 **Solutions:**
-1. Verify BUILDER_GITEA_TOKEN secret is set
+1. Verify AUTOMATION__GIT_PROVIDER__API_TOKEN secret is set
 2. Check token has correct scopes
 3. Regenerate token if expired
 4. Ensure secret name matches exactly (case-sensitive)
@@ -265,7 +265,7 @@ For real-time processing instead of cron-based:
 
 **Solutions:**
 1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
-2. Check BUILDER_OLLAMA_BASE_URL is correct
+2. Check AUTOMATION__OLLAMA__BASE_URL is correct
 3. Ensure runner can reach Ollama server (network/firewall)
 4. Verify model is pulled: `ollama list`
 
@@ -283,7 +283,7 @@ curl http://ollama-server:11434/api/tags
 
 **Solutions:**
 1. Pull the model: `ollama pull codellama:13b`
-2. Check model name matches BUILDER_OLLAMA_MODEL exactly
+2. Check model name matches AUTOMATION__OLLAMA__MODEL exactly
 3. List available models: `ollama list`
 
 ### Ollama Out of Memory

@@ -172,7 +172,7 @@ from automation.credentials import EncryptedFileBackend
 from pathlib import Path
 
 backend = EncryptedFileBackend(
-    file_path=Path(".builder/credentials.enc"),
+    file_path=Path(".repo-sapiens/credentials.enc"),
     master_password="secure-master-password"
 )
 
@@ -341,46 +341,46 @@ print(settings.git_provider.api_token)  # "actual-token-value"
 
 ## CLI Usage
 
-The `repo-agent credentials` command provides CLI access to credential management:
+The `automation credentials` command provides CLI access to credential management:
 
 ### Set a Credential
 
 ```bash
 # Store in keyring
-repo-agent credentials set gitea/api_token --backend keyring
+automation credentials set gitea/api_token --backend keyring
 
 # Store in environment (current session only)
-repo-agent credentials set GITEA_TOKEN --backend environment
+automation credentials set GITEA_TOKEN --backend environment
 
 # Store in encrypted file
-repo-agent credentials set gitea/api_token --backend encrypted
+automation credentials set gitea/api_token --backend encrypted
 ```
 
 ### Get a Credential
 
 ```bash
 # Retrieve and display (masked)
-repo-agent credentials get @keyring:gitea/api_token
+automation credentials get @keyring:gitea/api_token
 
 # Show full value
-repo-agent credentials get @keyring:gitea/api_token --show-value
+automation credentials get @keyring:gitea/api_token --show-value
 ```
 
 ### Delete a Credential
 
 ```bash
 # Delete from keyring
-repo-agent credentials delete gitea/api_token --backend keyring
+automation credentials delete gitea/api_token --backend keyring
 
 # Delete from environment
-repo-agent credentials delete GITEA_TOKEN --backend environment
+automation credentials delete GITEA_TOKEN --backend environment
 ```
 
 ### Test Backends
 
 ```bash
 # Check which backends are available
-repo-agent credentials test
+automation credentials test
 ```
 
 ## Best Practices
