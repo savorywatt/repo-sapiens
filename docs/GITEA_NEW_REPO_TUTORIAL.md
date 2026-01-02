@@ -177,7 +177,7 @@ Navigate to your cloned repository and run the interactive setup:
 
 ```bash
 cd /path/to/my-project
-repo-sapiens init
+automation init
 ```
 
 The init wizard will:
@@ -603,7 +603,7 @@ automation --config automation/config/automation_config.yaml show-plan --plan-id
 
 ### Configuration File Location
 
-After running `repo-sapiens init`, your config is at:
+After running `automation init`, your config is at:
 
 ```
 my-project/
@@ -921,7 +921,7 @@ automation show-plan --plan-id 1
 
 ```bash
 # Initialize in a new repo
-repo-sapiens init
+automation init
 
 # Process single issue
 automation process-issue --issue 42

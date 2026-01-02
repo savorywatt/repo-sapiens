@@ -1,6 +1,6 @@
 # Goose AI Agent Setup Guide
 
-This guide shows you how to use [Goose AI](https://github.com/block/goose) as the agent for repo-agent automation.
+This guide shows you how to use [Goose AI](https://github.com/block/goose) as the agent for repo-sapiens automation.
 
 ## What is Goose AI?
 
@@ -42,11 +42,11 @@ uvx goose
 goose --version
 ```
 
-### 2. Initialize repo-agent with Goose
+### 2. Initialize repo-sapiens with Goose
 
 ```bash
 cd /path/to/your/repo
-repo-agent init
+automation init
 ```
 
 When prompted:
@@ -78,7 +78,7 @@ Groq          | good         | low         | ultra-fast | Fast prototyping, high
 
 💡 Recommendation:
 Recommended: openai
-Reason: OpenAI GPT-4o has the best tool/function calling support, essential for repo-agent's file operations and git commands.
+Reason: OpenAI GPT-4o has the best tool/function calling support, essential for automation file operations and git commands.
 
 Which LLM provider? [openai/anthropic/ollama/openrouter/groq]: openai
 
@@ -99,7 +99,7 @@ Customize Goose settings? (temperature, toolkit) [y/N]: n
 ```bash
 # Label an issue with "needs-planning" in Gitea
 # Then start the daemon:
-repo-agent daemon --interval 60
+automation daemon --interval 60
 ```
 
 That's it! Goose will now handle your issues using the selected LLM provider.
@@ -113,7 +113,7 @@ That's it! Goose will now handle your issues using the selected LLM provider.
 **Best for**: Production automation, complex tasks requiring tool/function calling
 
 **Pros**:
-- Excellent tool/function calling (essential for repo-agent)
+- Excellent tool/function calling (essential for automation)
 - Fast inference
 - Reliable API
 - Best coding capabilities
@@ -124,7 +124,7 @@ That's it! Goose will now handle your issues using the selected LLM provider.
 
 **Setup**:
 ```bash
-repo-agent init
+automation init
 # Select: goose → openai → gpt-4o
 # Enter API key from: https://platform.openai.com/api-keys
 ```
@@ -149,7 +149,7 @@ repo-agent init
 
 **Setup**:
 ```bash
-repo-agent init
+automation init
 # Select: goose → anthropic → claude-3-5-sonnet-20241022
 # Enter API key from: https://console.anthropic.com/
 ```
@@ -186,12 +186,12 @@ ollama serve
 # 3. Pull a coding model
 ollama pull qwen2.5-coder:32b
 
-# 4. Initialize repo-agent
-repo-agent init
+# 4. Initialize repo-sapiens
+automation init
 # Select: goose → ollama → ollama/qwen2.5-coder:32b
 ```
 
-**⚠️ Important Note**: Ollama may not properly handle tool/function calls, which are essential for repo-agent's file operations. For production use with local models, **vLLM is strongly recommended** instead.
+**⚠️ Important Note**: Ollama may not properly handle tool/function calls, which are essential for automation file operations. For production use with local models, **vLLM is strongly recommended** instead.
 
 **Alternative: vLLM (Recommended for Local Tool Usage)**
 
@@ -227,7 +227,7 @@ vllm serve qwen2.5-coder:32b --enable-tools
 
 **Setup**:
 ```bash
-repo-agent init
+automation init
 # Select: goose → openrouter → openai/gpt-4o
 # Enter API key from: https://openrouter.ai
 ```
@@ -259,7 +259,7 @@ repo-agent init
 
 **Setup**:
 ```bash
-repo-agent init
+automation init
 # Select: goose → groq → llama-3.1-70b-versatile
 # Enter API key from: https://groq.com
 ```
@@ -344,16 +344,16 @@ Store credentials securely in your OS keyring:
 
 ```bash
 # During init, credentials are automatically stored
-repo-agent init --backend keyring
+automation init --backend keyring
 
 # Manual credential management
-repo-agent credentials set openai api_key
+automation credentials set openai api_key
 # Enter your OpenAI API key: ••••••••••••••••
 
-repo-agent credentials get openai api_key
+automation credentials get openai api_key
 # sk-proj-...
 
-repo-agent credentials list
+automation credentials list
 # openai/api_key: ••••••••...
 # gitea/api_token: ••••••••...
 ```
@@ -370,7 +370,7 @@ export OPENROUTER_API_KEY="sk-or-..."
 export GROQ_API_KEY="gsk_..."
 
 # Then run init
-repo-agent init --backend environment
+automation init --backend environment
 ```
 
 ### Gitea Actions Secrets
@@ -382,7 +382,7 @@ For automated workflows, set secrets in Gitea:
    - `GITEA_TOKEN` (your Gitea API token)
    - `OPENAI_API_KEY` (or whichever provider you use)
 
-Or let `repo-agent init` set them automatically with `--setup-secrets`.
+Or let `automation init` set them automatically with `--setup-secrets`.
 
 ---
 
@@ -402,7 +402,7 @@ agent_provider:
 
 Or re-run init:
 ```bash
-repo-agent init --force  # Regenerate config
+automation init --force  # Regenerate config
 ```
 
 ---
@@ -431,10 +431,10 @@ Error: Failed to authenticate with OpenAI
 **Solution**: Verify your API key:
 ```bash
 # Check if key is set
-repo-agent credentials get openai api_key
+automation credentials get openai api_key
 
 # Update key
-repo-agent credentials set openai api_key
+automation credentials set openai api_key
 ```
 
 ### Tool calling not working with Ollama
@@ -581,7 +581,7 @@ agent_provider:
 ## Getting Help
 
 - **Goose Issues**: https://github.com/block/goose/issues
-- **repo-agent Issues**: https://github.com/shireadmin/repo-agent/issues
+- **repo-sapiens Issues**: https://github.com/savorywatt/repo-sapiens/issues
 - **Provider Documentation**:
   - OpenAI: https://platform.openai.com/docs
   - Anthropic: https://docs.anthropic.com

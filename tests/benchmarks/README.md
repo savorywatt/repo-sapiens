@@ -1,6 +1,6 @@
-# Performance Benchmarks for repo-agent
+# Performance Benchmarks for repo-sapiens
 
-This directory contains comprehensive performance benchmarks for repo-agent's critical operations. The benchmarks use `pytest-benchmark` for statistical rigor and consistent measurements.
+This directory contains comprehensive performance benchmarks for repo-sapiens' critical operations. The benchmarks use `pytest-benchmark` for statistical rigor and consistent measurements.
 
 ## Quick Start
 
@@ -416,5 +416,3 @@ pytest tests/benchmarks/test_performance.py::TestMyClass::test_my_operation --be
 ```
 
 ---
-
-For detailed performance analysis, see `/home/ross/Workspace/repo-agent/docs/PERFORMANCE_BENCHMARKS.md`
