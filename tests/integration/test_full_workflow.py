@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from automation.engine.orchestrator import WorkflowOrchestrator
-from automation.models.domain import Issue, IssueState, Plan, Review, Task, TaskResult
+from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
+from repo_sapiens.models.domain import Issue, IssueState, Plan, Review, Task, TaskResult
 
 
 @pytest.mark.asyncio

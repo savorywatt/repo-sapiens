@@ -1,6 +1,6 @@
 """Tests for credential exceptions."""
 
-from automation.credentials.exceptions import (
+from repo_sapiens.credentials.exceptions import (
     BackendNotAvailableError,
     CredentialError,
     CredentialFormatError,

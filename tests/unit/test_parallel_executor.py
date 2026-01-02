@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from automation.engine.parallel_executor import (
+from repo_sapiens.engine.parallel_executor import (
     ExecutionTask,
     ParallelExecutor,
     TaskPriority,

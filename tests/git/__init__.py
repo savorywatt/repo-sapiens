@@ -1,1 +1,1 @@
-"""Tests for automation.git module."""
+"""Tests for repo_sapiens.git module."""

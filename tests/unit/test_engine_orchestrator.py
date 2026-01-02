@@ -14,11 +14,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from automation.config.settings import AutomationSettings
-from automation.engine.orchestrator import WorkflowOrchestrator
-from automation.engine.state_manager import StateManager
-from automation.models.domain import Issue, IssueState, Task
-from automation.providers.base import AgentProvider, GitProvider
+from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
+from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.models.domain import Issue, IssueState, Task
+from repo_sapiens.providers.base import AgentProvider, GitProvider
 
 
 # -----------------------------------------------------------------------------

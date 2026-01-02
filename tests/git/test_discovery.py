@@ -14,8 +14,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from automation.git.discovery import GitDiscovery, detect_git_origin
-from automation.git.exceptions import (
+from repo_sapiens.git.discovery import GitDiscovery, detect_git_origin
+from repo_sapiens.git.exceptions import (
     MultipleRemotesError,
     NoRemotesError,
     NotGitRepositoryError,
@@ -25,7 +25,7 @@ from automation.git.exceptions import (
 class TestGitDiscoveryRemoteListing:
     """Tests for listing Git remotes."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_list_remotes_single_ssh(self, mock_repo_class):
         """Test listing remotes with single SSH remote."""
         # Mock git.Repo
@@ -45,7 +45,7 @@ class TestGitDiscoveryRemoteListing:
         assert remotes[0].url == "git@gitea.com:owner/repo.git"
         assert remotes[0].url_type == "ssh"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_list_remotes_single_https(self, mock_repo_class):
         """Test listing remotes with single HTTPS remote."""
         mock_remote = Mock()
@@ -62,7 +62,7 @@ class TestGitDiscoveryRemoteListing:
         assert len(remotes) == 1
         assert remotes[0].url_type == "https"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_list_remotes_multiple(self, mock_repo_class):
         """Test listing multiple remotes."""
         mock_origin = Mock()
@@ -86,7 +86,7 @@ class TestGitDiscoveryRemoteListing:
         assert remotes[1].name == "upstream"
         assert remotes[1].url_type == "https"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_list_remotes_empty(self, mock_repo_class):
         """Test listing remotes when none exist."""
         mock_repo = Mock()
@@ -98,7 +98,7 @@ class TestGitDiscoveryRemoteListing:
 
         assert len(remotes) == 0
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_list_remotes_unknown_url_type(self, mock_repo_class):
         """Test listing remotes with unknown URL type."""
         mock_remote = Mock()
@@ -119,7 +119,7 @@ class TestGitDiscoveryRemoteListing:
 class TestGitDiscoveryGetRemote:
     """Tests for getting specific remotes."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_single(self, mock_repo_class):
         """Test getting remote when only one exists."""
         mock_remote = Mock()
@@ -135,7 +135,7 @@ class TestGitDiscoveryGetRemote:
 
         assert remote.name == "origin"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_by_name(self, mock_repo_class):
         """Test getting remote by specific name."""
         mock_origin = Mock()
@@ -155,7 +155,7 @@ class TestGitDiscoveryGetRemote:
 
         assert remote.name == "upstream"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_prefers_origin(self, mock_repo_class):
         """Test that origin is preferred over other remotes."""
         mock_origin = Mock()
@@ -176,7 +176,7 @@ class TestGitDiscoveryGetRemote:
 
         assert remote.name == "origin"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_prefers_upstream_over_others(self, mock_repo_class):
         """Test that upstream is preferred when origin doesn't exist."""
         mock_upstream = Mock()
@@ -196,7 +196,7 @@ class TestGitDiscoveryGetRemote:
 
         assert remote.name == "upstream"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_multiple_raises_error(self, mock_repo_class):
         """Test that multiple remotes raise error without allow_multiple when no preferred names."""
         # Use non-preferred remote names to trigger the error
@@ -224,7 +224,7 @@ class TestGitDiscoveryGetRemote:
         assert len(exc_info.value.remotes) == 2
         assert exc_info.value.suggested is not None
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_nonexistent_name(self, mock_repo_class):
         """Test getting remote with non-existent name raises error."""
         mock_remote = Mock()
@@ -243,7 +243,7 @@ class TestGitDiscoveryGetRemote:
         assert "nonexistent" in str(exc_info.value)
         assert "origin" in str(exc_info.value)
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_remote_no_remotes_raises_error(self, mock_repo_class):
         """Test getting remote when none exist raises error."""
         mock_repo = Mock()
@@ -259,7 +259,7 @@ class TestGitDiscoveryGetRemote:
 class TestGitDiscoveryMultipleRemotesInfo:
     """Tests for getting multiple remotes information."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_multiple_remotes_info_suggests_origin(self, mock_repo_class):
         """Test that origin is suggested when present."""
         mock_origin = Mock()
@@ -282,7 +282,7 @@ class TestGitDiscoveryMultipleRemotesInfo:
         assert info.suggested.name == "origin"
         assert info.remote_names == ["upstream", "origin"]
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_multiple_remotes_info_suggests_upstream(self, mock_repo_class):
         """Test that upstream is suggested when origin doesn't exist."""
         mock_upstream = Mock()
@@ -303,7 +303,7 @@ class TestGitDiscoveryMultipleRemotesInfo:
         assert info.suggested is not None
         assert info.suggested.name == "upstream"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_multiple_remotes_info_suggests_first(self, mock_repo_class):
         """Test that first remote is suggested when no preferred names."""
         mock_remote1 = Mock()
@@ -324,7 +324,7 @@ class TestGitDiscoveryMultipleRemotesInfo:
         assert info.suggested is not None
         assert info.suggested.name == "remote1"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_get_multiple_remotes_info_no_remotes_raises_error(self, mock_repo_class):
         """Test that no remotes raises error."""
         mock_repo = Mock()
@@ -340,7 +340,7 @@ class TestGitDiscoveryMultipleRemotesInfo:
 class TestGitDiscoveryParseRepository:
     """Tests for parsing repository information."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_ssh(self, mock_repo_class):
         """Test parsing repository with SSH URL."""
         mock_remote = Mock()
@@ -362,7 +362,7 @@ class TestGitDiscoveryParseRepository:
         assert info.https_url == "https://gitea.com/owner/repo.git"
         assert info.full_name == "owner/repo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_https(self, mock_repo_class):
         """Test parsing repository with HTTPS URL."""
         mock_remote = Mock()
@@ -380,7 +380,7 @@ class TestGitDiscoveryParseRepository:
         assert info.repo == "repo"
         assert str(info.base_url) == "https://gitea.com/"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_with_port(self, mock_repo_class):
         """Test parsing repository with custom port."""
         mock_remote = Mock()
@@ -399,7 +399,7 @@ class TestGitDiscoveryParseRepository:
         assert str(info.base_url) == "https://gitea.example.com:3000/"
         assert info.https_url == "https://gitea.example.com:3000/myorg/myrepo.git"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_specific_remote(self, mock_repo_class):
         """Test parsing repository with specific remote."""
         mock_origin = Mock()
@@ -424,7 +424,7 @@ class TestGitDiscoveryParseRepository:
 class TestGitDiscoveryDetectGiteaConfig:
     """Tests for detecting Gitea configuration."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_config(self, mock_repo_class):
         """Test detecting Gitea configuration."""
         mock_remote = Mock()
@@ -442,7 +442,7 @@ class TestGitDiscoveryDetectGiteaConfig:
         assert config["owner"] == "myorg"
         assert config["repo"] == "myrepo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_config_multiple_remotes_raises_error(self, mock_repo_class):
         """Test that multiple non-preferred remotes raises error."""
         # Use non-preferred remote names to trigger the error
@@ -469,7 +469,7 @@ class TestGitDiscoveryDetectGiteaConfig:
 class TestGitDiscoveryErrorHandling:
     """Tests for error handling."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_not_git_repository(self, mock_repo_class):
         """Test error when directory is not a Git repository."""
         from git.exc import InvalidGitRepositoryError as GitInvalidRepoError
@@ -484,7 +484,7 @@ class TestGitDiscoveryErrorHandling:
         assert "/tmp/not-a-repo" in str(exc_info.value)
         assert "git init" in str(exc_info.value)
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repository_path_resolution(self, mock_repo_class):
         """Test that repository path is resolved to absolute path."""
         mock_repo = Mock()
@@ -500,7 +500,7 @@ class TestGitDiscoveryErrorHandling:
 class TestDetectGitOriginHelper:
     """Tests for detect_git_origin helper function."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_origin_success(self, mock_repo_class):
         """Test successful Git origin detection."""
         mock_remote = Mock()
@@ -515,7 +515,7 @@ class TestDetectGitOriginHelper:
 
         assert base_url == "https://gitea.com/"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_origin_returns_none_on_error(self, mock_repo_class):
         """Test that detect_git_origin returns None on error."""
         from git.exc import InvalidGitRepositoryError as GitInvalidRepoError
@@ -526,7 +526,7 @@ class TestDetectGitOriginHelper:
 
         assert base_url is None
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_origin_with_path(self, mock_repo_class):
         """Test detect_git_origin with custom path."""
         mock_remote = Mock()
@@ -545,7 +545,7 @@ class TestDetectGitOriginHelper:
 class TestGitDiscoveryLazyLoading:
     """Tests for lazy loading of Git repository."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repo_lazy_loaded(self, mock_repo_class):
         """Test that Git repo is not loaded until needed."""
         discovery = GitDiscovery()
@@ -560,7 +560,7 @@ class TestGitDiscoveryLazyLoading:
         assert discovery._repo is not None
         mock_repo_class.assert_called_once()
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repo_cached_after_first_load(self, mock_repo_class):
         """Test that Git repo is cached after first load."""
         mock_repo = Mock()

@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from automation.config.settings import AutomationSettings
-from automation.engine.state_manager import StateManager
-from automation.models.domain import Issue, IssueState, Plan, Task
-from automation.utils.mcp_client import MockMCPClient
+from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.models.domain import Issue, IssueState, Plan, Task
+from repo_sapiens.utils.mcp_client import MockMCPClient
 
 
 @pytest.fixture

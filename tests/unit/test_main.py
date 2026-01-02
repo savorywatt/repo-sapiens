@@ -1,12 +1,12 @@
-"""Tests for automation.main CLI module."""
+"""Tests for repo_sapiens.main CLI module."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from automation.exceptions import RepoSapiensError
-from automation.main import cli
+from repo_sapiens.exceptions import RepoSapiensError
+from repo_sapiens.main import cli
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_process_single_issue(self, mock_settings):
         """Test processing a single issue."""
-        from automation.main import _process_single_issue
+        from repo_sapiens.main import _process_single_issue
 
         mock_orchestrator = AsyncMock()
         mock_issue = MagicMock()
@@ -61,7 +61,7 @@ class TestAsyncMainFunctions:
         mock_orchestrator.git.get_issue = AsyncMock(return_value=mock_issue)
         mock_orchestrator.process_issue = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_single_issue(mock_settings, 42)
 
             mock_orchestrator.git.get_issue.assert_called_once_with(42)
@@ -70,12 +70,12 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_process_all_issues_with_tag(self, mock_settings):
         """Test processing all issues with tag filter."""
-        from automation.main import _process_all_issues
+        from repo_sapiens.main import _process_all_issues
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_all_issues(mock_settings, "urgent")
 
             mock_orchestrator.process_all_issues.assert_called_once_with("urgent")
@@ -83,12 +83,12 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_process_all_issues_no_tag(self, mock_settings):
         """Test processing all issues without tag."""
-        from automation.main import _process_all_issues
+        from repo_sapiens.main import _process_all_issues
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_all_issues(mock_settings, None)
 
             mock_orchestrator.process_all_issues.assert_called_once_with(None)
@@ -96,12 +96,12 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_process_plan(self, mock_settings):
         """Test processing a plan."""
-        from automation.main import _process_plan
+        from repo_sapiens.main import _process_plan
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_plan = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_plan(mock_settings, "plan-123")
 
             mock_orchestrator.process_plan.assert_called_once_with("plan-123")
@@ -109,12 +109,12 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_list_active_plans_empty(self, mock_settings, capsys):
         """Test listing plans when no plans exist."""
-        from automation.main import _list_active_plans
+        from repo_sapiens.main import _list_active_plans
 
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=[])
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _list_active_plans(mock_settings)
 
             captured = capsys.readouterr()
@@ -123,7 +123,7 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_list_active_plans_with_plans(self, mock_settings, capsys):
         """Test listing plans when plans exist."""
-        from automation.main import _list_active_plans
+        from repo_sapiens.main import _list_active_plans
 
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=["plan-1", "plan-2"])
@@ -131,7 +131,7 @@ class TestAsyncMainFunctions:
             side_effect=[{"status": "active"}, {"status": "completed"}]
         )
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _list_active_plans(mock_settings)
 
             captured = capsys.readouterr()
@@ -140,7 +140,7 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_show_plan_status_found(self, mock_settings, capsys):
         """Test showing status of existing plan."""
-        from automation.main import _show_plan_status
+        from repo_sapiens.main import _show_plan_status
 
         mock_state = AsyncMock()
         mock_state.load_state = AsyncMock(
@@ -153,7 +153,7 @@ class TestAsyncMainFunctions:
             }
         )
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _show_plan_status(mock_settings, "plan-123")
 
             captured = capsys.readouterr()
@@ -162,12 +162,12 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_show_plan_status_not_found(self, mock_settings, capsys):
         """Test showing status of non-existent plan."""
-        from automation.main import _show_plan_status
+        from repo_sapiens.main import _show_plan_status
 
         mock_state = AsyncMock()
         mock_state.load_state = AsyncMock(side_effect=FileNotFoundError())
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _show_plan_status(mock_settings, "plan-123")
 
             captured = capsys.readouterr()
@@ -177,15 +177,15 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_daemon_mode_keyboard_interrupt(self, mock_settings):
         """Test daemon mode handles keyboard interrupt."""
-        from automation.main import _daemon_mode
+        from repo_sapiens.main import _daemon_mode
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock()
 
         with (
-            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
-            patch("automation.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-            patch("automation.main.click.echo"),
+            patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("repo_sapiens.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("repo_sapiens.main.click.echo"),
         ):
             mock_sleep.side_effect = KeyboardInterrupt()
 
@@ -195,15 +195,15 @@ class TestAsyncMainFunctions:
     @pytest.mark.asyncio
     async def test_daemon_mode_error_handling(self, mock_settings):
         """Test daemon mode handles errors gracefully."""
-        from automation.main import _daemon_mode
+        from repo_sapiens.main import _daemon_mode
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock(side_effect=RepoSapiensError("Test error"))
 
         with (
-            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
-            patch("automation.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
-            patch("automation.main.click.echo"),
+            patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("repo_sapiens.main.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+            patch("repo_sapiens.main.click.echo"),
         ):
             mock_sleep.side_effect = KeyboardInterrupt()
 

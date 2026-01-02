@@ -4,7 +4,7 @@ Tests for cost optimization system.
 
 import pytest
 
-from automation.utils.cost_optimizer import CostOptimizer, ModelTier
+from repo_sapiens.utils.cost_optimizer import CostOptimizer, ModelTier
 
 
 def test_select_model_simple_task(mock_task):

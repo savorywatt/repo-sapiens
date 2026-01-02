@@ -8,8 +8,8 @@ security filters work correctly.
 import pytest
 from jinja2 import UndefinedError
 
-from automation.rendering.engine import SecureTemplateEngine
-from automation.rendering.filters import (
+from repo_sapiens.rendering.engine import SecureTemplateEngine
+from repo_sapiens.rendering.filters import (
     safe_identifier,
     safe_label,
     safe_url,

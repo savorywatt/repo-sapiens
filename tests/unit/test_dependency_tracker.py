@@ -2,8 +2,8 @@
 
 import pytest
 
-from automation.models.domain import Task
-from automation.processors.dependency_tracker import DependencyTracker
+from repo_sapiens.models.domain import Task
+from repo_sapiens.processors.dependency_tracker import DependencyTracker
 
 
 def test_dependency_tracker_initialization():

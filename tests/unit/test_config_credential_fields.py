@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import BaseModel, SecretStr, ValidationError
 
-from automation.config.credential_fields import (
+from repo_sapiens.config.credential_fields import (
     CredentialSecret,
     CredentialStr,
     get_resolver,
@@ -23,7 +23,7 @@ from automation.config.credential_fields import (
     resolve_credential_string,
     set_resolver,
 )
-from automation.credentials import CredentialError, CredentialNotFoundError, CredentialResolver
+from repo_sapiens.credentials import CredentialError, CredentialNotFoundError, CredentialResolver
 
 
 class TestResolverManagement:

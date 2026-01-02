@@ -29,14 +29,14 @@ This directory contains comprehensive API documentation for the repo-sapiens pro
 
 #### Loading Configuration
 ```python
-from automation.config.settings import AutomationSettings
+from repo_sapiens.config.settings import AutomationSettings
 
-settings = AutomationSettings.from_yaml("automation/config/automation_config.yaml")
+settings = AutomationSettings.from_yaml("repo_sapiens/config/automation_config.yaml")
 ```
 
 #### Resolving Credentials
 ```python
-from automation.credentials import CredentialResolver
+from repo_sapiens.credentials import CredentialResolver
 
 resolver = CredentialResolver()
 token = resolver.resolve("@keyring:gitea/api_token")
@@ -45,7 +45,7 @@ api_key = resolver.resolve("${CLAUDE_API_KEY}")
 
 #### Git Repository Discovery
 ```python
-from automation.git.discovery import GitDiscovery
+from repo_sapiens.git.discovery import GitDiscovery
 
 discovery = GitDiscovery()
 info = discovery.parse_repository()
@@ -54,7 +54,7 @@ provider_type = discovery.detect_provider_type()  # "github" or "gitea"
 
 #### Creating Git Providers
 ```python
-from automation.providers.factory import create_git_provider
+from repo_sapiens.providers.factory import create_git_provider
 
 provider = create_git_provider(settings)
 await provider.connect()
@@ -65,7 +65,7 @@ pr = await provider.create_pull_request(title="...", body="...", head="feature",
 
 #### Template Rendering
 ```python
-from automation.rendering.engine import SecureTemplateEngine
+from repo_sapiens.rendering.engine import SecureTemplateEngine
 
 engine = SecureTemplateEngine()
 rendered = engine.render("workflows/ci/build.yaml.j2", context={
@@ -79,14 +79,14 @@ rendered = engine.render("workflows/ci/build.yaml.j2", context={
 
 | Module | Description |
 |--------|-------------|
-| `automation.config` | Configuration management with Pydantic models |
-| `automation.credentials` | Secure credential storage (keyring, env, encrypted) |
-| `automation.git` | Git repository operations and discovery |
-| `automation.providers` | Git and AI agent provider abstractions |
-| `automation.rendering` | Secure Jinja2 template rendering |
-| `automation.engine` | Workflow orchestration and execution |
-| `automation.cli` | Command-line interface |
-| `automation.utils` | Utility functions and helpers |
+| `repo_sapiens.config` | Configuration management with Pydantic models |
+| `repo_sapiens.credentials` | Secure credential storage (keyring, env, encrypted) |
+| `repo_sapiens.git` | Git repository operations and discovery |
+| `repo_sapiens.providers` | Git and AI agent provider abstractions |
+| `repo_sapiens.rendering` | Secure Jinja2 template rendering |
+| `repo_sapiens.engine` | Workflow orchestration and execution |
+| `repo_sapiens.cli` | Command-line interface |
+| `repo_sapiens.utils` | Utility functions and helpers |
 
 ## Navigation
 
@@ -105,7 +105,7 @@ pip install sphinx sphinx-rtd-theme
 # Generate documentation
 cd docs/
 sphinx-quickstart
-sphinx-apidoc -o api/ ../automation/
+sphinx-apidoc -o api/ ../repo_sapiens/
 make html
 ```
 

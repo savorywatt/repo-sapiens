@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from automation.models.domain import IssueState
-from automation.providers.gitea_rest import GiteaRestProvider
+from repo_sapiens.models.domain import IssueState
+from repo_sapiens.providers.gitea_rest import GiteaRestProvider
 
 
 # =============================================================================
@@ -167,7 +167,7 @@ class TestGiteaRestProviderConnection:
     """Tests for connection management."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.gitea_rest.httpx.AsyncClient")
+    @patch("repo_sapiens.providers.gitea_rest.httpx.AsyncClient")
     async def test_connect_creates_client(
         self, mock_client_class: MagicMock, provider: GiteaRestProvider
     ) -> None:

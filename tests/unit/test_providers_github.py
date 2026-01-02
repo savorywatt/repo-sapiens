@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from automation.models.domain import IssueState
-from automation.providers.github_rest import GitHubRestProvider
+from repo_sapiens.models.domain import IssueState
+from repo_sapiens.providers.github_rest import GitHubRestProvider
 
 
 @pytest.fixture
@@ -71,7 +71,7 @@ class TestGitHubRestProviderConnection:
     """Tests for connection management."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_connect(self, mock_github_class, provider, mock_github_repo):
         """Should initialize GitHub client on connect."""
         mock_client = Mock()
@@ -88,7 +88,7 @@ class TestGitHubRestProviderConnection:
         assert provider._repo is mock_github_repo
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_disconnect(self, mock_github_class, provider):
         """Should close client and clear references on disconnect."""
         mock_client = Mock()
@@ -115,7 +115,7 @@ class TestGitHubRestProviderIssues:
     """Tests for issue operations."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_issues_open(self, mock_github_class, provider):
         """Should retrieve open issues."""
         mock_gh_issue = Mock()
@@ -152,7 +152,7 @@ class TestGitHubRestProviderIssues:
         assert issues[0].labels == ["bug", "enhancement"]
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_issues_with_labels(self, mock_github_class, provider):
         """Should retrieve issues filtered by labels."""
         mock_repo = Mock()
@@ -171,7 +171,7 @@ class TestGitHubRestProviderIssues:
         assert call_args.kwargs["labels"] == ["bug", "high-priority"]
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_issue_by_number(self, mock_github_class, provider):
         """Should retrieve single issue by number."""
         mock_gh_issue = Mock()
@@ -201,7 +201,7 @@ class TestGitHubRestProviderIssues:
         assert issue.state == IssueState.CLOSED
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_create_issue(self, mock_github_class, provider):
         """Should create new issue."""
         mock_created_issue = Mock()
@@ -237,7 +237,7 @@ class TestGitHubRestProviderIssues:
         )
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_update_issue(self, mock_github_class, provider):
         """Should update existing issue."""
         mock_issue = Mock()
@@ -276,7 +276,7 @@ class TestGitHubRestProviderComments:
     """Tests for comment operations."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_add_comment(self, mock_github_class, provider):
         """Should add comment to issue."""
         mock_comment = Mock()
@@ -303,7 +303,7 @@ class TestGitHubRestProviderComments:
         assert comment.author == "testuser"
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_comments(self, mock_github_class, provider):
         """Should retrieve all comments for issue."""
         mock_comments = [
@@ -333,7 +333,7 @@ class TestGitHubRestProviderBranches:
     """Tests for branch operations."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_create_branch(self, mock_github_class, provider):
         """Should create new branch from source."""
         mock_source_ref = Mock()
@@ -361,7 +361,7 @@ class TestGitHubRestProviderBranches:
         assert branch.protected is False
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_branch(self, mock_github_class, provider):
         """Should retrieve branch information."""
         mock_branch = Mock()
@@ -384,7 +384,7 @@ class TestGitHubRestProviderBranches:
         assert branch.protected is True
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_branch_not_found(self, mock_github_class, provider):
         """Should return None for non-existent branch."""
         from github import GithubException
@@ -406,7 +406,7 @@ class TestGitHubRestProviderFiles:
     """Tests for file operations."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_get_file(self, mock_github_class, provider):
         """Should retrieve file contents."""
         mock_file = Mock()
@@ -425,7 +425,7 @@ class TestGitHubRestProviderFiles:
         assert content == "File contents here"
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_commit_file_new(self, mock_github_class, provider):
         """Should create new file."""
         from github import GithubException
@@ -444,7 +444,7 @@ class TestGitHubRestProviderFiles:
         assert sha == "new123"
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_commit_file_update(self, mock_github_class, provider):
         """Should update existing file."""
         mock_existing = Mock()
@@ -468,7 +468,7 @@ class TestGitHubRestProviderPullRequests:
     """Tests for pull request operations."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_create_pull_request(self, mock_github_class, provider):
         """Should create pull request."""
         mock_pr = Mock()
@@ -504,7 +504,7 @@ class TestGitHubRestProviderErrorHandling:
     """Tests for error handling."""
 
     @pytest.mark.asyncio
-    @patch("automation.providers.github_rest.Github")
+    @patch("repo_sapiens.providers.github_rest.Github")
     async def test_github_exception_propagates(self, mock_github_class, provider):
         """Should propagate GitHub API exceptions."""
         from github import GithubException

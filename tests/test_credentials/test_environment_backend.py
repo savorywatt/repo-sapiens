@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from automation.credentials import EnvironmentBackend
+from repo_sapiens.credentials import EnvironmentBackend
 
 
 class TestEnvironmentBackend:

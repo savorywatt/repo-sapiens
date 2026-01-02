@@ -21,14 +21,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from automation.config.settings import AutomationSettings
-from automation.engine.stages.approval import ApprovalStage
-from automation.engine.stages.code_review import CodeReviewStage
-from automation.engine.stages.execution import TaskExecutionStage
-from automation.engine.stages.planning import PlanningStage
-from automation.engine.stages.qa import QAStage
-from automation.engine.state_manager import StateManager
-from automation.models.domain import (
+from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.stages.approval import ApprovalStage
+from repo_sapiens.engine.stages.code_review import CodeReviewStage
+from repo_sapiens.engine.stages.execution import TaskExecutionStage
+from repo_sapiens.engine.stages.planning import PlanningStage
+from repo_sapiens.engine.stages.qa import QAStage
+from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.models.domain import (
     Branch,
     Comment,
     Issue,

@@ -5,7 +5,7 @@ Tests for Pydantic validation models.
 import pytest
 from pydantic import ValidationError
 
-from automation.rendering.validators import (
+from repo_sapiens.rendering.validators import (
     CIBuildConfig,
     PyPIPublishConfig,
     WorkflowConfig,

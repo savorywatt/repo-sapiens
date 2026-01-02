@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from automation.agents.react import ReActAgentProvider, ReActConfig, TrajectoryStep
-from automation.agents.tools import ToolExecutionError, ToolRegistry
-from automation.models.domain import Task, TaskResult
+from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig, TrajectoryStep
+from repo_sapiens.agents.tools import ToolExecutionError, ToolRegistry
+from repo_sapiens.models.domain import Task, TaskResult
 
 
 class TestToolRegistry:
@@ -732,7 +732,7 @@ class TestGenerateStep:
     async def test_generate_step_includes_trajectory(self, agent):
         """Test that trajectory is included in subsequent calls."""
         # Add a step to trajectory
-        from automation.agents.react import TrajectoryStep
+        from repo_sapiens.agents.react import TrajectoryStep
         agent._trajectory.append(TrajectoryStep(
             iteration=1,
             thought="First thought",
@@ -905,10 +905,10 @@ class TestRunReactTask:
     @pytest.mark.asyncio
     async def test_run_react_task_success(self, temp_dir):
         """Test run_react_task convenience function."""
-        from automation.agents.react import run_react_task
+        from repo_sapiens.agents.react import run_react_task
 
         # Mock the agent's methods
-        with patch("automation.agents.react.ReActAgentProvider") as MockAgent:
+        with patch("repo_sapiens.agents.react.ReActAgentProvider") as MockAgent:
             mock_instance = AsyncMock()
             mock_instance.execute_task = AsyncMock(return_value=TaskResult(
                 success=True,
@@ -938,9 +938,9 @@ class TestRunReactTask:
     @pytest.mark.asyncio
     async def test_run_react_task_verbose(self, temp_dir, capsys):
         """Test run_react_task with verbose output."""
-        from automation.agents.react import run_react_task, TrajectoryStep
+        from repo_sapiens.agents.react import run_react_task, TrajectoryStep
 
-        with patch("automation.agents.react.ReActAgentProvider") as MockAgent:
+        with patch("repo_sapiens.agents.react.ReActAgentProvider") as MockAgent:
             mock_instance = AsyncMock()
             mock_instance.execute_task = AsyncMock(return_value=TaskResult(
                 success=True,
@@ -977,11 +977,11 @@ class TestRunReactTask:
     @pytest.mark.asyncio
     async def test_run_react_task_with_defaults(self, temp_dir):
         """Test run_react_task uses correct defaults."""
-        from automation.agents.react import run_react_task
+        from repo_sapiens.agents.react import run_react_task
 
         captured_config = None
 
-        with patch("automation.agents.react.ReActAgentProvider") as MockAgent:
+        with patch("repo_sapiens.agents.react.ReActAgentProvider") as MockAgent:
             def capture_init(working_dir, config):
                 nonlocal captured_config
                 captured_config = config
@@ -1022,7 +1022,7 @@ class TestAgentProviderInterface:
     async def test_generate_plan(self, agent):
         """Test generate_plan creates single-task plan."""
         from datetime import datetime
-        from automation.models.domain import Issue, IssueState
+        from repo_sapiens.models.domain import Issue, IssueState
 
         issue = Issue(
             id=1,
@@ -1048,7 +1048,7 @@ class TestAgentProviderInterface:
     @pytest.mark.asyncio
     async def test_generate_prompts(self, agent):
         """Test generate_prompts returns tasks from plan."""
-        from automation.models.domain import Plan
+        from repo_sapiens.models.domain import Plan
 
         plan = Plan(
             id="test-plan",

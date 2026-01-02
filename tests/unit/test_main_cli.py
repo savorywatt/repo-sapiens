@@ -1,4 +1,4 @@
-"""Comprehensive unit tests for automation.main CLI module.
+"""Comprehensive unit tests for repo_sapiens.main CLI module.
 
 This module tests the main CLI entry point including:
 - All CLI commands (daemon, process-issue, process-all, process-plan, list-plans, show-plan, react)
@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
-from automation.exceptions import ConfigurationError, RepoSapiensError
-from automation.main import cli
+from repo_sapiens.exceptions import ConfigurationError, RepoSapiensError
+from repo_sapiens.main import cli
 
 
 # =============================================================================
@@ -203,7 +203,7 @@ class TestConfigurationLoading:
 
     def test_config_not_required_for_init(self, cli_runner, tmp_path):
         """Test init command does not require config file."""
-        with patch("automation.cli.init.RepoInitializer.run"):
+        with patch("repo_sapiens.cli.init.RepoInitializer.run"):
             result = cli_runner.invoke(
                 cli,
                 ["--config", "/nonexistent/config.yaml", "init", "--repo-path", str(tmp_path)],
@@ -226,7 +226,7 @@ class TestConfigurationLoading:
         )
         assert result.exit_code == 0
 
-    @patch("automation.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     def test_configuration_error_handling(self, mock_from_yaml, cli_runner, mock_config_file):
         """Test handling of ConfigurationError during loading."""
         mock_from_yaml.side_effect = ConfigurationError("Invalid configuration")
@@ -236,7 +236,7 @@ class TestConfigurationLoading:
         assert result.exit_code == 1
         assert "Invalid configuration" in result.output
 
-    @patch("automation.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     def test_unexpected_config_error(self, mock_from_yaml, cli_runner, mock_config_file):
         """Test handling of unexpected errors during config loading."""
         mock_from_yaml.side_effect = RuntimeError("Unexpected error")
@@ -255,8 +255,8 @@ class TestConfigurationLoading:
 class TestProcessIssueCommand:
     """Test process-issue command."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_issue_success(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -277,8 +277,8 @@ class TestProcessIssueCommand:
         assert result.exit_code != 0
         assert "Missing option" in result.output or "--issue" in result.output
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_issue_repo_sapiens_error(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -293,8 +293,8 @@ class TestProcessIssueCommand:
         assert result.exit_code == 1
         assert "Test error" in result.output
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_issue_keyboard_interrupt(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -309,8 +309,8 @@ class TestProcessIssueCommand:
         assert result.exit_code == 130
         assert "Interrupted" in result.output
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_issue_unexpected_error(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -334,8 +334,8 @@ class TestProcessIssueCommand:
 class TestProcessAllCommand:
     """Test process-all command."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_all_without_tag(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -346,8 +346,8 @@ class TestProcessAllCommand:
 
         assert mock_run.called
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_all_with_tag(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -360,8 +360,8 @@ class TestProcessAllCommand:
 
         assert mock_run.called
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_all_repo_sapiens_error(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -374,8 +374,8 @@ class TestProcessAllCommand:
         assert result.exit_code == 1
         assert "Processing error" in result.output
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_all_keyboard_interrupt(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -396,8 +396,8 @@ class TestProcessAllCommand:
 class TestProcessPlanCommand:
     """Test process-plan command."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_plan_success(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -416,8 +416,8 @@ class TestProcessPlanCommand:
         assert result.exit_code != 0
         assert "Missing option" in result.output or "--plan-id" in result.output
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_plan_repo_sapiens_error(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -441,8 +441,8 @@ class TestProcessPlanCommand:
 class TestDaemonCommand:
     """Test daemon command."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_daemon_default_interval(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -453,8 +453,8 @@ class TestDaemonCommand:
 
         assert mock_run.called
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_daemon_custom_interval(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -476,8 +476,8 @@ class TestDaemonCommand:
 class TestListPlansCommand:
     """Test list-plans command."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_list_plans_success(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -497,8 +497,8 @@ class TestListPlansCommand:
 class TestShowPlanCommand:
     """Test show-plan command."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_show_plan_success(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -534,7 +534,7 @@ class TestReactCommand:
 
     def test_react_accepts_task_argument(self, cli_runner):
         """Test react command accepts task argument."""
-        with patch("automation.main.asyncio.run") as mock_run:
+        with patch("repo_sapiens.main.asyncio.run") as mock_run:
             mock_run.side_effect = RuntimeError("Connection refused")
             result = cli_runner.invoke(cli, ["react", "Create a hello.py file"])
 
@@ -574,7 +574,7 @@ class TestReactCommand:
         result = cli_runner.invoke(cli, ["react", "--repl", "--help"])
         assert "--repl" in result.output
 
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_react_keyboard_interrupt(self, mock_run, cli_runner):
         """Test react handles KeyboardInterrupt."""
         mock_run.side_effect = KeyboardInterrupt()
@@ -584,7 +584,7 @@ class TestReactCommand:
         assert result.exit_code == 130
         assert "Interrupted" in result.output
 
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_react_runtime_error(self, mock_run, cli_runner):
         """Test react handles runtime errors."""
         mock_run.side_effect = RuntimeError("Ollama not available")
@@ -606,7 +606,7 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_process_single_issue(self, mock_settings):
         """Test _process_single_issue async function."""
-        from automation.main import _process_single_issue
+        from repo_sapiens.main import _process_single_issue
 
         mock_orchestrator = AsyncMock()
         mock_issue = MagicMock()
@@ -614,7 +614,7 @@ class TestAsyncHelperFunctions:
         mock_orchestrator.git.get_issue = AsyncMock(return_value=mock_issue)
         mock_orchestrator.process_issue = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_single_issue(mock_settings, 42)
 
         mock_orchestrator.git.get_issue.assert_called_once_with(42)
@@ -623,12 +623,12 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_process_all_issues_with_tag(self, mock_settings):
         """Test _process_all_issues with tag filter."""
-        from automation.main import _process_all_issues
+        from repo_sapiens.main import _process_all_issues
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_all_issues(mock_settings, "urgent")
 
         mock_orchestrator.process_all_issues.assert_called_once_with("urgent")
@@ -636,12 +636,12 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_process_all_issues_without_tag(self, mock_settings):
         """Test _process_all_issues without tag filter."""
-        from automation.main import _process_all_issues
+        from repo_sapiens.main import _process_all_issues
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_all_issues = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_all_issues(mock_settings, None)
 
         mock_orchestrator.process_all_issues.assert_called_once_with(None)
@@ -649,12 +649,12 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_process_plan(self, mock_settings):
         """Test _process_plan async function."""
-        from automation.main import _process_plan
+        from repo_sapiens.main import _process_plan
 
         mock_orchestrator = AsyncMock()
         mock_orchestrator.process_plan = AsyncMock()
 
-        with patch("automation.main._create_orchestrator", return_value=mock_orchestrator):
+        with patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator):
             await _process_plan(mock_settings, "plan-123")
 
         mock_orchestrator.process_plan.assert_called_once_with("plan-123")
@@ -662,12 +662,12 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_list_active_plans_empty(self, mock_settings, capsys):
         """Test _list_active_plans when no plans exist."""
-        from automation.main import _list_active_plans
+        from repo_sapiens.main import _list_active_plans
 
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=[])
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _list_active_plans(mock_settings)
 
         captured = capsys.readouterr()
@@ -676,7 +676,7 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_list_active_plans_with_plans(self, mock_settings, capsys):
         """Test _list_active_plans when plans exist."""
-        from automation.main import _list_active_plans
+        from repo_sapiens.main import _list_active_plans
 
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=["plan-1", "plan-2"])
@@ -684,7 +684,7 @@ class TestAsyncHelperFunctions:
             side_effect=[{"status": "active"}, {"status": "completed"}]
         )
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _list_active_plans(mock_settings)
 
         captured = capsys.readouterr()
@@ -695,7 +695,7 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_show_plan_status_found(self, mock_settings, capsys):
         """Test _show_plan_status for existing plan."""
-        from automation.main import _show_plan_status
+        from repo_sapiens.main import _show_plan_status
 
         mock_state = AsyncMock()
         mock_state.load_state = AsyncMock(
@@ -708,7 +708,7 @@ class TestAsyncHelperFunctions:
             }
         )
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _show_plan_status(mock_settings, "plan-123")
 
         captured = capsys.readouterr()
@@ -718,12 +718,12 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_show_plan_status_not_found(self, mock_settings, capsys):
         """Test _show_plan_status for non-existent plan."""
-        from automation.main import _show_plan_status
+        from repo_sapiens.main import _show_plan_status
 
         mock_state = AsyncMock()
         mock_state.load_state = AsyncMock(side_effect=FileNotFoundError())
 
-        with patch("automation.main.StateManager", return_value=mock_state):
+        with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _show_plan_status(mock_settings, "nonexistent")
 
         captured = capsys.readouterr()
@@ -732,7 +732,7 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_daemon_mode_processes_issues(self, mock_settings):
         """Test _daemon_mode processes issues in loop."""
-        from automation.main import _daemon_mode
+        from repo_sapiens.main import _daemon_mode
 
         mock_orchestrator = AsyncMock()
         call_count = 0
@@ -748,9 +748,9 @@ class TestAsyncHelperFunctions:
             raise KeyboardInterrupt()
 
         with (
-            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
-            patch("automation.main.asyncio.sleep", side_effect=mock_sleep_raise),
-            patch("automation.main.click.echo"),
+            patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("repo_sapiens.main.asyncio.sleep", side_effect=mock_sleep_raise),
+            patch("repo_sapiens.main.click.echo"),
         ):
             with pytest.raises(KeyboardInterrupt):
                 await _daemon_mode(mock_settings, 1)
@@ -761,7 +761,7 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_daemon_mode_handles_repo_sapiens_error(self, mock_settings):
         """Test _daemon_mode handles RepoSapiensError gracefully."""
-        from automation.main import _daemon_mode
+        from repo_sapiens.main import _daemon_mode
 
         mock_orchestrator = AsyncMock()
         call_count = 0
@@ -777,9 +777,9 @@ class TestAsyncHelperFunctions:
             raise KeyboardInterrupt()
 
         with (
-            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
-            patch("automation.main.asyncio.sleep", side_effect=mock_sleep_raise),
-            patch("automation.main.click.echo"),
+            patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("repo_sapiens.main.asyncio.sleep", side_effect=mock_sleep_raise),
+            patch("repo_sapiens.main.click.echo"),
         ):
             with pytest.raises(KeyboardInterrupt):
                 await _daemon_mode(mock_settings, 1)
@@ -790,7 +790,7 @@ class TestAsyncHelperFunctions:
     @pytest.mark.asyncio
     async def test_daemon_mode_handles_unexpected_error(self, mock_settings):
         """Test _daemon_mode handles unexpected errors gracefully."""
-        from automation.main import _daemon_mode
+        from repo_sapiens.main import _daemon_mode
 
         mock_orchestrator = AsyncMock()
         call_count = 0
@@ -806,9 +806,9 @@ class TestAsyncHelperFunctions:
             raise KeyboardInterrupt()
 
         with (
-            patch("automation.main._create_orchestrator", return_value=mock_orchestrator),
-            patch("automation.main.asyncio.sleep", side_effect=mock_sleep_raise),
-            patch("automation.main.click.echo"),
+            patch("repo_sapiens.main._create_orchestrator", return_value=mock_orchestrator),
+            patch("repo_sapiens.main.asyncio.sleep", side_effect=mock_sleep_raise),
+            patch("repo_sapiens.main.click.echo"),
         ):
             with pytest.raises(KeyboardInterrupt):
                 await _daemon_mode(mock_settings, 1)
@@ -828,7 +828,7 @@ class TestOrchestratorCreation:
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_ollama_provider(self):
         """Test _create_orchestrator with Ollama provider."""
-        from automation.main import _create_orchestrator
+        from repo_sapiens.main import _create_orchestrator
 
         mock_settings = MagicMock()
         mock_settings.git_provider.provider_type = "gitea"
@@ -843,11 +843,11 @@ class TestOrchestratorCreation:
         mock_settings.state_dir = "/tmp/state"
 
         with (
-            patch("automation.main.create_git_provider") as mock_git_factory,
-            patch("automation.providers.ollama.OllamaProvider") as mock_ollama,
-            patch("automation.main.StateManager"),
-            patch("automation.main.WorkflowOrchestrator"),
-            patch("automation.main.InteractiveQAHandler"),
+            patch("repo_sapiens.main.create_git_provider") as mock_git_factory,
+            patch("repo_sapiens.providers.ollama.OllamaProvider") as mock_ollama,
+            patch("repo_sapiens.main.StateManager"),
+            patch("repo_sapiens.main.WorkflowOrchestrator"),
+            patch("repo_sapiens.main.InteractiveQAHandler"),
         ):
             mock_git = AsyncMock()
             mock_git_factory.return_value = mock_git
@@ -863,7 +863,7 @@ class TestOrchestratorCreation:
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_claude_provider(self):
         """Test _create_orchestrator with Claude provider."""
-        from automation.main import _create_orchestrator
+        from repo_sapiens.main import _create_orchestrator
 
         mock_settings = MagicMock()
         mock_settings.git_provider.provider_type = "gitea"
@@ -878,11 +878,11 @@ class TestOrchestratorCreation:
         mock_settings.state_dir = "/tmp/state"
 
         with (
-            patch("automation.main.create_git_provider") as mock_git_factory,
-            patch("automation.main.ExternalAgentProvider") as mock_external,
-            patch("automation.main.StateManager"),
-            patch("automation.main.WorkflowOrchestrator"),
-            patch("automation.main.InteractiveQAHandler"),
+            patch("repo_sapiens.main.create_git_provider") as mock_git_factory,
+            patch("repo_sapiens.main.ExternalAgentProvider") as mock_external,
+            patch("repo_sapiens.main.StateManager"),
+            patch("repo_sapiens.main.WorkflowOrchestrator"),
+            patch("repo_sapiens.main.InteractiveQAHandler"),
         ):
             mock_git = AsyncMock()
             mock_git_factory.return_value = mock_git
@@ -899,7 +899,7 @@ class TestOrchestratorCreation:
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_goose_provider(self):
         """Test _create_orchestrator with Goose provider."""
-        from automation.main import _create_orchestrator
+        from repo_sapiens.main import _create_orchestrator
 
         mock_settings = MagicMock()
         mock_settings.git_provider.provider_type = "gitea"
@@ -918,11 +918,11 @@ class TestOrchestratorCreation:
         mock_settings.state_dir = "/tmp/state"
 
         with (
-            patch("automation.main.create_git_provider") as mock_git_factory,
-            patch("automation.main.ExternalAgentProvider") as mock_external,
-            patch("automation.main.StateManager"),
-            patch("automation.main.WorkflowOrchestrator"),
-            patch("automation.main.InteractiveQAHandler"),
+            patch("repo_sapiens.main.create_git_provider") as mock_git_factory,
+            patch("repo_sapiens.main.ExternalAgentProvider") as mock_external,
+            patch("repo_sapiens.main.StateManager"),
+            patch("repo_sapiens.main.WorkflowOrchestrator"),
+            patch("repo_sapiens.main.InteractiveQAHandler"),
         ):
             mock_git = AsyncMock()
             mock_git_factory.return_value = mock_git
@@ -948,8 +948,8 @@ class TestCLIOptions:
 
     def test_log_level_option(self, cli_runner, mock_config_file):
         """Test --log-level option is accepted."""
-        with patch("automation.main.AutomationSettings.from_yaml"), patch(
-            "automation.main.asyncio.run"
+        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
+            "repo_sapiens.main.asyncio.run"
         ):
             result = cli_runner.invoke(
                 cli, ["--log-level", "DEBUG", "--config", str(mock_config_file), "list-plans"]
@@ -960,8 +960,8 @@ class TestCLIOptions:
 
     def test_config_option_accepts_path(self, cli_runner, mock_config_file):
         """Test --config option accepts file path."""
-        with patch("automation.main.AutomationSettings.from_yaml"), patch(
-            "automation.main.asyncio.run"
+        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
+            "repo_sapiens.main.asyncio.run"
         ):
             result = cli_runner.invoke(
                 cli, ["--config", str(mock_config_file), "list-plans"]
@@ -985,8 +985,8 @@ class TestEdgeCases:
         # Should fail gracefully
         assert result.exit_code != 0
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_issue_with_zero(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -999,8 +999,8 @@ class TestEdgeCases:
 
         assert mock_run.called
 
-    @patch("automation.main.AutomationSettings.from_yaml")
-    @patch("automation.main.asyncio.run")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.asyncio.run")
     def test_process_issue_with_large_number(
         self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
@@ -1015,8 +1015,8 @@ class TestEdgeCases:
 
     def test_daemon_with_zero_interval(self, cli_runner, mock_config_file):
         """Test daemon with zero interval."""
-        with patch("automation.main.AutomationSettings.from_yaml"), patch(
-            "automation.main.asyncio.run"
+        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
+            "repo_sapiens.main.asyncio.run"
         ):
             result = cli_runner.invoke(
                 cli, ["--config", str(mock_config_file), "daemon", "--interval", "0"]
@@ -1040,30 +1040,30 @@ class TestEdgeCases:
 class TestCLIAsyncIntegration:
     """Test integration between CLI commands and async functions."""
 
-    @patch("automation.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     def test_process_issue_calls_async_function(
         self, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
         """Verify process-issue command calls async processing."""
         mock_settings_loader.return_value = mock_settings
 
-        with patch("automation.main._process_single_issue") as mock_func:
-            with patch("automation.main.asyncio.run") as mock_run:
+        with patch("repo_sapiens.main._process_single_issue") as mock_func:
+            with patch("repo_sapiens.main.asyncio.run") as mock_run:
                 result = cli_runner.invoke(
                     cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"]
                 )
 
                 mock_run.assert_called_once()
 
-    @patch("automation.main.AutomationSettings.from_yaml")
+    @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     def test_daemon_calls_async_function(
         self, mock_settings_loader, cli_runner, mock_config_file, mock_settings
     ):
         """Verify daemon command calls async daemon mode."""
         mock_settings_loader.return_value = mock_settings
 
-        with patch("automation.main._daemon_mode") as mock_func:
-            with patch("automation.main.asyncio.run") as mock_run:
+        with patch("repo_sapiens.main._daemon_mode") as mock_func:
+            with patch("repo_sapiens.main.asyncio.run") as mock_run:
                 result = cli_runner.invoke(
                     cli, ["--config", str(mock_config_file), "daemon"]
                 )

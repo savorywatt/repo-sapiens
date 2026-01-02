@@ -14,12 +14,12 @@ All repo-sapiens exceptions inherit from a base `RepoSapiensError` class, enabli
 RepoSapiensError (base)
 ├── ConfigurationError
 │   └── Configuration file issues (missing, invalid YAML, validation failures)
-├── CredentialError (see automation.credentials.exceptions)
+├── CredentialError (see repo_sapiens.credentials.exceptions)
 │   ├── CredentialNotFoundError
 │   ├── CredentialFormatError
 │   ├── BackendNotAvailableError
 │   └── EncryptionError
-├── GitOperationError (see automation.git.exceptions)
+├── GitOperationError (see repo_sapiens.git.exceptions)
 │   ├── NotGitRepositoryError
 │   ├── NoRemotesError
 │   ├── MultipleRemotesError
@@ -40,7 +40,7 @@ RepoSapiensError (base)
 Always catch specific exceptions rather than broad `Exception` catches. This enables proper recovery and logging.
 
 ```python
-from automation.exceptions import ConfigurationError
+from repo_sapiens.exceptions import ConfigurationError
 
 try:
     config = load_config(path)
@@ -123,7 +123,7 @@ raise ConfigurationError(
 The CLI should catch `RepoSapiensError` exceptions and display user-friendly messages:
 
 ```python
-from automation.exceptions import RepoSapiensError
+from repo_sapiens.exceptions import RepoSapiensError
 
 @cli.command()
 def my_command():
@@ -154,8 +154,8 @@ def my_command():
 Configuration errors should be caught early with clear messages:
 
 ```python
-from automation.config.settings import AutomationSettings
-from automation.exceptions import ConfigurationError
+from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.exceptions import ConfigurationError
 
 try:
     settings = AutomationSettings.from_yaml("config.yaml")
@@ -179,7 +179,7 @@ The `from_yaml()` method automatically:
 Credential errors include helpful suggestions for resolution:
 
 ```python
-from automation.credentials.exceptions import (
+from repo_sapiens.credentials.exceptions import (
     CredentialNotFoundError,
     BackendNotAvailableError,
 )
@@ -204,7 +204,7 @@ Suggestion: Store the credential with:
 Git errors include helpful hints for resolution:
 
 ```python
-from automation.git.exceptions import NotGitRepositoryError
+from repo_sapiens.git.exceptions import NotGitRepositoryError
 
 try:
     discover_git_info(path)
@@ -224,7 +224,7 @@ Hint: Run 'git init' or navigate to a Git repository directory.
 External service errors capture HTTP status codes and response details:
 
 ```python
-from automation.exceptions import ExternalServiceError
+from repo_sapiens.exceptions import ExternalServiceError
 
 try:
     response = await client.get(url)
@@ -279,7 +279,7 @@ The following patterns were found and fixed:
 
 ### Bare Except Clauses
 
-**Found in:** `automation/providers/gitea_rest.py:285`
+**Found in:** `repo_sapiens/providers/gitea_rest.py:285`
 
 **Problem:** Silently catches all exceptions including KeyboardInterrupt and SystemExit.
 
@@ -319,7 +319,7 @@ When writing tests, verify both successful and error paths:
 
 ```python
 import pytest
-from automation.exceptions import ConfigurationError
+from repo_sapiens.exceptions import ConfigurationError
 
 def test_missing_config_file():
     """Test handling of missing configuration file."""
@@ -351,7 +351,7 @@ except Exception as e:
 
 **After:**
 ```python
-from automation.exceptions import RepoSapiensError
+from repo_sapiens.exceptions import RepoSapiensError
 
 try:
     process_something()
@@ -368,7 +368,7 @@ except Exception as e:
 If a new subsystem needs custom exceptions:
 
 ```python
-from automation.exceptions import RepoSapiensError
+from repo_sapiens.exceptions import RepoSapiensError
 
 class MySubsystemError(RepoSapiensError):
     """Base exception for my subsystem."""

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from automation.credentials import (
+from repo_sapiens.credentials import (
     CredentialResolver,
     EncryptedFileBackend,
     EnvironmentBackend,
@@ -143,7 +143,7 @@ class TestCredentialIntegration:
 
     def test_resolver_error_recovery(self, tmp_path):
         """Test resolver handles errors gracefully."""
-        from automation.credentials import CredentialNotFoundError
+        from repo_sapiens.credentials import CredentialNotFoundError
 
         resolver = CredentialResolver()
 

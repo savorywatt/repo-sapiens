@@ -2,7 +2,7 @@
 
 import pytest
 
-from automation.engine.state_manager import StateManager
+from repo_sapiens.engine.state_manager import StateManager
 
 
 @pytest.mark.asyncio

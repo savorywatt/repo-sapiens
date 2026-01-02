@@ -17,16 +17,16 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
 
-from automation.credentials.encrypted_backend import EncryptedFileBackend
-from automation.credentials.environment_backend import EnvironmentBackend
-from automation.credentials.exceptions import (
+from repo_sapiens.credentials.encrypted_backend import EncryptedFileBackend
+from repo_sapiens.credentials.environment_backend import EnvironmentBackend
+from repo_sapiens.credentials.exceptions import (
     BackendNotAvailableError,
     CredentialError,
     CredentialNotFoundError,
     EncryptionError,
 )
-from automation.credentials.keyring_backend import KeyringBackend
-from automation.credentials.resolver import CredentialResolver
+from repo_sapiens.credentials.keyring_backend import KeyringBackend
+from repo_sapiens.credentials.resolver import CredentialResolver
 
 
 # =============================================================================
@@ -205,8 +205,8 @@ class TestKeyringBackendProperties:
 
     def test_available_when_keyring_installed(self):
         """Should return True when keyring module is available and functional."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.return_value = Mock()
 
                 backend = KeyringBackend()
@@ -214,14 +214,14 @@ class TestKeyringBackendProperties:
 
     def test_available_when_keyring_not_installed(self):
         """Should return False when keyring module is not installed."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False):
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False):
             backend = KeyringBackend()
             assert backend.available is False
 
     def test_available_when_keyring_fails(self):
         """Should return False when keyring initialization fails."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.side_effect = Exception("No backend")
 
                 backend = KeyringBackend()
@@ -233,8 +233,8 @@ class TestKeyringBackendGet:
 
     def test_get_existing_credential(self):
         """Should retrieve credential from keyring."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.return_value = Mock()
                 mock_keyring.get_password.return_value = "secret_token"
 
@@ -248,8 +248,8 @@ class TestKeyringBackendGet:
 
     def test_get_nonexistent_credential(self):
         """Should return None for non-existent credential."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.return_value = Mock()
                 mock_keyring.get_password.return_value = None
 
@@ -260,7 +260,7 @@ class TestKeyringBackendGet:
 
     def test_get_when_keyring_unavailable(self):
         """Should raise BackendNotAvailableError when keyring unavailable."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False):
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False):
             backend = KeyringBackend()
 
             with pytest.raises(BackendNotAvailableError) as exc_info:
@@ -271,8 +271,8 @@ class TestKeyringBackendGet:
 
     def test_get_handles_keyring_error(self):
         """Should wrap KeyringError in CredentialError."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 from keyring.errors import KeyringError
 
                 mock_keyring.get_keyring.return_value = Mock()
@@ -292,8 +292,8 @@ class TestKeyringBackendSet:
 
     def test_set_stores_credential(self):
         """Should store credential in keyring."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.return_value = Mock()
 
                 backend = KeyringBackend()
@@ -305,8 +305,8 @@ class TestKeyringBackendSet:
 
     def test_set_empty_value_raises_error(self):
         """Should raise ValueError for empty value."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.return_value = Mock()
 
                 backend = KeyringBackend()
@@ -318,7 +318,7 @@ class TestKeyringBackendSet:
 
     def test_set_when_keyring_unavailable(self):
         """Should raise BackendNotAvailableError when keyring unavailable."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False):
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False):
             backend = KeyringBackend()
 
             with pytest.raises(BackendNotAvailableError) as exc_info:
@@ -328,8 +328,8 @@ class TestKeyringBackendSet:
 
     def test_set_handles_keyring_error(self):
         """Should wrap KeyringError in CredentialError."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 from keyring.errors import KeyringError
 
                 mock_keyring.get_keyring.return_value = Mock()
@@ -348,8 +348,8 @@ class TestKeyringBackendDelete:
 
     def test_delete_existing_credential(self):
         """Should delete credential and return True."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 mock_keyring.get_keyring.return_value = Mock()
 
                 backend = KeyringBackend()
@@ -362,8 +362,8 @@ class TestKeyringBackendDelete:
 
     def test_delete_nonexistent_credential(self):
         """Should return False when credential doesn't exist."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 from keyring.errors import PasswordDeleteError
 
                 mock_keyring.get_keyring.return_value = Mock()
@@ -376,7 +376,7 @@ class TestKeyringBackendDelete:
 
     def test_delete_when_keyring_unavailable(self):
         """Should raise BackendNotAvailableError when keyring unavailable."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False):
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False):
             backend = KeyringBackend()
 
             with pytest.raises(BackendNotAvailableError):
@@ -384,8 +384,8 @@ class TestKeyringBackendDelete:
 
     def test_delete_handles_keyring_error(self):
         """Should wrap KeyringError in CredentialError."""
-        with patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True):
-            with patch("automation.credentials.keyring_backend.keyring") as mock_keyring:
+        with patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True):
+            with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_keyring:
                 from keyring.errors import KeyringError
 
                 mock_keyring.get_keyring.return_value = Mock()
@@ -444,7 +444,7 @@ class TestEncryptedFileBackendProperties:
 
         with patch.dict("sys.modules", {"cryptography.fernet": None}):
             with patch(
-                "automation.credentials.encrypted_backend.Fernet",
+                "repo_sapiens.credentials.encrypted_backend.Fernet",
                 side_effect=ImportError,
             ):
                 # Force re-evaluation of availability

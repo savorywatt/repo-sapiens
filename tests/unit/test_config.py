@@ -1,6 +1,6 @@
 """Tests for configuration."""
 
-from automation.config.settings import AutomationSettings
+from repo_sapiens.config.settings import AutomationSettings
 
 
 def test_config_from_yaml(sample_config_yaml):

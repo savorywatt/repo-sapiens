@@ -17,22 +17,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from automation.config.settings import AutomationSettings
-from automation.engine.branching import (
+from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.branching import (
     BranchingStrategy,
     PerAgentStrategy,
     PerPlanStrategy,
     get_branching_strategy,
 )
-from automation.engine.checkpointing import CheckpointManager
-from automation.engine.parallel_executor import (
+from repo_sapiens.engine.checkpointing import CheckpointManager
+from repo_sapiens.engine.parallel_executor import (
     ExecutionTask,
     ParallelExecutor,
     TaskPriority,
     TaskResult,
     TaskScheduler,
 )
-from automation.engine.recovery import (
+from repo_sapiens.engine.recovery import (
     AdvancedRecovery,
     ConflictResolutionStrategy,
     ErrorType,
@@ -42,8 +42,8 @@ from automation.engine.recovery import (
     RetryRecoveryStrategy,
     TestFixRecoveryStrategy,
 )
-from automation.models.domain import Branch, Task
-from automation.providers.base import GitProvider
+from repo_sapiens.models.domain import Branch, Task
+from repo_sapiens.providers.base import GitProvider
 
 
 # =============================================================================

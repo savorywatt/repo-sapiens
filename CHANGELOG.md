@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for GitHub Enterprise servers
 - **Goose AI Agent Support**: Full integration with Block's Goose AI agent as an alternative to Claude
   - Multi-provider LLM backend support (OpenAI, Anthropic, Ollama, OpenRouter, Groq, Databricks)
-  - Agent detection utility (`automation/utils/agent_detector.py`) with automatic CLI discovery
+  - Agent detection utility (`repo_sapiens/utils/agent_detector.py`) with automatic CLI discovery
   - Comprehensive provider comparison and recommendation system
   - Provider-specific credential management (keyring and environment backends)
   - Interactive configuration in init command with provider guidance

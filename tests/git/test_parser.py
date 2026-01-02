@@ -15,8 +15,8 @@ Tests cover:
 
 import pytest
 
-from automation.git.exceptions import InvalidGitUrlError
-from automation.git.parser import GitUrlParser
+from repo_sapiens.git.exceptions import InvalidGitUrlError
+from repo_sapiens.git.parser import GitUrlParser
 
 
 class TestGitUrlParserSSH:

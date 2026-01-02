@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from automation.rendering import WorkflowRenderer
-from automation.rendering.validators import (
+from repo_sapiens.rendering import WorkflowRenderer
+from repo_sapiens.rendering.validators import (
     CIBuildConfig,
     LabelSyncConfig,
     PyPIPublishConfig,
@@ -251,7 +251,7 @@ class TestAllTemplates:
                 # Read the raw template file
                 template_path = (
                     Path(__file__).parent.parent.parent
-                    / "automation"
+                    / "repo_sapiens"
                     / "templates"
                     / "workflows"
                     / f"{template_name}.yaml.j2"
@@ -368,7 +368,7 @@ class TestAllTemplates:
 
     def test_no_dangerous_patterns_in_output(self, renderer, base_config):
         """Test that rendered templates don't contain dangerous YAML patterns."""
-        from automation.rendering.security import check_rendered_output
+        from repo_sapiens.rendering.security import check_rendered_output
 
         config = WorkflowConfig(**base_config, package_name="test-package")
 
