@@ -1,4 +1,4 @@
-"""Unit tests for automation/cli/init.py - Repository initialization CLI."""
+"""Unit tests for repo_sapiens/cli/init.py - Repository initialization CLI."""
 
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock

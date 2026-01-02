@@ -195,7 +195,7 @@ sapiens init [OPTIONS]
 
 **`--config-path PATH`**
 - Where to save configuration file
-- Default: `automation/config/automation_config.yaml`
+- Default: `repo_sapiens/config/automation_config.yaml`
 - Example: `sapiens init --config-path config/my_config.yaml`
 
 **`--backend [keyring|environment|encrypted]`**
@@ -250,7 +250,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    Navigate to: https://gitea.example.com/myuser/my-repo/settings/secrets
 
 📝 Creating configuration file...
-   ✓ Created: automation/config/automation_config.yaml
+   ✓ Created: repo_sapiens/config/automation_config.yaml
 
 ✓ Validating setup...
    ✓ Credentials validated
@@ -264,7 +264,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    https://gitea.example.com/myuser/my-repo/issues
 
 2. Run the sapiens daemon:
-   sapiens --config automation/config/automation_config.yaml daemon --interval 60
+   sapiens --config repo_sapiens/config/automation_config.yaml daemon --interval 60
 
 3. Watch the automation work!
 ```
@@ -381,13 +381,13 @@ jobs:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          sapiens --config automation/config/automation_config.yaml process-all
+          sapiens --config repo_sapiens/config/automation_config.yaml process-all
 ```
 
 The workflow uses environment variable references in the config:
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 git_provider:
   api_token: ${GITEA_TOKEN}  # Resolved from env var
 

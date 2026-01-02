@@ -1,4 +1,4 @@
-"""Comprehensive tests for automation/config/settings.py Pydantic models.
+"""Comprehensive tests for repo_sapiens/config/settings.py Pydantic models.
 
 Tests cover:
 - GitProviderConfig validation

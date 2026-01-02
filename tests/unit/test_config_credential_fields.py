@@ -1,4 +1,4 @@
-"""Comprehensive tests for automation/config/credential_fields.py.
+"""Comprehensive tests for repo_sapiens/config/credential_fields.py.
 
 Tests cover:
 - CredentialSecret validation

@@ -64,8 +64,8 @@ repos:
           - types-PyYAML
           - types-aiofiles
         args: ['--ignore-missing-imports', '--allow-untyped-decorators', '--no-strict-optional', '--allow-untyped-calls', '--allow-incomplete-defs', '--allow-untyped-defs']
-        # Only check automation/ directory to avoid slow performance
-        files: ^automation/(config|git|rendering|credentials|cli)/
+        # Only check repo_sapiens/ directory to avoid slow performance
+        files: ^repo_sapiens/(config|git|rendering|credentials|cli)/
         exclude: ^tests/
 
   # Bandit - Security linter
@@ -79,7 +79,7 @@ repos:
           - 'pyproject.toml'
         additional_dependencies: ['bandit[toml]']
         # Run on source code, exclude tests
-        files: ^automation/
+        files: ^repo_sapiens/
         exclude: ^tests/
 
   # pyupgrade - Automatically upgrade syntax for newer Python versions

@@ -1,4 +1,4 @@
-"""Tests for automation/utils/agent_detector.py - AI agent detection utilities."""
+"""Tests for repo_sapiens/utils/agent_detector.py - AI agent detection utilities."""
 
 from unittest.mock import patch
 

@@ -1,4 +1,4 @@
-"""Unit tests for automation/rendering/engine.py - Template rendering engine."""
+"""Unit tests for repo_sapiens/rendering/engine.py - Template rendering engine."""
 
 from pathlib import Path
 

@@ -187,7 +187,7 @@ The init wizard will:
 3. **Ask** which AI provider you want to use
 4. **Collect** provider-specific credentials
 5. **Store** credentials securely
-6. **Generate** `automation/config/automation_config.yaml`
+6. **Generate** `repo_sapiens/config/automation_config.yaml`
 
 #### Example: Claude API Setup
 
@@ -222,7 +222,7 @@ Enter your Claude API key: ●●●●●●●●●●●●
    ✓ Credentials stored securely
 
 📝 Creating configuration file...
-   ✓ Created: automation/config/automation_config.yaml
+   ✓ Created: repo_sapiens/config/automation_config.yaml
 
 ✅ Initialization complete!
 ```
@@ -260,7 +260,7 @@ Enter model name [qwen3:latest]: qwen3:latest
    ✓ Ollama configured (no API key needed)
 
 📝 Creating configuration file...
-   ✓ Created: automation/config/automation_config.yaml
+   ✓ Created: repo_sapiens/config/automation_config.yaml
 
 ✅ Initialization complete!
 
@@ -577,10 +577,10 @@ If no runners are available, you'll need to:
 **Via CLI:**
 ```bash
 # Check workflow status
-sapiens --config automation/config/automation_config.yaml list-plans
+sapiens --config repo_sapiens/config/automation_config.yaml list-plans
 
 # View specific plan
-sapiens --config automation/config/automation_config.yaml show-plan --plan-id 1
+sapiens --config repo_sapiens/config/automation_config.yaml show-plan --plan-id 1
 ```
 
 ### Step 7.4: Expected Flow
@@ -617,7 +617,7 @@ my-project/
 #### Claude API Configuration
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 
 git_provider:
   provider_type: gitea
@@ -650,7 +650,7 @@ tags:
 #### Claude Code (Local CLI) Configuration
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 
 git_provider:
   provider_type: gitea
@@ -683,7 +683,7 @@ tags:
 #### Ollama Configuration
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 
 git_provider:
   provider_type: gitea
@@ -793,7 +793,7 @@ curl -H "Authorization: token YOUR_TOKEN" \
 **Debug:**
 ```bash
 # Test Claude API locally
-sapiens --config automation/config/automation_config.yaml \
+sapiens --config repo_sapiens/config/automation_config.yaml \
   process-issue --issue 1 --log-level DEBUG
 ```
 

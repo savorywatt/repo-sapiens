@@ -1,4 +1,4 @@
-# Multi-stage build for builder automation
+# Multi-stage build for repo-sapiens
 FROM python:3.11-slim AS builder
 
 # Install system dependencies
@@ -30,26 +30,26 @@ RUN apt-get update && apt-get install -y \
 RUN curl -fsSL https://claude.ai/download/linux | sh || true
 
 # Create non-root user
-RUN useradd -m -u 1000 automation && \
+RUN useradd -m -u 1000 sapiens && \
     mkdir -p /app /workspace && \
-    chown -R automation:automation /app /workspace
+    chown -R sapiens:sapiens /app /workspace
 
 # Switch to non-root user
-USER automation
+USER sapiens
 WORKDIR /app
 
 # Copy installed dependencies from builder
-COPY --from=builder --chown=automation:automation /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=builder --chown=automation:automation /usr/local/bin /usr/local/bin
+COPY --from=builder --chown=sapiens:sapiens /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder --chown=sapiens:sapiens /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --chown=automation:automation automation/ ./automation/
-COPY --chown=automation:automation pyproject.toml ./
+COPY --chown=sapiens:sapiens repo_sapiens/ ./repo_sapiens/
+COPY --chown=sapiens:sapiens pyproject.toml ./
 
 # Install the package in editable mode
 USER root
 RUN pip install --no-cache-dir -e .
-USER automation
+USER sapiens
 
 # Set working directory for automation
 WORKDIR /workspace
@@ -61,8 +61,8 @@ ENV AUTOMATION__WORKFLOW__STATE_DIRECTORY=/workspace/.automation/state \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "from automation.config.settings import AutomationSettings; print('OK')" || exit 1
+    CMD python -c "from repo_sapiens.config.settings import AutomationSettings; print('OK')" || exit 1
 
 # Default command
-ENTRYPOINT ["automation"]
+ENTRYPOINT ["sapiens"]
 CMD ["--help"]

@@ -96,7 +96,7 @@ class TaskExecutionStage(WorkflowStage):
             from pathlib import Path
 
             # Assume playground repo is in ../playground relative to builder
-            # __file__ = .../builder/automation/engine/stages/execution.py
+            # __file__ = .../builder/repo_sapiens/engine/stages/execution.py
             # parent x5 = .../Workspace
             playground_dir = Path(__file__).parent.parent.parent.parent.parent / "playground"
             if not playground_dir.exists():

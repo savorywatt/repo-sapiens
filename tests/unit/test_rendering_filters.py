@@ -1,4 +1,4 @@
-"""Unit tests for automation/rendering/filters.py - Custom Jinja2 filters."""
+"""Unit tests for repo_sapiens/rendering/filters.py - Custom Jinja2 filters."""
 
 import pytest
 
