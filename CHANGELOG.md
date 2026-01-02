@@ -5,13 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-02
+
+### Changed
+- **Module Renamed**: `automation` → `repo_sapiens` for Python best practices
+  - Package name now matches module name: `pip install repo-sapiens` → `import repo_sapiens`
+  - All 457+ internal imports updated
+- **CLI Commands Renamed**: `automation` → `sapiens` (with `repo-sapiens` alias)
+  - `sapiens init` - Initialize repository
+  - `sapiens react --repl` - Interactive ReAct agent REPL
+  - `sapiens daemon` - Run automation daemon
+  - `sapiens credentials` - Manage credentials
+- **Default Ollama Model**: Changed from `llama3.1:8b` to `qwen3:latest`
+- **Environment Variables**: Standardized to `SAPIENS__*` prefix (legacy `AUTOMATION__*` still supported)
+
+### Fixed
+- Documentation updated to reflect new CLI commands and module paths
+- All workflow YAML files updated to use `sapiens` command
+- Test coverage paths updated to `--cov=repo_sapiens`
+
 ## [0.2.0] - 2025-12-28
 
 ### Added
 - **ReAct Agent**: Local AI agent using Ollama for autonomous coding tasks
   - ReAct (Reasoning + Acting) pattern with thought-action-observation loop
   - 9 built-in tools: read_file, write_file, list_directory, run_command, search_files, find_files, edit_file, tree, finish
-  - Interactive REPL mode (`automation react --repl`) with colored prompt
+  - Interactive REPL mode (`sapiens react --repl`) with colored prompt
   - Remote Ollama support via `--ollama-url` for running on separate GPU servers
   - Model discovery and switching (`/models`, `/model <name>` commands)
   - Path sandboxing for security - all file operations restricted to working directory
@@ -33,7 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Provider-specific credential management (keyring and environment backends)
   - Interactive configuration in init command with provider guidance
   - Support for vLLM vs Ollama local serving with tool usage recommendations
-- **Enhanced Init Command**: Extended `repo-agent init` to support Goose configuration
+- **Enhanced Init Command**: Extended `sapiens init` to support Goose configuration
   - Interactive agent selection (Claude Code or Goose)
   - LLM provider selection with comparison table
   - Model selection from provider-specific model lists
@@ -111,7 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Package metadata passes twine validation (PyPI compliance verified)
 - Clean virtual environment installations work correctly
 - Core dependencies install without optional dependencies (correct split)
-- Version extraction works: automation.__version__ = "0.1.0"
+- Version extraction works: repo_sapiens.__version__ = "0.1.0"
 
+[0.3.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.3.0
 [0.2.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.1.0
