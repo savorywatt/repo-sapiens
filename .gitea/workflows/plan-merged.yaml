@@ -60,7 +60,7 @@ jobs:
               # Extract plan ID from filename (e.g., plans/42-feature.md -> 42)
               plan_id=$(basename "$plan_file" | sed 's/^\([0-9]*\)-.*/\1/')
 
-              automation generate-prompts \
+              sapiens generate-prompts \
                 --plan-file "$plan_file" \
                 --plan-id "$plan_id"
             fi
@@ -70,4 +70,4 @@ jobs:
         if: always()
         run: |
           echo "Prompt generation completed"
-          automation list-active-plans
+          sapiens list-active-plans

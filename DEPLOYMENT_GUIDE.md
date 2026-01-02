@@ -179,10 +179,10 @@ export GITEA_TOKEN="your-token"
 export CLAUDE_API_KEY="your-key"
 
 # Run health check
-automation health-check
+sapiens health-check
 
 # List active plans
-automation list-active-plans
+sapiens list-active-plans
 ```
 
 **View in Gitea:**
@@ -412,14 +412,14 @@ Create a simple dashboard to monitor automation:
 
 ```bash
 # View recent activity
-automation list-active-plans
+sapiens list-active-plans
 
 # Check for issues
-automation check-stale --max-age-hours 12
-automation check-failures --since-hours 24
+sapiens check-stale --max-age-hours 12
+sapiens check-failures --since-hours 24
 
 # Generate report
-automation health-check > /tmp/health.txt
+sapiens health-check > /tmp/health.txt
 cat /tmp/health.txt
 ```
 

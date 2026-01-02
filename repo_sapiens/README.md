@@ -149,22 +149,22 @@ The system includes sophisticated dependency tracking:
 
 ```bash
 # Process a single issue
-automation process-issue --issue 42
+sapiens process-issue --issue 42
 
 # Process all issues with specific tag
-automation process-all --tag needs-planning
+sapiens process-all --tag needs-planning
 
 # Process entire plan end-to-end
-automation process-plan --plan-id 42
+sapiens process-plan --plan-id 42
 
 # Run in daemon mode (continuous polling)
-automation daemon --interval 60
+sapiens daemon --interval 60
 
 # List active plans
-automation list-plans
+sapiens list-plans
 
 # Show plan status
-automation show-plan --plan-id 42
+sapiens show-plan --plan-id 42
 ```
 
 ### Configuration

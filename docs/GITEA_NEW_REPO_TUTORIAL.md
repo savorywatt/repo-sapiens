@@ -168,7 +168,7 @@ pip install -e .
 Verify the installation:
 
 ```bash
-automation --help
+sapiens --help
 ```
 
 ### Step 3.2: Initialize in Your Repository
@@ -177,7 +177,7 @@ Navigate to your cloned repository and run the interactive setup:
 
 ```bash
 cd /path/to/my-project
-automation init
+sapiens init
 ```
 
 The init wizard will:
@@ -253,7 +253,7 @@ Select AI provider:
 Enter choice [1]: 3
 
 Enter Ollama base URL [http://localhost:11434]: http://localhost:11434
-Enter model name [llama3.1:8b]: codellama:13b
+Enter model name [qwen3:latest]: qwen3:latest
 
 📦 Storing credentials in keyring backend...
    ✓ Stored: gitea/api_token
@@ -265,7 +265,7 @@ Enter model name [llama3.1:8b]: codellama:13b
 ✅ Initialization complete!
 
 💡 Make sure Ollama is running: ollama serve
-💡 Pull your model if needed: ollama pull codellama:13b
+💡 Pull your model if needed: ollama pull qwen3:latest
 ```
 
 #### Setting Up Ollama Before Init
@@ -280,8 +280,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
 
 # In another terminal, pull a model
+ollama pull qwen3:latest       # Recommended for code tasks
 ollama pull llama3.1:8b        # General purpose, good balance
-ollama pull codellama:13b      # Optimized for code
 ollama pull deepseek-coder:6.7b  # Fast code completion
 
 # Verify it's working
@@ -293,7 +293,7 @@ curl http://localhost:11434/api/tags
 | Model | Size | RAM Needed | Best For |
 |-------|------|------------|----------|
 | `codellama:7b` | 4GB | 8GB | Fast, basic tasks |
-| `codellama:13b` | 7GB | 16GB | Good balance |
+| `qwen3:latest` | 5GB | 10GB | Best balance (recommended) |
 | `llama3.1:8b` | 5GB | 10GB | General + code |
 | `deepseek-coder:6.7b` | 4GB | 8GB | Code-focused |
 | `codellama:34b` | 19GB | 32GB | Best quality |
@@ -332,7 +332,7 @@ The secrets you need depend on your chosen AI provider:
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
 | `BUILDER_OLLAMA_BASE_URL` | `http://ollama-server:11434` | Ollama API endpoint |
-| `BUILDER_OLLAMA_MODEL` | `codellama:13b` | Model to use |
+| `BUILDER_OLLAMA_MODEL` | `qwen3:latest` | Model to use |
 
 > **Note:** If Ollama runs on the same machine as your Gitea runner, use `http://localhost:11434`. For remote Ollama, ensure the runner can reach it.
 
@@ -428,7 +428,7 @@ jobs:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           echo "🔍 Processing issue #${{ gitea.event.issue.number }} for planning"
-          automation process-issue --issue ${{ gitea.event.issue.number }}
+          sapiens process-issue --issue ${{ gitea.event.issue.number }}
 
       - name: Comment on success
         if: success()
@@ -577,10 +577,10 @@ If no runners are available, you'll need to:
 **Via CLI:**
 ```bash
 # Check workflow status
-automation --config automation/config/automation_config.yaml list-plans
+sapiens --config automation/config/automation_config.yaml list-plans
 
 # View specific plan
-automation --config automation/config/automation_config.yaml show-plan --plan-id 1
+sapiens --config automation/config/automation_config.yaml show-plan --plan-id 1
 ```
 
 ### Step 7.4: Expected Flow
@@ -603,7 +603,7 @@ automation --config automation/config/automation_config.yaml show-plan --plan-id
 
 ### Configuration File Location
 
-After running `automation init`, your config is at:
+After running `sapiens init`, your config is at:
 
 ```
 my-project/
@@ -697,7 +697,7 @@ repository:
 
 agent_provider:
   provider_type: ollama
-  model: codellama:13b  # or llama3.1:8b, deepseek-coder:6.7b
+  model: qwen3:latest  # or llama3.1:8b, deepseek-coder:6.7b
   base_url: http://localhost:11434
   local_mode: true
   # No api_key needed for Ollama
@@ -737,7 +737,7 @@ AUTOMATION__REPOSITORY__OWNER=your-username
 AUTOMATION__REPOSITORY__NAME=my-project
 AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE=ollama
 AUTOMATION__AGENT_PROVIDER__BASE_URL=http://localhost:11434
-AUTOMATION__AGENT_PROVIDER__MODEL=codellama:13b
+AUTOMATION__AGENT_PROVIDER__MODEL=qwen3:latest
 ```
 
 ---
@@ -793,7 +793,7 @@ curl -H "Authorization: token YOUR_TOKEN" \
 **Debug:**
 ```bash
 # Test Claude API locally
-automation --config automation/config/automation_config.yaml \
+sapiens --config automation/config/automation_config.yaml \
   process-issue --issue 1 --log-level DEBUG
 ```
 
@@ -826,11 +826,11 @@ automation --config automation/config/automation_config.yaml \
 curl http://localhost:11434/api/tags
 
 # Pull model if missing
-ollama pull codellama:13b
+ollama pull qwen3:latest
 
 # Test generation
 curl http://localhost:11434/api/generate -d '{
-  "model": "codellama:13b",
+  "model": "qwen3:latest",
   "prompt": "Hello",
   "stream": false
 }'
@@ -894,16 +894,16 @@ The `automation-daemon.yaml` workflow polls for pending work every 5 minutes. En
 
 ```bash
 # List all active plans
-automation list-plans
+sapiens list-plans
 
 # Check system health
-automation health-check
+sapiens health-check
 
 # Process manually
-automation process-all
+sapiens process-all
 
 # View specific plan status
-automation show-plan --plan-id 1
+sapiens show-plan --plan-id 1
 ```
 
 ### Customize Workflow Behavior
@@ -921,25 +921,25 @@ automation show-plan --plan-id 1
 
 ```bash
 # Initialize in a new repo
-automation init
+sapiens init
 
 # Process single issue
-automation process-issue --issue 42
+sapiens process-issue --issue 42
 
 # Process all pending issues
-automation process-all
+sapiens process-all
 
 # List active plans
-automation list-plans
+sapiens list-plans
 
 # Show plan details
-automation show-plan --plan-id 42
+sapiens show-plan --plan-id 42
 
 # Run health check
-automation health-check
+sapiens health-check
 
 # Run as daemon
-automation daemon --interval 60
+sapiens daemon --interval 60
 ```
 
 ### Required Gitea Secrets
@@ -962,7 +962,7 @@ automation daemon --interval 60
 | Secret | Purpose |
 |--------|---------|
 | `BUILDER_OLLAMA_BASE_URL` | Ollama API endpoint |
-| `BUILDER_OLLAMA_MODEL` | Model to use (e.g., `codellama:13b`) |
+| `BUILDER_OLLAMA_MODEL` | Model to use (e.g., `qwen3:latest`) |
 
 ### Label Flow
 

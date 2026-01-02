@@ -46,7 +46,7 @@ goose --version
 
 ```bash
 cd /path/to/your/repo
-automation init
+sapiens init
 ```
 
 When prompted:
@@ -99,7 +99,7 @@ Customize Goose settings? (temperature, toolkit) [y/N]: n
 ```bash
 # Label an issue with "needs-planning" in Gitea
 # Then start the daemon:
-automation daemon --interval 60
+sapiens daemon --interval 60
 ```
 
 That's it! Goose will now handle your issues using the selected LLM provider.
@@ -124,7 +124,7 @@ That's it! Goose will now handle your issues using the selected LLM provider.
 
 **Setup**:
 ```bash
-automation init
+sapiens init
 # Select: goose → openai → gpt-4o
 # Enter API key from: https://platform.openai.com/api-keys
 ```
@@ -149,7 +149,7 @@ automation init
 
 **Setup**:
 ```bash
-automation init
+sapiens init
 # Select: goose → anthropic → claude-3-5-sonnet-20241022
 # Enter API key from: https://console.anthropic.com/
 ```
@@ -187,7 +187,7 @@ ollama serve
 ollama pull qwen2.5-coder:32b
 
 # 4. Initialize repo-sapiens
-automation init
+sapiens init
 # Select: goose → ollama → ollama/qwen2.5-coder:32b
 ```
 
@@ -227,7 +227,7 @@ vllm serve qwen2.5-coder:32b --enable-tools
 
 **Setup**:
 ```bash
-automation init
+sapiens init
 # Select: goose → openrouter → openai/gpt-4o
 # Enter API key from: https://openrouter.ai
 ```
@@ -259,7 +259,7 @@ automation init
 
 **Setup**:
 ```bash
-automation init
+sapiens init
 # Select: goose → groq → llama-3.1-70b-versatile
 # Enter API key from: https://groq.com
 ```
@@ -276,7 +276,7 @@ automation init
 ### Example 1: OpenAI with Custom Settings
 
 ```yaml
-# automation/config/automation_config.yaml
+# sapiens/config/sapiens_config.yaml
 agent_provider:
   provider_type: goose-local
   model: gpt-4o
@@ -344,16 +344,16 @@ Store credentials securely in your OS keyring:
 
 ```bash
 # During init, credentials are automatically stored
-automation init --backend keyring
+sapiens init --backend keyring
 
 # Manual credential management
-automation credentials set openai api_key
+sapiens credentials set openai api_key
 # Enter your OpenAI API key: ••••••••••••••••
 
-automation credentials get openai api_key
+sapiens credentials get openai api_key
 # sk-proj-...
 
-automation credentials list
+sapiens credentials list
 # openai/api_key: ••••••••...
 # gitea/api_token: ••••••••...
 ```
@@ -370,7 +370,7 @@ export OPENROUTER_API_KEY="sk-or-..."
 export GROQ_API_KEY="gsk_..."
 
 # Then run init
-automation init --backend environment
+sapiens init --backend environment
 ```
 
 ### Gitea Actions Secrets
@@ -382,7 +382,7 @@ For automated workflows, set secrets in Gitea:
    - `GITEA_TOKEN` (your Gitea API token)
    - `OPENAI_API_KEY` (or whichever provider you use)
 
-Or let `automation init` set them automatically with `--setup-secrets`.
+Or let `sapiens init` set them automatically with `--setup-secrets`.
 
 ---
 
@@ -402,7 +402,7 @@ agent_provider:
 
 Or re-run init:
 ```bash
-automation init --force  # Regenerate config
+sapiens init --force  # Regenerate config
 ```
 
 ---
@@ -431,10 +431,10 @@ Error: Failed to authenticate with OpenAI
 **Solution**: Verify your API key:
 ```bash
 # Check if key is set
-automation credentials get openai api_key
+sapiens credentials get openai api_key
 
 # Update key
-automation credentials set openai api_key
+sapiens credentials set openai api_key
 ```
 
 ### Tool calling not working with Ollama

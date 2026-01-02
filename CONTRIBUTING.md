@@ -104,7 +104,7 @@ Verify your setup by running the test suite:
 
 ```bash
 pytest tests/ -v
-pytest tests/ --cov=automation --cov-report=term-missing  # With coverage
+pytest tests/ --cov=repo_sapiens --cov-report=term-missing  # With coverage
 ```
 
 ## Code Style
@@ -370,7 +370,7 @@ async def test_resolve_keyring_credential(resolver):
 
 ### Maintain 75%+ Code Coverage
 
-- Run coverage reports: `pytest --cov=automation --cov-report=html`
+- Run coverage reports: `pytest --cov=repo_sapiens --cov-report=html`
 - Coverage reports are generated in `htmlcov/index.html`
 - Aim for 75%+ line coverage; critical paths should have higher coverage
 - Use `# pragma: no cover` sparingly for untestable code (e.g., CLI entry points)
@@ -384,7 +384,7 @@ Before submitting a pull request, ensure:
 pytest tests/ -v
 
 # Check coverage
-pytest tests/ --cov=automation --cov-report=term-missing
+pytest tests/ --cov=repo_sapiens --cov-report=term-missing
 
 # Type checking
 mypy repo_sapiens/

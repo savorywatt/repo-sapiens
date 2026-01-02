@@ -37,7 +37,7 @@ jobs:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
           echo "🔧 Creating fix proposal for issue/PR #${{ gitea.event.issue.number }}"
-          automation process-issue --issue ${{ gitea.event.issue.number }}
+          sapiens process-issue --issue ${{ gitea.event.issue.number }}
 
       - name: Comment on completion
         if: success()

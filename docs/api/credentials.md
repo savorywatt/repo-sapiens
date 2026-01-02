@@ -341,46 +341,46 @@ print(settings.git_provider.api_token)  # "actual-token-value"
 
 ## CLI Usage
 
-The `automation credentials` command provides CLI access to credential management:
+The `sapiens credentials` command provides CLI access to credential management:
 
 ### Set a Credential
 
 ```bash
 # Store in keyring
-automation credentials set gitea/api_token --backend keyring
+sapiens credentials set gitea/api_token --backend keyring
 
 # Store in environment (current session only)
-automation credentials set GITEA_TOKEN --backend environment
+sapiens credentials set GITEA_TOKEN --backend environment
 
 # Store in encrypted file
-automation credentials set gitea/api_token --backend encrypted
+sapiens credentials set gitea/api_token --backend encrypted
 ```
 
 ### Get a Credential
 
 ```bash
 # Retrieve and display (masked)
-automation credentials get @keyring:gitea/api_token
+sapiens credentials get @keyring:gitea/api_token
 
 # Show full value
-automation credentials get @keyring:gitea/api_token --show-value
+sapiens credentials get @keyring:gitea/api_token --show-value
 ```
 
 ### Delete a Credential
 
 ```bash
 # Delete from keyring
-automation credentials delete gitea/api_token --backend keyring
+sapiens credentials delete gitea/api_token --backend keyring
 
 # Delete from environment
-automation credentials delete GITEA_TOKEN --backend environment
+sapiens credentials delete GITEA_TOKEN --backend environment
 ```
 
 ### Test Backends
 
 ```bash
 # Check which backends are available
-automation credentials test
+sapiens credentials test
 ```
 
 ## Best Practices

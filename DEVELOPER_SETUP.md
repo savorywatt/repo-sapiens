@@ -34,7 +34,7 @@ brew install ollama
 ollama serve &
 
 # Pull recommended models
-ollama pull codellama:13b      # Best for code generation
+ollama pull qwen3:latest       # Best for code generation (recommended)
 ollama pull llama3.1:8b        # Good general purpose, smaller
 
 # Verify installation
@@ -46,8 +46,8 @@ curl http://localhost:11434/api/tags
 
 | Model | Size | RAM | Use Case |
 |-------|------|-----|----------|
+| `qwen3:latest` | 5GB | 10GB | Best balance (recommended) |
 | `codellama:7b` | 4GB | 8GB | Fast iteration, basic tasks |
-| `codellama:13b` | 7GB | 16GB | Good balance (recommended) |
 | `llama3.1:8b` | 5GB | 10GB | General + code |
 | `deepseek-coder:6.7b` | 4GB | 8GB | Code-focused, efficient |
 
@@ -69,7 +69,7 @@ repository:
 
 agent_provider:
   provider_type: ollama
-  model: ${OLLAMA_MODEL:-codellama:13b}
+  model: ${OLLAMA_MODEL:-qwen3:latest}
   base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
   local_mode: true
 
@@ -94,7 +94,7 @@ Set environment variables:
 export BUILDER_GITEA_URL="http://localhost:3000"
 export BUILDER_GITEA_TOKEN="your-gitea-token"
 export OLLAMA_BASE_URL="http://localhost:11434"
-export OLLAMA_MODEL="codellama:13b"
+export OLLAMA_MODEL="qwen3:latest"
 ```
 
 ### 4. Test Your Setup
@@ -102,16 +102,16 @@ export OLLAMA_MODEL="codellama:13b"
 ```bash
 # Verify Ollama is working
 curl http://localhost:11434/api/generate -d '{
-  "model": "codellama:13b",
+  "model": "qwen3:latest",
   "prompt": "Write a Python hello world function",
   "stream": false
 }' | jq .response
 
-# Run the automation health check
-automation --config repo_sapiens/config/local_config.yaml health-check
+# Run the sapiens health check
+sapiens --config repo_sapiens/config/local_config.yaml health-check
 
 # Process a test issue (if you have a Gitea instance)
-automation --config repo_sapiens/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
+sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
 ```
 
 ---

@@ -60,7 +60,7 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
 
 # Pull recommended models (in another terminal)
-ollama pull codellama:13b      # Best for code tasks
+ollama pull qwen3:latest       # Best for code tasks (recommended)
 ollama pull llama3.1:8b        # Good general purpose, faster
 ollama pull deepseek-coder:6.7b # Efficient code model
 
@@ -74,13 +74,13 @@ The easiest way to use the ReAct agent is through the interactive REPL:
 
 ```bash
 # Start interactive mode
-automation react --repl
+sapiens react --repl
 
 # With specific model
-automation react --repl --model codellama:13b
+sapiens react --repl --model qwen3:latest
 
 # With custom working directory
-automation react --repl --working-dir /path/to/project
+sapiens react --repl --working-dir /path/to/project
 ```
 
 **REPL Commands:**
@@ -98,15 +98,15 @@ automation react --repl --working-dir /path/to/project
 **Example REPL Session:**
 
 ```
-$ automation react --repl --model codellama:13b
+$ sapiens react --repl --model qwen3:latest
 
 ============================================================
 ReAct Agent REPL
 ============================================================
-Model: codellama:13b
+Model: qwen3:latest
 Ollama: http://localhost:11434
 Working directory: /home/user/my-project
-Available models: codellama:13b, llama3.1:8b, deepseek-coder:6.7b
+Available models: qwen3:latest, llama3.1:8b, deepseek-coder:6.7b
 
 Commands:
   Type a task to execute it
@@ -123,7 +123,7 @@ react> Create a Python function that calculates fibonacci numbers
 
 [Task #1] Create a Python function that calculates fibonacci numbers
 
-Starting ReAct agent with model: codellama:13b
+Starting ReAct agent with model: qwen3:latest
 
 --- Result ---
 Status: SUCCESS
@@ -161,14 +161,14 @@ Run a single task from the command line:
 
 ```bash
 # Execute a single task
-automation react "Create a hello.py file that prints Hello World"
+sapiens react "Create a hello.py file that prints Hello World"
 
 # With verbose output (shows reasoning steps)
-automation react "Refactor the utils.py module" --verbose
+sapiens react "Refactor the utils.py module" --verbose
 
 # With custom settings
-automation react "Add error handling to api.py" \
-  --model codellama:13b \
+sapiens react "Add error handling to api.py" \
+  --model qwen3:latest \
   --max-iterations 15 \
   --working-dir /path/to/project
 ```
@@ -227,7 +227,7 @@ repository:
 
 agent_provider:
   provider_type: ollama
-  model: codellama:13b
+  model: qwen3:latest
   base_url: http://localhost:11434
   local_mode: true
 
@@ -241,13 +241,13 @@ Then process issues:
 
 ```bash
 # Process a single issue
-automation process-issue --issue 42
+sapiens process-issue --issue 42
 
 # Process all issues with a specific label
-automation process-all --tag needs-planning
+sapiens process-all --tag needs-planning
 
 # Run as daemon (polls for new issues)
-automation daemon --interval 60
+sapiens daemon --interval 60
 ```
 
 ---
@@ -299,22 +299,22 @@ workflow:
 
 ```bash
 # Process a single issue - Claude Code will execute the task
-automation process-issue --issue 42
+sapiens process-issue --issue 42
 
 # Process entire plan
-automation process-plan --plan-id 42
+sapiens process-plan --plan-id 42
 
 # Run daemon mode
-automation daemon --interval 60
+sapiens daemon --interval 60
 ```
 
 ### 2.4 How Claude Code Execution Works
 
-When you run `automation process-issue --issue 42`:
+When you run `sapiens process-issue --issue 42`:
 
 ```mermaid
 sequenceDiagram
-    participant CLI as automation CLI
+    participant CLI as sapiens CLI
     participant Orch as Orchestrator
     participant Git as Gitea API
     participant Claude as Claude Code CLI
@@ -361,35 +361,35 @@ The orchestrator:
 repo-sapiens init
 
 # Process a single issue
-automation process-issue --issue <number>
+sapiens process-issue --issue <number>
 
 # Process all issues (optionally filtered by tag)
-automation process-all [--tag <label>]
+sapiens process-all [--tag <label>]
 
 # Process a specific plan
-automation process-plan --plan-id <id>
+sapiens process-plan --plan-id <id>
 
 # Run in daemon mode (continuous polling)
-automation daemon --interval <seconds>
+sapiens daemon --interval <seconds>
 
 # List active plans
-automation list-plans
+sapiens list-plans
 
 # Show plan details
-automation show-plan --plan-id <id>
+sapiens show-plan --plan-id <id>
 ```
 
 ### ReAct Agent Commands
 
 ```bash
 # Single task execution
-automation react "<task description>"
+sapiens react "<task description>"
 
 # Interactive REPL
-automation react --repl
+sapiens react --repl
 
 # With options
-automation react "<task>" \
+sapiens react "<task>" \
   --model <ollama-model> \
   --ollama-url <url> \
   --max-iterations <n> \
@@ -418,7 +418,7 @@ ollama serve &
 
 # 2. Start REPL in your project
 cd /path/to/my-project
-automation react --repl --model codellama:13b
+sapiens react --repl --model qwen3:latest
 
 # 3. Interactively develop
 react> What's the structure of this project?
@@ -461,7 +461,7 @@ EOF
 export BUILDER_GITEA_TOKEN="your-gitea-token"
 
 # 3. Process an issue
-automation --config automation/config/local_config.yaml process-issue --issue 15
+sapiens --config automation/config/local_config.yaml process-issue --issue 15
 
 # Claude Code will:
 # - Read the issue
@@ -478,7 +478,7 @@ automation --config automation/config/local_config.yaml process-issue --issue 15
 
 ```bash
 # Start daemon with Ollama backend
-automation --config automation/config/ollama_config.yaml daemon --interval 120
+sapiens --config automation/config/ollama_config.yaml daemon --interval 120
 
 # The daemon will:
 # - Poll Gitea every 2 minutes
@@ -491,19 +491,19 @@ automation --config automation/config/ollama_config.yaml daemon --interval 120
 
 ```bash
 # Create a file
-automation react "Create a Python script that downloads images from URLs"
+sapiens react "Create a Python script that downloads images from URLs"
 
 # Refactor existing code
-automation react "Refactor database.py to use async/await"
+sapiens react "Refactor database.py to use async/await"
 
 # Add documentation
-automation react "Add docstrings to all functions in utils/"
+sapiens react "Add docstrings to all functions in utils/"
 
 # Debug help
-automation react "Find why the tests in test_api.py are failing"
+sapiens react "Find why the tests in test_api.py are failing"
 
 # Code review
-automation react "Review main.py and suggest improvements"
+sapiens react "Review main.py and suggest improvements"
 ```
 
 ---
@@ -515,7 +515,7 @@ automation react "Review main.py and suggest improvements"
 ```yaml
 agent_provider:
   provider_type: ollama
-  model: codellama:13b           # Model name
+  model: qwen3:latest           # Model name
   base_url: http://localhost:11434  # Ollama server URL
   local_mode: true
 ```
@@ -539,7 +539,7 @@ export BUILDER_GITEA_TOKEN="your-token"
 
 # Ollama settings
 export OLLAMA_BASE_URL="http://localhost:11434"
-export OLLAMA_MODEL="codellama:13b"
+export OLLAMA_MODEL="qwen3:latest"
 
 # Override config values
 export AUTOMATION__AGENT_PROVIDER__MODEL="llama3.1:8b"
@@ -553,19 +553,19 @@ export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="2"
 ### For Ollama + ReAct
 
 1. **Choose the right model**:
+   - `qwen3:latest` - Best balance for code tasks (recommended)
    - `codellama:7b` - Fast, good for simple tasks
-   - `codellama:13b` - Best balance for code tasks
    - `llama3.1:8b` - Good general purpose
    - `deepseek-coder:6.7b` - Efficient code model
 
 2. **Use verbose mode when debugging**:
    ```bash
-   automation react "task" --verbose
+   sapiens react "task" --verbose
    ```
 
 3. **Adjust max iterations for complex tasks**:
    ```bash
-   automation react "complex refactoring task" --max-iterations 20
+   sapiens react "complex refactoring task" --max-iterations 20
    ```
 
 4. **Keep tasks focused** - Break large tasks into smaller ones.
@@ -618,11 +618,11 @@ curl http://localhost:11434/api/tags
 ollama list
 
 # Pull missing model
-ollama pull codellama:13b
+ollama pull qwen3:latest
 ```
 
 **Slow performance**
-- Use a smaller model: `codellama:7b` instead of `codellama:34b`
+- Use a smaller model: `qwen3:latest` or `codellama:7b`
 - Ensure sufficient RAM
 - Check GPU acceleration is working: `nvidia-smi`
 
@@ -648,7 +648,7 @@ claude auth
 **"Configuration file not found"**
 ```bash
 # Specify config path
-automation --config /path/to/config.yaml process-issue --issue 1
+sapiens --config /path/to/config.yaml process-issue --issue 1
 ```
 
 **"Permission denied"**
@@ -664,20 +664,20 @@ automation --config /path/to/config.yaml process-issue --issue 1
 ### Start Ollama REPL
 ```bash
 ollama serve &
-automation react --repl --model codellama:13b
+sapiens react --repl --model qwen3:latest
 ```
 
 ### Process Issue with Claude Code
 ```bash
-automation --config automation/config/claude_config.yaml process-issue --issue 42
+sapiens --config automation/config/claude_config.yaml process-issue --issue 42
 ```
 
 ### Run Daemon with Ollama
 ```bash
-automation --config automation/config/ollama_config.yaml daemon --interval 120
+sapiens --config automation/config/ollama_config.yaml daemon --interval 120
 ```
 
 ### Execute Single Task
 ```bash
-automation react "Create a README.md for this project" --verbose
+sapiens react "Create a README.md for this project" --verbose
 ```

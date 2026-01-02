@@ -43,7 +43,7 @@ jobs:
       - name: Validate package
         run: |
           python -c "from repo_sapiens.config.settings import AutomationSettings; print('✓ Package OK')"
-          automation --help
+          sapiens --help
 
       - name: Cache automation package
         uses: actions/cache@v3
@@ -84,10 +84,10 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.issue_number }}" ]; then
             echo "Processing specific issue #${{ github.event.inputs.issue_number }}"
-            automation process-issue --issue ${{ github.event.inputs.issue_number }}
+            sapiens process-issue --issue ${{ github.event.inputs.issue_number }}
           else
             echo "Processing all planning issues"
-            automation process-all --tag needs-planning
+            sapiens process-all --tag needs-planning
           fi
 
       - name: Upload state
@@ -126,7 +126,7 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
-          automation process-all --tag execute
+          sapiens process-all --tag execute
 
   # Job 4: Review pull requests
   code-review:
@@ -155,7 +155,7 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
-          automation process-all --tag needs-review
+          sapiens process-all --tag needs-review
 
   # Job 5: QA - Build and Test
   qa-check:
@@ -191,7 +191,7 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
-          automation process-all --tag requires-qa
+          sapiens process-all --tag requires-qa
 
   # Job 6: Health monitoring
   health-check:
@@ -217,11 +217,11 @@ jobs:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
         run: |
-          automation health-check || echo "Health check completed with warnings"
+          sapiens health-check || echo "Health check completed with warnings"
 
       - name: List active plans
         run: |
-          automation list-plans
+          sapiens list-plans
 
   # Job 7: Docker build and publish (optional)
   docker:

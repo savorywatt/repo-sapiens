@@ -159,7 +159,7 @@ jobs:
       - name: Install from wheel
         run: |
           pip install dist/*.whl
-          automation --help
+          sapiens --help
 
       - name: Test package import
         run: |
