@@ -1,8 +1,8 @@
-# Developer Setup Guide - Pre-commit Hooks
+# Developer Setup Guide
 
-## Quick Start (5 Minutes)
+## Quick Start (10 Minutes)
 
-This project uses pre-commit hooks to ensure code quality. Follow these steps to get started:
+This guide covers setting up your development environment, including AI provider configuration and pre-commit hooks.
 
 ### 1. Install Development Dependencies
 
@@ -19,7 +19,108 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-### 2. Install Pre-commit Hooks
+### 2. Set Up Ollama (Recommended for Testing)
+
+Ollama provides free, local AI inference - perfect for development and testing without API costs.
+
+```bash
+# Install Ollama (macOS/Linux)
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# On macOS with Homebrew
+brew install ollama
+
+# Start Ollama server (runs in background)
+ollama serve &
+
+# Pull recommended models
+ollama pull codellama:13b      # Best for code generation
+ollama pull llama3.1:8b        # Good general purpose, smaller
+
+# Verify installation
+ollama list
+curl http://localhost:11434/api/tags
+```
+
+**Recommended Models for Development:**
+
+| Model | Size | RAM | Use Case |
+|-------|------|-----|----------|
+| `codellama:7b` | 4GB | 8GB | Fast iteration, basic tasks |
+| `codellama:13b` | 7GB | 16GB | Good balance (recommended) |
+| `llama3.1:8b` | 5GB | 10GB | General + code |
+| `deepseek-coder:6.7b` | 4GB | 8GB | Code-focused, efficient |
+
+### 3. Configure for Local Development
+
+Create a local configuration file:
+
+```bash
+cat > automation/config/local_config.yaml << 'EOF'
+git_provider:
+  provider_type: gitea
+  base_url: ${BUILDER_GITEA_URL:-http://localhost:3000}
+  api_token: ${BUILDER_GITEA_TOKEN}
+
+repository:
+  owner: ${REPO_OWNER:-your-username}
+  name: ${REPO_NAME:-your-repo}
+  default_branch: main
+
+agent_provider:
+  provider_type: ollama
+  model: ${OLLAMA_MODEL:-codellama:13b}
+  base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+  local_mode: true
+
+workflow:
+  plans_directory: plans
+  state_directory: .automation/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 1
+  review_approval_threshold: 0.7
+
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+EOF
+```
+
+Set environment variables:
+
+```bash
+# Add to your shell profile (.bashrc, .zshrc, etc.)
+export BUILDER_GITEA_URL="http://localhost:3000"
+export BUILDER_GITEA_TOKEN="your-gitea-token"
+export OLLAMA_BASE_URL="http://localhost:11434"
+export OLLAMA_MODEL="codellama:13b"
+```
+
+### 4. Test Your Setup
+
+```bash
+# Verify Ollama is working
+curl http://localhost:11434/api/generate -d '{
+  "model": "codellama:13b",
+  "prompt": "Write a Python hello world function",
+  "stream": false
+}' | jq .response
+
+# Run the automation health check
+automation --config automation/config/local_config.yaml health-check
+
+# Process a test issue (if you have a Gitea instance)
+automation --config automation/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
+```
+
+---
+
+## Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality.
+
+### Install Pre-commit Hooks
 
 ```bash
 # Install the git hooks (one-time setup)
@@ -29,7 +130,7 @@ pre-commit install
 pre-commit --version
 ```
 
-### 3. Test Your Setup
+### Verify Pre-commit Setup
 
 ```bash
 # Run all hooks on all files to verify everything works
