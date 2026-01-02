@@ -33,7 +33,7 @@ services:
       # Mount workspace for file operations
       - ./workspace:/workspace
       # Mount config file (optional)
-      - ./automation/config/automation_config.yaml:/app/config/automation_config.yaml:ro
+      - ./repo_sapiens/config/automation_config.yaml:/app/config/automation_config.yaml:ro
       # Mount credentials (if using local Claude)
       - ${HOME}/.config/claude:/home/automation/.config/claude:ro
     command: >
@@ -56,11 +56,11 @@ services:
       - AUTOMATION__REPOSITORY__NAME=${REPO_NAME:-myrepo}
     volumes:
       - ./workspace:/workspace
-      - ./automation/config/automation_config.yaml:/app/config/automation_config.yaml:ro
+      - ./repo_sapiens/config/automation_config.yaml:/app/config/automation_config.yaml:ro
     ports:
       - "8000:8000"
     command: >
-      uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
+      uvicorn repo_sapiens.webhook_server:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
     networks:
       - builder-network

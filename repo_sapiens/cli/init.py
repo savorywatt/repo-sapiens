@@ -24,7 +24,7 @@ log = structlog.get_logger(__name__)
 @click.option(
     "--config-path",
     type=click.Path(path_type=Path),
-    default="automation/config/automation_config.yaml",
+    default="repo_sapiens/config/automation_config.yaml",
     help="Path for configuration file",
 )
 @click.option(

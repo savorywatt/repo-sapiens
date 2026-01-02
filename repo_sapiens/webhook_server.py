@@ -22,7 +22,7 @@ async def startup():
     """Initialize on startup."""
     global settings
     try:
-        settings = AutomationSettings.from_yaml("automation/config/automation_config.yaml")
+        settings = AutomationSettings.from_yaml("repo_sapiens/config/automation_config.yaml")
         log.info("webhook_server_started")
     except ConfigurationError as e:
         log.error("webhook_startup_failed", error=e.message, exc_info=True)
