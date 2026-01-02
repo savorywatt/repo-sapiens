@@ -1,12 +1,12 @@
-name: Build Automation Artifacts
+name: Build Sapiens Artifacts
 
-# Build the automation package and Docker image for reuse across workflows
+# Build the repo-sapiens package and Docker image for reuse across workflows
 on:
   push:
     branches:
       - main
     paths:
-      - 'automation/**'
+      - 'repo_sapiens/**'
       - 'pyproject.toml'
       - 'Dockerfile'
   pull_request:
@@ -47,14 +47,14 @@ jobs:
       - name: Upload wheel
         uses: actions/upload-artifact@v3
         with:
-          name: automation-wheel
+          name: sapiens-wheel
           path: dist/*.whl
           retention-days: 30
 
       - name: Upload source dist
         uses: actions/upload-artifact@v3
         with:
-          name: automation-sdist
+          name: sapiens-sdist
           path: dist/*.tar.gz
           retention-days: 30
 
@@ -96,9 +96,9 @@ jobs:
           context: .
           file: ./Dockerfile
           tags: |
-            gitea-automation:latest
-            gitea-automation:${{ gitea.sha }}
-          outputs: type=docker,dest=/tmp/automation-image.tar
+            repo-sapiens:latest
+            repo-sapiens:${{ gitea.sha }}
+          outputs: type=docker,dest=/tmp/sapiens-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -106,7 +106,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: docker-image
-          path: /tmp/automation-image.tar
+          path: /tmp/sapiens-image.tar
           retention-days: 7
           # Docker images are large, shorter retention
 
@@ -114,7 +114,7 @@ jobs:
         run: |
           cat > image-info.json <<EOF
           {
-            "image_name": "gitea-automation",
+            "image_name": "repo-sapiens",
             "tags": ["latest", "${{ gitea.sha }}"],
             "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "git_commit": "${{ gitea.sha }}",
@@ -148,7 +148,7 @@ jobs:
       - name: Download wheel
         uses: actions/download-artifact@v3
         with:
-          name: automation-wheel
+          name: sapiens-wheel
           path: dist/
 
       - name: Download package metadata
@@ -178,8 +178,8 @@ jobs:
 
       - name: Load and test Docker image
         run: |
-          docker load < /tmp/automation-image.tar
-          docker run --rm gitea-automation:latest --help
+          docker load < /tmp/sapiens-image.tar
+          docker run --rm repo-sapiens:latest --help
           echo "✅ Docker image works correctly"
 
       - name: Report success
@@ -191,6 +191,6 @@ jobs:
           echo "**Build Date:** $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Artifacts available for download:" >> $GITHUB_STEP_SUMMARY
-          echo "- \`automation-wheel\` (Python package)" >> $GITHUB_STEP_SUMMARY
-          echo "- \`automation-sdist\` (Source distribution)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sapiens-wheel\` (Python package)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sapiens-sdist\` (Source distribution)" >> $GITHUB_STEP_SUMMARY
           echo "- \`docker-image\` (Docker container)" >> $GITHUB_STEP_SUMMARY

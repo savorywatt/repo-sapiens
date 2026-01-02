@@ -27,7 +27,7 @@ jobs:
       - name: Download pre-built wheel
         uses: actions/download-artifact@v3
         with:
-          name: automation-wheel
+          name: sapiens-wheel
           path: dist/
         continue-on-error: true
 
@@ -41,7 +41,7 @@ jobs:
             pip install -e .
           fi
 
-      - name: Run automation
+      - name: Run sapiens
         env:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
@@ -73,15 +73,15 @@ jobs:
 
       - name: Load Docker image
         run: |
-          if [ -f /tmp/automation-image.tar ]; then
+          if [ -f /tmp/sapiens-image.tar ]; then
             echo "✅ Using pre-built Docker image (fast!)"
-            docker load < /tmp/automation-image.tar
+            docker load < /tmp/sapiens-image.tar
           else
             echo "⚠️ No Docker artifact found, building image (slower)"
-            docker build -t gitea-automation:latest .
+            docker build -t repo-sapiens:latest .
           fi
 
-      - name: Run automation in Docker
+      - name: Run sapiens in Docker
         env:
           GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
@@ -93,5 +93,5 @@ jobs:
             -e AUTOMATION__REPOSITORY__NAME="${{ gitea.repository }}" \
             -e AUTOMATION__AGENT_PROVIDER__API_KEY="$CLAUDE_API_KEY" \
             -v ${{ gitea.workspace }}:/workspace \
-            gitea-automation:latest \
+            repo-sapiens:latest \
             process-issue --issue ${{ gitea.event.issue.number }}
