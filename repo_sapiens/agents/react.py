@@ -34,7 +34,7 @@ class TrajectoryStep:
 class ReActConfig:
     """Configuration for the ReAct agent."""
 
-    model: str = "llama3.1:8b"
+    model: str = "qwen3:latest"
     ollama_url: str = "http://localhost:11434"
     max_iterations: int = 10
     temperature: float = 0.7
@@ -425,7 +425,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
 async def run_react_task(
     task_description: str,
     working_dir: str | None = None,
-    model: str = "llama3.1:8b",
+    model: str = "qwen3:latest",
     max_iterations: int = 10,
     verbose: bool = False,
 ) -> TaskResult:

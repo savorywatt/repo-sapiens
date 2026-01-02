@@ -160,7 +160,7 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 
 @cli.command()
 @click.argument("task", required=False)
-@click.option("--model", default="llama3.1:8b", help="Ollama model to use")
+@click.option("--model", default="qwen3:latest", help="Ollama model to use")
 @click.option("--ollama-url", default="http://localhost:11434", help="Ollama server URL")
 @click.option("--max-iterations", default=10, type=int, help="Max ReAct iterations")
 @click.option("--working-dir", default=".", help="Working directory for file operations")
