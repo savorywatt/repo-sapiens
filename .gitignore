@@ -41,3 +41,4 @@ build/
 
 # Secrets baseline (keep in repo for detect-secrets)
 # .secrets.baseline
+uv.lock
