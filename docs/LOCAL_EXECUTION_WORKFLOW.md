@@ -214,7 +214,7 @@ ACTION_INPUT: {"answer": "Found 3 Python files that import requests:\n- api/clie
 Configure repo-sapiens to use Ollama for issue processing:
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
@@ -272,7 +272,7 @@ claude auth
 ### 2.2 Configure for Claude Local
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
@@ -401,7 +401,7 @@ sapiens react "<task>" \
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--config` | Path to config file | `automation/config/automation_config.yaml` |
+| `--config` | Path to config file | `repo_sapiens/config/automation_config.yaml` |
 | `--log-level` | Logging verbosity | `INFO` |
 
 ---
@@ -440,7 +440,7 @@ git commit -m "Add user profile API endpoint"
 
 ```bash
 # 1. Configure for claude-local
-cat > automation/config/local_config.yaml << 'EOF'
+cat > repo_sapiens/config/local_config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
@@ -461,7 +461,7 @@ EOF
 export BUILDER_GITEA_TOKEN="your-gitea-token"
 
 # 3. Process an issue
-sapiens --config automation/config/local_config.yaml process-issue --issue 15
+sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 15
 
 # Claude Code will:
 # - Read the issue
@@ -478,7 +478,7 @@ sapiens --config automation/config/local_config.yaml process-issue --issue 15
 
 ```bash
 # Start daemon with Ollama backend
-sapiens --config automation/config/ollama_config.yaml daemon --interval 120
+sapiens --config repo_sapiens/config/ollama_config.yaml daemon --interval 120
 
 # The daemon will:
 # - Poll Gitea every 2 minutes
@@ -669,12 +669,12 @@ sapiens react --repl --model qwen3:latest
 
 ### Process Issue with Claude Code
 ```bash
-sapiens --config automation/config/claude_config.yaml process-issue --issue 42
+sapiens --config repo_sapiens/config/claude_config.yaml process-issue --issue 42
 ```
 
 ### Run Daemon with Ollama
 ```bash
-sapiens --config automation/config/ollama_config.yaml daemon --interval 120
+sapiens --config repo_sapiens/config/ollama_config.yaml daemon --interval 120
 ```
 
 ### Execute Single Task

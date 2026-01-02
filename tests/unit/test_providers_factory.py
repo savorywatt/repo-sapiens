@@ -1,4 +1,4 @@
-"""Tests for automation/providers/factory.py - Git provider factory."""
+"""Tests for repo_sapiens/providers/factory.py - Git provider factory."""
 
 import pytest
 from pydantic import SecretStr

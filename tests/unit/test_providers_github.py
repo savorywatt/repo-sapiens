@@ -1,4 +1,4 @@
-"""Tests for automation/providers/github_rest.py - GitHub provider implementation."""
+"""Tests for repo_sapiens/providers/github_rest.py - GitHub provider implementation."""
 
 from datetime import UTC, datetime
 from unittest.mock import Mock, patch

@@ -1,4 +1,4 @@
-"""Tests for automation/providers/gitea_rest.py - Gitea REST API provider implementation.
+"""Tests for repo_sapiens/providers/gitea_rest.py - Gitea REST API provider implementation.
 
 This module provides comprehensive test coverage for the GiteaRestProvider class,
 testing initialization, connection management, issue/PR operations, file handling,

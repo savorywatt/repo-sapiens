@@ -82,7 +82,7 @@ class ToolRegistry:
             description="Find files matching a glob pattern. Returns list of matching file paths.",
             parameters={
                 "pattern": "Glob pattern to match files, e.g., '**/*.py' or '*.txt'",
-                "path": "Directory to search in (default: current directory). Use 'automation/' to search only in that folder.",
+                "path": "Directory to search in (default: current directory). Use 'repo_sapiens/' to search only in that folder.",
             },
         ),
         "edit_file": ToolDefinition(

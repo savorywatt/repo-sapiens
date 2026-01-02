@@ -1,4 +1,4 @@
-"""Unit tests for automation/cli/credentials.py - Credential management CLI."""
+"""Unit tests for repo_sapiens/cli/credentials.py - Credential management CLI."""
 
 import os
 from pathlib import Path
