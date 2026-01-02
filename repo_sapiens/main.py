@@ -31,7 +31,7 @@ log = structlog.get_logger(__name__)
 @click.option("--log-level", default="INFO", help="Logging level")
 @click.pass_context
 def cli(ctx: click.Context, config: str, log_level: str) -> None:
-    """Gitea automation system CLI."""
+    """repo-sapiens: Intelligent repository automation CLI."""
     # Configure logging
     configure_logging(log_level)
 
@@ -181,8 +181,8 @@ def react(
     run commands) to complete the task.
 
     Examples:
-        automation react "Create a hello.py file that prints Hello World"
-        automation react --repl  # Start interactive mode
+        sapiens react "Create a hello.py file that prints Hello World"
+        sapiens react --repl  # Start interactive mode
     """
     from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
     from repo_sapiens.models.domain import Task as DomainTask

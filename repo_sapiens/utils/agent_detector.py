@@ -459,7 +459,7 @@ def get_provider_recommendation(use_case: str = "general") -> str:
         "tool-usage": (
             "openai",
             "OpenAI GPT-4o has the best tool/function calling support, "
-            "essential for repo-agent's file operations and git commands.",
+            "essential for repo-sapiens file operations and git commands.",
         ),
         "cost": (
             "ollama",
@@ -544,7 +544,7 @@ For local model serving with tool/function calling:
   - Use with: --provider ollama
 
 *Note: Ollama may not properly handle tool/function calls, which are
-essential for repo-agent's file operations. For production use with
+essential for repo-sapiens file operations. For production use with
 local models, vLLM is strongly recommended.
 
 **Recommendation**: Start with cloud providers (OpenAI/Anthropic) for
