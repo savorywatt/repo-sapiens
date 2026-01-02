@@ -23,15 +23,15 @@ import pytest
 import yaml
 
 # Import modules to benchmark
-from automation.config.settings import (
+from repo_sapiens.config.settings import (
     AutomationSettings,
 )
-from automation.credentials.environment_backend import EnvironmentBackend
-from automation.credentials.keyring_backend import KeyringBackend
-from automation.credentials.resolver import CredentialResolver
-from automation.engine.state_manager import StateManager
-from automation.git.discovery import GitDiscovery
-from automation.rendering import SecureTemplateEngine
+from repo_sapiens.credentials.environment_backend import EnvironmentBackend
+from repo_sapiens.credentials.keyring_backend import KeyringBackend
+from repo_sapiens.credentials.resolver import CredentialResolver
+from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.git.discovery import GitDiscovery
+from repo_sapiens.rendering import SecureTemplateEngine
 
 # ============================================================================
 # Configuration Loading Benchmarks
@@ -175,7 +175,7 @@ class TestGitDiscoveryPerformance:
         ]
 
         def parse_urls():
-            from automation.git.parser import GitUrlParser
+            from repo_sapiens.git.parser import GitUrlParser
 
             results = []
             for url in urls:
@@ -189,7 +189,7 @@ class TestGitDiscoveryPerformance:
         result = benchmark(parse_urls)
         assert len(result) > 0
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repository_info_detection(self, mock_git_class, benchmark, mock_git_repo):
         """Benchmark repository information detection."""
         mock_git_class.return_value = mock_git_repo

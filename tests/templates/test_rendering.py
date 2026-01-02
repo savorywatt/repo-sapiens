@@ -8,8 +8,8 @@ and that all expected fields are present and valid.
 import pytest
 import yaml
 
-from automation.rendering import WorkflowRenderer
-from automation.rendering.validators import (
+from repo_sapiens.rendering import WorkflowRenderer
+from repo_sapiens.rendering.validators import (
     CIBuildConfig,
     LabelSyncConfig,
     WorkflowConfig,

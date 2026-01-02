@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from automation.utils.agent_detector import (
+from repo_sapiens.utils.agent_detector import (
     AGENT_INFO,
     LLM_PROVIDER_INFO,
     check_agent_or_raise,
@@ -29,7 +29,7 @@ class TestDetectAvailableAgents:
 
     def test_detect_both_agents_available(self):
         """Should detect both Claude and Goose when both are installed."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
 
             agents = detect_available_agents()
@@ -40,7 +40,7 @@ class TestDetectAvailableAgents:
 
     def test_detect_only_claude_available(self):
         """Should detect only Claude when Goose is not installed."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.side_effect = lambda x: "/usr/local/bin/claude" if x == "claude" else None
 
             agents = detect_available_agents()
@@ -49,7 +49,7 @@ class TestDetectAvailableAgents:
 
     def test_detect_only_goose_available(self):
         """Should detect only Goose when Claude is not installed."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.side_effect = lambda x: "/usr/local/bin/goose" if x == "goose" else None
 
             agents = detect_available_agents()
@@ -58,7 +58,7 @@ class TestDetectAvailableAgents:
 
     def test_detect_goose_via_uvx(self):
         """Should detect Goose via uvx when direct install is not available."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             # uvx is available, but goose is not directly installed
             mock_which.side_effect = lambda x: "/usr/local/bin/uvx" if x == "uvx" else None
 
@@ -68,7 +68,7 @@ class TestDetectAvailableAgents:
 
     def test_no_goose_uvx_when_goose_already_detected(self):
         """Should not add goose-uvx if goose is already detected."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             # Both goose and uvx are available
             mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
 
@@ -79,7 +79,7 @@ class TestDetectAvailableAgents:
 
     def test_detect_no_agents_available(self):
         """Should return empty list when no agents are installed."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.return_value = None
 
             agents = detect_available_agents()
@@ -92,7 +92,7 @@ class TestIsAgentAvailable:
 
     def test_claude_available(self):
         """Should return True when Claude CLI is found."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.return_value = "/usr/local/bin/claude"
 
             result = is_agent_available("claude")
@@ -102,7 +102,7 @@ class TestIsAgentAvailable:
 
     def test_claude_not_available(self):
         """Should return False when Claude CLI is not found."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.return_value = None
 
             result = is_agent_available("claude")
@@ -111,7 +111,7 @@ class TestIsAgentAvailable:
 
     def test_goose_available(self):
         """Should return True when Goose CLI is found."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.return_value = "/usr/local/bin/goose"
 
             result = is_agent_available("goose")
@@ -121,7 +121,7 @@ class TestIsAgentAvailable:
 
     def test_goose_not_available(self):
         """Should return False when Goose CLI is not found."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.return_value = None
 
             result = is_agent_available("goose")
@@ -287,7 +287,7 @@ class TestFormatAgentList:
 
     def test_format_with_both_agents(self):
         """Should format list with both agents available."""
-        with patch("automation.utils.agent_detector.detect_available_agents") as mock_detect:
+        with patch("repo_sapiens.utils.agent_detector.detect_available_agents") as mock_detect:
             mock_detect.return_value = ["claude", "goose"]
 
             result = format_agent_list()
@@ -300,7 +300,7 @@ class TestFormatAgentList:
 
     def test_format_with_goose_uvx(self):
         """Should indicate uvx installation method for goose-uvx."""
-        with patch("automation.utils.agent_detector.detect_available_agents") as mock_detect:
+        with patch("repo_sapiens.utils.agent_detector.detect_available_agents") as mock_detect:
             mock_detect.return_value = ["goose-uvx"]
 
             result = format_agent_list()
@@ -310,7 +310,7 @@ class TestFormatAgentList:
 
     def test_format_with_no_agents(self):
         """Should return message when no agents detected."""
-        with patch("automation.utils.agent_detector.detect_available_agents") as mock_detect:
+        with patch("repo_sapiens.utils.agent_detector.detect_available_agents") as mock_detect:
             mock_detect.return_value = []
 
             result = format_agent_list()
@@ -319,7 +319,7 @@ class TestFormatAgentList:
 
     def test_format_with_single_agent(self):
         """Should format list with single agent."""
-        with patch("automation.utils.agent_detector.detect_available_agents") as mock_detect:
+        with patch("repo_sapiens.utils.agent_detector.detect_available_agents") as mock_detect:
             mock_detect.return_value = ["claude"]
 
             result = format_agent_list()
@@ -364,7 +364,7 @@ class TestCheckAgentOrRaise:
 
     def test_check_available_agent_succeeds(self):
         """Should not raise when agent is available."""
-        with patch("automation.utils.agent_detector.is_agent_available") as mock_available:
+        with patch("repo_sapiens.utils.agent_detector.is_agent_available") as mock_available:
             mock_available.return_value = True
 
             # Should not raise
@@ -372,7 +372,7 @@ class TestCheckAgentOrRaise:
 
     def test_check_unavailable_agent_raises(self):
         """Should raise RuntimeError when agent is not available."""
-        with patch("automation.utils.agent_detector.is_agent_available") as mock_available:
+        with patch("repo_sapiens.utils.agent_detector.is_agent_available") as mock_available:
             mock_available.return_value = False
 
             with pytest.raises(RuntimeError) as exc_info:
@@ -635,7 +635,7 @@ class TestEdgeCases:
 
     def test_shutil_which_called_with_correct_binary(self):
         """Should call shutil.which with the correct binary name from registry."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             mock_which.return_value = None
 
             is_agent_available("claude")
@@ -661,7 +661,7 @@ class TestEdgeCases:
 
     def test_format_agent_list_with_unknown_agent_in_list(self):
         """Should handle gracefully if an unknown agent key appears."""
-        with patch("automation.utils.agent_detector.detect_available_agents") as mock_detect:
+        with patch("repo_sapiens.utils.agent_detector.detect_available_agents") as mock_detect:
             mock_detect.return_value = ["claude", "unknown-agent"]
 
             result = format_agent_list()
@@ -672,7 +672,7 @@ class TestEdgeCases:
 
     def test_multiple_calls_to_detect_are_independent(self):
         """Should not cache detection results between calls."""
-        with patch("automation.utils.agent_detector.shutil.which") as mock_which:
+        with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             # First call: Claude available
             mock_which.side_effect = lambda x: "/bin/claude" if x == "claude" else None
             result1 = detect_available_agents()

@@ -4,7 +4,7 @@ Tests for runtime security monitoring.
 
 import pytest
 
-from automation.rendering.security import (
+from repo_sapiens.rendering.security import (
     SecurityAudit,
     check_rendered_output,
 )

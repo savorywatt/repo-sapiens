@@ -56,7 +56,7 @@ curl http://localhost:11434/api/tags
 Create a local configuration file:
 
 ```bash
-cat > automation/config/local_config.yaml << 'EOF'
+cat > repo_sapiens/config/local_config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
   base_url: ${BUILDER_GITEA_URL:-http://localhost:3000}
@@ -108,10 +108,10 @@ curl http://localhost:11434/api/generate -d '{
 }' | jq .response
 
 # Run the automation health check
-automation --config automation/config/local_config.yaml health-check
+automation --config repo_sapiens/config/local_config.yaml health-check
 
 # Process a test issue (if you have a Gitea instance)
-automation --config automation/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
+automation --config repo_sapiens/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
 ```
 
 ---
@@ -146,7 +146,7 @@ When you run `git commit`, pre-commit automatically:
 1. **Formats your code** with Black (auto-fixes)
 2. **Organizes imports** with Ruff (auto-fixes)
 3. **Checks code quality** with Ruff linter
-4. **Validates types** with MyPy (on automation/ only)
+4. **Validates types** with MyPy (on repo_sapiens/ only)
 5. **Scans for security issues** with Bandit
 6. **Checks file formats** (YAML, JSON, TOML)
 7. **Detects secrets** (API keys, passwords)
@@ -163,10 +163,10 @@ If any check fails or modifies files:
 
 ```bash
 # Make your changes
-vim automation/some_file.py
+vim repo_sapiens/some_file.py
 
 # Stage changes
-git add automation/some_file.py
+git add repo_sapiens/some_file.py
 
 # Commit (hooks run automatically)
 git commit -m "Add new feature"
@@ -195,16 +195,16 @@ pre-commit run mypy
 
 ```bash
 # Auto-fix formatting
-black automation/ tests/
+black repo_sapiens/ tests/
 
 # Auto-fix linting issues
-ruff check --fix automation/ tests/
+ruff check --fix repo_sapiens/ tests/
 
 # Check types
-mypy automation/
+mypy repo_sapiens/
 
 # Security scan
-bandit -c pyproject.toml -r automation/
+bandit -c pyproject.toml -r repo_sapiens/
 ```
 
 ## Common Scenarios
@@ -227,7 +227,7 @@ git commit -m "Add feature"
 
 ```
 mypy.............................................Failed
-automation/main.py:42: error: Argument 1 has incompatible type
+repo_sapiens/main.py:42: error: Argument 1 has incompatible type
 ```
 
 **Solution**: Fix the type hint based on error message
@@ -245,7 +245,7 @@ def process(data: str) -> str:
 
 ```
 ruff.............................................Failed
-automation/main.py:10:5: F841 Local variable is assigned but never used
+repo_sapiens/main.py:10:5: F841 Local variable is assigned but never used
 ```
 
 **Solution**: Fix the issue or suppress if necessary

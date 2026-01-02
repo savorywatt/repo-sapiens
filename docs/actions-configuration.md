@@ -132,7 +132,7 @@ schedule:
 ```yaml
 # Add more test steps
 - name: Security scan
-  run: bandit -r automation/
+  run: bandit -r repo_sapiens/
 
 - name: Dependency check
   run: safety check
@@ -259,7 +259,7 @@ jobs:
 
 ### Adding Custom CLI Command
 
-In `automation/main.py`:
+In `repo_sapiens/main.py`:
 
 ```python
 @cli.command()
@@ -291,7 +291,7 @@ on:
 on:
   push:
     paths:
-      - 'automation/**'
+      - 'repo_sapiens/**'
       - 'tests/**'
 ```
 

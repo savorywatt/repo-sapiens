@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from automation.credentials import BackendNotAvailableError, CredentialError, KeyringBackend
+from repo_sapiens.credentials import BackendNotAvailableError, CredentialError, KeyringBackend
 
 
 class TestKeyringBackend:
@@ -19,23 +19,23 @@ class TestKeyringBackend:
         """Test backend name property."""
         assert backend.name == "keyring"
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_available_when_keyring_installed(self, mock_keyring, backend):
         """Test backend reports available when keyring is installed."""
         mock_keyring.get_keyring.return_value = MagicMock()
 
         assert backend.available is True
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False)
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False)
     def test_unavailable_when_keyring_not_installed(self):
         """Test backend reports unavailable when keyring not installed."""
         backend = KeyringBackend()
 
         assert backend.available is False
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_unavailable_when_keyring_fails(self, mock_keyring):
         """Test backend reports unavailable when keyring fails to initialize."""
         mock_keyring.get_keyring.side_effect = Exception("Keyring failed")
@@ -43,8 +43,8 @@ class TestKeyringBackend:
 
         assert backend.available is False
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_get_credential_success(self, mock_keyring, backend):
         """Test successful credential retrieval."""
         mock_keyring.get_keyring.return_value = MagicMock()
@@ -55,8 +55,8 @@ class TestKeyringBackend:
         assert result == "test-token"
         mock_keyring.get_password.assert_called_once_with("builder/gitea", "api_token")
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_get_credential_not_found(self, mock_keyring, backend):
         """Test credential not found returns None."""
         mock_keyring.get_keyring.return_value = MagicMock()
@@ -66,7 +66,7 @@ class TestKeyringBackend:
 
         assert result is None
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False)
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False)
     def test_get_raises_when_unavailable(self):
         """Test get raises BackendNotAvailableError when unavailable."""
         backend = KeyringBackend()
@@ -77,8 +77,8 @@ class TestKeyringBackend:
         assert "not available" in str(exc_info.value)
         assert exc_info.value.suggestion is not None
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_get_raises_on_keyring_error(self, mock_keyring, backend):
         """Test get raises CredentialError on keyring failure."""
         from keyring.errors import KeyringError
@@ -92,8 +92,8 @@ class TestKeyringBackend:
         assert "Keyring operation failed" in str(exc_info.value)
         assert exc_info.value.reference == "@keyring:gitea/api_token"
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_set_credential(self, mock_keyring, backend):
         """Test credential storage."""
         mock_keyring.get_keyring.return_value = MagicMock()
@@ -107,7 +107,7 @@ class TestKeyringBackend:
         with pytest.raises(ValueError, match="cannot be empty"):
             backend.set("gitea", "api_token", "")
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False)
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False)
     def test_set_raises_when_unavailable(self):
         """Test set raises BackendNotAvailableError when unavailable."""
         backend = KeyringBackend()
@@ -115,8 +115,8 @@ class TestKeyringBackend:
         with pytest.raises(BackendNotAvailableError):
             backend.set("gitea", "api_token", "token")
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_set_raises_on_keyring_error(self, mock_keyring, backend):
         """Test set raises CredentialError on keyring failure."""
         from keyring.errors import KeyringError
@@ -129,8 +129,8 @@ class TestKeyringBackend:
 
         assert "Failed to store credential" in str(exc_info.value)
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_delete_credential_success(self, mock_keyring, backend):
         """Test successful credential deletion."""
         mock_keyring.get_keyring.return_value = MagicMock()
@@ -140,8 +140,8 @@ class TestKeyringBackend:
         assert result is True
         mock_keyring.delete_password.assert_called_once_with("builder/gitea", "api_token")
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_delete_credential_not_found(self, mock_keyring, backend):
         """Test delete returns False when credential not found."""
         from keyring.errors import PasswordDeleteError
@@ -153,7 +153,7 @@ class TestKeyringBackend:
 
         assert result is False
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", False)
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", False)
     def test_delete_raises_when_unavailable(self):
         """Test delete raises BackendNotAvailableError when unavailable."""
         backend = KeyringBackend()
@@ -161,8 +161,8 @@ class TestKeyringBackend:
         with pytest.raises(BackendNotAvailableError):
             backend.delete("gitea", "api_token")
 
-    @patch("automation.credentials.keyring_backend.KEYRING_AVAILABLE", True)
-    @patch("automation.credentials.keyring_backend.keyring")
+    @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
+    @patch("repo_sapiens.credentials.keyring_backend.keyring")
     def test_delete_raises_on_keyring_error(self, mock_keyring, backend):
         """Test delete raises CredentialError on keyring failure."""
         from keyring.errors import KeyringError

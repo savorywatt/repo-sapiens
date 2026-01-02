@@ -102,7 +102,7 @@ This will:
 
 1. Copy and edit configuration:
    ```bash
-   cp automation/config/automation_config.yaml automation/config/my_config.yaml
+   cp repo_sapiens/config/automation_config.yaml repo_sapiens/config/my_config.yaml
    ```
 
 2. Set environment variables:
@@ -113,7 +113,7 @@ This will:
 
 3. Test configuration:
    ```bash
-   automation --config automation/config/my_config.yaml list-plans
+   automation --config repo_sapiens/config/my_config.yaml list-plans
    ```
 
 ### Basic Usage
@@ -140,7 +140,7 @@ automation check-stale --max-age-hours 24
 ### Components
 
 ```
-automation/
+repo_sapiens/
 ├── config/           # Configuration management
 ├── models/           # Domain models (Issue, Task, Plan, etc.)
 ├── providers/        # Git and AI provider implementations
@@ -226,13 +226,13 @@ pytest tests/unit/test_state_manager.py -v
 
 ```bash
 # Format code
-black automation/ tests/
+black repo_sapiens/ tests/
 
 # Lint code
-ruff check automation/ tests/
+ruff check repo_sapiens/ tests/
 
 # Type check
-mypy automation/
+mypy repo_sapiens/
 ```
 
 ### Project Structure
@@ -240,7 +240,7 @@ mypy automation/
 ```
 .
 ├── .gitea/workflows/      # Gitea Actions workflows
-├── automation/            # Main package
+├── repo_sapiens/          # Main package
 │   ├── config/           # Configuration
 │   ├── engine/           # Workflow engine
 │   ├── models/           # Domain models
@@ -390,7 +390,7 @@ This system is designed to be extended with:
 - Enhanced error recovery
 - Performance optimizations
 
-**Note**: GitHub and Gitea are fully supported. GitLab and other providers can be added following the provider pattern in `automation/providers/`.
+**Note**: GitHub and Gitea are fully supported. GitLab and other providers can be added following the provider pattern in `repo_sapiens/providers/`.
 
 For bugs, feature requests, or questions, please [open an issue](https://github.com/savorywatt/repo-sapiens/issues) on GitHub.
 

@@ -3,15 +3,15 @@
 import pytest
 from pydantic import SecretStr
 
-from automation.config.settings import (
+from repo_sapiens.config.settings import (
     AgentProviderConfig,
     AutomationSettings,
     GitProviderConfig,
     RepositoryConfig,
 )
-from automation.providers.factory import create_git_provider, detect_provider_from_url
-from automation.providers.gitea_rest import GiteaRestProvider
-from automation.providers.github_rest import GitHubRestProvider
+from repo_sapiens.providers.factory import create_git_provider, detect_provider_from_url
+from repo_sapiens.providers.gitea_rest import GiteaRestProvider
+from repo_sapiens.providers.github_rest import GitHubRestProvider
 
 
 class TestCreateGitProvider:

@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from automation.models.domain import (
+from repo_sapiens.models.domain import (
     Branch,
     Comment,
     Issue,
@@ -28,10 +28,10 @@ from automation.models.domain import (
     Task,
     TaskResult,
 )
-from automation.providers.agent_provider import ClaudeLocalProvider
-from automation.providers.external_agent import ExternalAgentProvider
-from automation.providers.git_provider import GiteaProvider
-from automation.utils.mcp_client import MCPClient
+from repo_sapiens.providers.agent_provider import ClaudeLocalProvider
+from repo_sapiens.providers.external_agent import ExternalAgentProvider
+from repo_sapiens.providers.git_provider import GiteaProvider
+from repo_sapiens.utils.mcp_client import MCPClient
 
 
 # =============================================================================

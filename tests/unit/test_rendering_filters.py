@@ -2,7 +2,7 @@
 
 import pytest
 
-from automation.rendering.filters import (
+from repo_sapiens.rendering.filters import (
     safe_identifier,
     safe_label,
     safe_url,

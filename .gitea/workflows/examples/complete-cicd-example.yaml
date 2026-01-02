@@ -42,7 +42,7 @@ jobs:
 
       - name: Validate package
         run: |
-          python -c "from automation.config.settings import AutomationSettings; print('✓ Package OK')"
+          python -c "from repo_sapiens.config.settings import AutomationSettings; print('✓ Package OK')"
           automation --help
 
       - name: Cache automation package

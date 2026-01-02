@@ -4,7 +4,7 @@ Tests for checkpoint management system.
 
 import pytest
 
-from automation.engine.checkpointing import CheckpointManager
+from repo_sapiens.engine.checkpointing import CheckpointManager
 
 
 @pytest.mark.asyncio

@@ -213,19 +213,19 @@ pytest tests/benchmarks/ \
 - **Current:** 10-15ms per repo
 - **Optimization:** Parallel discovery with asyncio
 - **Expected Improvement:** 3-5x faster
-- **File:** `automation/git/discovery.py`
+- **File:** `repo_sapiens/git/discovery.py`
 
 ### 2. Configuration Validation
 - **Current:** 15-20ms
 - **Optimization:** Model caching, lazy validation
 - **Expected Improvement:** 2-3x faster
-- **File:** `automation/config/settings.py`
+- **File:** `repo_sapiens/config/settings.py`
 
 ### 3. State File I/O
 - **Current:** 5-8ms per write
 - **Optimization:** Batch updates, compression
 - **Expected Improvement:** 60-70% reduction
-- **File:** `automation/engine/state_manager.py`
+- **File:** `repo_sapiens/engine/state_manager.py`
 
 ## Profiling Tools
 

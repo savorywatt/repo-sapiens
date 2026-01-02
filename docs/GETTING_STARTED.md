@@ -146,7 +146,7 @@ Copy the default configuration template:
 
 ```bash
 # From the source directory
-cp automation/config/automation_config.yaml ./my_config.yaml
+cp repo_sapiens/config/automation_config.yaml ./my_config.yaml
 
 # Or create a new one with this basic template:
 cat > my_config.yaml << 'EOF'
@@ -810,7 +810,7 @@ ls -la my_config.yaml
 automation --config /full/path/to/my_config.yaml list-plans
 
 # Use default location
-cp my_config.yaml automation/config/automation_config.yaml
+cp my_config.yaml repo_sapiens/config/automation_config.yaml
 automation list-plans  # Uses default config
 ```
 
@@ -949,7 +949,7 @@ When you need assistance:
 
 Once you're comfortable with the basics, explore:
 
-- **Custom Templates**: Modify plan and prompt templates in `automation/templates/`
+- **Custom Templates**: Modify plan and prompt templates in `repo_sapiens/templates/`
 - **Workflow Customization**: Adjust stages and workflow behavior in configuration
 - **Multiple Repositories**: Configure automation for multiple repos simultaneously
 - **Cost Optimization**: Fine-tune AI model selection for cost/quality tradeoff
@@ -972,8 +972,8 @@ See: [CI/CD Integration Guide](ci-cd-usage.md)
 
 Customize how plans and prompts are generated:
 
-- **Plan Templates**: Modify `automation/templates/plan.j2`
-- **Prompt Templates**: Modify `automation/templates/prompt.j2`
+- **Plan Templates**: Modify `repo_sapiens/templates/plan.j2`
+- **Prompt Templates**: Modify `repo_sapiens/templates/prompt.j2`
 - **Custom Stages**: Add custom workflow stages
 - **Custom Tags**: Define custom issue labels and their meaning
 

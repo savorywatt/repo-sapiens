@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from automation.credentials import EncryptedFileBackend, EncryptionError
+from repo_sapiens.credentials import EncryptedFileBackend, EncryptionError
 
 
 class TestCredentialSecurity:
@@ -129,7 +129,7 @@ class TestCredentialSecurity:
 
     def test_token_detection_heuristic(self):
         """Test direct token values are detected."""
-        from automation.credentials.resolver import CredentialResolver
+        from repo_sapiens.credentials.resolver import CredentialResolver
 
         resolver = CredentialResolver()
 
@@ -145,7 +145,7 @@ class TestCredentialSecurity:
 
     def test_no_credential_leakage_in_exceptions(self, tmp_path):
         """Test credential values don't leak in exception messages."""
-        from automation.credentials import CredentialResolver
+        from repo_sapiens.credentials import CredentialResolver
 
         os.environ["SECRET_TOKEN"] = "super-secret-value-12345"
 
@@ -164,7 +164,7 @@ class TestCredentialSecurity:
 
     def test_cache_clearing_removes_secrets(self):
         """Test cache clearing actually removes credential values."""
-        from automation.credentials import CredentialResolver
+        from repo_sapiens.credentials import CredentialResolver
 
         os.environ["TEST_SECRET"] = "secret-123"
 

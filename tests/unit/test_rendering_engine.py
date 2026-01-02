@@ -7,7 +7,7 @@ from jinja2 import StrictUndefined, TemplateNotFound
 from jinja2.exceptions import UndefinedError
 from jinja2.sandbox import SandboxedEnvironment
 
-from automation.rendering.engine import SecureTemplateEngine
+from repo_sapiens.rendering.engine import SecureTemplateEngine
 
 
 class TestSecureTemplateEngineInit:

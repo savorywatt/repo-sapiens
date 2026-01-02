@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from automation.credentials import (
+from repo_sapiens.credentials import (
     BackendNotAvailableError,
     CredentialNotFoundError,
     CredentialResolver,
@@ -74,7 +74,7 @@ class TestCredentialResolver:
 
     # Keyring resolution tests
 
-    @patch("automation.credentials.resolver.KeyringBackend")
+    @patch("repo_sapiens.credentials.resolver.KeyringBackend")
     def test_resolve_keyring_reference(self, mock_backend_class, resolver):
         """Test resolving keyring reference."""
         mock_backend = Mock()
@@ -87,7 +87,7 @@ class TestCredentialResolver:
         assert result == "keyring-token"
         mock_backend.get.assert_called_once_with("gitea", "api_token")
 
-    @patch("automation.credentials.resolver.KeyringBackend")
+    @patch("repo_sapiens.credentials.resolver.KeyringBackend")
     def test_resolve_keyring_not_found(self, mock_backend_class, resolver):
         """Test keyring credential not found raises error."""
         mock_backend = Mock()
@@ -101,7 +101,7 @@ class TestCredentialResolver:
         assert "gitea/api_token" in str(exc_info.value)
         assert exc_info.value.suggestion is not None
 
-    @patch("automation.credentials.resolver.KeyringBackend")
+    @patch("repo_sapiens.credentials.resolver.KeyringBackend")
     def test_resolve_keyring_unavailable(self, mock_backend_class, resolver):
         """Test keyring backend unavailable raises error."""
         mock_backend = Mock()
@@ -118,7 +118,7 @@ class TestCredentialResolver:
 
     def test_resolve_encrypted_reference(self, resolver, tmp_path):
         """Test resolving encrypted file reference."""
-        from automation.credentials import EncryptedFileBackend
+        from repo_sapiens.credentials import EncryptedFileBackend
 
         file_path = tmp_path / "credentials.enc"
         backend = EncryptedFileBackend(file_path, "password")
@@ -132,7 +132,7 @@ class TestCredentialResolver:
 
     def test_resolve_encrypted_not_found(self, resolver, tmp_path):
         """Test encrypted credential not found raises error."""
-        from automation.credentials import EncryptedFileBackend
+        from repo_sapiens.credentials import EncryptedFileBackend
 
         file_path = tmp_path / "credentials.enc"
         backend = EncryptedFileBackend(file_path, "password")
@@ -171,7 +171,7 @@ class TestCredentialResolver:
         assert not resolver._looks_like_token("@keyring:service/key")
         assert not resolver._looks_like_token("@encrypted:service/key")
 
-    @patch("automation.credentials.resolver.logger")
+    @patch("repo_sapiens.credentials.resolver.logger")
     def test_direct_token_logs_warning(self, mock_logger, resolver):
         """Test direct token values trigger warning."""
         resolver.resolve("ghp_1234567890abcdefghij")
@@ -239,7 +239,7 @@ class TestCredentialResolver:
 
     def test_multiple_backend_types(self, resolver, tmp_path):
         """Test resolving from different backends in same session."""
-        from automation.credentials import EncryptedFileBackend
+        from repo_sapiens.credentials import EncryptedFileBackend
 
         # Set up environment
         os.environ["TEST_ENV_TOKEN"] = "env-value"

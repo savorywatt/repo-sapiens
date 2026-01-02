@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from automation.utils.caching import AsyncCache, CacheKeyBuilder, cached
+from repo_sapiens.utils.caching import AsyncCache, CacheKeyBuilder, cached
 
 
 @pytest.mark.asyncio

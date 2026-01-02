@@ -1,6 +1,6 @@
 """Comprehensive unit tests for Git discovery module.
 
-This test module provides additional coverage for the automation.git.discovery
+This test module provides additional coverage for the repo_sapiens.git.discovery
 module, focusing on:
 - detect_provider_type() - GitHub vs Gitea detection
 - detect_git_config() - Full configuration detection with API URL mapping
@@ -17,20 +17,20 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from automation.git.discovery import GitDiscovery, detect_git_origin
-from automation.git.exceptions import (
+from repo_sapiens.git.discovery import GitDiscovery, detect_git_origin
+from repo_sapiens.git.exceptions import (
     InvalidGitUrlError,
     MultipleRemotesError,
     NoRemotesError,
     NotGitRepositoryError,
 )
-from automation.git.models import GitRemote
+from repo_sapiens.git.models import GitRemote
 
 
 class TestDetectProviderType:
     """Tests for detect_provider_type() method - GitHub vs Gitea detection."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_github_from_https_url(self, mock_repo_class: Mock) -> None:
         """Test detection of GitHub from github.com HTTPS URL."""
         mock_remote = Mock()
@@ -46,7 +46,7 @@ class TestDetectProviderType:
 
         assert provider == "github"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_github_from_ssh_url(self, mock_repo_class: Mock) -> None:
         """Test detection of GitHub from github.com SSH URL."""
         mock_remote = Mock()
@@ -62,7 +62,7 @@ class TestDetectProviderType:
 
         assert provider == "github"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_github_case_insensitive(self, mock_repo_class: Mock) -> None:
         """Test that GitHub detection is case-insensitive."""
         mock_remote = Mock()
@@ -78,7 +78,7 @@ class TestDetectProviderType:
 
         assert provider == "github"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_github_enterprise(self, mock_repo_class: Mock) -> None:
         """Test detection of GitHub Enterprise from URL patterns."""
         mock_remote = Mock()
@@ -94,7 +94,7 @@ class TestDetectProviderType:
 
         assert provider == "github"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_github_ghe_pattern(self, mock_repo_class: Mock) -> None:
         """Test detection of GitHub Enterprise from GHE URL pattern."""
         mock_remote = Mock()
@@ -113,7 +113,7 @@ class TestDetectProviderType:
         # So self-hosted GHE without "github" in URL will fall through to gitea
         assert provider == "gitea"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_self_hosted(self, mock_repo_class: Mock) -> None:
         """Test detection of Gitea from self-hosted URL."""
         mock_remote = Mock()
@@ -129,7 +129,7 @@ class TestDetectProviderType:
 
         assert provider == "gitea"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_from_gitea_com(self, mock_repo_class: Mock) -> None:
         """Test detection of Gitea from gitea.com URL."""
         mock_remote = Mock()
@@ -145,7 +145,7 @@ class TestDetectProviderType:
 
         assert provider == "gitea"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_from_codeberg(self, mock_repo_class: Mock) -> None:
         """Test that Codeberg (Gitea instance) is detected as Gitea."""
         mock_remote = Mock()
@@ -161,7 +161,7 @@ class TestDetectProviderType:
 
         assert provider == "gitea"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_from_local_instance(self, mock_repo_class: Mock) -> None:
         """Test detection of Gitea from local network URL."""
         mock_remote = Mock()
@@ -177,7 +177,7 @@ class TestDetectProviderType:
 
         assert provider == "gitea"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_provider_type_with_specific_remote(self, mock_repo_class: Mock) -> None:
         """Test detect_provider_type with specific remote name."""
         mock_github = Mock()
@@ -209,7 +209,7 @@ class TestDetectProviderType:
 class TestDetectGitConfig:
     """Tests for detect_git_config() method - full configuration detection."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_github_public(self, mock_repo_class: Mock) -> None:
         """Test full config detection for public GitHub repository.
 
@@ -236,7 +236,7 @@ class TestDetectGitConfig:
         assert config["owner"] == "myorg"
         assert config["repo"] == "myrepo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_github_ssh(self, mock_repo_class: Mock) -> None:
         """Test full config detection for GitHub SSH URL.
 
@@ -261,7 +261,7 @@ class TestDetectGitConfig:
         assert config["owner"] == "myorg"
         assert config["repo"] == "myrepo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_gitea(self, mock_repo_class: Mock) -> None:
         """Test full config detection for Gitea repository."""
         mock_remote = Mock()
@@ -281,7 +281,7 @@ class TestDetectGitConfig:
         assert config["owner"] == "myorg"
         assert config["repo"] == "myrepo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_github_enterprise(self, mock_repo_class: Mock) -> None:
         """Test full config detection for GitHub Enterprise."""
         mock_remote = Mock()
@@ -301,7 +301,7 @@ class TestDetectGitConfig:
         assert config["owner"] == "myorg"
         assert config["repo"] == "myrepo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_with_specific_remote(self, mock_repo_class: Mock) -> None:
         """Test full config detection with specific remote."""
         mock_origin = Mock()
@@ -323,7 +323,7 @@ class TestDetectGitConfig:
         assert config["owner"] == "owner2"
         assert config["repo"] == "repo2"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_raises_on_multiple_remotes(self, mock_repo_class: Mock) -> None:
         """Test that detect_git_config raises error for multiple non-preferred remotes."""
         mock_remote1 = Mock()
@@ -343,7 +343,7 @@ class TestDetectGitConfig:
         with pytest.raises(MultipleRemotesError):
             discovery.detect_git_config()
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_config_uses_preferred_remote(self, mock_repo_class: Mock) -> None:
         """Test that detect_git_config uses preferred remote (origin) when available."""
         mock_other = Mock()
@@ -369,7 +369,7 @@ class TestDetectGitConfig:
 class TestURLParsingEdgeCases:
     """Tests for URL parsing edge cases and various formats."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_without_git_suffix(self, mock_repo_class: Mock) -> None:
         """Test parsing repository URL without .git suffix."""
         mock_remote = Mock()
@@ -386,7 +386,7 @@ class TestURLParsingEdgeCases:
         assert info.owner == "owner"
         assert info.repo == "repo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_with_trailing_slash(self, mock_repo_class: Mock) -> None:
         """Test parsing repository URL with trailing slash (edge case)."""
         mock_remote = Mock()
@@ -404,7 +404,7 @@ class TestURLParsingEdgeCases:
         assert info.owner == "owner"
         assert info.repo == "repo"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_nested_groups(self, mock_repo_class: Mock) -> None:
         """Test parsing repository URL with nested groups (GitLab-style)."""
         mock_remote = Mock()
@@ -422,7 +422,7 @@ class TestURLParsingEdgeCases:
         assert info.owner == "group"
         assert info.repo == "subgroup"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_with_dashes_and_underscores(self, mock_repo_class: Mock) -> None:
         """Test parsing repository URL with special characters in names."""
         mock_remote = Mock()
@@ -439,7 +439,7 @@ class TestURLParsingEdgeCases:
         assert info.owner == "my-org_name"
         assert info.repo == "my-repo_name"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_ssh_with_different_user(self, mock_repo_class: Mock) -> None:
         """Test parsing SSH URL with different user (not git@)."""
         mock_remote = Mock()
@@ -457,7 +457,7 @@ class TestURLParsingEdgeCases:
         assert info.repo == "repo"
         assert info.ssh_url == "git@example.com:owner/repo.git"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_parse_repository_http_insecure(self, mock_repo_class: Mock) -> None:
         """Test parsing insecure HTTP URL."""
         mock_remote = Mock()
@@ -480,7 +480,7 @@ class TestURLParsingEdgeCases:
 class TestErrorHandling:
     """Tests for error handling in various scenarios."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_not_git_repository_error_with_path(self, mock_repo_class: Mock) -> None:
         """Test NotGitRepositoryError includes path information."""
         from git.exc import InvalidGitRepositoryError as GitInvalidRepoError
@@ -496,7 +496,7 @@ class TestErrorHandling:
         assert exc_info.value.path == "/some/nonexistent/path"
         assert "git init" in exc_info.value.hint
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_no_remotes_error_has_helpful_hint(self, mock_repo_class: Mock) -> None:
         """Test NoRemotesError includes helpful hint."""
         mock_repo = Mock()
@@ -510,7 +510,7 @@ class TestErrorHandling:
 
         assert "git remote add" in str(exc_info.value)
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_multiple_remotes_error_lists_remotes(self, mock_repo_class: Mock) -> None:
         """Test MultipleRemotesError lists available remotes."""
         mock_remote1 = Mock()
@@ -553,7 +553,7 @@ class TestErrorHandling:
 class TestDetectGitOriginHelper:
     """Additional tests for detect_git_origin helper function."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_origin_with_multiple_remotes(self, mock_repo_class: Mock) -> None:
         """Test that detect_git_origin works with multiple remotes."""
         mock_origin = Mock()
@@ -573,7 +573,7 @@ class TestDetectGitOriginHelper:
         # Should succeed because allow_multiple=True in detect_git_origin
         assert base_url == "https://github.com/"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_origin_returns_none_on_no_remotes(self, mock_repo_class: Mock) -> None:
         """Test that detect_git_origin returns None when no remotes exist."""
         mock_repo = Mock()
@@ -584,7 +584,7 @@ class TestDetectGitOriginHelper:
 
         assert base_url is None
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_git_origin_returns_none_on_parse_error(self, mock_repo_class: Mock) -> None:
         """Test that detect_git_origin returns None on URL parse error."""
         mock_remote = Mock()
@@ -607,7 +607,7 @@ class TestPreferredRemotes:
         """Test that PREFERRED_REMOTES is defined correctly."""
         assert GitDiscovery.PREFERRED_REMOTES == ["origin", "upstream"]
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_origin_preferred_over_upstream(self, mock_repo_class: Mock) -> None:
         """Test that origin is selected over upstream."""
         mock_upstream = Mock()
@@ -628,7 +628,7 @@ class TestPreferredRemotes:
 
         assert remote.name == "origin"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_upstream_preferred_when_no_origin(self, mock_repo_class: Mock) -> None:
         """Test that upstream is selected when origin doesn't exist."""
         mock_other = Mock()
@@ -672,7 +672,7 @@ class TestGitRemoteModel:
 class TestLazyLoadingBehavior:
     """Tests for lazy loading of Git repository."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repo_not_loaded_on_init(self, mock_repo_class: Mock) -> None:
         """Test that repository is not loaded during initialization."""
         discovery = GitDiscovery()
@@ -681,7 +681,7 @@ class TestLazyLoadingBehavior:
         assert discovery._repo is None
         mock_repo_class.assert_not_called()
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repo_loaded_on_first_access(self, mock_repo_class: Mock) -> None:
         """Test that repository is loaded on first method call."""
         mock_repo = Mock()
@@ -694,7 +694,7 @@ class TestLazyLoadingBehavior:
         assert discovery._repo is not None
         mock_repo_class.assert_called_once()
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_repo_cached_across_calls(self, mock_repo_class: Mock) -> None:
         """Test that repository instance is cached across multiple calls."""
         mock_remote = Mock()
@@ -720,7 +720,7 @@ class TestLazyLoadingBehavior:
 class TestURLTypeDetection:
     """Tests for URL type detection in list_remotes()."""
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_ssh_url_detection(self, mock_repo_class: Mock) -> None:
         """Test that SSH URLs are correctly identified."""
         mock_remote = Mock()
@@ -736,7 +736,7 @@ class TestURLTypeDetection:
 
         assert remotes[0].url_type == "ssh"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_https_url_detection(self, mock_repo_class: Mock) -> None:
         """Test that HTTPS URLs are correctly identified."""
         mock_remote = Mock()
@@ -752,7 +752,7 @@ class TestURLTypeDetection:
 
         assert remotes[0].url_type == "https"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_http_url_detection(self, mock_repo_class: Mock) -> None:
         """Test that HTTP URLs are correctly identified as https type."""
         mock_remote = Mock()
@@ -768,7 +768,7 @@ class TestURLTypeDetection:
 
         assert remotes[0].url_type == "https"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_file_url_detection(self, mock_repo_class: Mock) -> None:
         """Test that file:// URLs are identified as unknown type."""
         mock_remote = Mock()
@@ -784,7 +784,7 @@ class TestURLTypeDetection:
 
         assert remotes[0].url_type == "unknown"
 
-    @patch("automation.git.discovery.git.Repo")
+    @patch("repo_sapiens.git.discovery.git.Repo")
     def test_unknown_url_detection(self, mock_repo_class: Mock) -> None:
         """Test that unknown URL formats are identified correctly."""
         mock_remote = Mock()

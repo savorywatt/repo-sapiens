@@ -12,7 +12,7 @@ The system supports three storage backends:
 ## Module Structure
 
 ```
-automation/credentials/
+repo_sapiens/credentials/
 ├── __init__.py          # Public API exports
 ├── backend.py           # Abstract base class
 ├── resolver.py          # Main credential resolver
@@ -107,7 +107,7 @@ Use this when credentials may have been updated and you want to force re-resolut
 Stores credentials in the operating system's secure credential storage.
 
 ```python
-from automation.credentials import KeyringBackend
+from repo_sapiens.credentials import KeyringBackend
 
 backend = KeyringBackend()
 
@@ -140,7 +140,7 @@ if backend.available:
 Retrieves credentials from environment variables.
 
 ```python
-from automation.credentials import EnvironmentBackend
+from repo_sapiens.credentials import EnvironmentBackend
 import os
 
 backend = EnvironmentBackend()
@@ -168,7 +168,7 @@ backend.delete("API_TOKEN")
 Stores credentials in an AES-256 encrypted JSON file.
 
 ```python
-from automation.credentials import EncryptedFileBackend
+from repo_sapiens.credentials import EncryptedFileBackend
 from pathlib import Path
 
 backend = EncryptedFileBackend(
@@ -314,7 +314,7 @@ Format: `@encrypted:service/key`
 Credentials can be referenced in YAML configuration files:
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 git_provider:
   provider_type: gitea
   base_url: https://gitea.example.com
@@ -331,9 +331,9 @@ repository:
 When the configuration is loaded, all credential references are automatically resolved:
 
 ```python
-from automation.config.settings import AutomationSettings
+from repo_sapiens.config.settings import AutomationSettings
 
-settings = AutomationSettings.from_yaml("automation/config/automation_config.yaml")
+settings = AutomationSettings.from_yaml("repo_sapiens/config/automation_config.yaml")
 
 # api_token is automatically resolved from keyring
 print(settings.git_provider.api_token)  # "actual-token-value"
@@ -417,7 +417,7 @@ value = resolver.resolve("@keyring:service/key")  # Gets new value
 ### 4. Handle Missing Credentials Gracefully
 
 ```python
-from automation.credentials.exceptions import CredentialNotFoundError
+from repo_sapiens.credentials.exceptions import CredentialNotFoundError
 
 try:
     token = resolver.resolve("@keyring:optional/token")
@@ -455,7 +455,7 @@ backend = EncryptedFileBackend(
 ### Example 1: Multi-Backend Resolution
 
 ```python
-from automation.credentials import CredentialResolver
+from repo_sapiens.credentials import CredentialResolver
 
 resolver = CredentialResolver()
 
@@ -470,7 +470,7 @@ config = {
 ### Example 2: Custom Backend Fallback
 
 ```python
-from automation.credentials.exceptions import BackendNotAvailableError
+from repo_sapiens.credentials.exceptions import BackendNotAvailableError
 
 resolver = CredentialResolver()
 
@@ -484,7 +484,7 @@ except BackendNotAvailableError:
 ### Example 3: Rotating Credentials
 
 ```python
-from automation.credentials import KeyringBackend
+from repo_sapiens.credentials import KeyringBackend
 
 backend = KeyringBackend()
 

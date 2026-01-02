@@ -204,7 +204,7 @@ class MyClass:
 Format code automatically using Black:
 
 ```bash
-black automation/ tests/
+black repo_sapiens/ tests/
 ```
 
 The project is configured with:
@@ -216,8 +216,8 @@ The project is configured with:
 Check code quality with Ruff:
 
 ```bash
-ruff check automation/ tests/
-ruff check --fix automation/ tests/  # Auto-fix fixable issues
+ruff check repo_sapiens/ tests/
+ruff check --fix repo_sapiens/ tests/  # Auto-fix fixable issues
 ```
 
 The project is configured to check:
@@ -291,16 +291,16 @@ If you prefer to run tools manually instead of using pre-commit:
 
 ```bash
 # Format code
-black automation/ tests/
+black repo_sapiens/ tests/
 
 # Fix linting issues
-ruff check --fix automation/ tests/
+ruff check --fix repo_sapiens/ tests/
 
 # Type checking
-mypy automation/
+mypy repo_sapiens/
 
 # Security scanning
-bandit -c pyproject.toml -r automation/
+bandit -c pyproject.toml -r repo_sapiens/
 
 # Run tests
 pytest tests/ -v
@@ -327,8 +327,8 @@ All new features must include tests. Test files should be placed in `tests/` wit
 Example test structure:
 
 ```
-automation/credentials/resolver.py  →  tests/test_credentials/test_resolver.py
-automation/git/discovery.py         →  tests/git/test_discovery.py
+repo_sapiens/credentials/resolver.py  →  tests/test_credentials/test_resolver.py
+repo_sapiens/git/discovery.py         →  tests/git/test_discovery.py
 ```
 
 Write tests using pytest:
@@ -336,7 +336,7 @@ Write tests using pytest:
 ```python
 # tests/test_credentials/test_resolver.py
 import pytest
-from automation.credentials.resolver import CredentialResolver
+from repo_sapiens.credentials.resolver import CredentialResolver
 
 
 @pytest.fixture
@@ -387,11 +387,11 @@ pytest tests/ -v
 pytest tests/ --cov=automation --cov-report=term-missing
 
 # Type checking
-mypy automation/
+mypy repo_sapiens/
 
 # Formatting and linting
-black --check automation/ tests/
-ruff check automation/ tests/
+black --check repo_sapiens/ tests/
+ruff check repo_sapiens/ tests/
 ```
 
 ## Pull Request Process
@@ -603,7 +603,7 @@ Format: `MAJOR.MINOR.PATCH` (optionally with pre-release: `1.0.0-rc.1`)
 
 When releasing a new version:
 
-1. Update version in `automation/__version__.py`:
+1. Update version in `repo_sapiens/__version__.py`:
    ```python
    __version__ = "1.1.0"
    ```
@@ -657,12 +657,12 @@ git push upstream --tags
 
 - [ ] All pre-commit hooks pass: `pre-commit run --all-files`
 - [ ] All tests pass: `pytest tests/ -v`
-- [ ] Coverage is acceptable: `pytest --cov=automation`
-- [ ] Code is formatted: `black automation/ tests/`
-- [ ] Linting passes: `ruff check automation/`
-- [ ] Type checking passes: `mypy automation/`
-- [ ] Security scan passes: `bandit -c pyproject.toml -r automation/`
-- [ ] Version updated in `automation/__version__.py`
+- [ ] Coverage is acceptable: `pytest --cov=repo_sapiens`
+- [ ] Code is formatted: `black repo_sapiens/ tests/`
+- [ ] Linting passes: `ruff check repo_sapiens/`
+- [ ] Type checking passes: `mypy repo_sapiens/`
+- [ ] Security scan passes: `bandit -c pyproject.toml -r repo_sapiens/`
+- [ ] Version updated in `repo_sapiens/__version__.py`
 - [ ] `CHANGELOG.md` is updated
 - [ ] Git tag is created and pushed
 - [ ] Release notes are published

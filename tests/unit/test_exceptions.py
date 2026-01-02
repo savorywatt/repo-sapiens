@@ -1,8 +1,8 @@
-"""Tests for automation.exceptions module."""
+"""Tests for repo_sapiens.exceptions module."""
 
 import pytest
 
-from automation.exceptions import (
+from repo_sapiens.exceptions import (
     ConfigurationError,
     CredentialError,
     ExternalServiceError,

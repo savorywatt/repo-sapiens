@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from automation.utils.helpers import parse_issue_reference, slugify, truncate_text
-from automation.utils.retry import async_retry
-from automation.utils.status_reporter import StatusReporter
+from repo_sapiens.utils.helpers import parse_issue_reference, slugify, truncate_text
+from repo_sapiens.utils.retry import async_retry
+from repo_sapiens.utils.status_reporter import StatusReporter
 
 
 # =============================================================================
-# Tests for automation.utils.helpers
+# Tests for repo_sapiens.utils.helpers
 # =============================================================================
 
 
@@ -209,7 +209,7 @@ class TestTruncateText:
 
 
 # =============================================================================
-# Tests for automation.utils.retry
+# Tests for repo_sapiens.utils.retry
 # =============================================================================
 
 
@@ -411,7 +411,7 @@ class TestAsyncRetry:
             raise ValueError("Temporary")
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            with patch("automation.utils.retry.log") as mock_log:
+            with patch("repo_sapiens.utils.retry.log") as mock_log:
                 with pytest.raises(ValueError):
                     await fails_once()
 
@@ -428,7 +428,7 @@ class TestAsyncRetry:
             raise ValueError("Persistent")
 
         with patch("asyncio.sleep", new_callable=AsyncMock):
-            with patch("automation.utils.retry.log") as mock_log:
+            with patch("repo_sapiens.utils.retry.log") as mock_log:
                 with pytest.raises(ValueError):
                     await always_fails()
 
@@ -466,7 +466,7 @@ class TestAsyncRetry:
 
 
 # =============================================================================
-# Tests for automation.utils.status_reporter
+# Tests for repo_sapiens.utils.status_reporter
 # =============================================================================
 
 
@@ -489,7 +489,7 @@ class TestStatusReporter:
 
         reporter = StatusReporter(mock_git)
 
-        with patch("automation.utils.status_reporter.datetime") as mock_datetime:
+        with patch("repo_sapiens.utils.status_reporter.datetime") as mock_datetime:
             mock_now = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
@@ -515,7 +515,7 @@ class TestStatusReporter:
 
         reporter = StatusReporter(mock_git)
 
-        with patch("automation.utils.status_reporter.datetime") as mock_datetime:
+        with patch("repo_sapiens.utils.status_reporter.datetime") as mock_datetime:
             mock_now = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
@@ -540,7 +540,7 @@ class TestStatusReporter:
         reporter = StatusReporter(mock_git)
         details = "Created 5 files, updated 3 tests"
 
-        with patch("automation.utils.status_reporter.datetime") as mock_datetime:
+        with patch("repo_sapiens.utils.status_reporter.datetime") as mock_datetime:
             mock_now = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
@@ -566,7 +566,7 @@ class TestStatusReporter:
         reporter = StatusReporter(mock_git)
         error_message = "Connection timeout"
 
-        with patch("automation.utils.status_reporter.datetime") as mock_datetime:
+        with patch("repo_sapiens.utils.status_reporter.datetime") as mock_datetime:
             mock_now = datetime(2024, 1, 15, 12, 0, 0, tzinfo=UTC)
             mock_datetime.now.return_value = mock_now
             mock_datetime.UTC = UTC
@@ -593,7 +593,7 @@ class TestStatusReporter:
 
         reporter = StatusReporter(mock_git)
 
-        with patch("automation.utils.status_reporter.log") as mock_log:
+        with patch("repo_sapiens.utils.status_reporter.log") as mock_log:
             await reporter.report_stage_start(mock_issue, "Planning")
 
             mock_log.info.assert_called_once()
@@ -610,7 +610,7 @@ class TestStatusReporter:
 
         reporter = StatusReporter(mock_git)
 
-        with patch("automation.utils.status_reporter.log") as mock_log:
+        with patch("repo_sapiens.utils.status_reporter.log") as mock_log:
             await reporter.report_stage_complete(mock_issue, "Implementation")
 
             mock_log.info.assert_called_once()
@@ -625,7 +625,7 @@ class TestStatusReporter:
 
         reporter = StatusReporter(mock_git)
 
-        with patch("automation.utils.status_reporter.log") as mock_log:
+        with patch("repo_sapiens.utils.status_reporter.log") as mock_log:
             await reporter.report_stage_failed(mock_issue, "Review", "Error occurred")
 
             mock_log.error.assert_called_once()

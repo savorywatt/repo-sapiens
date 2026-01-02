@@ -20,8 +20,8 @@ import pytest
 import yaml
 from pydantic import SecretStr, ValidationError
 
-from automation.config.credential_fields import set_resolver
-from automation.config.settings import (
+from repo_sapiens.config.credential_fields import set_resolver
+from repo_sapiens.config.settings import (
     AgentProviderConfig,
     AutomationSettings,
     GitProviderConfig,
@@ -29,7 +29,7 @@ from automation.config.settings import (
     TagsConfig,
     WorkflowConfig,
 )
-from automation.credentials import CredentialResolver
+from repo_sapiens.credentials import CredentialResolver
 
 
 class TestGitProviderConfig:
@@ -644,7 +644,7 @@ class TestAutomationSettingsFromYAML:
 
     def test_load_from_nonexistent_file_raises_error(self):
         """Test loading from nonexistent file raises ConfigurationError."""
-        from automation.exceptions import ConfigurationError
+        from repo_sapiens.exceptions import ConfigurationError
 
         # from_yaml wraps FileNotFoundError in ConfigurationError
         with pytest.raises(ConfigurationError):
@@ -652,7 +652,7 @@ class TestAutomationSettingsFromYAML:
 
     def test_yaml_with_missing_required_fields(self, temp_yaml_file: Path):
         """Test YAML with missing required fields raises error."""
-        from automation.exceptions import ConfigurationError
+        from repo_sapiens.exceptions import ConfigurationError
 
         config_content = {
             "repository": {
@@ -671,7 +671,7 @@ class TestAutomationSettingsFromYAML:
 
     def test_yaml_with_invalid_values_raises_error(self, temp_yaml_file: Path):
         """Test YAML with invalid values raises validation error."""
-        from automation.exceptions import ConfigurationError
+        from repo_sapiens.exceptions import ConfigurationError
 
         config_content = {
             "git_provider": {
@@ -728,7 +728,7 @@ agent_provider:
 
     def test_missing_env_var_raises_error(self, temp_yaml_file: Path):
         """Test missing environment variable raises ValueError."""
-        from automation.exceptions import ConfigurationError
+        from repo_sapiens.exceptions import ConfigurationError
 
         config_content = """
 git_provider:
@@ -776,7 +776,7 @@ agent_provider:
 
     def test_env_var_pattern_case_sensitivity(self, temp_yaml_file: Path, monkeypatch):
         """Test environment variable pattern is case-sensitive (uppercase only)."""
-        from automation.exceptions import ConfigurationError
+        from repo_sapiens.exceptions import ConfigurationError
 
         monkeypatch.setenv("UPPERCASE_VAR", "value")
 

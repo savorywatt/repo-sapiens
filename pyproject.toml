@@ -57,9 +57,9 @@ dev = [
 all = ["repo-sapiens[monitoring,analytics]"]
 
 [project.scripts]
-automation = "automation.main:cli"
-builder = "automation.main:cli"
-repo-agent = "automation.main:cli"
+automation = "repo_sapiens.main:cli"
+builder = "repo_sapiens.main:cli"
+repo-agent = "repo_sapiens.main:cli"
 
 [project.urls]
 Homepage = "https://github.com/savorywatt/repo-sapiens"
@@ -73,10 +73,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["automation*"]
+include = ["repo_sapiens*"]
 
 [tool.setuptools.package-data]
-automation = [
+repo_sapiens = [
     "config/*.yaml",
     "py.typed",
     "templates/**/*.j2",
@@ -110,38 +110,38 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = "automation.templates.examples.*"
+module = "repo_sapiens.templates.examples.*"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
-    "automation.providers.gitea_rest",
-    "automation.providers.github_rest",
-    "automation.providers.ollama",
-    "automation.providers.external_agent",
-    "automation.providers.agent_provider",
-    "automation.providers.git_provider",
-    "automation.webhook_server",
-    "automation.monitoring.dashboard",
-    "automation.monitoring.metrics",
-    "automation.cli.init",
-    "automation.cli.credentials",
-    "automation.engine.stages.qa",
-    "automation.engine.stages.approval",
-    "automation.engine.stages.pr_review",
-    "automation.engine.stages.implementation",
-    "automation.engine.stages.execution",
-    "automation.engine.stages.fix_execution",
-    "automation.engine.stages.plan_review",
-    "automation.engine.stages.merge",
-    "automation.engine.stages.proposal",
-    "automation.engine.stages.code_review",
-    "automation.engine.multi_repo",
-    "automation.engine.recovery",
-    "automation.engine.parallel_executor",
-    "automation.engine.checkpointing",
-    "automation.engine.orchestrator",
-    "automation.config.credential_fields",
+    "repo_sapiens.providers.gitea_rest",
+    "repo_sapiens.providers.github_rest",
+    "repo_sapiens.providers.ollama",
+    "repo_sapiens.providers.external_agent",
+    "repo_sapiens.providers.agent_provider",
+    "repo_sapiens.providers.git_provider",
+    "repo_sapiens.webhook_server",
+    "repo_sapiens.monitoring.dashboard",
+    "repo_sapiens.monitoring.metrics",
+    "repo_sapiens.cli.init",
+    "repo_sapiens.cli.credentials",
+    "repo_sapiens.engine.stages.qa",
+    "repo_sapiens.engine.stages.approval",
+    "repo_sapiens.engine.stages.pr_review",
+    "repo_sapiens.engine.stages.implementation",
+    "repo_sapiens.engine.stages.execution",
+    "repo_sapiens.engine.stages.fix_execution",
+    "repo_sapiens.engine.stages.plan_review",
+    "repo_sapiens.engine.stages.merge",
+    "repo_sapiens.engine.stages.proposal",
+    "repo_sapiens.engine.stages.code_review",
+    "repo_sapiens.engine.multi_repo",
+    "repo_sapiens.engine.recovery",
+    "repo_sapiens.engine.parallel_executor",
+    "repo_sapiens.engine.checkpointing",
+    "repo_sapiens.engine.orchestrator",
+    "repo_sapiens.config.credential_fields",
 ]
 # Complex provider/stage implementations - will be refactored for strict typing later
 ignore_errors = true
@@ -152,7 +152,7 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "--cov=automation --cov-report=html --cov-report=term-missing --cov-fail-under=10"
+addopts = "--cov=repo_sapiens --cov-report=html --cov-report=term-missing --cov-fail-under=10"
 
 [tool.bandit]
 # Bandit security linter configuration

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from automation.models.domain import (
+from repo_sapiens.models.domain import (
     Issue,
     IssueState,
     Plan,

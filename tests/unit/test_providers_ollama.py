@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from automation.models.domain import Issue, IssueState, Plan, Task, TaskResult
-from automation.providers.ollama import OllamaProvider
+from repo_sapiens.models.domain import Issue, IssueState, Plan, Task, TaskResult
+from repo_sapiens.providers.ollama import OllamaProvider
 
 
 @pytest.fixture
@@ -640,7 +640,7 @@ Good implementation. Code follows best practices."""
         Review instantiation.
         """
         # Patch Review to avoid the instantiation error and capture args
-        from automation.providers import ollama as ollama_module
+        from repo_sapiens.providers import ollama as ollama_module
 
         original_review = ollama_module.Review
         captured_kwargs = {}
@@ -669,7 +669,7 @@ Good implementation. Code follows best practices."""
     @pytest.mark.asyncio
     async def test_review_code_detects_request_changes(self, provider):
         """Should correctly parse REQUEST_CHANGES from output."""
-        from automation.providers import ollama as ollama_module
+        from repo_sapiens.providers import ollama as ollama_module
 
         captured_kwargs = {}
 

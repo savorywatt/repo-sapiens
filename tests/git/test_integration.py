@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from automation.git.discovery import GitDiscovery, detect_git_origin
-from automation.git.exceptions import (
+from repo_sapiens.git.discovery import GitDiscovery, detect_git_origin
+from repo_sapiens.git.exceptions import (
     MultipleRemotesError,
     NoRemotesError,
     NotGitRepositoryError,

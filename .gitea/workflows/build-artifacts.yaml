@@ -164,9 +164,9 @@ jobs:
       - name: Test package import
         run: |
           python -c "
-          from automation.config.settings import AutomationSettings
-          from automation.engine.orchestrator import WorkflowOrchestrator
-          from automation.providers.gitea_rest import GiteaRestProvider
+          from repo_sapiens.config.settings import AutomationSettings
+          from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
+          from repo_sapiens.providers.gitea_rest import GiteaRestProvider
           print('✅ Package imports work correctly')
           "
 

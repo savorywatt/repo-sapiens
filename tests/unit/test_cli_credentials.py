@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from click.testing import CliRunner
 
-from automation.cli.credentials import (
+from repo_sapiens.cli.credentials import (
     _delete_encrypted,
     _delete_environment,
     _delete_keyring,
@@ -21,7 +21,7 @@ from automation.cli.credentials import (
     set_credential,
     test_credentials,
 )
-from automation.credentials import (
+from repo_sapiens.credentials import (
     CredentialError,
     CredentialNotFoundError,
 )
@@ -36,7 +36,7 @@ def cli_runner():
 @pytest.fixture
 def mock_keyring_backend():
     """Create a mock KeyringBackend."""
-    with patch("automation.cli.credentials.KeyringBackend") as mock_class:
+    with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_class:
         mock_backend = Mock()
         mock_backend.available = True
         mock_class.return_value = mock_backend
@@ -46,7 +46,7 @@ def mock_keyring_backend():
 @pytest.fixture
 def mock_environment_backend():
     """Create a mock EnvironmentBackend."""
-    with patch("automation.cli.credentials.EnvironmentBackend") as mock_class:
+    with patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_class:
         mock_backend = Mock()
         mock_backend.available = True
         mock_class.return_value = mock_backend
@@ -56,7 +56,7 @@ def mock_environment_backend():
 @pytest.fixture
 def mock_encrypted_backend():
     """Create a mock EncryptedFileBackend."""
-    with patch("automation.cli.credentials.EncryptedFileBackend") as mock_class:
+    with patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_class:
         mock_backend = Mock()
         mock_backend.available = True
         mock_class.return_value = mock_backend
@@ -66,7 +66,7 @@ def mock_encrypted_backend():
 @pytest.fixture
 def mock_credential_resolver():
     """Create a mock CredentialResolver."""
-    with patch("automation.cli.credentials.CredentialResolver") as mock_class:
+    with patch("repo_sapiens.cli.credentials.CredentialResolver") as mock_class:
         mock_resolver = Mock()
         mock_class.return_value = mock_resolver
         yield mock_resolver
@@ -211,7 +211,7 @@ class TestSetCredentialCommand:
 
     def test_set_credential_handles_credential_error(self, cli_runner):
         """Should handle CredentialError gracefully."""
-        with patch("automation.cli.credentials._set_keyring") as mock_set:
+        with patch("repo_sapiens.cli.credentials._set_keyring") as mock_set:
             mock_set.side_effect = CredentialError("Backend unavailable", suggestion="Install keyring")
 
             result = cli_runner.invoke(
@@ -227,7 +227,7 @@ class TestSetCredentialCommand:
 
     def test_set_credential_handles_value_error(self, cli_runner):
         """Should handle ValueError gracefully."""
-        with patch("automation.cli.credentials._set_keyring") as mock_set:
+        with patch("repo_sapiens.cli.credentials._set_keyring") as mock_set:
             mock_set.side_effect = ValueError("Invalid format")
 
             result = cli_runner.invoke(
@@ -338,7 +338,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_keyring_success(self, cli_runner):
         """Should delete credential from keyring."""
-        with patch("automation.cli.credentials._delete_keyring") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_keyring") as mock_delete:
             mock_delete.return_value = True
 
             result = cli_runner.invoke(
@@ -351,7 +351,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_not_found(self, cli_runner):
         """Should handle credential not found scenario."""
-        with patch("automation.cli.credentials._delete_keyring") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_keyring") as mock_delete:
             mock_delete.return_value = False
 
             result = cli_runner.invoke(
@@ -364,7 +364,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_environment(self, cli_runner):
         """Should delete environment variable."""
-        with patch("automation.cli.credentials._delete_environment") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_environment") as mock_delete:
             mock_delete.return_value = True
 
             result = cli_runner.invoke(
@@ -377,7 +377,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_encrypted(self, cli_runner):
         """Should delete credential from encrypted store."""
-        with patch("automation.cli.credentials._delete_encrypted") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_encrypted") as mock_delete:
             mock_delete.return_value = True
 
             result = cli_runner.invoke(
@@ -398,7 +398,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_requires_confirmation(self, cli_runner):
         """Should require confirmation before deletion."""
-        with patch("automation.cli.credentials._delete_keyring") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_keyring") as mock_delete:
             mock_delete.return_value = True
 
             # Without -y, should prompt for confirmation
@@ -413,7 +413,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_confirm_yes(self, cli_runner):
         """Should proceed with deletion when confirmed."""
-        with patch("automation.cli.credentials._delete_keyring") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_keyring") as mock_delete:
             mock_delete.return_value = True
 
             result = cli_runner.invoke(
@@ -427,7 +427,7 @@ class TestDeleteCredentialCommand:
 
     def test_delete_credential_handles_credential_error(self, cli_runner):
         """Should handle CredentialError gracefully."""
-        with patch("automation.cli.credentials._delete_keyring") as mock_delete:
+        with patch("repo_sapiens.cli.credentials._delete_keyring") as mock_delete:
             mock_delete.side_effect = CredentialError(
                 "Operation failed", suggestion="Try again"
             )
@@ -447,9 +447,9 @@ class TestTestCredentialsCommand:
 
     def test_test_credentials_all_available(self, cli_runner):
         """Should report all backends as available."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_keyring, \
-             patch("automation.cli.credentials.EnvironmentBackend") as mock_env, \
-             patch("automation.cli.credentials.EncryptedFileBackend") as mock_encrypted:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_keyring, \
+             patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_env, \
+             patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_encrypted:
 
             mock_keyring.return_value.available = True
             mock_env.return_value.available = True
@@ -466,9 +466,9 @@ class TestTestCredentialsCommand:
 
     def test_test_credentials_keyring_unavailable(self, cli_runner):
         """Should report keyring backend as unavailable."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_keyring, \
-             patch("automation.cli.credentials.EnvironmentBackend") as mock_env, \
-             patch("automation.cli.credentials.EncryptedFileBackend") as mock_encrypted:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_keyring, \
+             patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_env, \
+             patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_encrypted:
 
             mock_keyring.return_value.available = False
             mock_env.return_value.available = True
@@ -485,9 +485,9 @@ class TestTestCredentialsCommand:
 
     def test_test_credentials_encrypted_unavailable(self, cli_runner):
         """Should report encrypted backend as unavailable."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_keyring, \
-             patch("automation.cli.credentials.EnvironmentBackend") as mock_env, \
-             patch("automation.cli.credentials.EncryptedFileBackend") as mock_encrypted:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_keyring, \
+             patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_env, \
+             patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_encrypted:
 
             mock_keyring.return_value.available = True
             mock_env.return_value.available = True
@@ -504,9 +504,9 @@ class TestTestCredentialsCommand:
 
     def test_test_credentials_with_master_password(self, cli_runner):
         """Should use provided master password for encrypted backend test."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_keyring, \
-             patch("automation.cli.credentials.EnvironmentBackend") as mock_env, \
-             patch("automation.cli.credentials.EncryptedFileBackend") as mock_encrypted:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_keyring, \
+             patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_env, \
+             patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_encrypted:
 
             mock_keyring.return_value.available = True
             mock_env.return_value.available = True
@@ -530,7 +530,7 @@ class TestSetKeyringHelper:
 
     def test_set_keyring_success(self):
         """Should store credential in keyring."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_class:
             mock_backend = Mock()
             mock_class.return_value = mock_backend
 
@@ -551,7 +551,7 @@ class TestSetEnvironmentHelper:
 
     def test_set_environment_success(self):
         """Should store credential in environment."""
-        with patch("automation.cli.credentials.EnvironmentBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_class:
             mock_backend = Mock()
             mock_class.return_value = mock_backend
 
@@ -565,7 +565,7 @@ class TestSetEncryptedHelper:
 
     def test_set_encrypted_with_password(self):
         """Should store credential in encrypted file."""
-        with patch("automation.cli.credentials.EncryptedFileBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_class:
             mock_backend = Mock()
             mock_class.return_value = mock_backend
 
@@ -575,8 +575,8 @@ class TestSetEncryptedHelper:
 
     def test_set_encrypted_prompts_for_password(self):
         """Should prompt for password when not provided."""
-        with patch("automation.cli.credentials.EncryptedFileBackend") as mock_class, \
-             patch("automation.cli.credentials.click.prompt") as mock_prompt:
+        with patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_class, \
+             patch("repo_sapiens.cli.credentials.click.prompt") as mock_prompt:
             mock_backend = Mock()
             mock_class.return_value = mock_backend
             mock_prompt.return_value = "prompted_password"
@@ -599,7 +599,7 @@ class TestDeleteKeyringHelper:
 
     def test_delete_keyring_success(self):
         """Should delete credential from keyring."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_class:
             mock_backend = Mock()
             mock_backend.delete.return_value = True
             mock_class.return_value = mock_backend
@@ -611,7 +611,7 @@ class TestDeleteKeyringHelper:
 
     def test_delete_keyring_not_found(self):
         """Should return False when credential not found."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_class:
             mock_backend = Mock()
             mock_backend.delete.return_value = False
             mock_class.return_value = mock_backend
@@ -626,7 +626,7 @@ class TestDeleteEnvironmentHelper:
 
     def test_delete_environment_success(self):
         """Should delete environment variable."""
-        with patch("automation.cli.credentials.EnvironmentBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.EnvironmentBackend") as mock_class:
             mock_backend = Mock()
             mock_backend.delete.return_value = True
             mock_class.return_value = mock_backend
@@ -642,7 +642,7 @@ class TestDeleteEncryptedHelper:
 
     def test_delete_encrypted_with_password(self):
         """Should delete credential from encrypted file."""
-        with patch("automation.cli.credentials.EncryptedFileBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_class:
             mock_backend = Mock()
             mock_backend.delete.return_value = True
             mock_class.return_value = mock_backend
@@ -654,8 +654,8 @@ class TestDeleteEncryptedHelper:
 
     def test_delete_encrypted_prompts_for_password(self):
         """Should prompt for password when not provided."""
-        with patch("automation.cli.credentials.EncryptedFileBackend") as mock_class, \
-             patch("automation.cli.credentials.click.prompt") as mock_prompt:
+        with patch("repo_sapiens.cli.credentials.EncryptedFileBackend") as mock_class, \
+             patch("repo_sapiens.cli.credentials.click.prompt") as mock_prompt:
             mock_backend = Mock()
             mock_backend.delete.return_value = True
             mock_class.return_value = mock_backend
@@ -685,7 +685,7 @@ class TestEnvironmentVariableHandling:
 
     def test_cli_option_overrides_envvar(self, cli_runner):
         """Should prefer CLI option over environment variable."""
-        with patch("automation.cli.credentials._delete_encrypted") as mock_delete, \
+        with patch("repo_sapiens.cli.credentials._delete_encrypted") as mock_delete, \
              patch.dict(os.environ, {"BUILDER_MASTER_PASSWORD": "env_password"}):
 
             mock_delete.return_value = True
@@ -734,7 +734,7 @@ class TestInputValidation:
 
     def test_unicode_in_reference(self, cli_runner):
         """Should handle unicode characters."""
-        with patch("automation.cli.credentials.KeyringBackend") as mock_class:
+        with patch("repo_sapiens.cli.credentials.KeyringBackend") as mock_class:
             mock_backend = Mock()
             mock_class.return_value = mock_backend
 
@@ -816,7 +816,7 @@ class TestErrorHandlingScenarios:
 
     def test_credential_error_without_suggestion(self, cli_runner):
         """Should handle CredentialError without suggestion."""
-        with patch("automation.cli.credentials._set_keyring") as mock_set:
+        with patch("repo_sapiens.cli.credentials._set_keyring") as mock_set:
             mock_set.side_effect = CredentialError("Generic error")
 
             result = cli_runner.invoke(
@@ -833,7 +833,7 @@ class TestErrorHandlingScenarios:
 
     def test_credential_error_with_suggestion(self, cli_runner):
         """Should display suggestion when present in CredentialError."""
-        with patch("automation.cli.credentials._set_keyring") as mock_set:
+        with patch("repo_sapiens.cli.credentials._set_keyring") as mock_set:
             mock_set.side_effect = CredentialError(
                 "Backend error",
                 suggestion="Try installing the package",

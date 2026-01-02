@@ -3,7 +3,7 @@
 import pytest
 from cryptography.fernet import Fernet
 
-from automation.credentials import EncryptedFileBackend, EncryptionError
+from repo_sapiens.credentials import EncryptedFileBackend, EncryptionError
 
 
 class TestEncryptedFileBackend:

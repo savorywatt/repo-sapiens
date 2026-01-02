@@ -50,7 +50,7 @@ repo-sapiens is an intelligent repository automation and management tool designe
 
 ## Core Components
 
-### 1. Configuration System (`automation/config/`)
+### 1. Configuration System (`repo_sapiens/config/`)
 
 **Purpose**: Type-safe, centralized configuration management using Pydantic.
 
@@ -69,14 +69,14 @@ repo-sapiens is an intelligent repository automation and management tool designe
 
 **Example**:
 ```python
-from automation.config.settings import AutomationSettings
+from repo_sapiens.config.settings import AutomationSettings
 
 settings = AutomationSettings.from_yaml("config.yaml")
 git_config = settings.git_provider
 api_token = git_config.api_token  # Automatically resolved from credentials
 ```
 
-### 2. Credential Management (`automation/credentials/`)
+### 2. Credential Management (`repo_sapiens/credentials/`)
 
 **Purpose**: Secure, flexible credential storage and retrieval with multiple backends.
 
@@ -109,7 +109,7 @@ api_token = git_config.api_token  # Automatically resolved from credentials
 
 **Usage**:
 ```python
-from automation.credentials.resolver import CredentialResolver
+from repo_sapiens.credentials.resolver import CredentialResolver
 
 resolver = CredentialResolver()
 
@@ -123,7 +123,7 @@ password = resolver.resolve("@keyring:github/password")
 secret = resolver.resolve("@encrypted:api/secret_key")
 ```
 
-### 3. Git Operations (`automation/git/`)
+### 3. Git Operations (`repo_sapiens/git/`)
 
 **Purpose**: Abstracted Git provider interface for multiple hosting platforms.
 
@@ -142,7 +142,7 @@ secret = resolver.resolve("@encrypted:api/secret_key")
 
 **Example**:
 ```python
-from automation.providers.gitea_rest import GiteaRestProvider
+from repo_sapiens.providers.gitea_rest import GiteaRestProvider
 
 provider = GiteaRestProvider(base_url="https://git.example.com", token="token")
 
@@ -163,7 +163,7 @@ pr = await provider.create_pull_request(
 )
 ```
 
-### 4. Agent Providers (`automation/providers/`)
+### 4. Agent Providers (`repo_sapiens/providers/`)
 
 **Purpose**: Interface with AI agents for intelligent automation decisions.
 
@@ -181,7 +181,7 @@ pr = await provider.create_pull_request(
 
 **Example**:
 ```python
-from automation.providers.external_agent import ExternalAgentProvider
+from repo_sapiens.providers.external_agent import ExternalAgentProvider
 
 agent = ExternalAgentProvider(api_key="key", model="claude-3-sonnet")
 
@@ -193,7 +193,7 @@ review = await agent.request(
 )
 ```
 
-### 5. Template Rendering (`automation/rendering/`)
+### 5. Template Rendering (`repo_sapiens/rendering/`)
 
 **Purpose**: Safe, secure Jinja2 template rendering for code generation and configuration.
 
@@ -211,7 +211,7 @@ review = await agent.request(
 
 **Example**:
 ```python
-from automation.rendering.engine import TemplateEngine
+from repo_sapiens.rendering.engine import TemplateEngine
 
 engine = TemplateEngine()
 
@@ -230,7 +230,7 @@ rendered = engine.render(template, context={
 })
 ```
 
-### 6. Workflow Engine (`automation/engine/`)
+### 6. Workflow Engine (`repo_sapiens/engine/`)
 
 **Purpose**: Orchestrates multi-stage automated workflows with state management.
 
@@ -265,8 +265,8 @@ WorkflowOrchestrator
 
 **Example**:
 ```python
-from automation.engine.orchestrator import WorkflowOrchestrator
-from automation.config.settings import AutomationSettings
+from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
+from repo_sapiens.config.settings import AutomationSettings
 
 settings = AutomationSettings.from_yaml("config.yaml")
 orchestrator = WorkflowOrchestrator(settings)
@@ -562,7 +562,7 @@ Create a custom credential backend:
 
 ```python
 # myapp/credentials/s3_backend.py
-from automation.credentials.backend import CredentialBackend
+from repo_sapiens.credentials.backend import CredentialBackend
 
 class S3CredentialBackend(CredentialBackend):
     """Resolve credentials stored in AWS S3."""
@@ -587,7 +587,7 @@ class S3CredentialBackend(CredentialBackend):
 Register in your application:
 
 ```python
-from automation.credentials.resolver import CredentialResolver
+from repo_sapiens.credentials.resolver import CredentialResolver
 from myapp.credentials.s3_backend import S3CredentialBackend
 
 resolver = CredentialResolver(backends=[
@@ -602,8 +602,8 @@ resolver = CredentialResolver(backends=[
 Create a provider for a new Git hosting service:
 
 ```python
-# automation/providers/gitlab_provider.py
-from automation.providers.base import GitProvider
+# repo_sapiens/providers/gitlab_provider.py
+from repo_sapiens.providers.base import GitProvider
 
 class GitLabProvider(GitProvider):
     """GitLab-specific Git operations."""
@@ -636,7 +636,7 @@ class GitLabProvider(GitProvider):
 Add custom Jinja2 filters:
 
 ```python
-# automation/rendering/custom_filters.py
+# repo_sapiens/rendering/custom_filters.py
 def markdown_to_html(value: str) -> str:
     """Convert Markdown to HTML."""
     import markdown
@@ -647,7 +647,7 @@ def count_occurrences(value: str, substring: str) -> int:
     return value.count(substring)
 
 # Register in engine
-from automation.rendering.engine import TemplateEngine
+from repo_sapiens.rendering.engine import TemplateEngine
 
 engine = TemplateEngine()
 engine.add_filter("markdown", markdown_to_html)
@@ -663,8 +663,8 @@ result = engine.render(template, context={"content": "# Hello"})
 Create specialized workflow stages:
 
 ```python
-# automation/engine/stages/custom_stage.py
-from automation.engine.stages.base import WorkflowStage
+# repo_sapiens/engine/stages/custom_stage.py
+from repo_sapiens.engine.stages.base import WorkflowStage
 
 class DatabaseMigrationStage(WorkflowStage):
     """Handle database migration checks before merge."""
@@ -689,7 +689,7 @@ class DatabaseMigrationStage(WorkflowStage):
 ### Configuration File Structure
 
 ```yaml
-# automation/config/automation_config.yaml
+# repo_sapiens/config/automation_config.yaml
 git_provider:
   provider_type: gitea
   base_url: https://git.example.com
@@ -729,7 +729,7 @@ repositories:
 ### Type-Safe Access
 
 ```python
-from automation.config.settings import AutomationSettings
+from repo_sapiens.config.settings import AutomationSettings
 
 settings = AutomationSettings.from_yaml("config.yaml")
 
