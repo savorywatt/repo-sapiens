@@ -7,8 +7,44 @@ This guide walks through deploying the automation system to a Gitea repository w
 - Gitea instance with Actions enabled (Gitea v1.19+)
 - Gitea runner configured and active
 - Repository with admin access
-- Anthropic Claude API key
 - Git installed locally
+- **AI Provider** (choose one):
+  - **Ollama** (recommended for testing/development) - Self-hosted, free
+  - **Claude API** (recommended for production) - Cloud-based, pay per use
+
+## AI Provider Setup
+
+### Option A: Ollama (Recommended for Testing)
+
+Ollama provides free, local AI inference - perfect for development and testing.
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Start Ollama server
+ollama serve
+
+# Pull recommended models (in another terminal)
+ollama pull codellama:13b      # Best for code tasks
+ollama pull llama3.1:8b        # Good general purpose
+
+# Verify installation
+curl http://localhost:11434/api/tags
+```
+
+**For CI/CD runners**, ensure Ollama is accessible:
+- Same machine: `http://localhost:11434`
+- Network server: `http://ollama-server:11434`
+
+### Option B: Claude API (Production)
+
+For production workloads requiring highest quality:
+
+1. Go to https://console.anthropic.com
+2. Create account or login
+3. Navigate to API Keys
+4. Create new key (starts with `sk-ant-`)
 
 ## Deployment Steps
 
@@ -38,10 +74,10 @@ git push -u origin main
 2. Go to **Settings** → **Secrets**
 3. Click **Add Secret**
 
-Add these secrets:
+#### Required Secrets (All Setups)
 
-**Secret 1: GITEA_TOKEN**
-- Name: `GITEA_TOKEN`
+**Secret: BUILDER_GITEA_TOKEN**
+- Name: `BUILDER_GITEA_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
   1. User Settings → Applications → Generate New Token
@@ -50,8 +86,24 @@ Add these secrets:
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret 2: CLAUDE_API_KEY**
-- Name: `CLAUDE_API_KEY`
+**Secret: BUILDER_GITEA_URL**
+- Name: `BUILDER_GITEA_URL`
+- Value: Your Gitea instance URL (e.g., `https://gitea.example.com`)
+
+#### For Ollama Setup (Recommended for Testing)
+
+**Secret: BUILDER_OLLAMA_BASE_URL**
+- Name: `BUILDER_OLLAMA_BASE_URL`
+- Value: `http://localhost:11434` (or your Ollama server URL)
+
+**Secret: BUILDER_OLLAMA_MODEL**
+- Name: `BUILDER_OLLAMA_MODEL`
+- Value: `codellama:13b` (or your preferred model)
+
+#### For Claude API Setup (Production)
+
+**Secret: BUILDER_CLAUDE_API_KEY**
+- Name: `BUILDER_CLAUDE_API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
   1. Go to https://console.anthropic.com
@@ -170,10 +222,14 @@ For real-time processing instead of cron-based:
 ## Verification Checklist
 
 - [ ] Code pushed to Gitea
-- [ ] Secrets configured (GITEA_TOKEN, CLAUDE_API_KEY)
+- [ ] Core secrets configured (BUILDER_GITEA_TOKEN, BUILDER_GITEA_URL)
+- [ ] AI provider secrets configured:
+  - [ ] **Ollama**: BUILDER_OLLAMA_BASE_URL, BUILDER_OLLAMA_MODEL
+  - [ ] **Claude**: BUILDER_CLAUDE_API_KEY
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
 - [ ] Workflow files present in `.gitea/workflows/`
+- [ ] (Ollama only) Ollama server running and model pulled
 - [ ] Test issue created with label
 - [ ] Workflow triggered successfully
 - [ ] Workflow logs show no errors
@@ -198,10 +254,47 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" in workflow logs
 
 **Solutions:**
-1. Verify GITEA_TOKEN secret is set
+1. Verify BUILDER_GITEA_TOKEN secret is set
 2. Check token has correct scopes
 3. Regenerate token if expired
 4. Ensure secret name matches exactly (case-sensitive)
+
+### Ollama Connection Issues
+
+**Problem:** "Ollama not running" or "Connection refused" errors
+
+**Solutions:**
+1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
+2. Check BUILDER_OLLAMA_BASE_URL is correct
+3. Ensure runner can reach Ollama server (network/firewall)
+4. Verify model is pulled: `ollama list`
+
+```bash
+# Debug Ollama connectivity from runner
+curl http://localhost:11434/api/tags
+
+# If using remote Ollama, test connectivity
+curl http://ollama-server:11434/api/tags
+```
+
+### Ollama Model Not Found
+
+**Problem:** "Model not found" errors
+
+**Solutions:**
+1. Pull the model: `ollama pull codellama:13b`
+2. Check model name matches BUILDER_OLLAMA_MODEL exactly
+3. List available models: `ollama list`
+
+### Ollama Out of Memory
+
+**Problem:** Model fails to load or runs very slowly
+
+**Solutions:**
+1. Use smaller model: `codellama:7b` instead of `codellama:34b`
+2. Ensure sufficient RAM (model size + 2GB overhead)
+3. Check GPU memory if using GPU acceleration
+4. Close other applications using GPU memory
 
 ### Permission Errors
 

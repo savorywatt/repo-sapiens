@@ -12,7 +12,10 @@ Before you begin, ensure you have:
 - [ ] A Gitea account with permission to create repositories
 - [ ] Python 3.11 or higher installed locally
 - [ ] Git installed and configured
-- [ ] An Anthropic Claude API key (get one at https://console.anthropic.com/)
+- [ ] **One of the following AI providers:**
+  - **Claude API** - Anthropic API key (https://console.anthropic.com/)
+  - **Claude Code** - Claude Code CLI installed locally
+  - **Ollama** - Ollama running locally or on a server (https://ollama.ai/)
 
 ---
 
@@ -54,9 +57,103 @@ cd my-project
 
 ---
 
-## Part 2: Install and Initialize repo-sapiens
+## Part 2: Choose Your AI Provider
 
-### Step 2.1: Install repo-sapiens
+repo-sapiens supports multiple AI providers. Choose the one that best fits your needs:
+
+```mermaid
+flowchart TD
+    A[Choose AI Provider] --> B{Need cloud API?}
+    B -->|Yes| C{Budget?}
+    B -->|No| D{Local resources?}
+    C -->|Higher| E[Claude API]
+    C -->|Lower| F[Ollama + cloud model]
+    D -->|Strong GPU| G[Ollama local]
+    D -->|Limited| H[Claude Code CLI]
+
+    E --> I[Best quality, pay per use]
+    F --> I
+    G --> J[Free, private, requires hardware]
+    H --> K[Uses your Claude subscription]
+
+    style E fill:#6B4C9A,color:#fff
+    style H fill:#6B4C9A,color:#fff
+    style G fill:#00A67E,color:#fff
+```
+
+### Option A: Claude API (Recommended for Production)
+
+**Best for:** Teams, CI/CD pipelines, production workloads
+
+**Pros:**
+- Highest quality results (Claude Opus 4.5, Sonnet 4.5)
+- No local resources required
+- Works in CI/CD environments
+- Consistent performance
+
+**Cons:**
+- Costs money per API call
+- Requires internet connection
+- Data sent to Anthropic's servers
+
+**Requirements:**
+- Anthropic API key from https://console.anthropic.com/
+- API credits
+
+### Option B: Claude Code (Local CLI)
+
+**Best for:** Individual developers with Claude subscription
+
+**Pros:**
+- Uses your existing Claude subscription
+- Rich interactive experience
+- Can access local files directly
+
+**Cons:**
+- Requires Claude Code CLI installed
+- Not suitable for CI/CD (interactive)
+- Tied to your personal account
+
+**Requirements:**
+- Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+- Active Claude subscription
+
+### Option C: Ollama (Self-Hosted)
+
+**Best for:** Privacy-conscious teams, air-gapped environments, cost optimization
+
+**Pros:**
+- Completely free (after hardware)
+- Data never leaves your infrastructure
+- Works offline
+- No API costs
+
+**Cons:**
+- Requires capable hardware (GPU recommended)
+- Quality varies by model
+- Setup and maintenance overhead
+
+**Requirements:**
+- Ollama installed: https://ollama.ai/download
+- A pulled model: `ollama pull llama3.1:8b` or `ollama pull codellama`
+- Sufficient RAM (8GB+ for small models, 16GB+ for larger)
+
+### Quick Comparison
+
+| Feature | Claude API | Claude Code | Ollama |
+|---------|------------|-------------|--------|
+| Cost | Pay per use | Subscription | Free |
+| Quality | Excellent | Excellent | Good to Very Good |
+| Privacy | Cloud | Cloud | Local |
+| CI/CD Ready | ✅ | ❌ | ✅ |
+| Offline | ❌ | ❌ | ✅ |
+| Setup | Easy | Easy | Moderate |
+
+---
+
+## Part 3: Install and Initialize repo-sapiens
+
+### Step 3.1: Install repo-sapiens
 
 ```bash
 # Option A: Install from PyPI (recommended)
@@ -74,7 +171,7 @@ Verify the installation:
 automation --help
 ```
 
-### Step 2.2: Initialize in Your Repository
+### Step 3.2: Initialize in Your Repository
 
 Navigate to your cloned repository and run the interactive setup:
 
@@ -87,11 +184,12 @@ The init wizard will:
 
 1. **Auto-detect** your Git remote configuration
 2. **Prompt** for your Gitea API token
-3. **Ask** whether to use Claude API or local Claude Code
-4. **Store** credentials securely
-5. **Generate** `automation/config/automation_config.yaml`
+3. **Ask** which AI provider you want to use
+4. **Collect** provider-specific credentials
+5. **Store** credentials securely
+6. **Generate** `automation/config/automation_config.yaml`
 
-Example session:
+#### Example: Claude API Setup
 
 ```
 🚀 Initializing repo-sapiens
@@ -109,7 +207,12 @@ Gitea API Token is required. Get it from:
 
 Enter your Gitea API token: ●●●●●●●●●●●●
 
-Do you want to use Claude API or local Claude Code? [api/local]: api
+Select AI provider:
+  1. Claude API (cloud)
+  2. Claude Code (local CLI)
+  3. Ollama (self-hosted)
+
+Enter choice [1]: 1
 
 Enter your Claude API key: ●●●●●●●●●●●●
 
@@ -124,27 +227,114 @@ Enter your Claude API key: ●●●●●●●●●●●●
 ✅ Initialization complete!
 ```
 
+#### Example: Ollama Setup
+
+```
+🚀 Initializing repo-sapiens
+
+🔍 Discovering repository configuration...
+   ✓ Found Git repository: /home/user/my-project
+   ✓ Detected remote: origin
+   ✓ Parsed: owner=your-username, repo=my-project
+   ✓ Base URL: https://gitea.example.com
+
+🔑 Setting up credentials...
+
+Gitea API Token is required. Get it from:
+   https://gitea.example.com/user/settings/applications
+
+Enter your Gitea API token: ●●●●●●●●●●●●
+
+Select AI provider:
+  1. Claude API (cloud)
+  2. Claude Code (local CLI)
+  3. Ollama (self-hosted)
+
+Enter choice [1]: 3
+
+Enter Ollama base URL [http://localhost:11434]: http://localhost:11434
+Enter model name [llama3.1:8b]: codellama:13b
+
+📦 Storing credentials in keyring backend...
+   ✓ Stored: gitea/api_token
+   ✓ Ollama configured (no API key needed)
+
+📝 Creating configuration file...
+   ✓ Created: automation/config/automation_config.yaml
+
+✅ Initialization complete!
+
+💡 Make sure Ollama is running: ollama serve
+💡 Pull your model if needed: ollama pull codellama:13b
+```
+
+#### Setting Up Ollama Before Init
+
+If you chose Ollama, ensure it's properly configured:
+
+```bash
+# Install Ollama (macOS/Linux)
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Start Ollama server
+ollama serve
+
+# In another terminal, pull a model
+ollama pull llama3.1:8b        # General purpose, good balance
+ollama pull codellama:13b      # Optimized for code
+ollama pull deepseek-coder:6.7b  # Fast code completion
+
+# Verify it's working
+curl http://localhost:11434/api/tags
+```
+
+**Recommended Ollama Models for Code:**
+
+| Model | Size | RAM Needed | Best For |
+|-------|------|------------|----------|
+| `codellama:7b` | 4GB | 8GB | Fast, basic tasks |
+| `codellama:13b` | 7GB | 16GB | Good balance |
+| `llama3.1:8b` | 5GB | 10GB | General + code |
+| `deepseek-coder:6.7b` | 4GB | 8GB | Code-focused |
+| `codellama:34b` | 19GB | 32GB | Best quality |
+
 ---
 
-## Part 3: Set Up Gitea Repository Secrets
+## Part 4: Set Up Gitea Repository Secrets
 
 The Gitea Actions workflows need access to your credentials. These must be configured as repository secrets.
 
-### Step 3.1: Navigate to Repository Secrets
+### Step 4.1: Navigate to Repository Secrets
 
 1. Go to your repository in Gitea
 2. Click **Settings** (gear icon)
 3. Click **Actions** → **Secrets**
 
-### Step 3.2: Add Required Secrets
+### Step 4.2: Add Required Secrets
 
-Add the following secrets:
+The secrets you need depend on your chosen AI provider:
+
+#### Core Secrets (Always Required)
 
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
 | `BUILDER_GITEA_TOKEN` | Your Gitea API token | Used to interact with issues, PRs, and labels |
 | `BUILDER_GITEA_URL` | `https://gitea.example.com` | Your Gitea instance URL |
-| `BUILDER_CLAUDE_API_KEY` | Your Claude API key | Used for AI-powered automation |
+
+#### If Using Claude API
+
+| Secret Name | Value | Description |
+|-------------|-------|-------------|
+| `BUILDER_CLAUDE_API_KEY` | Your Claude API key | From https://console.anthropic.com/ |
+
+#### If Using Ollama
+
+| Secret Name | Value | Description |
+|-------------|-------|-------------|
+| `BUILDER_OLLAMA_BASE_URL` | `http://ollama-server:11434` | Ollama API endpoint |
+| `BUILDER_OLLAMA_MODEL` | `codellama:13b` | Model to use |
+
+> **Note:** If Ollama runs on the same machine as your Gitea runner, use `http://localhost:11434`. For remote Ollama, ensure the runner can reach it.
 
 To add each secret:
 1. Click **Add Secret**
@@ -152,19 +342,26 @@ To add each secret:
 3. Enter the **Value**
 4. Click **Add Secret**
 
-### Step 3.3: Verify Secrets Are Configured
+### Step 4.3: Verify Secrets Are Configured
 
-You should see all three secrets listed (values are hidden):
-
+**For Claude API setup:**
 ```
 BUILDER_GITEA_TOKEN     *****
 BUILDER_GITEA_URL       *****
 BUILDER_CLAUDE_API_KEY  *****
 ```
 
+**For Ollama setup:**
+```
+BUILDER_GITEA_TOKEN       *****
+BUILDER_GITEA_URL         *****
+BUILDER_OLLAMA_BASE_URL   *****
+BUILDER_OLLAMA_MODEL      *****
+```
+
 ---
 
-## Part 4: Copy Workflow Files
+## Part 5: Copy Workflow Files
 
 The automation is driven by Gitea Actions workflows. You need to copy these to your repository.
 
@@ -274,7 +471,7 @@ git push origin main
 
 ---
 
-## Part 5: Create Required Labels
+## Part 6: Create Required Labels
 
 The automation uses labels to track workflow state. Create these in Gitea.
 
@@ -327,7 +524,7 @@ done
 
 ---
 
-## Part 6: Verify Gitea Actions Is Enabled
+## Part 7: Verify Gitea Actions Is Enabled
 
 ### Step 6.1: Check Repository Settings
 
@@ -347,7 +544,7 @@ If no runners are available, you'll need to:
 
 ---
 
-## Part 7: Test Your Setup
+## Part 8: Test Your Setup
 
 ### Step 7.1: Create a Test Issue
 
@@ -402,7 +599,7 @@ automation --config automation/config/automation_config.yaml show-plan --plan-id
 
 ---
 
-## Part 8: Configuration Reference
+## Part 9: Configuration Reference
 
 ### Configuration File Location
 
@@ -415,7 +612,9 @@ my-project/
         └── automation_config.yaml
 ```
 
-### Key Configuration Options
+### Configuration by Provider
+
+#### Claude API Configuration
 
 ```yaml
 # automation/config/automation_config.yaml
@@ -434,6 +633,7 @@ agent_provider:
   provider_type: claude-api
   model: claude-sonnet-4.5  # or claude-opus-4.5 for complex tasks
   api_key: "@keyring:claude/api_key"
+  local_mode: false
 
 workflow:
   plans_directory: plans
@@ -447,21 +647,102 @@ tags:
   ready_to_implement: ready-to-implement
 ```
 
+#### Claude Code (Local CLI) Configuration
+
+```yaml
+# automation/config/automation_config.yaml
+
+git_provider:
+  provider_type: gitea
+  base_url: https://gitea.example.com
+  api_token: "@keyring:gitea/api_token"
+
+repository:
+  owner: your-username
+  name: my-project
+  default_branch: main
+
+agent_provider:
+  provider_type: claude-local
+  model: claude-sonnet-4.5
+  local_mode: true
+  # No api_key needed - uses Claude Code CLI authentication
+
+workflow:
+  plans_directory: plans
+  state_directory: .automation/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 1  # Local mode typically single-threaded
+
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+```
+
+#### Ollama Configuration
+
+```yaml
+# automation/config/automation_config.yaml
+
+git_provider:
+  provider_type: gitea
+  base_url: https://gitea.example.com
+  api_token: "@keyring:gitea/api_token"
+
+repository:
+  owner: your-username
+  name: my-project
+  default_branch: main
+
+agent_provider:
+  provider_type: ollama
+  model: codellama:13b  # or llama3.1:8b, deepseek-coder:6.7b
+  base_url: http://localhost:11434
+  local_mode: true
+  # No api_key needed for Ollama
+
+workflow:
+  plans_directory: plans
+  state_directory: .automation/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 1  # Adjust based on GPU memory
+  review_approval_threshold: 0.7  # Lower threshold for local models
+
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+```
+
 ### Environment Variable Overrides
 
 For CI/CD, override config values with environment variables:
 
+**Claude API:**
 ```bash
 AUTOMATION__GIT_PROVIDER__BASE_URL=https://gitea.example.com
 AUTOMATION__GIT_PROVIDER__API_TOKEN=your-token
 AUTOMATION__REPOSITORY__OWNER=your-username
 AUTOMATION__REPOSITORY__NAME=my-project
+AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE=claude-api
 AUTOMATION__AGENT_PROVIDER__API_KEY=your-claude-key
+```
+
+**Ollama:**
+```bash
+AUTOMATION__GIT_PROVIDER__BASE_URL=https://gitea.example.com
+AUTOMATION__GIT_PROVIDER__API_TOKEN=your-token
+AUTOMATION__REPOSITORY__OWNER=your-username
+AUTOMATION__REPOSITORY__NAME=my-project
+AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE=ollama
+AUTOMATION__AGENT_PROVIDER__BASE_URL=http://localhost:11434
+AUTOMATION__AGENT_PROVIDER__MODEL=codellama:13b
 ```
 
 ---
 
-## Part 9: Troubleshooting
+## Part 10: Troubleshooting
 
 ### Workflow Doesn't Trigger
 
@@ -529,6 +810,53 @@ automation --config automation/config/automation_config.yaml \
     pip install repo-sapiens
 ```
 
+### Ollama Connection Failed
+
+**Symptoms:** `Connection refused` or `Ollama not running` errors.
+
+**Checklist:**
+1. Is Ollama running? (`ollama serve`)
+2. Is the base_url correct in config?
+3. Can the runner reach the Ollama server?
+4. Is the model pulled? (`ollama list`)
+
+**Debug:**
+```bash
+# Check Ollama is running
+curl http://localhost:11434/api/tags
+
+# Pull model if missing
+ollama pull codellama:13b
+
+# Test generation
+curl http://localhost:11434/api/generate -d '{
+  "model": "codellama:13b",
+  "prompt": "Hello",
+  "stream": false
+}'
+```
+
+### Ollama Slow or Out of Memory
+
+**Symptoms:** Requests timeout or model fails to load.
+
+**Solutions:**
+1. Use a smaller model: `codellama:7b` instead of `codellama:34b`
+2. Increase timeout in config
+3. Ensure sufficient RAM (model size + ~2GB overhead)
+4. For GPU: ensure CUDA/ROCm drivers are installed
+
+```bash
+# Check available memory
+free -h
+
+# Check GPU memory (NVIDIA)
+nvidia-smi
+
+# Use smaller quantized model
+ollama pull codellama:7b-instruct-q4_0
+```
+
 ### Workflow Runs But Nothing Happens
 
 **Symptoms:** Workflow shows success but no plan is created.
@@ -540,7 +868,7 @@ automation --config automation/config/automation_config.yaml \
 
 ---
 
-## Part 10: Next Steps
+## Part 11: Next Steps
 
 ### Enable Full Automation Pipeline
 
@@ -616,11 +944,25 @@ automation daemon --interval 60
 
 ### Required Gitea Secrets
 
+**Core (always required):**
+
 | Secret | Purpose |
 |--------|---------|
 | `BUILDER_GITEA_TOKEN` | Gitea API access |
 | `BUILDER_GITEA_URL` | Gitea instance URL |
+
+**Claude API:**
+
+| Secret | Purpose |
+|--------|---------|
 | `BUILDER_CLAUDE_API_KEY` | Claude AI API access |
+
+**Ollama:**
+
+| Secret | Purpose |
+|--------|---------|
+| `BUILDER_OLLAMA_BASE_URL` | Ollama API endpoint |
+| `BUILDER_OLLAMA_MODEL` | Model to use (e.g., `codellama:13b`) |
 
 ### Label Flow
 
