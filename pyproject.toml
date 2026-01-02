@@ -57,9 +57,8 @@ dev = [
 all = ["repo-sapiens[monitoring,analytics]"]
 
 [project.scripts]
-automation = "repo_sapiens.main:cli"
-builder = "repo_sapiens.main:cli"
-repo-agent = "repo_sapiens.main:cli"
+repo-sapiens = "repo_sapiens.main:cli"
+sapiens = "repo_sapiens.main:cli"
 
 [project.urls]
 Homepage = "https://github.com/savorywatt/repo-sapiens"
