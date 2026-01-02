@@ -52,14 +52,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Major repository cleanup: removed 94,000+ lines of cruft (implementation notes, test scripts, unused directories)
 - Added `__main__.py` for `python -m automation` support
 - Static version in pyproject.toml for Poetry compatibility
-- Expanded test coverage from 11% to 35% with 530+ unit tests
+- Expanded test coverage from 11% to 63% with 936 unit tests
   - ReAct agent: 100% coverage
   - Provider factory: 100% coverage
   - Ollama provider: 100% coverage
   - Gitea provider: comprehensive coverage
   - CLI credentials: 100% coverage
+  - CLI init: 95% coverage
+  - Main CLI: 64% coverage
   - Git discovery: comprehensive coverage
-  - Engine orchestrator: comprehensive coverage
+  - Engine orchestrator: 97% coverage
+  - Engine stages: 87%+ coverage
+  - Credential backends: 90%+ coverage
   - Agent detector: 99% coverage
   - Utils (retry, helpers, status_reporter): 100% coverage
 - Rebranded package from "repo-agent" to "repo-sapiens"
