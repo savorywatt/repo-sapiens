@@ -386,3 +386,53 @@ class TestProviderFactoryEdgeCases:
 
         provider = create_git_provider(settings)
         assert provider.repo == "repo-with-hyphens_and_underscores"
+
+    def test_detect_enterprise_only_url(self):
+        """Should detect GitHub Enterprise from URL with only 'enterprise' keyword.
+
+        This specifically tests the enterprise detection when 'github' is not in URL.
+        Covers factory.py line 88-89.
+        """
+        # URL contains 'enterprise' but not 'github' or 'ghe'
+        result = detect_provider_from_url("https://enterprise.company.com/org/repo")
+        assert result == "github"
+
+    def test_detect_ghe_hyphen_suffix(self):
+        """Should detect GitHub Enterprise from URL with '-ghe' pattern."""
+        result = detect_provider_from_url("https://company-ghe.example.com/team/repo")
+        assert result == "github"
+
+    def test_detect_ghe_path_pattern(self):
+        """Should detect GitHub Enterprise from URL with '/ghe' in path."""
+        result = detect_provider_from_url("https://git.company.com/ghe/org/repo")
+        assert result == "github"
+
+
+class TestDetectProviderUrlPatterns:
+    """Additional URL pattern tests for provider detection."""
+
+    @pytest.mark.parametrize(
+        "url,expected",
+        [
+            # GitHub variations
+            ("https://github.com/user/repo", "github"),
+            ("git@github.com:user/repo.git", "github"),
+            ("ssh://git@github.com/user/repo", "github"),
+            ("https://raw.githubusercontent.com/user/repo/main/file", "github"),
+            # GitHub Enterprise patterns
+            ("https://ghe.corp.com/org/repo", "github"),
+            ("https://corp-ghe.internal/org/repo", "github"),
+            ("https://git.corp.com/ghe/org/repo", "github"),
+            ("https://enterprise.corp.com/org/repo", "github"),
+            # Gitea (default) patterns
+            ("https://gitea.io/user/repo", "gitea"),
+            ("https://code.company.com/team/project", "gitea"),
+            ("http://localhost:3000/user/repo", "gitea"),
+            ("https://192.168.1.1:8080/org/repo", "gitea"),
+            ("git@code.example.org:user/repo.git", "gitea"),
+        ],
+    )
+    def test_detect_provider_parametrized(self, url, expected):
+        """Should detect correct provider type from various URL patterns."""
+        result = detect_provider_from_url(url)
+        assert result == expected
