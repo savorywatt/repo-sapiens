@@ -25,7 +25,7 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install automation
+      - name: Install sapiens
         run: pip install -e .
 
       - name: Run code review

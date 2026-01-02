@@ -1,4 +1,4 @@
-name: Automation Daemon
+name: Sapiens Daemon
 
 on:
   schedule:
@@ -70,7 +70,7 @@ jobs:
       - name: Check for stale workflows
         if: steps.check_changes.outputs.has_recent_changes == 'true'
         run: |
-          .venv/bin/automation check-stale --max-age-hours 24
+          .venv/bin/sapiens check-stale --max-age-hours 24
 
       - name: Upload state artifacts
         if: always() && steps.check_changes.outputs.has_recent_changes == 'true'

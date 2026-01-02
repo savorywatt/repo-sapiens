@@ -26,12 +26,12 @@ jobs:
 
       - name: Run linters
         run: |
-          black --check automation/ tests/ || true
-          ruff check automation/ tests/ || true
+          black --check repo_sapiens/ tests/ || true
+          ruff check repo_sapiens/ tests/ || true
 
       - name: Run type checker
         run: |
-          mypy automation/ || true
+          mypy repo_sapiens/ || true
 
       - name: Run tests
         run: |

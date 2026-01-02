@@ -1,4 +1,4 @@
-name: Automation Monitor
+name: Sapiens Monitor
 
 on:
   schedule:

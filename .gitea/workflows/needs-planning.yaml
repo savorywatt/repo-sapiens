@@ -27,11 +27,11 @@ jobs:
       - name: Download pre-built wheel (if available)
         uses: actions/download-artifact@v3
         with:
-          name: automation-wheel
+          name: sapiens-wheel
           path: dist/
         continue-on-error: true
 
-      - name: Install automation
+      - name: Install sapiens
         run: |
           pip install --upgrade pip
           # Use pre-built wheel if available, otherwise install from source
