@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation updated to reflect new CLI commands and module paths
 - All workflow YAML files updated to use `sapiens` command
 - Test coverage paths updated to `--cov=repo_sapiens`
+- Default config path updated from `automation/config/` to `repo_sapiens/config/`
+- Dockerfile updated: module paths, user name (`sapiens`), entrypoint
+- Pre-commit config updated to target `repo_sapiens/` directory
+- Docker Compose volume mounts and uvicorn module path corrected
 
 ## [0.2.0] - 2025-12-28
 
