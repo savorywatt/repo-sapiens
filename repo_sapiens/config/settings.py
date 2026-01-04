@@ -74,6 +74,7 @@ class AgentProviderConfig(BaseModel):
         "goose-local",
         "goose-api",
         "openai",
+        "openai-compatible",
         "ollama",
     ] = Field(default="claude-local", description="Type of agent provider")
     model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
@@ -85,7 +86,8 @@ class AgentProviderConfig(BaseModel):
         default=True, description="Whether to use local CLI (Claude Code or Goose)"
     )
     base_url: str | None = Field(
-        default="http://localhost:11434", description="Base URL for Ollama or custom API endpoints"
+        default="http://localhost:11434",
+        description="Base URL for Ollama, vLLM, or other OpenAI-compatible API endpoints",
     )
     goose_config: GooseConfig | None = Field(
         default=None,

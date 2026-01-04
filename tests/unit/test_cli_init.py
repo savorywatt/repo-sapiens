@@ -1,12 +1,12 @@
 """Unit tests for repo_sapiens/cli/init.py - Repository initialization CLI."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import os
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from click.testing import CliRunner
 from click import ClickException
+from click.testing import CliRunner
 
 from repo_sapiens.cli.init import RepoInitializer, init_command
 from repo_sapiens.git.exceptions import GitDiscoveryError
@@ -262,7 +262,13 @@ class TestRepoInitializerDiscoverRepository:
 class TestRepoInitializerCollectCredentials:
     """Tests for credential collection flows."""
 
-    @patch.dict(os.environ, {"GITEA_TOKEN": "test-token-123", "CLAUDE_API_KEY": "sk-test-key"})
+    @patch.dict(
+        os.environ,
+        {
+            "GITEA_TOKEN": "test-token-123",
+            "CLAUDE_API_KEY": "sk-test-key",  # pragma: allowlist secret
+        },
+    )
     def test_collect_from_environment_success(self, tmp_path, mock_repo_info):
         """Should collect credentials from environment in non-interactive mode."""
         with patch.object(RepoInitializer, "_detect_backend", return_value="environment"):
@@ -277,7 +283,7 @@ class TestRepoInitializerCollectCredentials:
         initializer.repo_info = mock_repo_info
         initializer._collect_from_environment()
 
-        assert initializer.gitea_token == "test-token-123"
+        assert initializer.gitea_token == "test-token-123"  # pragma: allowlist secret
 
     @patch.dict(os.environ, {}, clear=True)
     def test_collect_from_environment_missing_token(self, tmp_path, mock_repo_info):
@@ -322,7 +328,7 @@ class TestRepoInitializerCollectCredentials:
         with patch.object(initializer, "_configure_ai_agent"):
             initializer._collect_interactively()
 
-        assert initializer.gitea_token == "interactive-token-456"
+        assert initializer.gitea_token == "interactive-token-456"  # pragma: allowlist secret
         mock_prompt.assert_called()
 
 
@@ -512,7 +518,7 @@ class TestConfigureClaude:
         initializer._configure_claude()
 
         assert initializer.agent_mode == "api"
-        assert initializer.agent_api_key == "sk-ant-test-key-123"
+        assert initializer.agent_api_key == "sk-ant-test-key-123"  # pragma: allowlist secret
 
 
 class TestConfigureGoose:
@@ -520,7 +526,7 @@ class TestConfigureGoose:
 
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
-    @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-openai-test"})
+    @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-openai-test"})  # pragma: allowlist secret
     def test_configure_goose_openai_existing_key(
         self, mock_confirm, mock_prompt, tmp_path, mock_repo_info
     ):
@@ -542,7 +548,7 @@ class TestConfigureGoose:
 
         assert initializer.goose_llm_provider == "openai"
         assert initializer.goose_model == "gpt-4o"
-        assert initializer.agent_api_key == "sk-openai-test"
+        assert initializer.agent_api_key == "sk-openai-test"  # pragma: allowlist secret
         assert initializer.agent_mode == "local"
 
     @patch("repo_sapiens.cli.init.click.prompt")
@@ -577,7 +583,7 @@ class TestConfigureGoose:
 
         assert initializer.goose_llm_provider == "anthropic"
         assert initializer.goose_model == "claude-3-5-sonnet-20241022"
-        assert initializer.agent_api_key == "sk-ant-goose-key"
+        assert initializer.agent_api_key == "sk-ant-goose-key"  # pragma: allowlist secret
 
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
@@ -659,13 +665,15 @@ class TestRepoInitializerStoreCredentials:
         )
 
         initializer.repo_info = mock_repo_info
-        initializer.gitea_token = "test-gitea-token"
+        initializer.gitea_token = "test-gitea-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_api_key = None
 
         initializer._store_in_keyring()
 
-        mock_keyring.set.assert_called_once_with("gitea", "api_token", "test-gitea-token")
+        mock_keyring.set.assert_called_once_with(
+            "gitea", "api_token", "test-gitea-token"
+        )  # pragma: allowlist secret
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
     def test_store_in_keyring_with_claude_api_key(
@@ -685,15 +693,19 @@ class TestRepoInitializerStoreCredentials:
         )
 
         initializer.repo_info = mock_repo_info
-        initializer.gitea_token = "test-gitea-token"
+        initializer.gitea_token = "test-gitea-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
-        initializer.agent_api_key = "sk-ant-test-key"
+        initializer.agent_api_key = "sk-ant-test-key"  # pragma: allowlist secret
 
         initializer._store_in_keyring()
 
         assert mock_keyring.set.call_count == 2
-        mock_keyring.set.assert_any_call("gitea", "api_token", "test-gitea-token")
-        mock_keyring.set.assert_any_call("claude", "api_key", "sk-ant-test-key")
+        mock_keyring.set.assert_any_call(
+            "gitea", "api_token", "test-gitea-token"
+        )  # pragma: allowlist secret
+        mock_keyring.set.assert_any_call(
+            "claude", "api_key", "sk-ant-test-key"
+        )  # pragma: allowlist secret
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
     def test_store_in_keyring_with_goose_provider_key(
@@ -713,21 +725,23 @@ class TestRepoInitializerStoreCredentials:
         )
 
         initializer.repo_info = mock_repo_info
-        initializer.gitea_token = "test-gitea-token"
+        initializer.gitea_token = "test-gitea-token"  # pragma: allowlist secret
         initializer.agent_type = "goose"
         initializer.goose_llm_provider = "openai"
-        initializer.agent_api_key = "sk-openai-key"
+        initializer.agent_api_key = "sk-openai-key"  # pragma: allowlist secret
 
         initializer._store_in_keyring()
 
         assert mock_keyring.set.call_count == 2
-        mock_keyring.set.assert_any_call("gitea", "api_token", "test-gitea-token")
-        mock_keyring.set.assert_any_call("openai", "api_key", "sk-openai-key")
+        mock_keyring.set.assert_any_call(
+            "gitea", "api_token", "test-gitea-token"
+        )  # pragma: allowlist secret
+        mock_keyring.set.assert_any_call(
+            "openai", "api_key", "sk-openai-key"
+        )  # pragma: allowlist secret
 
     @patch("repo_sapiens.cli.init.EnvironmentBackend")
-    def test_store_in_environment_gitea_only(
-        self, mock_env_class, tmp_path, mock_repo_info
-    ):
+    def test_store_in_environment_gitea_only(self, mock_env_class, tmp_path, mock_repo_info):
         """Should store Gitea token in environment."""
         mock_env = Mock()
         mock_env_class.return_value = mock_env
@@ -741,7 +755,7 @@ class TestRepoInitializerStoreCredentials:
         )
 
         initializer.repo_info = mock_repo_info
-        initializer.gitea_token = "test-gitea-token"
+        initializer.gitea_token = "test-gitea-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_api_key = None
 
@@ -766,10 +780,10 @@ class TestRepoInitializerStoreCredentials:
         )
 
         initializer.repo_info = mock_repo_info
-        initializer.gitea_token = "test-gitea-token"
+        initializer.gitea_token = "test-gitea-token"  # pragma: allowlist secret
         initializer.agent_type = "goose"
         initializer.goose_llm_provider = "anthropic"
-        initializer.agent_api_key = "sk-ant-key"
+        initializer.agent_api_key = "sk-ant-key"  # pragma: allowlist secret
 
         initializer._store_in_environment()
 
@@ -832,7 +846,7 @@ class TestRepoInitializerGenerateConfig:
         initializer.provider_type = "gitea"
         initializer.agent_type = "claude"
         initializer.agent_mode = "api"
-        initializer.agent_api_key = "sk-ant-key"
+        initializer.agent_api_key = "sk-ant-key"  # pragma: allowlist secret
 
         initializer._generate_config()
 
@@ -864,7 +878,7 @@ class TestRepoInitializerGenerateConfig:
         initializer.goose_model = "gpt-4o"
         initializer.goose_toolkit = "developer"
         initializer.goose_temperature = 0.5
-        initializer.agent_api_key = "sk-openai-key"
+        initializer.agent_api_key = "sk-openai-key"  # pragma: allowlist secret
 
         initializer._generate_config()
 
@@ -974,7 +988,7 @@ class TestRepoInitializerSetupSecrets:
 
         initializer.repo_info = mock_repo_info
         initializer.provider_type = "gitea"
-        initializer.gitea_token = "test-token"
+        initializer.gitea_token = "test-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_mode = "local"
 
@@ -993,10 +1007,10 @@ class TestRepoInitializerSetupSecrets:
 
         initializer.repo_info = mock_repo_info
         initializer.provider_type = "gitea"
-        initializer.gitea_token = "test-token"
+        initializer.gitea_token = "test-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_mode = "api"
-        initializer.agent_api_key = "sk-ant-key"
+        initializer.agent_api_key = "sk-ant-key"  # pragma: allowlist secret
 
         # Should not raise
         initializer._setup_gitea_secrets_mcp()
@@ -1021,14 +1035,18 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         initializer.repo_info = github_repo_info
         initializer.provider_type = "github"
-        initializer.gitea_token = "ghp-test-token"
+        initializer.gitea_token = "ghp-test-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_mode = "local"
         initializer.agent_api_key = None
 
         with patch.dict(
             "sys.modules",
-            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))}
+            {
+                "repo_sapiens.providers.github_rest": MagicMock(
+                    GitHubRestProvider=Mock(return_value=mock_github)
+                )
+            },
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1052,14 +1070,18 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         initializer.repo_info = github_repo_info
         initializer.provider_type = "github"
-        initializer.gitea_token = "ghp-test-token"
+        initializer.gitea_token = "ghp-test-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_mode = "api"
-        initializer.agent_api_key = "sk-ant-key"
+        initializer.agent_api_key = "sk-ant-key"  # pragma: allowlist secret
 
         with patch.dict(
             "sys.modules",
-            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))}
+            {
+                "repo_sapiens.providers.github_rest": MagicMock(
+                    GitHubRestProvider=Mock(return_value=mock_github)
+                )
+            },
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1077,9 +1099,7 @@ class TestRepoInitializerValidateSetup:
     """Tests for setup validation."""
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
-    def test_validate_setup_keyring_success(
-        self, mock_resolver_class, tmp_path, mock_repo_info
-    ):
+    def test_validate_setup_keyring_success(self, mock_resolver_class, tmp_path, mock_repo_info):
         """Should validate keyring credentials successfully."""
         mock_resolver = Mock()
         mock_resolver.resolve.return_value = "resolved-token"
@@ -1471,7 +1491,7 @@ class TestRepoInitializerEdgeCases:
             )
 
             initializer.repo_info = mock_repo_info
-            initializer.gitea_token = "test-token"
+            initializer.gitea_token = "test-token"  # pragma: allowlist secret
             initializer.agent_type = "claude"
             initializer.agent_api_key = None
 
@@ -1492,13 +1512,13 @@ class TestRepoInitializerEdgeCases:
 
         initializer.repo_info = mock_repo_info
         initializer.provider_type = "github"
-        initializer.gitea_token = "test-token"
+        initializer.gitea_token = "test-token"  # pragma: allowlist secret
         initializer.agent_type = "claude"
         initializer.agent_mode = "local"
 
         with patch.object(
             initializer, "_setup_github_secrets", side_effect=Exception("API error")
-        ):
+        ):  # pragma: allowlist secret
             # Should not raise, just warn
             initializer._setup_gitea_secrets()
 

@@ -160,8 +160,15 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 
 @cli.command()
 @click.argument("task", required=False)
-@click.option("--model", default="qwen3:latest", help="Ollama model to use")
-@click.option("--ollama-url", default="http://localhost:11434", help="Ollama server URL")
+@click.option("--model", default="qwen3:latest", help="Model to use")
+@click.option(
+    "--backend",
+    default="ollama",
+    type=click.Choice(["ollama", "openai"]),
+    help="LLM backend: ollama or openai-compatible (vLLM, etc.)",
+)
+@click.option("--base-url", default=None, help="Backend server URL (default: auto-detected)")
+@click.option("--api-key", default=None, help="API key for OpenAI-compatible backends")
 @click.option("--max-iterations", default=10, type=int, help="Max ReAct iterations")
 @click.option("--working-dir", default=".", help="Working directory for file operations")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed trajectory")
@@ -169,20 +176,24 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 def react(
     task: str | None,
     model: str,
-    ollama_url: str,
+    backend: str,
+    base_url: str | None,
+    api_key: str | None,
     max_iterations: int,
     working_dir: str,
     verbose: bool,
     repl: bool,
 ) -> None:
-    """Run a task using the ReAct agent with Ollama.
+    """Run a task using the ReAct agent.
 
     The ReAct agent reasons step-by-step and uses tools (read/write files,
-    run commands) to complete the task.
+    run commands) to complete the task. Supports both Ollama and OpenAI-compatible
+    backends (vLLM, LMStudio, etc.).
 
     Examples:
         sapiens react "Create a hello.py file that prints Hello World"
         sapiens react --repl  # Start interactive mode
+        sapiens react --backend openai --base-url http://localhost:8000/v1 "task"
     """
     from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
     from repo_sapiens.models.domain import Task as DomainTask
@@ -234,7 +245,7 @@ def react(
         click.echo("ReAct Agent REPL")
         click.echo("=" * 60)
         click.echo(f"Model: {agent.config.model}")
-        click.echo(f"Ollama: {ollama_url}")
+        click.echo(f"Backend: {agent.config.backend} @ {agent.backend.base_url}")
         click.echo(f"Working directory: {Path(working_dir).resolve()}")
         if available_models:
             click.echo(f"Available models: {', '.join(available_models[:5])}")
@@ -274,7 +285,10 @@ def react(
                         click.echo("Goodbye!")
                         break
                     elif cmd == "/help":
-                        click.echo("\nCommands: /help, /models, /model <name>, /pwd, /verbose, /clear, /quit")
+                        click.echo(
+                            "\nCommands: /help, /models, /model <name>, "
+                            "/pwd, /verbose, /clear, /quit"
+                        )
                         click.echo("Or type any task for the agent to execute.\n")
                     elif cmd == "/models":
                         models = await agent.list_models()
@@ -321,11 +335,17 @@ def react(
                 break
 
     async def run() -> None:
-        config = ReActConfig(model=model, max_iterations=max_iterations, ollama_url=ollama_url)
+        config = ReActConfig(
+            model=model,
+            backend=backend,
+            base_url=base_url,
+            api_key=api_key,
+            max_iterations=max_iterations,
+        )
         agent = ReActAgentProvider(working_dir=working_dir, config=config)
 
         click.echo(f"Starting ReAct agent with model: {model}")
-        click.echo(f"Ollama server: {ollama_url}")
+        click.echo(f"Backend: {backend}" + (f" @ {base_url}" if base_url else " (default URL)"))
         click.echo(f"Working directory: {Path(working_dir).resolve()}")
 
         async with agent:
@@ -383,6 +403,22 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
         agent = OllamaProvider(
             base_url=base_url,
             model=settings.agent_provider.model,
+            working_dir=str(Path.cwd()),
+            qa_handler=qa_handler,
+        )
+    elif settings.agent_provider.provider_type == "openai-compatible":
+        from repo_sapiens.providers.openai_compatible import OpenAICompatibleProvider
+
+        base_url = settings.agent_provider.base_url or "http://localhost:8000/v1"
+        # Resolve API key if it's a credential reference
+        api_key = None
+        if settings.agent_provider.api_key:
+            api_key = settings.agent_provider.api_key.get_secret_value()
+
+        agent = OpenAICompatibleProvider(
+            base_url=base_url,
+            model=settings.agent_provider.model,
+            api_key=api_key,
             working_dir=str(Path.cwd()),
             qa_handler=qa_handler,
         )

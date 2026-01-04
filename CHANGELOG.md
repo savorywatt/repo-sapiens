@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Provider module structure explanation
   - Template engine naming justification
   - State persistence approach
+- **Makefile**: Development convenience commands
+  - `make test`, `make lint`, `make format`, `make type-check`
+  - `make repl` for interactive ReAct agent
+  - `make docker-build`, `make docker-run`
+- **Agent Comparison Guide**: New `docs/AGENT_COMPARISON.md`
+  - Decision flowchart for choosing between agents
+  - Detailed comparison of ReAct, Goose, Claude Code, Ollama Provider
+- **ReAct Agent Documentation**: Extended GOOSE_SETUP.md
+  - Full built-in ReAct agent usage guide
+  - Model recommendations and configuration
+  - Interactive REPL commands reference
 
 ### Changed
 - **WorkflowStage Interface**: Updated from `execute(issue)` to `execute(context)`
@@ -30,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **CredentialResolver.resolve()**: Now iterates over `self.backends` property
   - Enables custom backend ordering for testing
   - Maintains backward compatibility with existing code
+- **Code Quality**: Applied Ruff formatting and linting across codebase
+  - Removed unused imports
+  - Consistent string formatting
+  - Improved type hints (forward references → direct types)
+- **Test Suite**: Refactored unit tests for clarity
+  - Reduced code duplication in test fixtures
+  - Simplified mock setups
+- **.gitignore**: Added `plans/*` to ignore plan working files
 
 ### Fixed
 - **ARCHITECTURE.md Accuracy**: Documentation now matches actual implementation

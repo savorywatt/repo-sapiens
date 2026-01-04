@@ -1,6 +1,5 @@
 """Tests for miscellaneous utility modules: retry, helpers, and status_reporter."""
 
-import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,7 +8,6 @@ import pytest
 from repo_sapiens.utils.helpers import parse_issue_reference, slugify, truncate_text
 from repo_sapiens.utils.retry import async_retry
 from repo_sapiens.utils.status_reporter import StatusReporter
-
 
 # =============================================================================
 # Tests for repo_sapiens.utils.helpers

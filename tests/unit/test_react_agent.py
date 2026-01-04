@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig, TrajectoryStep
-from repo_sapiens.agents.tools import ToolExecutionError, ToolRegistry
+from repo_sapiens.agents.tools import ToolRegistry
 from repo_sapiens.models.domain import Task, TaskResult
 
 
@@ -180,9 +181,7 @@ class TestToolRegistry:
         """Test searching when no matches exist."""
         (temp_dir / "test.txt").write_text("nothing special here")
 
-        result = await registry.execute(
-            "search_files", {"pattern": "nonexistent_pattern_xyz"}
-        )
+        result = await registry.execute("search_files", {"pattern": "nonexistent_pattern_xyz"})
         assert "No matches found" in result
 
     @pytest.mark.asyncio
@@ -279,7 +278,7 @@ class TestToolRegistry:
 
         # Verify the change
         content = test_file.read_text()
-        assert "Hello Universe! This is a test." == content
+        assert content == "Hello Universe! This is a test."
 
         # Verify tracking
         assert "edit_me.txt" in registry.get_files_written()
@@ -324,9 +323,7 @@ class TestToolRegistry:
         test_file.write_text("content")
 
         # Missing old_text
-        result = await registry.execute(
-            "edit_file", {"path": "test.txt", "new_text": "new"}
-        )
+        result = await registry.execute("edit_file", {"path": "test.txt", "new_text": "new"})
         assert "required" in result.lower()
 
     @pytest.mark.asyncio
@@ -454,7 +451,7 @@ class TestReActAgentProvider:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            backend="ollama",
             max_iterations=3,
         )
 
@@ -596,25 +593,19 @@ ACTION_INPUT: {"path": "."}
 
     @pytest.mark.asyncio
     async def test_connect_success(self, agent):
-        """Test successful connection to Ollama."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "models": [{"name": "test-model:latest"}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(agent.client, "get", AsyncMock(return_value=mock_response)):
+        """Test successful connection to backend."""
+        with patch.object(agent.backend, "connect", AsyncMock()), patch.object(
+            agent.backend, "list_models", AsyncMock(return_value=["test-model:latest"])
+        ):
             await agent.connect()  # Should not raise
 
     @pytest.mark.asyncio
     async def test_connect_ollama_not_running(self, agent):
-        """Test connection failure when Ollama is not running."""
-        import httpx
-
+        """Test connection failure when backend is not running."""
         with patch.object(
-            agent.client,
-            "get",
-            AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
+            agent.backend,
+            "connect",
+            AsyncMock(side_effect=RuntimeError("Ollama not running at http://localhost:11434")),
         ):
             with pytest.raises(RuntimeError, match="Ollama not running"):
                 await agent.connect()
@@ -645,8 +636,10 @@ class TestReActConfig:
     def test_defaults(self):
         """Test default configuration values."""
         config = ReActConfig()
-        assert config.model == "llama3.1:8b"
-        assert config.ollama_url == "http://localhost:11434"
+        assert config.model == "qwen3:latest"
+        assert config.backend == "ollama"
+        assert config.base_url is None
+        assert config.api_key is None
         assert config.max_iterations == 10
         assert config.temperature == 0.7
         assert config.timeout == 300
@@ -655,10 +648,16 @@ class TestReActConfig:
         """Test custom configuration values."""
         config = ReActConfig(
             model="custom-model",
+            backend="openai",
+            base_url="http://localhost:8000/v1",
+            api_key="test-key",  # pragma: allowlist secret
             max_iterations=5,
             temperature=0.5,
         )
         assert config.model == "custom-model"
+        assert config.backend == "openai"
+        assert config.base_url == "http://localhost:8000/v1"
+        assert config.api_key == "test-key"  # pragma: allowlist secret
         assert config.max_iterations == 5
         assert config.temperature == 0.5
 
@@ -677,7 +676,7 @@ class TestGenerateStep:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            backend="ollama",
             max_iterations=3,
         )
 
@@ -688,16 +687,13 @@ class TestGenerateStep:
 
     @pytest.mark.asyncio
     async def test_generate_step_success(self, agent):
-        """Test _generate_step makes correct HTTP request and returns content."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "message": {
-                "content": "THOUGHT: I should read the file.\nACTION: read_file\nACTION_INPUT: {\"path\": \"test.txt\"}"
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
+        """Test _generate_step calls backend.chat and returns content."""
+        expected_response = (
+            "THOUGHT: I should read the file.\nACTION: read_file\n"
+            'ACTION_INPUT: {"path": "test.txt"}'
+        )
 
-        with patch.object(agent.client, "post", AsyncMock(return_value=mock_response)):
+        with patch.object(agent.backend, "chat", AsyncMock(return_value=expected_response)):
             result = await agent._generate_step("Test task")
 
         assert "read_file" in result
@@ -705,25 +701,25 @@ class TestGenerateStep:
 
     @pytest.mark.asyncio
     async def test_generate_step_empty_response(self, agent):
-        """Test _generate_step handles empty message content."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"message": {}}
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(agent.client, "post", AsyncMock(return_value=mock_response)):
+        """Test _generate_step handles empty response content."""
+        with patch.object(agent.backend, "chat", AsyncMock(return_value="")):
             result = await agent._generate_step("Test task")
 
         assert result == ""
 
     @pytest.mark.asyncio
     async def test_generate_step_http_error(self, agent):
-        """Test _generate_step propagates HTTP errors."""
+        """Test _generate_step propagates backend errors."""
         import httpx
 
         with patch.object(
-            agent.client,
-            "post",
-            AsyncMock(side_effect=httpx.HTTPStatusError("Server error", request=MagicMock(), response=MagicMock())),
+            agent.backend,
+            "chat",
+            AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    "Server error", request=MagicMock(), response=MagicMock()
+                )
+            ),
         ):
             with pytest.raises(httpx.HTTPStatusError):
                 await agent._generate_step("Test task")
@@ -733,32 +729,31 @@ class TestGenerateStep:
         """Test that trajectory is included in subsequent calls."""
         # Add a step to trajectory
         from repo_sapiens.agents.react import TrajectoryStep
-        agent._trajectory.append(TrajectoryStep(
-            iteration=1,
-            thought="First thought",
-            action="read_file",
-            action_input={"path": "test.txt"},
-            observation="File contents here",
-        ))
 
-        captured_json = None
+        agent._trajectory.append(
+            TrajectoryStep(
+                iteration=1,
+                thought="First thought",
+                action="read_file",
+                action_input={"path": "test.txt"},
+                observation="File contents here",
+            )
+        )
 
-        async def capture_post(url, json=None):
-            nonlocal captured_json
-            captured_json = json
-            mock_resp = MagicMock()
-            mock_resp.json.return_value = {"message": {"content": "THOUGHT: Done\nACTION: finish\nACTION_INPUT: {}"}}
-            mock_resp.raise_for_status = MagicMock()
-            return mock_resp
+        captured_messages = None
 
-        with patch.object(agent.client, "post", capture_post):
+        async def capture_chat(messages, model, temperature):
+            nonlocal captured_messages
+            captured_messages = messages
+            return "THOUGHT: Done\nACTION: finish\nACTION_INPUT: {}"
+
+        with patch.object(agent.backend, "chat", capture_chat):
             await agent._generate_step("Test task")
 
-        # Verify trajectory is in messages
-        messages = captured_json["messages"]
-        assert len(messages) >= 4  # system, user, assistant (trajectory), user (observation)
-        assert any("First thought" in str(m) for m in messages)
-        assert any("File contents here" in str(m) for m in messages)
+        # Verify trajectory is in messages (system, user, assistant trajectory, user observation)
+        assert len(captured_messages) >= 4
+        assert any("First thought" in str(m) for m in captured_messages)
+        assert any("File contents here" in str(m) for m in captured_messages)
 
 
 class TestFinishWithInvalidJson:
@@ -775,7 +770,7 @@ class TestFinishWithInvalidJson:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            backend="ollama",
             max_iterations=5,
         )
 
@@ -908,13 +903,15 @@ class TestRunReactTask:
         from repo_sapiens.agents.react import run_react_task
 
         # Mock the agent's methods
-        with patch("repo_sapiens.agents.react.ReActAgentProvider") as MockAgent:
+        with patch("repo_sapiens.agents.react.ReActAgentProvider") as mock_agent_class:
             mock_instance = AsyncMock()
-            mock_instance.execute_task = AsyncMock(return_value=TaskResult(
-                success=True,
-                output="Task done",
-                files_changed=[],
-            ))
+            mock_instance.execute_task = AsyncMock(
+                return_value=TaskResult(
+                    success=True,
+                    output="Task done",
+                    files_changed=[],
+                )
+            )
             mock_instance.connect = AsyncMock()
             mock_instance.get_trajectory = MagicMock(return_value=[])
 
@@ -922,7 +919,7 @@ class TestRunReactTask:
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
 
-            MockAgent.return_value = mock_instance
+            mock_agent_class.return_value = mock_instance
 
             result = await run_react_task(
                 task_description="Test task",
@@ -938,30 +935,34 @@ class TestRunReactTask:
     @pytest.mark.asyncio
     async def test_run_react_task_verbose(self, temp_dir, capsys):
         """Test run_react_task with verbose output."""
-        from repo_sapiens.agents.react import run_react_task, TrajectoryStep
+        from repo_sapiens.agents.react import TrajectoryStep, run_react_task
 
-        with patch("repo_sapiens.agents.react.ReActAgentProvider") as MockAgent:
+        with patch("repo_sapiens.agents.react.ReActAgentProvider") as mock_agent_class:
             mock_instance = AsyncMock()
-            mock_instance.execute_task = AsyncMock(return_value=TaskResult(
-                success=True,
-                output="Done",
-                files_changed=[],
-            ))
-            mock_instance.connect = AsyncMock()
-            mock_instance.get_trajectory = MagicMock(return_value=[
-                TrajectoryStep(
-                    iteration=1,
-                    thought="Test thought",
-                    action="read_file",
-                    action_input={"path": "test.txt"},
-                    observation="File contents here that is longer than 200 characters " * 5,
+            mock_instance.execute_task = AsyncMock(
+                return_value=TaskResult(
+                    success=True,
+                    output="Done",
+                    files_changed=[],
                 )
-            ])
+            )
+            mock_instance.connect = AsyncMock()
+            mock_instance.get_trajectory = MagicMock(
+                return_value=[
+                    TrajectoryStep(
+                        iteration=1,
+                        thought="Test thought",
+                        action="read_file",
+                        action_input={"path": "test.txt"},
+                        observation="File contents here that is longer than 200 characters " * 5,
+                    )
+                ]
+            )
 
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
 
-            MockAgent.return_value = mock_instance
+            mock_agent_class.return_value = mock_instance
 
             result = await run_react_task(
                 task_description="Test task",
@@ -981,26 +982,29 @@ class TestRunReactTask:
 
         captured_config = None
 
-        with patch("repo_sapiens.agents.react.ReActAgentProvider") as MockAgent:
+        with patch("repo_sapiens.agents.react.ReActAgentProvider") as mock_agent_class:
+
             def capture_init(working_dir, config):
                 nonlocal captured_config
                 captured_config = config
                 mock = AsyncMock()
-                mock.execute_task = AsyncMock(return_value=TaskResult(success=True, output="", files_changed=[]))
+                mock.execute_task = AsyncMock(
+                    return_value=TaskResult(success=True, output="", files_changed=[])
+                )
                 mock.connect = AsyncMock()
                 mock.get_trajectory = MagicMock(return_value=[])
                 mock.__aenter__ = AsyncMock(return_value=mock)
                 mock.__aexit__ = AsyncMock()
                 return mock
 
-            MockAgent.side_effect = capture_init
+            mock_agent_class.side_effect = capture_init
 
             await run_react_task(
                 task_description="Test task",
                 working_dir=str(temp_dir),
             )
 
-        assert captured_config.model == "llama3.1:8b"
+        assert captured_config.model == "qwen3:latest"
         assert captured_config.max_iterations == 10
 
 
@@ -1022,6 +1026,7 @@ class TestAgentProviderInterface:
     async def test_generate_plan(self, agent):
         """Test generate_plan creates single-task plan."""
         from datetime import datetime
+
         from repo_sapiens.models.domain import Issue, IssueState
 
         issue = Issue(
@@ -1031,8 +1036,8 @@ class TestAgentProviderInterface:
             body="Issue description",
             state=IssueState.OPEN,
             labels=[],
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            created_at=datetime.now(tz=UTC),
+            updated_at=datetime.now(tz=UTC),
             author="testuser",
             url="https://example.com/issues/42",
         )
@@ -1146,17 +1151,19 @@ ACTION_INPUT: {"summary": "Resolved"}
 """
 
         with patch.object(agent, "_generate_step", mock_generate):
-            result = await agent.resolve_conflict({
-                "file": "conflict.txt",
-                "content": "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>>",
-            })
+            result = await agent.resolve_conflict(
+                {
+                    "file": "conflict.txt",
+                    "content": "<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>>",
+                }
+            )
 
         assert result == "resolved content"
 
     @pytest.mark.asyncio
     async def test_set_model(self, agent):
         """Test set_model changes the model."""
-        assert agent.config.model == "llama3.1:8b"
+        assert agent.config.model == "qwen3:latest"
         agent.set_model("new-model")
         assert agent.config.model == "new-model"
 
@@ -1175,11 +1182,21 @@ class TestAsyncContextManager:
         """Test async context manager properly enters and exits."""
         agent = ReActAgentProvider(working_dir=temp_dir)
 
+        close_called = False
+        original_close = agent.backend.close
+
+        async def mock_close():
+            nonlocal close_called
+            close_called = True
+            await original_close()
+
+        agent.backend.close = mock_close
+
         async with agent as a:
             assert a is agent
 
-        # Client should be closed after exit
-        assert agent.client.is_closed
+        # Backend close should have been called
+        assert close_called
 
 
 class TestListModels:
@@ -1199,16 +1216,11 @@ class TestListModels:
     @pytest.mark.asyncio
     async def test_list_models_success(self, agent):
         """Test list_models returns model names."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "models": [
-                {"name": "llama3.1:8b"},
-                {"name": "codellama:7b"},
-            ]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(agent.client, "get", AsyncMock(return_value=mock_response)):
+        with patch.object(
+            agent.backend,
+            "list_models",
+            AsyncMock(return_value=["llama3.1:8b", "codellama:7b"]),
+        ):
             models = await agent.list_models()
 
         assert "llama3.1:8b" in models
@@ -1217,12 +1229,10 @@ class TestListModels:
     @pytest.mark.asyncio
     async def test_list_models_connection_error_silent(self, agent):
         """Test list_models returns empty list on connection error."""
-        import httpx
-
         with patch.object(
-            agent.client,
-            "get",
-            AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
+            agent.backend,
+            "list_models",
+            AsyncMock(return_value=[]),
         ):
             models = await agent.list_models(raise_on_error=False)
 
@@ -1234,8 +1244,8 @@ class TestListModels:
         import httpx
 
         with patch.object(
-            agent.client,
-            "get",
+            agent.backend,
+            "list_models",
             AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
         ):
             with pytest.raises(httpx.ConnectError):
@@ -1244,15 +1254,11 @@ class TestListModels:
     @pytest.mark.asyncio
     async def test_connect_model_not_found_warning(self, agent, caplog):
         """Test connect logs warning when model not found."""
-        import logging
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "models": [{"name": "other-model:latest"}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(agent.client, "get", AsyncMock(return_value=mock_response)):
+        with patch.object(
+            agent.backend,
+            "list_models",
+            AsyncMock(return_value=["other-model:latest"]),
+        ):
             # Should not raise, just warn
             await agent.connect()
 
@@ -1353,9 +1359,7 @@ class TestToolEdgeCases:
         """Test search_files when path is a file."""
         (temp_dir / "file.txt").write_text("content")
 
-        result = await registry.execute(
-            "search_files", {"pattern": "content", "path": "file.txt"}
-        )
+        result = await registry.execute("search_files", {"pattern": "content", "path": "file.txt"})
         assert "not a directory" in result
 
     @pytest.mark.asyncio
@@ -1364,9 +1368,7 @@ class TestToolEdgeCases:
         (temp_dir / "file.txt").write_text("content")
 
         with patch("subprocess.run", side_effect=FileNotFoundError("grep not found")):
-            result = await registry.execute(
-                "search_files", {"pattern": "content", "path": "."}
-            )
+            result = await registry.execute("search_files", {"pattern": "content", "path": "."})
         assert "grep command not found" in result
 
     @pytest.mark.asyncio
@@ -1377,15 +1379,12 @@ class TestToolEdgeCases:
         (temp_dir / "file.txt").write_text("content")
 
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("grep", 30)):
-            result = await registry.execute(
-                "search_files", {"pattern": "content", "path": "."}
-            )
+            result = await registry.execute("search_files", {"pattern": "content", "path": "."})
         assert "timed out" in result.lower()
 
     @pytest.mark.asyncio
     async def test_search_files_grep_error(self, registry, temp_dir):
         """Test search_files when grep returns error."""
-        import subprocess
 
         (temp_dir / "file.txt").write_text("content")
 
@@ -1395,15 +1394,12 @@ class TestToolEdgeCases:
         mock_result.stdout = ""
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await registry.execute(
-                "search_files", {"pattern": "content", "path": "."}
-            )
+            result = await registry.execute("search_files", {"pattern": "content", "path": "."})
         assert "Error" in result or "invalid option" in result
 
     @pytest.mark.asyncio
     async def test_search_files_many_results_truncated(self, registry, temp_dir):
         """Test search_files truncates many results."""
-        import subprocess
 
         # Create a file with many matching lines
         lines = [f"match line {i}" for i in range(100)]
@@ -1416,9 +1412,7 @@ class TestToolEdgeCases:
         mock_result.stdout = "\n".join([f"file.txt:{i}:match line {i}" for i in range(60)])
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await registry.execute(
-                "search_files", {"pattern": "match", "path": "."}
-            )
+            result = await registry.execute("search_files", {"pattern": "match", "path": "."})
         assert "Truncated" in result
 
     @pytest.mark.asyncio
@@ -1634,7 +1628,6 @@ class TestToolsAdditionalCoverage:
     @pytest.mark.asyncio
     async def test_search_files_empty_output(self, registry, temp_dir):
         """Test search_files when grep returns empty output."""
-        import subprocess
 
         (temp_dir / "file.txt").write_text("content")
 
@@ -1644,9 +1637,7 @@ class TestToolsAdditionalCoverage:
         mock_result.stdout = ""  # Empty output
 
         with patch("subprocess.run", return_value=mock_result):
-            result = await registry.execute(
-                "search_files", {"pattern": "pattern", "path": "."}
-            )
+            result = await registry.execute("search_files", {"pattern": "pattern", "path": "."})
         assert "No matches found" in result
 
     @pytest.mark.asyncio
@@ -1655,17 +1646,13 @@ class TestToolsAdditionalCoverage:
         (temp_dir / "file.txt").write_text("content")
 
         with patch("subprocess.run", side_effect=RuntimeError("Unexpected")):
-            result = await registry.execute(
-                "search_files", {"pattern": "pattern", "path": "."}
-            )
+            result = await registry.execute("search_files", {"pattern": "pattern", "path": "."})
         assert "Error:" in result
 
     @pytest.mark.asyncio
     async def test_find_files_non_existent_path(self, registry):
         """Test find_files with non-existent directory."""
-        result = await registry.execute(
-            "find_files", {"pattern": "*.txt", "path": "nonexistent"}
-        )
+        result = await registry.execute("find_files", {"pattern": "*.txt", "path": "nonexistent"})
         assert "does not exist" in result
 
     @pytest.mark.asyncio
@@ -1689,9 +1676,7 @@ class TestToolsAdditionalCoverage:
     @pytest.mark.asyncio
     async def test_edit_file_missing_path(self, registry):
         """Test edit_file without path."""
-        result = await registry.execute(
-            "edit_file", {"old_text": "old", "new_text": "new"}
-        )
+        result = await registry.execute("edit_file", {"old_text": "old", "new_text": "new"})
         assert "required" in result.lower()
 
     @pytest.mark.asyncio
@@ -1710,9 +1695,7 @@ class TestToolsAdditionalCoverage:
     async def test_write_file_oserror(self, registry, temp_dir):
         """Test write_file handles OSError."""
         with patch.object(Path, "write_text", side_effect=OSError("Disk full")):
-            result = await registry.execute(
-                "write_file", {"path": "test.txt", "content": "test"}
-            )
+            result = await registry.execute("write_file", {"path": "test.txt", "content": "test"})
         assert "Error" in result
 
     @pytest.mark.asyncio

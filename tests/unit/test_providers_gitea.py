@@ -6,7 +6,6 @@ branch management, label operations, and error handling scenarios.
 """
 
 import base64
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -14,7 +13,6 @@ import pytest
 
 from repo_sapiens.models.domain import IssueState
 from repo_sapiens.providers.gitea_rest import GiteaRestProvider
-
 
 # =============================================================================
 # Fixtures
@@ -26,7 +24,7 @@ def provider() -> GiteaRestProvider:
     """Create a GiteaRestProvider instance for testing."""
     return GiteaRestProvider(
         base_url="https://gitea.example.com/",
-        token="test_api_token_12345",
+        token="test_api_token_12345",  # pragma: allowlist secret
         owner="test-owner",
         repo="test-repo",
     )
@@ -77,7 +75,7 @@ def sample_branch_data() -> dict:
     return {
         "name": "feature/authentication-fix",
         "commit": {
-            "id": "abc123def456789",
+            "id": "abc123def456789",  # pragma: allowlist secret
             "message": "Fix password validation",
         },
     }
@@ -121,14 +119,14 @@ class TestGiteaRestProviderInit:
         """Should initialize with required parameters."""
         provider = GiteaRestProvider(
             base_url="https://gitea.test.com",
-            token="test-token",
+            token="test-token",  # pragma: allowlist secret
             owner="myowner",
             repo="myrepo",
         )
 
         assert provider.base_url == "https://gitea.test.com"
         assert provider.api_base == "https://gitea.test.com/api/v1"
-        assert provider.token == "test-token"
+        assert provider.token == "test-token"  # pragma: allowlist secret
         assert provider.owner == "myowner"
         assert provider.repo == "myrepo"
         assert provider.client is None
@@ -137,7 +135,7 @@ class TestGiteaRestProviderInit:
         """Should strip trailing slash from base URL."""
         provider = GiteaRestProvider(
             base_url="https://gitea.test.com/",
-            token="token",
+            token="token",  # pragma: allowlist secret
             owner="owner",
             repo="repo",
         )
@@ -149,7 +147,7 @@ class TestGiteaRestProviderInit:
         """Should handle custom port in base URL."""
         provider = GiteaRestProvider(
             base_url="http://localhost:3000",
-            token="local-token",
+            token="local-token",  # pragma: allowlist secret
             owner="local-owner",
             repo="local-repo",
         )
@@ -199,9 +197,7 @@ class TestGiteaRestProviderConnection:
         assert provider.client is None
 
     @pytest.mark.asyncio
-    async def test_disconnect_when_not_connected(
-        self, provider: GiteaRestProvider
-    ) -> None:
+    async def test_disconnect_when_not_connected(self, provider: GiteaRestProvider) -> None:
         """Should handle disconnect when no client exists."""
         assert provider.client is None
 
@@ -703,7 +699,7 @@ class TestGiteaRestProviderBranches:
 
         assert branch is not None
         assert branch.name == "feature/authentication-fix"
-        assert branch.sha == "abc123def456789"
+        assert branch.sha == "abc123def456789"  # pragma: allowlist secret
 
     @pytest.mark.asyncio
     async def test_get_branch_not_found(
@@ -992,9 +988,7 @@ class TestGiteaRestProviderPullRequests:
         mock_httpx_client: AsyncMock,
     ) -> None:
         """Should return None for non-existent PR."""
-        mock_httpx_client.get = AsyncMock(
-            side_effect=Exception("Not found")
-        )
+        mock_httpx_client.get = AsyncMock(side_effect=Exception("Not found"))
         provider.client = mock_httpx_client
 
         pr = await provider.get_pull_request(999)
@@ -1072,9 +1066,7 @@ class TestGiteaRestProviderLabels:
         mock_httpx_client.get = AsyncMock(return_value=mock_response)
         provider.client = mock_httpx_client
 
-        label_ids = await provider._get_or_create_label_ids(
-            ["bug", "documentation"]
-        )
+        label_ids = await provider._get_or_create_label_ids(["bug", "documentation"])
 
         assert label_ids == [1, 3]
         # Should not have called POST (no new labels needed)
@@ -1102,9 +1094,7 @@ class TestGiteaRestProviderLabels:
         mock_httpx_client.post = AsyncMock(return_value=create_response)
         provider.client = mock_httpx_client
 
-        label_ids = await provider._get_or_create_label_ids(
-            ["bug", "new-label"]
-        )
+        label_ids = await provider._get_or_create_label_ids(["bug", "new-label"])
 
         assert label_ids == [1, 100]
 
@@ -1150,9 +1140,7 @@ class TestGiteaRestProviderErrorHandling:
         mock_httpx_client: AsyncMock,
     ) -> None:
         """Should propagate network errors."""
-        mock_httpx_client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        mock_httpx_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
         provider.client = mock_httpx_client
 
         with pytest.raises(httpx.ConnectError):
@@ -1269,9 +1257,7 @@ class TestGiteaRestProviderParsing:
         assert pr.head == "feature-branch"
         assert pr.base == "main"
 
-    def test_parse_pull_request_missing_body(
-        self, provider: GiteaRestProvider
-    ) -> None:
+    def test_parse_pull_request_missing_body(self, provider: GiteaRestProvider) -> None:
         """Should handle missing PR body."""
         data = {
             "id": 501,

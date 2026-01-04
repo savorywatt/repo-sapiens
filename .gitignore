@@ -38,6 +38,7 @@ build/
 .benchmarks/
 .builder/
 .credentials
+plans/*
 
 # Secrets baseline (keep in repo for detect-secrets)
 # .secrets.baseline

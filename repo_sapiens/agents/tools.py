@@ -1,10 +1,10 @@
 """Tool registry and execution for ReAct agent."""
+# ruff: noqa: E501  # Tool descriptions contain long lines by design
 
 from __future__ import annotations
 
 import asyncio
-import os
-import subprocess
+import subprocess  # nosec B404
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -282,9 +282,7 @@ class ToolRegistry:
         if self.allowed_commands:
             allowed = any(command.strip().startswith(cmd) for cmd in self.allowed_commands)
             if not allowed:
-                return (
-                    f"Error: Command not allowed. Permitted prefixes: {self.allowed_commands}"
-                )
+                return f"Error: Command not allowed. Permitted prefixes: {self.allowed_commands}"
 
         log.info("running_command", command=command, cwd=str(self.working_dir))
 
@@ -301,7 +299,7 @@ class ToolRegistry:
                     process.communicate(),
                     timeout=self.command_timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 return f"Error: Command timed out after {self.command_timeout}s"
 
@@ -321,9 +319,7 @@ class ToolRegistry:
         except Exception as e:
             return f"Error running command: {e}"
 
-    async def _search_files(
-        self, pattern: str, path: str = ".", file_pattern: str = "*"
-    ) -> str:
+    async def _search_files(self, pattern: str, path: str = ".", file_pattern: str = "*") -> str:
         """Search for a pattern in file contents using grep."""
         if not pattern:
             return "Error: 'pattern' parameter is required"
@@ -348,7 +344,7 @@ class ToolRegistry:
                 str(resolved),
             ]
 
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 capture_output=True,
                 text=True,
@@ -372,13 +368,15 @@ class ToolRegistry:
             max_matches = 50
             if len(lines) > max_matches:
                 lines = lines[:max_matches]
-                lines.append(f"\n[Truncated - showing first {max_matches} of {len(output.split(chr(10)))} matches]")
+                lines.append(
+                    f"\n[Truncated - showing first {max_matches} of {len(output.split(chr(10)))} matches]"
+                )
 
             # Convert absolute paths to relative paths
             formatted_lines = []
             for line in lines:
                 if line.startswith(str(resolved)):
-                    line = line[len(str(resolved)) + 1:]  # +1 for the slash
+                    line = line[len(str(resolved)) + 1 :]  # +1 for the slash
                 formatted_lines.append(line)
 
             return "\n".join(formatted_lines)

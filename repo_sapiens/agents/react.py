@@ -1,17 +1,18 @@
-"""ReAct (Reasoning + Acting) agent using Ollama and local tools."""
+"""ReAct (Reasoning + Acting) agent using configurable LLM backends and local tools."""
+# ruff: noqa: E501  # System prompts contain long lines by design
 
 from __future__ import annotations
 
 import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
 import structlog
 
+from repo_sapiens.agents.backends import LLMBackend, create_backend
 from repo_sapiens.agents.tools import ToolRegistry
 from repo_sapiens.models.domain import Issue, Plan, Review, Task, TaskResult
 from repo_sapiens.providers.base import AgentProvider
@@ -32,17 +33,32 @@ class TrajectoryStep:
 
 @dataclass
 class ReActConfig:
-    """Configuration for the ReAct agent."""
+    """Configuration for the ReAct agent.
+
+    Attributes:
+        model: The LLM model to use (e.g., "qwen3:latest" for Ollama,
+            "gpt-4" for OpenAI).
+        backend: The LLM backend type. Supported values: "ollama", "openai".
+        base_url: Custom base URL for the backend. If None, uses backend defaults:
+            - ollama: http://localhost:11434
+            - openai: http://localhost:8000/v1
+        api_key: Optional API key for authentication (used by OpenAI backend).
+        max_iterations: Maximum number of ReAct loop iterations.
+        temperature: Sampling temperature for the LLM (0.0 to 1.0).
+        timeout: Request timeout in seconds.
+    """
 
     model: str = "qwen3:latest"
-    ollama_url: str = "http://localhost:11434"
+    backend: str = "ollama"
+    base_url: str | None = None
+    api_key: str | None = None
     max_iterations: int = 10
     temperature: float = 0.7
     timeout: int = 300
 
 
 class ReActAgentProvider(AgentProvider):
-    """ReAct agent using Ollama for reasoning and local tools for acting.
+    """ReAct agent using configurable LLM backends for reasoning and local tools for acting.
 
     This agent implements the ReAct (Reasoning + Acting) pattern:
     1. Think about what to do next
@@ -50,8 +66,23 @@ class ReActAgentProvider(AgentProvider):
     3. Observe the result
     4. Repeat until task is complete
 
+    The agent supports multiple LLM backends through the LLMBackend abstraction:
+    - Ollama: Local inference with open-source models
+    - OpenAI: OpenAI-compatible APIs (including local servers like vLLM)
+
     Example usage:
+        # Using Ollama (default)
         agent = ReActAgentProvider(working_dir="/path/to/project")
+
+        # Using OpenAI-compatible backend
+        config = ReActConfig(
+            model="gpt-4",
+            backend="openai",
+            base_url="https://api.openai.com/v1",
+            api_key="sk-..."  # pragma: allowlist secret
+        )
+        agent = ReActAgentProvider(working_dir="/path/to/project", config=config)
+
         result = await agent.execute_task(task, context={})
     """
 
@@ -107,46 +138,45 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             self.working_dir,
             allowed_commands=allowed_commands,
         )
-        self.client = httpx.AsyncClient(timeout=self.config.timeout)
+        self.backend: LLMBackend = create_backend(
+            backend_type=self.config.backend,
+            base_url=self.config.base_url,
+            api_key=self.config.api_key,
+            timeout=self.config.timeout,
+        )
         self._trajectory: list[TrajectoryStep] = []
 
-    async def __aenter__(self) -> "ReActAgentProvider":
+    async def __aenter__(self) -> ReActAgentProvider:
         """Async context manager entry."""
         return self
 
     async def __aexit__(self, *args: Any) -> None:
         """Async context manager exit."""
-        await self.client.aclose()
+        await self.backend.close()
 
     async def list_models(self, raise_on_error: bool = False) -> list[str]:
-        """Get list of available models from Ollama server."""
-        try:
-            response = await self.client.get(f"{self.config.ollama_url}/api/tags")
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            return [m.get("name", "") for m in models]
-        except httpx.ConnectError:
-            if raise_on_error:
-                raise
-            return []
+        """Get list of available models from the backend.
+
+        Args:
+            raise_on_error: If True, raise exceptions on connection errors.
+
+        Returns:
+            List of available model names/identifiers.
+        """
+        return await self.backend.list_models(raise_on_error=raise_on_error)
 
     async def connect(self) -> None:
-        """Verify Ollama is running and model is available."""
-        try:
-            model_names = await self.list_models(raise_on_error=True)
+        """Verify backend is running and model is available."""
+        await self.backend.connect()
 
-            if not any(self.config.model in name for name in model_names):
-                log.warning(
-                    "model_not_found",
-                    model=self.config.model,
-                    available=model_names[:5],
-                    hint=f"Run: ollama pull {self.config.model}",
-                )
-        except httpx.ConnectError as e:
-            raise RuntimeError(
-                f"Ollama not running at {self.config.ollama_url}. "
-                "Start it with: ollama serve"
-            ) from e
+        # Check if configured model is available
+        models = await self.backend.list_models()
+        if models and not any(self.config.model in name for name in models):
+            log.warning(
+                "model_not_found",
+                model=self.config.model,
+                available=models[:5],
+            )
 
     def set_model(self, model: str) -> None:
         """Change the model to use."""
@@ -244,7 +274,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
         )
 
     async def _generate_step(self, task_prompt: str) -> str:
-        """Generate the next ReAct step from Ollama.
+        """Generate the next ReAct step from the LLM backend.
 
         Args:
             task_prompt: The task description
@@ -253,11 +283,9 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             Raw LLM response
         """
         # Build the full prompt
-        system = self.SYSTEM_PROMPT.format(
-            tool_descriptions=self.tools.get_tool_descriptions()
-        )
+        system = self.SYSTEM_PROMPT.format(tool_descriptions=self.tools.get_tool_descriptions())
 
-        messages = [
+        messages: list[dict[str, str]] = [
             {"role": "system", "content": system},
             {"role": "user", "content": task_prompt},
         ]
@@ -273,28 +301,21 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             messages.append({"role": "assistant", "content": assistant_msg})
 
             # Observation as user message
-            messages.append({
-                "role": "user",
-                "content": f"OBSERVATION: {step.observation}\n\nContinue with the next step.",
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"OBSERVATION: {step.observation}\n\nContinue with the next step.",
+                }
+            )
 
         try:
-            response = await self.client.post(
-                f"{self.config.ollama_url}/api/chat",
-                json={
-                    "model": self.config.model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": self.config.temperature,
-                    },
-                },
+            return await self.backend.chat(
+                messages=messages,
+                model=self.config.model,
+                temperature=self.config.temperature,
             )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("message", {}).get("content", "")
         except Exception as e:
-            log.error("ollama_request_failed", error=str(e))
+            log.error("llm_request_failed", error=str(e), backend=self.config.backend)
             raise
 
     def _parse_response(self, response: str) -> tuple[str, str, dict[str, Any]]:
@@ -426,6 +447,9 @@ async def run_react_task(
     task_description: str,
     working_dir: str | None = None,
     model: str = "qwen3:latest",
+    backend: str = "ollama",
+    base_url: str | None = None,
+    api_key: str | None = None,
     max_iterations: int = 10,
     verbose: bool = False,
 ) -> TaskResult:
@@ -434,14 +458,36 @@ async def run_react_task(
     Args:
         task_description: What to do
         working_dir: Directory to work in
-        model: Ollama model to use
+        model: LLM model to use (e.g., "qwen3:latest" for Ollama, "gpt-4" for OpenAI)
+        backend: LLM backend type ("ollama" or "openai")
+        base_url: Custom base URL for the backend (None uses backend defaults)
+        api_key: Optional API key for authentication (used by OpenAI backend)
         max_iterations: Maximum ReAct iterations
         verbose: Print trajectory steps
 
     Returns:
         TaskResult with execution details
+
+    Example:
+        # Using Ollama (default)
+        result = await run_react_task("List Python files", working_dir="./")
+
+        # Using OpenAI-compatible API
+        result = await run_react_task(
+            "List Python files",
+            model="gpt-4",
+            backend="openai",
+            base_url="https://api.openai.com/v1",
+            api_key="sk-..."  # pragma: allowlist secret
+        )
     """
-    config = ReActConfig(model=model, max_iterations=max_iterations)
+    config = ReActConfig(
+        model=model,
+        backend=backend,
+        base_url=base_url,
+        api_key=api_key,
+        max_iterations=max_iterations,
+    )
     agent = ReActAgentProvider(working_dir=working_dir, config=config)
 
     task = Task(
