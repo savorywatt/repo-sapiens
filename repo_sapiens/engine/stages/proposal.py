@@ -2,6 +2,7 @@
 
 import structlog
 
+from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue
 
@@ -18,12 +19,13 @@ class ProposalStage(WorkflowStage):
     4. Waits for user approval
     """
 
-    async def execute(self, issue: Issue) -> None:
+    async def execute(self, context: ExecutionContext) -> None:
         """Execute proposal stage.
 
         Args:
-            issue: Original issue requesting planning
+            context: Execution context containing the issue and workflow state
         """
+        issue = context.issue
         log.info("proposal_stage_start", issue=issue.number)
 
         # Notify user

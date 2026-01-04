@@ -2,7 +2,8 @@
 Base class for workflow stages.
 
 This module provides the WorkflowStage abstract base class that defines the
-interface and common functionality for all workflow stages.
+interface and common functionality for all workflow stages. Stages receive
+an ExecutionContext that carries the issue along with workflow state.
 """
 
 from abc import ABC, abstractmethod
@@ -10,8 +11,8 @@ from abc import ABC, abstractmethod
 import structlog
 
 from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.state_manager import StateManager
-from repo_sapiens.models.domain import Issue
 from repo_sapiens.providers.base import AgentProvider, GitProvider
 
 log = structlog.get_logger(__name__)
@@ -46,27 +47,30 @@ class WorkflowStage(ABC):
         self.settings = settings
 
     @abstractmethod
-    async def execute(self, issue: Issue) -> None:
+    async def execute(self, context: ExecutionContext) -> None:
         """Execute this stage of the workflow.
 
         Args:
-            issue: Issue being processed
+            context: Execution context containing the issue and workflow state.
+                     Stages may read from context.issue and other fields,
+                     and record outputs via context.set_stage_output().
 
         Raises:
             Exception: If stage execution fails
         """
         pass
 
-    async def _handle_stage_error(self, issue: Issue, error: Exception) -> None:
+    async def _handle_stage_error(self, context: ExecutionContext, error: Exception) -> None:
         """Common error handling for all stages.
 
         Adds a comment to the issue describing the error and adds the
         needs-attention label.
 
         Args:
-            issue: Issue that encountered an error
+            context: Execution context containing the issue
             error: Exception that occurred
         """
+        issue = context.issue
         error_msg = f"Stage execution failed: {str(error)}"
         log.error("stage_error", issue=issue.number, error=error_msg, exc_info=True)
 

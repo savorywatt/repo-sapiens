@@ -10,16 +10,16 @@ Tests cover:
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
 from repo_sapiens.models.domain import Issue, IssueState, Task
 from repo_sapiens.providers.base import AgentProvider, GitProvider
-
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -238,9 +238,7 @@ class TestStageRouting:
         stage = orchestrator._determine_stage(issue)
         assert stage == "pr_fix"
 
-    def test_route_approved_fix_proposal_to_fix_execution(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    def test_route_approved_fix_proposal_to_fix_execution(self, orchestrator: WorkflowOrchestrator):
         """Test that approved + fix-proposal labels route to fix_execution stage."""
         issue = create_test_issue(labels=["approved", "fix-proposal"])
         stage = orchestrator._determine_stage(issue)
@@ -282,9 +280,7 @@ class TestStageRouting:
         stage = orchestrator._determine_stage(issue)
         assert stage is None
 
-    def test_label_priority_proposed_over_needs_planning(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    def test_label_priority_proposed_over_needs_planning(self, orchestrator: WorkflowOrchestrator):
         """Test that 'proposed' takes precedence when both labels present."""
         issue = create_test_issue(labels=["proposed", "needs-planning"])
         stage = orchestrator._determine_stage(issue)
@@ -307,9 +303,7 @@ class TestIssueProcessing:
     """Tests for process_issue and process_all_issues methods."""
 
     @pytest.mark.asyncio
-    async def test_process_issue_executes_correct_stage(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_process_issue_executes_correct_stage(self, orchestrator: WorkflowOrchestrator):
         """Test that process_issue executes the correct stage based on labels."""
         issue = create_test_issue(labels=["needs-planning"])
 
@@ -319,7 +313,12 @@ class TestIssueProcessing:
 
         await orchestrator.process_issue(issue)
 
-        mock_stage.execute.assert_called_once_with(issue)
+        # Verify context was passed with the correct issue
+        mock_stage.execute.assert_called_once()
+        call_args = mock_stage.execute.call_args
+        context = call_args[0][0]  # First positional argument
+        assert isinstance(context, ExecutionContext)
+        assert context.issue == issue
 
     @pytest.mark.asyncio
     async def test_process_issue_no_matching_stage_returns_early(
@@ -335,13 +334,11 @@ class TestIssueProcessing:
         await orchestrator.process_issue(issue)
 
         # Verify no stage was executed
-        for stage_name, mock_stage in orchestrator.stages.items():
+        for _stage_name, mock_stage in orchestrator.stages.items():
             mock_stage.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_process_issue_stage_error_propagates(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_process_issue_stage_error_propagates(self, orchestrator: WorkflowOrchestrator):
         """Test that stage execution errors are propagated."""
         issue = create_test_issue(labels=["needs-planning"])
 
@@ -590,8 +587,9 @@ class TestParallelTaskExecution:
         # Track execution order
         execution_order = []
 
-        async def mock_execute(issue):
-            execution_order.append(issue.number)
+        async def mock_execute(context):
+            # context is now an ExecutionContext, extract issue from it
+            execution_order.append(context.issue.number)
 
         # Create mock stage objects
         mock_impl_stage = MagicMock()
@@ -736,8 +734,9 @@ class TestParallelTaskExecution:
 
         executed = []
 
-        async def track_execution(issue):
-            executed.append(issue.number)
+        async def track_execution(context):
+            # context is now an ExecutionContext, extract issue from it
+            executed.append(context.issue.number)
             await asyncio.sleep(0.001)
 
         mock_impl_stage = MagicMock()
@@ -763,9 +762,7 @@ class TestSingleTaskExecution:
     """Tests for _execute_single_task method."""
 
     @pytest.mark.asyncio
-    async def test_execute_single_task_requires_issue_id(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_execute_single_task_requires_issue_id(self, orchestrator: WorkflowOrchestrator):
         """Test that task without issue ID raises ValueError."""
         task = Task(
             id="task-1",
@@ -836,12 +833,12 @@ class TestSingleTaskExecution:
         assert execution_order == ["implementation", "code_review"]
 
     @pytest.mark.asyncio
-    async def test_execute_single_task_passes_issue_to_stages(
+    async def test_execute_single_task_passes_context_to_stages(
         self,
         orchestrator: WorkflowOrchestrator,
         mock_git_provider: AsyncMock,
     ):
-        """Test that the fetched issue is passed to both stages."""
+        """Test that an ExecutionContext with the fetched issue is passed to both stages."""
         task = create_test_task(task_id="task-1", issue_id=43)
         expected_issue = create_test_issue(number=43)
         mock_git_provider.get_issue.return_value = expected_issue
@@ -853,8 +850,19 @@ class TestSingleTaskExecution:
 
         await orchestrator._execute_single_task(task, "test-plan")
 
-        impl_mock.assert_called_once_with(expected_issue)
-        review_mock.assert_called_once_with(expected_issue)
+        # Verify implementation stage received context with correct issue and plan_id
+        impl_mock.assert_called_once()
+        impl_context = impl_mock.call_args[0][0]
+        assert isinstance(impl_context, ExecutionContext)
+        assert impl_context.issue == expected_issue
+        assert impl_context.plan_id == "test-plan"
+
+        # Verify code_review stage received context with correct issue and plan_id
+        review_mock.assert_called_once()
+        review_context = review_mock.call_args[0][0]
+        assert isinstance(review_context, ExecutionContext)
+        assert review_context.issue == expected_issue
+        assert review_context.plan_id == "test-plan"
 
 
 # -----------------------------------------------------------------------------
@@ -973,9 +981,7 @@ class TestStateManagement:
         assert plan_id in load_calls
 
     @pytest.mark.asyncio
-    async def test_stages_have_access_to_state_manager(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_stages_have_access_to_state_manager(self, orchestrator: WorkflowOrchestrator):
         """Test that all stages have access to the state manager."""
         for stage_name, stage in orchestrator.stages.items():
             assert hasattr(stage, "state"), f"Stage {stage_name} missing state attribute"
@@ -1002,7 +1008,8 @@ class TestIntegration:
 
         stage_executed = False
 
-        async def mock_execute(i):
+        async def mock_execute(context):
+            # context is now an ExecutionContext
             nonlocal stage_executed
             stage_executed = True
 
@@ -1031,7 +1038,8 @@ class TestIntegration:
         for stage_name in ["proposal", "approval", "pr_review"]:
 
             async def create_tracker(name):
-                async def track(issue):
+                async def track(context):
+                    # context is now an ExecutionContext
                     executed_stages.append(name)
 
                 return track
@@ -1061,8 +1069,9 @@ class TestIntegration:
 
         processed_numbers = []
 
-        async def track(issue):
-            processed_numbers.append(issue.number)
+        async def track(context):
+            # context is now an ExecutionContext, extract issue from it
+            processed_numbers.append(context.issue.number)
 
         orchestrator.stages["proposal"].execute = track
 

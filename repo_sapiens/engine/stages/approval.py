@@ -2,6 +2,7 @@
 
 import structlog
 
+from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue
 
@@ -22,12 +23,13 @@ class ApprovalStage(WorkflowStage):
 
     APPROVAL_KEYWORDS = ["ok", "approve", "approved", "lgtm", "looks good"]
 
-    async def execute(self, issue: Issue) -> None:
+    async def execute(self, context: ExecutionContext) -> None:
         """Execute approval stage.
 
         Args:
-            issue: Proposal issue to check for approval
+            context: Execution context containing the issue and workflow state
         """
+        issue = context.issue
         log.info("approval_stage_start", issue=issue.number)
 
         # Check if already processed (proposal closed means tasks already created)

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import structlog
 
+from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue, PullRequest
 
@@ -23,12 +24,13 @@ class QAStage(WorkflowStage):
     6. Updates label to 'qa-passed' or 'qa-failed'
     """
 
-    async def execute(self, issue: Issue) -> None:
+    async def execute(self, context: ExecutionContext) -> None:
         """Execute QA build and test.
 
         Args:
-            issue: Issue with 'requires-qa' label
+            context: Execution context containing the issue and workflow state
         """
+        issue = context.issue
         log.info("qa_stage_start", issue=issue.number)
 
         # Check if already QA'd

@@ -7,12 +7,9 @@ Tests cover:
 - CredentialResolver: Reference parsing, multi-backend resolution
 """
 
-import base64
-import json
 import os
 import secrets
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
@@ -27,7 +24,6 @@ from repo_sapiens.credentials.exceptions import (
 )
 from repo_sapiens.credentials.keyring_backend import KeyringBackend
 from repo_sapiens.credentials.resolver import CredentialResolver
-
 
 # =============================================================================
 # EnvironmentBackend Tests
@@ -242,9 +238,7 @@ class TestKeyringBackendGet:
                 result = backend.get("gitea", "api_token")
 
                 assert result == "secret_token"
-                mock_keyring.get_password.assert_called_once_with(
-                    "builder/gitea", "api_token"
-                )
+                mock_keyring.get_password.assert_called_once_with("builder/gitea", "api_token")
 
     def test_get_nonexistent_credential(self):
         """Should return None for non-existent credential."""
@@ -356,9 +350,7 @@ class TestKeyringBackendDelete:
                 result = backend.delete("gitea", "api_token")
 
                 assert result is True
-                mock_keyring.delete_password.assert_called_once_with(
-                    "builder/gitea", "api_token"
-                )
+                mock_keyring.delete_password.assert_called_once_with("builder/gitea", "api_token")
 
     def test_delete_nonexistent_credential(self):
         """Should return False when credential doesn't exist."""
@@ -419,7 +411,7 @@ def encrypted_backend(temp_credentials_dir):
     salt = secrets.token_bytes(16)
     return EncryptedFileBackend(
         file_path=file_path,
-        master_password="test_master_password",
+        master_password="test_master_password",  # pragma: allowlist secret
         salt=salt,
     )
 
@@ -439,7 +431,7 @@ class TestEncryptedFileBackendProperties:
         """Should return False when cryptography import fails."""
         backend = EncryptedFileBackend(
             file_path=temp_credentials_dir / "credentials.enc",
-            master_password="test",
+            master_password="test",  # pragma: allowlist secret
         )
 
         with patch.dict("sys.modules", {"cryptography.fernet": None}):
@@ -462,7 +454,7 @@ class TestEncryptedFileBackendInit:
         """Should initialize Fernet when password provided."""
         backend = EncryptedFileBackend(
             file_path=temp_credentials_dir / "credentials.enc",
-            master_password="test_password",
+            master_password="test_password",  # pragma: allowlist secret
             salt=secrets.token_bytes(16),
         )
 
@@ -483,7 +475,7 @@ class TestEncryptedFileBackendInit:
         """Should generate and save salt file when not provided."""
         backend = EncryptedFileBackend(
             file_path=temp_credentials_dir / "credentials.enc",
-            master_password="test",
+            master_password="test",  # pragma: allowlist secret
         )
 
         salt_file = temp_credentials_dir / "credentials.salt"
@@ -499,7 +491,7 @@ class TestEncryptedFileBackendInit:
 
         backend = EncryptedFileBackend(
             file_path=temp_credentials_dir / "credentials.enc",
-            master_password="test",
+            master_password="test",  # pragma: allowlist secret
         )
 
         assert backend.salt == expected_salt
@@ -525,7 +517,7 @@ class TestEncryptedFileBackendKeyDerivation:
     def test_same_password_salt_produces_same_key(self):
         """Should produce deterministic key from same inputs."""
         salt = secrets.token_bytes(16)
-        password = "test_password"
+        password = "test_password"  # pragma: allowlist secret
 
         fernet1 = EncryptedFileBackend._create_fernet(password, salt)
         fernet2 = EncryptedFileBackend._create_fernet(password, salt)
@@ -541,7 +533,7 @@ class TestEncryptedFileBackendKeyDerivation:
         """Should produce different keys for different salts."""
         salt1 = secrets.token_bytes(16)
         salt2 = secrets.token_bytes(16)
-        password = "test_password"
+        password = "test_password"  # pragma: allowlist secret
 
         fernet1 = EncryptedFileBackend._create_fernet(password, salt1)
         fernet2 = EncryptedFileBackend._create_fernet(password, salt2)
@@ -610,7 +602,7 @@ class TestEncryptedFileBackendGet:
         # Create backend with correct password and store credential
         backend1 = EncryptedFileBackend(
             file_path=temp_credentials_dir / "credentials.enc",
-            master_password="correct_password",
+            master_password="correct_password",  # pragma: allowlist secret
             salt=salt,
         )
         backend1.set("gitea", "api_token", "secret")
@@ -618,7 +610,7 @@ class TestEncryptedFileBackendGet:
         # Create backend with wrong password
         backend2 = EncryptedFileBackend(
             file_path=temp_credentials_dir / "credentials.enc",
-            master_password="wrong_password",
+            master_password="wrong_password",  # pragma: allowlist secret
             salt=salt,
         )
 
@@ -703,7 +695,7 @@ class TestEncryptedFileBackendSet:
 
         backend = EncryptedFileBackend(
             file_path=nested_path,
-            master_password="test",
+            master_password="test",  # pragma: allowlist secret
             salt=secrets.token_bytes(16),
         )
         backend.set("service", "key", "value")
@@ -771,7 +763,6 @@ class TestEncryptedFileBackendAtomicOperations:
         encrypted_backend.set("service", "key", "value")
 
         # Check file permissions (Unix only)
-        import stat
 
         mode = encrypted_backend.file_path.stat().st_mode
         # Owner read/write only
@@ -832,7 +823,7 @@ class TestCredentialResolverResolve:
 
     def test_resolve_environment_variable(self, credential_resolver):
         """Should resolve environment variable reference."""
-        with patch.dict(os.environ, {"TEST_API_KEY": "env_secret"}):
+        with patch.dict(os.environ, {"TEST_API_KEY": "env_secret"}):  # pragma: allowlist secret
             result = credential_resolver.resolve("${TEST_API_KEY}")
 
         assert result == "env_secret"
@@ -889,7 +880,7 @@ class TestCredentialResolverResolve:
         """Should resolve encrypted file reference."""
         # Set up encrypted backend with test credentials
         credential_resolver._encrypted_file_path = tmp_path / "creds.enc"
-        credential_resolver._encrypted_master_password = "test_password"
+        credential_resolver._encrypted_master_password = "test_password"  # pragma: allowlist secret
 
         # Create a mock and assign to private attribute to bypass property
         mock_backend = Mock()
@@ -1017,7 +1008,7 @@ class TestCredentialResolverLazyBackend:
         """Should lazily initialize encrypted backend."""
         resolver = CredentialResolver(
             encrypted_file_path=tmp_path / "lazy.enc",
-            encrypted_master_password="lazy_password",
+            encrypted_master_password="lazy_password",  # pragma: allowlist secret
         )
 
         # Backend not created yet
@@ -1038,6 +1029,135 @@ class TestCredentialResolverLazyBackend:
         assert ".builder/credentials.enc" in str(backend.file_path)
 
 
+class TestCredentialResolverBackendInjection:
+    """Tests for custom backend dependency injection."""
+
+    def test_custom_backends_injection(self):
+        """Should use custom backends when provided via constructor."""
+        # Create mock backends implementing CredentialBackend protocol
+        mock_backend_1 = Mock()
+        mock_backend_1.name = "mock_backend_1"
+        mock_backend_1.available = True
+        mock_backend_1.get.return_value = "secret_from_backend_1"
+
+        mock_backend_2 = Mock()
+        mock_backend_2.name = "mock_backend_2"
+        mock_backend_2.available = True
+        mock_backend_2.get.return_value = "secret_from_backend_2"
+
+        # Inject custom backends
+        resolver = CredentialResolver(backends=[mock_backend_1, mock_backend_2])
+
+        # Verify backends property returns our custom backends
+        backends = resolver.backends
+        assert len(backends) == 2
+        assert backends[0] is mock_backend_1
+        assert backends[1] is mock_backend_2
+
+        # Verify custom backends are stored as immutable tuple
+        assert isinstance(backends, tuple)
+
+        # Verify default backends are not in the returned tuple
+        assert resolver.environment_backend not in backends
+        assert resolver.keyring_backend not in backends
+
+    def test_default_backends_when_none_provided(self):
+        """Should use default backends when no custom backends specified."""
+        resolver = CredentialResolver()
+
+        backends = resolver.backends
+
+        # Should return default backends in standard resolution order
+        assert len(backends) == 3
+
+        # Verify order: environment, keyring, encrypted
+        assert backends[0] is resolver.environment_backend
+        assert backends[1] is resolver.keyring_backend
+        assert backends[2] is resolver.encrypted_backend
+
+        # Verify it's an immutable tuple
+        assert isinstance(backends, tuple)
+
+    def test_backend_resolution_order(self):
+        """Should try backends in the order they were provided."""
+        # Create mock backends with tracking
+        call_order = []
+
+        def make_tracked_backend(name: str, should_return: str | None):
+            """Create a mock backend that tracks call order."""
+            backend = Mock()
+            backend.name = name
+            backend.available = True
+
+            def tracked_get(service, key):
+                call_order.append(name)
+                return should_return
+
+            backend.get.side_effect = tracked_get
+            return backend
+
+        # First backend returns None (not found), second returns value
+        backend_a = make_tracked_backend("backend_a", None)
+        backend_b = make_tracked_backend("backend_b", "found_in_b")
+        backend_c = make_tracked_backend("backend_c", "found_in_c")
+
+        resolver = CredentialResolver(backends=[backend_a, backend_b, backend_c])
+
+        # Verify backends are in correct order
+        assert resolver.backends[0].name == "backend_a"
+        assert resolver.backends[1].name == "backend_b"
+        assert resolver.backends[2].name == "backend_c"
+
+        # Access backends property multiple times should return same order
+        first_access = resolver.backends
+        second_access = resolver.backends
+        assert first_access == second_access
+
+    def test_empty_backends_list_falls_back_to_defaults(self):
+        """Should fall back to default backends when empty list is provided.
+
+        An empty list is treated as 'no custom backends specified' rather than
+        'use zero backends', which is the more practical interpretation.
+        """
+        resolver = CredentialResolver(backends=[])
+
+        backends = resolver.backends
+
+        # Empty list is falsy, so defaults are used
+        assert len(backends) == 3
+        assert backends[0] is resolver.environment_backend
+        assert backends[1] is resolver.keyring_backend
+        assert backends[2] is resolver.encrypted_backend
+
+    def test_single_backend_injection(self):
+        """Should work correctly with a single custom backend."""
+        mock_backend = Mock()
+        mock_backend.name = "single_mock"
+        mock_backend.available = True
+
+        resolver = CredentialResolver(backends=[mock_backend])
+
+        backends = resolver.backends
+        assert len(backends) == 1
+        assert backends[0] is mock_backend
+
+    def test_backends_stored_as_immutable_tuple(self):
+        """Should convert backends list to immutable tuple for safety."""
+        mock_backend = Mock()
+        mock_backend.name = "test_backend"
+        mock_backend.available = True
+
+        mutable_list = [mock_backend]
+        resolver = CredentialResolver(backends=mutable_list)
+
+        # Verify internal storage is a tuple
+        assert isinstance(resolver._custom_backends, tuple)
+
+        # Modifying original list should not affect resolver
+        mutable_list.append(Mock())
+        assert len(resolver.backends) == 1
+
+
 # =============================================================================
 # Integration Tests (Backend Interactions)
 # =============================================================================
@@ -1051,7 +1171,7 @@ class TestEncryptionRoundTrip:
         salt = secrets.token_bytes(16)
         backend = EncryptedFileBackend(
             file_path=temp_credentials_dir / "lifecycle.enc",
-            master_password="lifecycle_password",
+            master_password="lifecycle_password",  # pragma: allowlist secret
             salt=salt,
         )
 
@@ -1072,7 +1192,7 @@ class TestEncryptionRoundTrip:
         """Should persist credentials across backend instances."""
         file_path = temp_credentials_dir / "persist.enc"
         salt = secrets.token_bytes(16)
-        password = "persist_password"
+        password = "persist_password"  # pragma: allowlist secret
 
         # First instance stores credential
         backend1 = EncryptedFileBackend(
@@ -1094,7 +1214,7 @@ class TestEncryptionRoundTrip:
 
     def test_special_characters_in_credentials(self, encrypted_backend):
         """Should handle special characters in credential values."""
-        special_value = 'secret!@#$%^&*()_+-=[]{}|;\':",./<>?`~\n\t'
+        special_value = "secret!@#$%^&*()_+-=[]{}|;':\",./<>?`~\n\t"
 
         encrypted_backend.set("service", "special", special_value)
         result = encrypted_backend.get("service", "special")
@@ -1136,7 +1256,7 @@ class TestResolverBackendIntegration:
         """Should resolve encrypted credentials through resolver."""
         resolver = CredentialResolver(
             encrypted_file_path=tmp_path / "resolver_test.enc",
-            encrypted_master_password="resolver_password",
+            encrypted_master_password="resolver_password",  # pragma: allowlist secret
         )
 
         # Store via encrypted backend directly

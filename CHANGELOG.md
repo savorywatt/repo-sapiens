@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-04
+
+### Added
+- **ExecutionContext Pattern**: New dataclass for workflow stage state management
+  - `ExecutionContext` in `repo_sapiens/engine/context.py` with issue, plan_id, workspace_path, branch_name, stage_outputs
+  - Enables inter-stage communication via `get_stage_output()` and `set_stage_output()`
+  - Immutable updates via `with_updates()` method
+- **CredentialResolver Dependency Injection**: Backends can now be injected for testing
+  - New `backends` parameter in `CredentialResolver.__init__()`
+  - `backends` property returns custom or default backends in resolution order
+  - 6 new unit tests for backend injection behavior
+- **Design Decisions Section**: New ARCHITECTURE.md section documenting intentional choices
+  - Credential backend interface rationale
+  - Provider module structure explanation
+  - Template engine naming justification
+  - State persistence approach
+
+### Changed
+- **WorkflowStage Interface**: Updated from `execute(issue)` to `execute(context)`
+  - All 12 stage implementations migrated to new signature
+  - Orchestrator creates ExecutionContext and passes to stages
+  - Error handling updated to use context
+- **CredentialResolver.resolve()**: Now iterates over `self.backends` property
+  - Enables custom backend ordering for testing
+  - Maintains backward compatibility with existing code
+
+### Fixed
+- **ARCHITECTURE.md Accuracy**: Documentation now matches actual implementation
+  - Corrected `CredentialBackend` interface (ABC with get/set/delete, not Protocol with resolve/can_handle)
+  - Fixed Git provider paths (`repo_sapiens/providers/` not `repo_sapiens/git/`)
+  - Updated template engine name (`SecureTemplateEngine` not `TemplateEngine`)
+  - Fixed WorkflowOrchestrator example with correct DI pattern
+  - Updated Strategy Pattern section with centralized pattern matching approach
+
 ## [0.3.0] - 2026-01-02
 
 ### Changed

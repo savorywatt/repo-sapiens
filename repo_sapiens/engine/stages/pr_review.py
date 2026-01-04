@@ -4,6 +4,7 @@ import re
 
 import structlog
 
+from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue, PullRequest
 
@@ -21,12 +22,13 @@ class PRReviewStage(WorkflowStage):
     5. Updates label to 'needs-fix' or 'approved'
     """
 
-    async def execute(self, issue: Issue) -> None:
+    async def execute(self, context: ExecutionContext) -> None:
         """Execute PR code review.
 
         Args:
-            issue: PR issue with 'needs-review' label
+            context: Execution context containing the issue and workflow state
         """
+        issue = context.issue
         log.info("pr_review_start", issue=issue.number)
 
         # This should only run on PR issues

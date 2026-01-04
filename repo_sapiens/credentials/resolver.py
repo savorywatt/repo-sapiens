@@ -2,8 +2,11 @@
 
 import logging
 import re
+from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
+from .backend import CredentialBackend
 from .encrypted_backend import EncryptedFileBackend
 from .environment_backend import EnvironmentBackend
 from .exceptions import (
@@ -41,14 +44,19 @@ class CredentialResolver:
         self,
         encrypted_file_path: Path | None = None,
         encrypted_master_password: str | None = None,
+        backends: Sequence[CredentialBackend] | None = None,
     ) -> None:
         """Initialize credential resolver.
 
         Args:
             encrypted_file_path: Path to encrypted credentials file
             encrypted_master_password: Master password for encrypted backend
+            backends: Optional sequence of custom backends to use instead of
+                the default backends. When provided, only these backends will
+                be used for resolution (via the `backends` property). The
+                sequence is converted to a tuple for immutability.
         """
-        # Initialize backends
+        # Initialize default backends
         self.keyring_backend = KeyringBackend()
         self.environment_backend = EnvironmentBackend()
 
@@ -56,6 +64,11 @@ class CredentialResolver:
         self._encrypted_backend: EncryptedFileBackend | None = None
         self._encrypted_file_path = encrypted_file_path
         self._encrypted_master_password = encrypted_master_password
+
+        # Store custom backends as immutable tuple (if provided)
+        self._custom_backends: tuple[CredentialBackend, ...] | None = (
+            tuple(backends) if backends else None
+        )
 
         # Cache for resolved credentials (reduces backend calls)
         self._cache: dict[str, str] = {}
@@ -70,6 +83,24 @@ class CredentialResolver:
                 master_password=self._encrypted_master_password,
             )
         return self._encrypted_backend
+
+    @property
+    def backends(self) -> tuple[CredentialBackend, ...]:
+        """Return active backends in resolution order.
+
+        Returns:
+            Tuple of backends to use for credential resolution. If custom
+            backends were provided at initialization, returns those;
+            otherwise returns the default backends (environment, keyring,
+            encrypted) in standard resolution order.
+        """
+        if self._custom_backends is not None:
+            return self._custom_backends
+        # Cast to satisfy mypy - these are all CredentialBackend implementations
+        return cast(
+            tuple[CredentialBackend, ...],
+            (self.environment_backend, self.keyring_backend, self.encrypted_backend),
+        )
 
     def resolve(self, value: str, cache: bool = True) -> str:
         """Resolve credential reference to actual value.
@@ -99,37 +130,37 @@ class CredentialResolver:
             logger.debug(f"Credential resolved from cache: {value}")
             return self._cache[value]
 
-        # Try to parse as keyring reference
+        # Parse reference format to determine backend type and parameters
         keyring_match = self.KEYRING_PATTERN.match(value)
+        env_match = self.ENV_PATTERN.match(value)
+        encrypted_match = self.ENCRYPTED_PATTERN.match(value)
+
+        # Route to appropriate resolution based on reference format
+        resolved: str | None = None
+
         if keyring_match:
-            resolved = self._resolve_keyring(
+            resolved = self._resolve_via_backends(
+                backend_name="keyring",
                 service=keyring_match.group(1),
                 key=keyring_match.group(2),
                 reference=value,
             )
-            if cache:
-                self._cache[value] = resolved
-            return resolved
-
-        # Try to parse as environment variable
-        env_match = self.ENV_PATTERN.match(value)
-        if env_match:
-            resolved = self._resolve_environment(
-                var_name=env_match.group(1),
+        elif env_match:
+            resolved = self._resolve_via_backends(
+                backend_name="environment",
+                service=env_match.group(1),
+                key=None,
                 reference=value,
             )
-            if cache:
-                self._cache[value] = resolved
-            return resolved
-
-        # Try to parse as encrypted file reference
-        encrypted_match = self.ENCRYPTED_PATTERN.match(value)
-        if encrypted_match:
-            resolved = self._resolve_encrypted(
+        elif encrypted_match:
+            resolved = self._resolve_via_backends(
+                backend_name="encrypted",
                 service=encrypted_match.group(1),
                 key=encrypted_match.group(2),
                 reference=value,
             )
+
+        if resolved is not None:
             if cache:
                 self._cache[value] = resolved
             return resolved
@@ -143,6 +174,114 @@ class CredentialResolver:
             )
 
         return value
+
+    def _resolve_via_backends(
+        self,
+        backend_name: str,
+        service: str,
+        key: str | None,
+        reference: str,
+    ) -> str:
+        """Resolve credential by iterating through configured backends.
+
+        Args:
+            backend_name: Target backend name ('keyring', 'environment', 'encrypted')
+            service: Service identifier or variable name
+            key: Key within service (None for environment backend)
+            reference: Original reference string for error messages
+
+        Returns:
+            Resolved credential value
+
+        Raises:
+            CredentialNotFoundError: If credential doesn't exist
+            BackendNotAvailableError: If required backend is unavailable
+        """
+        for backend in self.backends:
+            # Match backend by name property
+            backend_matches = False
+            if hasattr(backend, "name"):
+                backend_matches = backend.name == backend_name
+
+            if not backend_matches:
+                continue
+
+            # Found matching backend - check availability
+            if not backend.available:
+                suggestions = {
+                    "keyring": (
+                        "Install keyring: pip install keyring\n"
+                        "Or use environment variables: ${VAR_NAME}"
+                    ),
+                    "encrypted": "Install cryptography: pip install cryptography",
+                    "environment": None,
+                }
+                backend_display = {
+                    "keyring": "Keyring backend is not available on this system",
+                    "encrypted": "Encrypted file backend is not available",
+                    "environment": "Environment backend is not available",
+                }
+                raise BackendNotAvailableError(
+                    backend_display.get(backend_name, f"{backend_name} backend is not available"),
+                    reference=reference,
+                    suggestion=suggestions.get(backend_name),
+                )
+
+            try:
+                # Environment backend takes single arg, others take service/key
+                if backend_name == "environment":
+                    credential = backend.get(service)  # type: ignore[call-arg]
+                else:
+                    credential = backend.get(service, key)
+
+                if credential is None:
+                    # Use specific error messages matching original behavior
+                    if backend_name == "environment":
+                        raise CredentialNotFoundError(
+                            f"Environment variable not set: {service}",
+                            reference=reference,
+                            suggestion=(
+                                f"Set the environment variable:\n"
+                                f"  export {service}='your-credential-here'"
+                            ),
+                        )
+                    elif backend_name == "keyring":
+                        raise CredentialNotFoundError(
+                            f"Credential not found in keyring: {service}/{key}",
+                            reference=reference,
+                            suggestion=(
+                                f"Store the credential with:\n"
+                                f"  builder credentials set --keyring {service}/{key}"
+                            ),
+                        )
+                    elif backend_name == "encrypted":
+                        raise CredentialNotFoundError(
+                            f"Credential not found in encrypted file: {service}/{key}",
+                            reference=reference,
+                            suggestion=(
+                                f"Store the credential with:\n"
+                                f"  builder credentials set --encrypted {service}/{key}"
+                            ),
+                        )
+
+                log_key = f"{service}/{key}" if key else service
+                logger.debug(f"Resolved {backend_name} credential: {log_key}")
+                return credential
+
+            except CredentialError:
+                raise
+            except Exception as e:
+                raise CredentialError(
+                    f"Failed to resolve {backend_name} credential: {e}",
+                    reference=reference,
+                ) from e
+
+        # No matching backend found in the configured backends
+        raise BackendNotAvailableError(
+            f"No {backend_name} backend configured",
+            reference=reference,
+            suggestion=f"Ensure a {backend_name} backend is available in the resolver.",
+        )
 
     def _resolve_keyring(self, service: str, key: str, reference: str) -> str:
         """Resolve keyring reference.
