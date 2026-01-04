@@ -221,6 +221,10 @@ class AutomationSettings(BaseSettings):
 
         Raises:
             ValueError: If a referenced environment variable is not set
+
+        Note:
+            YAML comment lines (starting with #) are preserved unchanged,
+            allowing documentation examples like ${VAR_NAME} in comments.
         """
         pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
 
@@ -242,4 +246,12 @@ class AutomationSettings(BaseSettings):
                 raise ValueError(f"Environment variable {var_name} is not set")
             return value
 
-        return pattern.sub(replace_var, content)
+        def process_line(line: str) -> str:
+            """Process a single line, skipping YAML comments."""
+            stripped = line.lstrip()
+            if stripped.startswith("#"):
+                return line
+            return pattern.sub(replace_var, line)
+
+        lines = content.split("\n")
+        return "\n".join(process_line(line) for line in lines)

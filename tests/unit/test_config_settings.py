@@ -1030,6 +1030,36 @@ agent_provider:
         # The empty string is a valid SecretStr
         assert settings.git_provider.api_token
 
+    def test_env_var_in_yaml_comment_is_ignored(self, temp_yaml_file: Path, monkeypatch):
+        """Test that ${VAR_NAME} patterns in YAML comments are not interpolated.
+
+        This prevents documentation examples from being parsed as actual
+        environment variable references.
+        """
+        monkeypatch.setenv("REAL_TOKEN", "actual-token-value")
+        # Note: VAR_NAME is intentionally NOT set - it's just documentation
+
+        config_content = """
+# Configuration file for automation
+# Environment variables can be referenced using ${VAR_NAME} syntax
+# Example: api_token: ${MY_TOKEN}
+git_provider:
+  base_url: https://example.com
+  api_token: ${REAL_TOKEN}
+repository:
+  owner: org
+  name: repo
+agent_provider:
+  provider_type: claude-local
+"""
+
+        with open(temp_yaml_file, "w") as f:
+            f.write(config_content)
+
+        # Should NOT raise ValueError about VAR_NAME or MY_TOKEN being unset
+        settings = AutomationSettings.from_yaml(str(temp_yaml_file))
+        assert settings.git_provider.api_token.get_secret_value() == "actual-token-value"
+
 
 class TestConfigurationSerialization:
     """Test configuration model serialization."""
