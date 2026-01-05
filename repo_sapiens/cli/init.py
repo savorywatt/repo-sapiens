@@ -128,8 +128,9 @@ class RepoInitializer:
         self.goose_temperature = 0.7
 
         # Builtin ReAct agent settings
+        self.builtin_provider = None  # 'ollama', 'vllm', 'openai', 'anthropic', etc.
         self.builtin_model = None
-        self.builtin_ollama_url = None
+        self.builtin_base_url = None  # For ollama/vllm
 
     def run(self) -> None:
         """Run the initialization workflow."""
@@ -298,8 +299,7 @@ class RepoInitializer:
                 if base_agent not in agent_choices:
                     agent_choices.append(base_agent)
 
-            agent_choices.append("builtin")  # Builtin ReAct agent with Ollama
-            agent_choices.append("api")  # Always allow API mode
+            agent_choices.append("builtin")  # Builtin ReAct agent (Ollama, vLLM, or API)
 
             self.agent_type = click.prompt(
                 "Which agent do you want to use?",
@@ -310,22 +310,13 @@ class RepoInitializer:
             click.echo(click.style("⚠ No AI agent CLIs detected", fg="yellow"))
             click.echo()
             click.echo("You can:")
-            click.echo("  1. Use builtin ReAct agent (requires Ollama)")
+            click.echo("  1. Use builtin ReAct agent (local or cloud LLM)")
             click.echo("  2. Install Claude Code: https://claude.com/install.sh")
             click.echo("  3. Install Goose: pip install goose-ai")
-            click.echo("  4. Use API mode (requires API key)")
             click.echo()
 
-            self.agent_type = click.prompt(
-                "Which option?",
-                type=click.Choice(["builtin", "api"]),
-                default="builtin",
-            )
-            if self.agent_type == "api":
-                self.agent_type = click.prompt(
-                    "Which API provider?", type=click.Choice(["claude", "openai"]), default="claude"
-                )
-                self.agent_mode = "api"
+            self.agent_type = "builtin"
+            click.echo("Using builtin ReAct agent...")
 
         # Configure based on agent type
         if self.agent_type == "claude":
@@ -447,19 +438,63 @@ class RepoInitializer:
         self.agent_mode = "local"  # Goose runs locally
 
     def _configure_builtin(self) -> None:
-        """Configure builtin ReAct agent with Ollama."""
+        """Configure builtin ReAct agent with LLM provider selection."""
+        from repo_sapiens.utils.agent_detector import (
+            format_provider_comparison,
+            get_provider_info,
+            get_provider_recommendation,
+            get_vllm_vs_ollama_note,
+        )
+
         click.echo()
         click.echo(click.style("🧠 Builtin ReAct Agent Configuration", bold=True, fg="cyan"))
         click.echo()
-        click.echo("The builtin agent uses a local LLM via Ollama for reasoning.")
+        click.echo("The builtin agent uses an LLM for reasoning and executes tools locally.")
         click.echo()
 
-        # Check Ollama availability
+        # Show provider comparison
+        click.echo(format_provider_comparison())
+        click.echo()
+
+        # Show vLLM vs Ollama note for local providers
+        click.echo(get_vllm_vs_ollama_note())
+        click.echo()
+
+        # Show recommendation
+        click.echo(click.style("💡 Recommendation:", bold=True, fg="green"))
+        click.echo(get_provider_recommendation("tool-usage"))
+        click.echo()
+
+        # Prompt for LLM provider
+        self.builtin_provider = click.prompt(
+            "Which LLM provider?",
+            type=click.Choice(["ollama", "vllm", "openai", "anthropic", "openrouter", "groq"]),
+            default="ollama",
+        )
+
+        provider_info = get_provider_info(self.builtin_provider)
+
+        # For local providers, check availability and configure URL
+        if self.builtin_provider == "ollama":
+            self._configure_builtin_ollama(provider_info)
+        elif self.builtin_provider == "vllm":
+            self._configure_builtin_vllm(provider_info)
+        else:
+            # Cloud provider - needs API key
+            self._configure_builtin_cloud(provider_info)
+
+        self.agent_mode = "local"
+
+    def _configure_builtin_ollama(self, provider_info: dict) -> None:
+        """Configure Ollama for builtin agent."""
         import httpx
 
-        ollama_url = "http://localhost:11434"
+        click.echo()
+        default_url = "http://localhost:11434"
+
+        # Check Ollama availability
         try:
-            response = httpx.get(f"{ollama_url}/api/tags", timeout=5.0)
+            response = httpx.get(f"{default_url}/api/tags", timeout=5.0)
             if response.status_code == 200:
                 models_data = response.json()
                 available_models = [m["name"] for m in models_data.get("models", [])]
@@ -482,40 +517,114 @@ class RepoInitializer:
         # Model selection
         recommended_models = ["qwen3:8b", "qwen3:14b", "llama3.1:8b", "mistral:7b"]
         if available_models:
-            # Prefer available models, but allow custom input
             model_choices = [m for m in recommended_models if m in available_models]
             model_choices.extend([m for m in available_models if m not in model_choices][:3])
             default_model = model_choices[0] if model_choices else "qwen3:8b"
         else:
-            model_choices = recommended_models
             default_model = "qwen3:8b"
 
         click.echo("Recommended models for tool-calling:")
         for model in recommended_models[:4]:
-            marker = (
-                " (recommended)"
-                if model == "qwen3:8b"
-                else " (requires 24GB VRAM)"
-                if model == "qwen3:14b"
-                else ""
-            )
+            marker = " (recommended)" if model == "qwen3:8b" else " (requires 24GB VRAM)" if model == "qwen3:14b" else ""
             available = " ✓" if model in available_models else ""
             click.echo(f"  • {model}{marker}{available}")
         click.echo()
 
+        self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
+
+        # URL configuration
+        if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
+            self.builtin_base_url = default_url
+        else:
+            self.builtin_base_url = click.prompt("Ollama URL", default=default_url)
+
+    def _configure_builtin_vllm(self, provider_info: dict) -> None:
+        """Configure vLLM for builtin agent."""
+        import httpx
+
+        click.echo()
+        default_url = "http://localhost:8000"
+
+        # Check vLLM availability
+        try:
+            response = httpx.get(f"{default_url}/v1/models", timeout=5.0)
+            if response.status_code == 200:
+                models_data = response.json()
+                available_models = [m["id"] for m in models_data.get("data", [])]
+                click.echo(click.style("✓ vLLM is running", fg="green"))
+                if available_models:
+                    click.echo(f"  Available models: {', '.join(available_models)}")
+            else:
+                available_models = []
+                click.echo(click.style("⚠ vLLM responded but no models found", fg="yellow"))
+        except Exception:
+            available_models = []
+            click.echo(click.style("⚠ vLLM not detected at localhost:8000", fg="yellow"))
+            click.echo("  Start vLLM: vllm serve qwen3:8b --port 8000")
+
+        click.echo()
+
+        # Model selection
+        recommended_models = provider_info.get("models", ["qwen3:8b", "qwen3:14b", "llama3.1:8b"])
+        default_model = available_models[0] if available_models else provider_info.get("default_model", "qwen3:8b")
+
+        click.echo("Recommended models for tool-calling:")
+        for model in recommended_models[:4]:
+            marker = " (recommended)" if model == "qwen3:8b" else " (requires 24GB VRAM)" if "14b" in model else ""
+            available = " ✓" if model in available_models else ""
+            click.echo(f"  • {model}{marker}{available}")
+        click.echo()
+
+        self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
+
+        # URL configuration
+        if click.confirm("Use default vLLM URL (localhost:8000)?", default=True):
+            self.builtin_base_url = default_url
+        else:
+            self.builtin_base_url = click.prompt("vLLM URL", default=default_url)
+
+    def _configure_builtin_cloud(self, provider_info: dict) -> None:
+        """Configure cloud LLM provider for builtin agent."""
+        import os
+
+        click.echo()
+
+        # Model selection
+        available_models = provider_info.get("models", [])
+        default_model = provider_info.get("default_model", available_models[0] if available_models else "gpt-4o")
+
+        click.echo(f"Available models for {provider_info['name']}:")
+        for i, model in enumerate(available_models[:5], 1):
+            marker = " (recommended)" if model == default_model else ""
+            click.echo(f"  {i}. {model}{marker}")
+        click.echo()
+
         self.builtin_model = click.prompt(
             "Which model?",
-            type=str,
+            type=click.Choice(available_models) if available_models else str,
             default=default_model,
         )
 
-        # Ollama URL (usually default)
-        if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
-            self.builtin_ollama_url = ollama_url
-        else:
-            self.builtin_ollama_url = click.prompt("Ollama URL", default=ollama_url)
+        # API key
+        api_key_env = provider_info.get("api_key_env")
+        if api_key_env:
+            existing_key = os.getenv(api_key_env)
 
-        self.agent_mode = "local"
+            if existing_key:
+                use_existing = click.confirm(f"{api_key_env} found in environment. Use it?", default=True)
+                if use_existing:
+                    self.agent_api_key = existing_key
+                else:
+                    self.agent_api_key = click.prompt(
+                        f"Enter your {provider_info['name']} API key", hide_input=True, type=str
+                    )
+            else:
+                website = provider_info.get("website", "provider website")
+                click.echo(f"API key required. Get it from: {website}")
+                click.echo()
+                self.agent_api_key = click.prompt(
+                    f"Enter your {provider_info['name']} API key", hide_input=True, type=str
+                )
 
     def _store_credentials(self) -> None:
         """Store credentials in selected backend."""
@@ -548,6 +657,10 @@ class RepoInitializer:
                 # Store under provider-specific key
                 backend.set(self.goose_llm_provider, "api_key", self.agent_api_key)
                 click.echo(f"   ✓ Stored: {self.goose_llm_provider}/api_key")
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                # Store under provider-specific key
+                backend.set(self.builtin_provider, "api_key", self.agent_api_key)
+                click.echo(f"   ✓ Stored: {self.builtin_provider}/api_key")
             elif self.agent_type == "claude":
                 backend.set("claude", "api_key", self.agent_api_key)
                 click.echo("   ✓ Stored: claude/api_key")
@@ -565,6 +678,11 @@ class RepoInitializer:
             if self.agent_type == "goose" and self.goose_llm_provider:
                 # Store under provider-specific environment variable
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
+                backend.set(env_var, self.agent_api_key)
+                click.echo(f"   ✓ Set: {env_var}")
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                # Store under provider-specific environment variable
+                env_var = f"{self.builtin_provider.upper()}_API_KEY"
                 backend.set(env_var, self.agent_api_key)
                 click.echo(f"   ✓ Set: {env_var}")
             elif self.agent_type == "claude":
@@ -694,10 +812,14 @@ class RepoInitializer:
         if self.backend == "keyring":
             gitea_token_ref = "@keyring:gitea/api_token"  # nosec B105 # Template placeholder for keyring reference
 
-            # For Goose, use provider-specific keyring path
+            # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
                 agent_api_key_ref = (
                     f"@keyring:{self.goose_llm_provider}/api_key" if self.agent_api_key else "null"
+                )
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                agent_api_key_ref = (
+                    f"@keyring:{self.builtin_provider}/api_key" if self.agent_api_key else "null"
                 )
             elif self.agent_type == "claude":
                 agent_api_key_ref = "@keyring:claude/api_key" if self.agent_api_key else "null"
@@ -708,9 +830,12 @@ class RepoInitializer:
             gitea_token_ref = "${GITEA_TOKEN}"  # nosec B105 # Template placeholder for environment variable
             # fmt: on
 
-            # For Goose, use provider-specific environment variable
+            # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
+                agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                env_var = f"{self.builtin_provider.upper()}_API_KEY"
                 agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
             elif self.agent_type == "claude":
                 agent_api_key_ref = "${CLAUDE_API_KEY}" if self.agent_api_key else "null"
@@ -738,16 +863,35 @@ class RepoInitializer:
   local_mode: {str(self.agent_mode == "local").lower()}
 {goose_config_section}"""
         elif self.agent_type == "builtin":
-            # Builtin ReAct agent with Ollama
-            provider_type = "ollama"
+            # Builtin ReAct agent with selected provider
             model = self.builtin_model or "qwen3:8b"
-            ollama_url = self.builtin_ollama_url or "http://localhost:11434"
-            agent_config = f"""agent_provider:
+
+            if self.builtin_provider == "ollama":
+                provider_type = "ollama"
+                base_url = self.builtin_base_url or "http://localhost:11434"
+                agent_config = f"""agent_provider:
   provider_type: {provider_type}
   model: {model}
   api_key: null
   local_mode: true
-  ollama_url: {ollama_url}"""
+  base_url: {base_url}"""
+            elif self.builtin_provider == "vllm":
+                provider_type = "openai-compatible"
+                base_url = self.builtin_base_url or "http://localhost:8000"
+                agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: null
+  local_mode: true
+  base_url: {base_url}/v1"""
+            else:
+                # Cloud provider (openai, anthropic, openrouter, groq)
+                provider_type = self.builtin_provider
+                agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: {agent_api_key_ref}
+  local_mode: false"""
         else:
             # Claude configuration
             provider_type = f"claude-{self.agent_mode}"

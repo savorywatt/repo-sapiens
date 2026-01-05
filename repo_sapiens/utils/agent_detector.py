@@ -347,6 +347,30 @@ LLM_PROVIDER_INFO = {
         "recommended_for": "Privacy-sensitive work, experimentation, learning, offline use",
         "note": "For tool usage, consider vLLM instead of Ollama",
     },
+    "vllm": {
+        "name": "vLLM (Local)",
+        "description": "High-performance local serving with OpenAI-compatible API",
+        "models": ["qwen3:8b", "qwen3:14b", "llama3.1:8b", "mistral:7b"],
+        "default_model": "qwen3:8b",
+        "tool_support": "good",
+        "cost": "free",
+        "speed": "fast",
+        "api_key_env": None,
+        "requires_install": "pip install vllm",
+        "pros": [
+            "100% free (no API costs)",
+            "Complete data privacy (runs locally)",
+            "OpenAI-compatible API (better tool support than Ollama)",
+            "Excellent GPU utilization",
+            "Continuous batching for high throughput",
+        ],
+        "cons": [
+            "Requires powerful GPU (NVIDIA recommended)",
+            "More complex setup than Ollama",
+            "Linux-only (or WSL2 on Windows)",
+        ],
+        "recommended_for": "Local tool-calling tasks, privacy-sensitive work with good hardware",
+    },
     "openrouter": {
         "name": "OpenRouter",
         "description": "Access to 100+ models through one API",
@@ -500,7 +524,7 @@ def format_provider_comparison() -> str:
         "--------------|--------------|-------------|------------|---------------------------",
     ]
 
-    providers = ["openai", "anthropic", "ollama", "openrouter", "groq"]
+    providers = ["openai", "anthropic", "ollama", "vllm", "openrouter", "groq"]
 
     for provider in providers:
         if provider not in LLM_PROVIDER_INFO:

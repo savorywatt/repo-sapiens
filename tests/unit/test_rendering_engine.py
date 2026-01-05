@@ -429,3 +429,257 @@ label: {{ label | safe_label }}
         assert "url: https://example.com" in result
         assert "identifier: my-repo" in result
         assert "label: bug-fix" in result or "label: bug fix" in result
+
+
+class TestSecureTemplateEngineRenderMethod:
+    """Tests for the render() method."""
+
+    def test_render_method_basic(self, tmp_path):
+        """Should render template via render() method."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "simple.yaml.j2"
+        template_file.write_text("name: {{ name }}")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        result = engine.render("simple.yaml.j2", {"name": "test"}, validate=False)
+
+        assert result == "name: test"
+
+    def test_render_validates_context_by_default(self, tmp_path):
+        """Should validate context by default."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "test.yaml.j2"
+        template_file.write_text("value: {{ value }}")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        # Provide required fields for validation
+        context = {
+            "value": "safe",
+            "gitea_url": "https://gitea.example.com",
+            "gitea_owner": "owner",
+            "gitea_repo": "repo",
+        }
+        result = engine.render("test.yaml.j2", context)
+        assert "value: safe" in result
+
+    def test_render_skip_validation(self, tmp_path):
+        """Should skip validation when validate=False."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "skip.yaml.j2"
+        template_file.write_text("{{ data }}")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        result = engine.render("skip.yaml.j2", {"data": "test"}, validate=False)
+
+        assert result == "test"
+
+
+class TestValidateTemplatePath:
+    """Tests for validate_template_path() method."""
+
+    def test_valid_path(self, tmp_path):
+        """Should return resolved path for valid template."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "valid.j2"
+        template_file.write_text("content")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        path = engine.validate_template_path("valid.j2")
+
+        assert path.exists()
+        assert path.is_absolute()
+        assert path.name == "valid.j2"
+
+    def test_nested_valid_path(self, tmp_path):
+        """Should allow nested paths within template dir."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        nested = template_dir / "workflows"
+        nested.mkdir()
+
+        template_file = nested / "ci.j2"
+        template_file.write_text("content")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        path = engine.validate_template_path("workflows/ci.j2")
+
+        assert path.exists()
+        assert "workflows" in str(path)
+
+    def test_directory_traversal_blocked(self, tmp_path):
+        """Should block directory traversal attempts."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        # Create a file outside template dir
+        outside = tmp_path / "secret.txt"
+        outside.write_text("secret")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+
+        with pytest.raises(ValueError) as exc_info:
+            engine.validate_template_path("../secret.txt")
+
+        assert "escapes template directory" in str(exc_info.value)
+
+    def test_nonexistent_template_raises_error(self, tmp_path):
+        """Should raise TemplateNotFound for nonexistent template."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+
+        with pytest.raises(TemplateNotFound):
+            engine.validate_template_path("nonexistent.j2")
+
+
+class TestListTemplates:
+    """Tests for list_templates() method."""
+
+    def test_list_templates_default_pattern(self, tmp_path):
+        """Should list templates matching default pattern."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        # Create some template files
+        (template_dir / "workflow1.yaml.j2").write_text("content1")
+        (template_dir / "workflow2.yaml.j2").write_text("content2")
+        (template_dir / "readme.md").write_text("not a template")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        templates = engine.list_templates()
+
+        assert len(templates) == 2
+        assert "workflow1.yaml.j2" in templates
+        assert "workflow2.yaml.j2" in templates
+        assert "readme.md" not in templates
+
+    def test_list_templates_custom_pattern(self, tmp_path):
+        """Should list templates matching custom pattern."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        (template_dir / "template.j2").write_text("content")
+        (template_dir / "config.yaml.j2").write_text("yaml content")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        templates = engine.list_templates(pattern="*.j2")
+
+        assert len(templates) == 2
+
+    def test_list_templates_nested_directories(self, tmp_path):
+        """Should find templates in nested directories."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        nested = template_dir / "workflows" / "ci"
+        nested.mkdir(parents=True)
+
+        (nested / "build.yaml.j2").write_text("build content")
+        (template_dir / "main.yaml.j2").write_text("main content")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        templates = engine.list_templates()
+
+        assert len(templates) == 2
+        assert "main.yaml.j2" in templates
+        assert any("build.yaml.j2" in t for t in templates)
+
+    def test_list_templates_empty_directory(self, tmp_path):
+        """Should return empty list for empty directory."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        templates = engine.list_templates()
+
+        assert templates == []
+
+    def test_list_templates_sorted(self, tmp_path):
+        """Should return templates in sorted order."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        (template_dir / "z.yaml.j2").write_text("z")
+        (template_dir / "a.yaml.j2").write_text("a")
+        (template_dir / "m.yaml.j2").write_text("m")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        templates = engine.list_templates()
+
+        assert templates == ["a.yaml.j2", "m.yaml.j2", "z.yaml.j2"]
+
+
+class TestSecureTemplateEngineCustomTests:
+    """Tests for custom Jinja2 tests."""
+
+    def test_valid_url_test_registered(self):
+        """Should register valid_url test."""
+        engine = SecureTemplateEngine()
+        assert "valid_url" in engine.env.tests
+
+    def test_valid_identifier_test_registered(self):
+        """Should register valid_identifier test."""
+        engine = SecureTemplateEngine()
+        assert "valid_identifier" in engine.env.tests
+
+    def test_valid_url_test_https(self, tmp_path):
+        """Should recognize https URL as valid."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "url_test.j2"
+        template_file.write_text("{% if url is valid_url %}valid{% else %}invalid{% endif %}")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        template = engine.env.get_template("url_test.j2")
+
+        assert template.render(url="https://example.com") == "valid"
+        assert template.render(url="not-a-url") == "invalid"
+
+    def test_valid_identifier_test(self, tmp_path):
+        """Should recognize Python identifiers."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "id_test.j2"
+        template_file.write_text("{% if name is valid_identifier %}yes{% else %}no{% endif %}")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        template = engine.env.get_template("id_test.j2")
+
+        assert template.render(name="valid_name") == "yes"
+        assert template.render(name="123invalid") == "no"
+
+
+class TestSecureTemplateEngineGlobals:
+    """Tests for custom global functions."""
+
+    def test_none_global_registered(self):
+        """Should register none global."""
+        engine = SecureTemplateEngine()
+        assert "none" in engine.env.globals
+        assert engine.env.globals["none"] is None
+
+    def test_none_in_template(self, tmp_path):
+        """Should be able to use none in template."""
+        template_dir = tmp_path / "templates"
+        template_dir.mkdir()
+
+        template_file = template_dir / "none_test.j2"
+        template_file.write_text("{% if value is none %}null{% else %}{{ value }}{% endif %}")
+
+        engine = SecureTemplateEngine(template_dir=template_dir)
+        template = engine.env.get_template("none_test.j2")
+
+        assert template.render(value=None) == "null"
+        assert template.render(value="something") == "something"
