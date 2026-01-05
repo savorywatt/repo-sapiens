@@ -5,8 +5,39 @@ This document illustrates the complete automation workflow.
 ## High-Level Flow
 
 ```
-Issue Created → Planning → Plan Review → Prompt Generation →
-Implementation → Code Review → Merge → Pull Request
+Issue Created → [needs-planning] → Plan Proposal → [approved] →
+Task Creation → [execute] → Implementation → [needs-review] →
+Code Review → [requires-qa] → QA → Merge/PR
+```
+
+## Label-Driven Architecture
+
+The system uses labels to drive workflow progression. Each label triggers a dedicated workflow file:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         LABEL-DRIVEN PIPELINE                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Issue Created                                                          │
+│       │                                                                 │
+│       ▼                                                                 │
+│  [needs-planning] ──► needs-planning.yaml ──► Plan Proposal             │
+│       │                                                                 │
+│       ▼                                                                 │
+│  [approved] ──► approved.yaml ──► Task Creation                         │
+│       │                                                                 │
+│       ▼                                                                 │
+│  [execute] ──► execute-task.yaml ──► Implementation                     │
+│       │                                                                 │
+│       ▼                                                                 │
+│  [needs-review] ──► needs-review.yaml ──► Code Review                   │
+│       │                                                                 │
+│       ├──► [requires-qa] ──► requires-qa.yaml ──► QA Testing            │
+│       │                                                                 │
+│       └──► [needs-fix] ──► needs-fix.yaml ──► Fix Issues                │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Detailed Workflow
@@ -23,14 +54,14 @@ Implementation → Code Review → Merge → Pull Request
          │
          ▼
 ┌─────────────────────────┐
-│ Gitea Actions Trigger   │
-│ (automation-trigger)    │
+│ needs-planning.yaml     │
+│ triggers on label       │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ CLI: process-issue      │
-│ --stage planning        │
+│ CLI: sapiens            │
+│ process-issue --issue N │
 └────────┬────────────────┘
          │
          ▼
@@ -47,9 +78,9 @@ Implementation → Code Review → Merge → Pull Request
          │
          ▼
 ┌─────────────────────────┐
-│ Plan review issue       │
-│ created with            │
-│ plan-review label       │
+│ Issue updated with      │
+│ proposed label and      │
+│ plan comment            │
 └─────────────────────────┘
 ```
 
@@ -58,64 +89,49 @@ Implementation → Code Review → Merge → Pull Request
 ```
 ┌─────────────────────────┐
 │ Team reviews plan       │
-│ Comments on review      │
-│ issue                   │
+│ in issue comments       │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ Plan approved           │
-│ (close review issue or  │
-│ add approved label)     │
+│ Plan approved:          │
+│ Add 'approved' label    │
+│ to issue                │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ Plan merged to main     │
+│ approved.yaml triggers  │
+│ (requires 'proposed'    │
+│ label also present)     │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ Gitea Actions Trigger   │
-│ (plan-merged)           │
+│ CLI: sapiens            │
+│ process-issue --issue N │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ CLI: generate-prompts   │
-│ parses plan file        │
+│ Task issues created     │
+│ with 'task' label       │
 └─────────────────────────┘
 ```
 
-### 3. Prompt Generation
+### 3. Task Execution
 
 ```
 ┌─────────────────────────┐
-│ Agent parses plan       │
-│ markdown to extract     │
-│ tasks                   │
+│ Add 'execute' label     │
+│ to task issue           │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ For each task:          │
-│ Create issue with       │
-│ implement label         │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ Task dependencies       │
-│ tracked in state        │
-└─────────────────────────┘
-```
-
-### 4. Task Implementation
-
-```
-┌─────────────────────────┐
-│ Issue with implement    │
-│ label detected          │
+│ execute-task.yaml       │
+│ triggers (requires      │
+│ 'task' label also)      │
 └────────┬────────────────┘
          │
          ▼
@@ -144,17 +160,23 @@ Implementation → Code Review → Merge → Pull Request
          │
          ▼
 ┌─────────────────────────┐
-│ Add code-review label   │
-│ to task issue           │
+│ State artifacts         │
+│ uploaded for debugging  │
 └─────────────────────────┘
 ```
 
-### 5. Code Review
+### 4. Code Review
 
 ```
 ┌─────────────────────────┐
-│ Issue with code-review  │
-│ label detected          │
+│ Add 'needs-review'      │
+│ label to issue          │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ needs-review.yaml       │
+│ triggers                │
 └────────┬────────────────┘
          │
          ▼
@@ -176,50 +198,91 @@ Implementation → Code Review → Merge → Pull Request
      │       │
      │       ▼
      │   ┌──────────────────┐
-     │   │ Post review      │
-     │   │ comments         │
+     │   │ Add 'needs-fix'  │
+     │   │ label            │
      │   └──────────────────┘
      │
      ▼
 ┌─────────────────────────┐
-│ Add merge-ready label   │
+│ Add 'requires-qa' label │
+│ for QA testing          │
 └─────────────────────────┘
 ```
 
-### 6. Merge and Pull Request
+### 5. QA and Merge
 
 ```
 ┌─────────────────────────┐
-│ All tasks in plan       │
-│ have merge-ready label  │
+│ 'requires-qa' label     │
+│ triggers QA workflow    │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ Branching strategy:     │
-│ - Per-plan: Use plan    │
-│   branch                │
-│ - Per-agent: Merge all  │
-│   task branches         │
+│ requires-qa.yaml        │
+│ runs QA checks          │
 └────────┬────────────────┘
          │
          ▼
+     ┌───┴───┐
+     │       │
+  Passed   Failed
+     │       │
+     │       ▼
+     │   ┌──────────────────┐
+     │   │ Add 'needs-fix'  │
+     │   │ label            │
+     │   └──────────────────┘
+     │
+     ▼
 ┌─────────────────────────┐
 │ Create Pull Request     │
-│ with summary of all     │
-│ tasks                   │
+│ with implementation     │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
-│ Update all related      │
-│ issues with PR link     │
+│ Update related issues   │
+│ with PR link            │
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
 │ Mark plan as completed  │
 │ in state                │
+└─────────────────────────┘
+```
+
+### 6. Fix Flow (When Changes Needed)
+
+```
+┌─────────────────────────┐
+│ 'needs-fix' label       │
+│ added to issue          │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ needs-fix.yaml          │
+│ triggers                │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ Agent addresses         │
+│ review feedback         │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ Commits fixes to        │
+│ existing branch         │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ Re-request review       │
+│ (add 'needs-review')    │
 └─────────────────────────┘
 ```
 
@@ -249,14 +312,29 @@ pending → in_progress → completed
          (recovery)
 ```
 
-## CI/CD Triggers
+### Internal Stage Tracking
+
+The StateManager tracks these internal stages:
 
 ```
-Issue Event         →  automation-trigger.yaml
-Plan Merge (push)   →  plan-merged.yaml
-Cron Schedule       →  automation-daemon.yaml
-Cron Schedule       →  monitor.yaml
-PR/Push             →  test.yaml
+planning → plan_review → prompts → implementation → code_review → merge
+```
+
+## CI/CD Workflow Files
+
+```
+.gitea/workflows/
+├── needs-planning.yaml     ──→ Triggered by 'needs-planning' label
+├── approved.yaml           ──→ Triggered by 'approved' label
+├── execute-task.yaml       ──→ Triggered by 'execute' label
+├── needs-review.yaml       ──→ Triggered by 'needs-review' label
+├── needs-fix.yaml          ──→ Triggered by 'needs-fix' label
+├── requires-qa.yaml        ──→ Triggered by 'requires-qa' label
+├── plan-merged.yaml        ──→ Triggered by push to main (plans/)
+├── automation-daemon.yaml  ──→ Scheduled (cron: */5 * * * *)
+├── monitor.yaml            ──→ Scheduled (cron: 0 */6 * * *)
+├── test.yaml               ──→ Triggered by PR/push
+└── build-artifacts.yaml    ──→ Builds wheel for faster installs
 ```
 
 ## File Structure Flow
@@ -279,3 +357,17 @@ Integration branch: integration/plan-42
     ↓
 Pull Request created
 ```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `sapiens process-issue --issue N` | Process a single issue |
+| `sapiens process-all` | Process all pending issues |
+| `sapiens process-plan --plan-id N` | Process entire plan |
+| `sapiens list-plans` | List active plans |
+| `sapiens show-plan --plan-id N` | Show plan details |
+| `sapiens check-stale` | Find stale workflows |
+| `sapiens health-check` | Generate health report |
+| `sapiens check-failures` | Find recent failures |
+| `sapiens daemon` | Run continuous polling |
