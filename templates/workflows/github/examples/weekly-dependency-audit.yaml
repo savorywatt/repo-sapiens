@@ -1,3 +1,7 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: weekly-dependency-audit
+#
 # Weekly Dependency Audit for GitHub Actions
 #
 # Checks for outdated dependencies, security vulnerabilities, and

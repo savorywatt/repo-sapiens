@@ -10,6 +10,7 @@ import structlog
 
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.init import init_command
+from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
@@ -37,8 +38,9 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
     configure_logging(log_level)
 
     # Skip config loading for commands that don't need it
-    # (init creates the config, credentials manages credentials, react is standalone)
-    commands_without_config = ["init", "credentials", "react"]
+    # (init creates the config, credentials manages credentials, react is standalone,
+    # update only checks workflow templates)
+    commands_without_config = ["init", "credentials", "react", "update"]
     if ctx.invoked_subcommand in commands_without_config:
         ctx.obj = {"settings": None}
         return
@@ -406,6 +408,9 @@ cli.add_command(credentials_group)
 
 # Add init command
 cli.add_command(init_command)
+
+# Add update command
+cli.add_command(update_command)
 
 
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:

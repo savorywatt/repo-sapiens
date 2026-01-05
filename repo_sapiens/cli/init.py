@@ -1018,6 +1018,20 @@ tags:
             click.echo(click.style(f"   ✓ Added {len(copied_files)} workflow file(s)", fg="green"))
         click.echo()
 
+    # Supported languages for security workflow
+    SECURITY_LANGUAGES = [
+        ("python", "Python", "bandit, pip-audit, safety"),
+        ("go", "Go", "gosec, govulncheck"),
+        ("java", "Java", "SpotBugs, OWASP Dependency-Check"),
+        ("kotlin", "Kotlin", "detekt, OWASP Dependency-Check"),
+        ("rust", "Rust", "cargo-audit, cargo-deny"),
+        ("cpp", "C/C++", "cppcheck, flawfinder"),
+        ("csharp", "C#", "dotnet package audit"),
+        ("clojure", "Clojure", "nvd-clojure"),
+        ("typescript", "TypeScript", "npm audit, eslint-plugin-security"),
+        ("javascript", "JavaScript", "npm audit, eslint-plugin-security"),
+    ]
+
     def _setup_example_workflows(self) -> None:
         """Set up example recurring task workflows (cron-style automation)."""
         # Available example workflows with descriptions
@@ -1040,7 +1054,7 @@ tags:
             (
                 "weekly-security-review.yaml",
                 "Weekly security review",
-                "Runs security scans (Bandit, Semgrep, pip-audit) and auto-fixes issues",
+                "Multi-language security scans with auto-fix support",
             ),
             (
                 "daily-issue-triage.yaml",
@@ -1127,6 +1141,15 @@ tags:
             click.echo("   No example workflows selected.")
             return
 
+        # Check if security workflow is selected and prompt for languages
+        security_languages = None
+        security_workflow_selected = any(
+            f == "weekly-security-review.yaml" for _, _, f in selected_workflows
+        )
+
+        if security_workflow_selected:
+            security_languages = self._prompt_security_languages()
+
         # Create destination directory and copy selected workflows
         dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1135,6 +1158,11 @@ tags:
         copied_files = []
         for src_file, dest_file, filename in selected_workflows:
             content = src_file.read_text()
+
+            # Replace security languages placeholder if this is the security workflow
+            if filename == "weekly-security-review.yaml" and security_languages:
+                content = content.replace("{{SECURITY_LANGUAGES}}", security_languages)
+
             dest_file.write_text(content)
             copied_files.append(filename)
             click.echo(f"   ✓ Created: {dest_file.relative_to(self.repo_path)}")
@@ -1147,6 +1175,52 @@ tags:
             click.echo()
             click.echo("   See templates/workflows/examples-README.md for customization tips.")
         click.echo()
+
+    def _prompt_security_languages(self) -> str:
+        """Prompt user to select project languages for security scanning."""
+        click.echo()
+        click.echo(click.style("🔒 Security Workflow Configuration", bold=True, fg="cyan"))
+        click.echo()
+        click.echo("Select the programming languages used in your project.")
+        click.echo("The security workflow will run appropriate scanners for each language.")
+        click.echo()
+
+        if self.non_interactive:
+            # Default to Python in non-interactive mode
+            click.echo("   Using default: python (non-interactive mode)")
+            return "python"
+
+        click.echo("Available languages:")
+        for lang_id, lang_name, tools in self.SECURITY_LANGUAGES:
+            click.echo(f"  • {lang_id:12} - {lang_name} ({tools})")
+        click.echo()
+
+        # Prompt for languages
+        click.echo("Enter languages separated by spaces (e.g., 'python go rust'):")
+        click.echo("Or press Enter for 'python' (default)")
+        click.echo()
+
+        selected = click.prompt(
+            "Languages",
+            default="python",
+            show_default=True,
+        )
+
+        # Validate selection
+        valid_langs = {lang[0] for lang in self.SECURITY_LANGUAGES}
+        selected_list = selected.lower().split()
+        validated = [lang for lang in selected_list if lang in valid_langs]
+
+        if not validated:
+            click.echo(click.style("   ⚠ No valid languages selected, using 'python'", fg="yellow"))
+            validated = ["python"]
+
+        result = " ".join(validated)
+        click.echo()
+        click.echo(f"   ✓ Security scanning configured for: {result}")
+        click.echo()
+
+        return result
 
     def _find_templates_dir(self) -> Path | None:
         """Find the workflow templates directory."""

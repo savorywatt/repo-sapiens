@@ -1,3 +1,7 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: daily-issue-triage
+#
 # Daily Issue Triage for Gitea Actions
 #
 # Automatically reviews and labels new issues, adds initial assessments,

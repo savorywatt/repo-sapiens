@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `weekly-dependency-audit.yaml` - Dependency version checking
     - `weekly-security-review.yaml` - Security audit workflow
     - `weekly-test-coverage.yaml` - Test coverage monitoring
+- **Multi-Language Security Workflow**: Enhanced `weekly-security-review.yaml`
+  - Support for 10 programming languages: Python, Go, Java, Kotlin, Rust, C++, C#, Clojure, TypeScript, JavaScript
+  - Language-specific security tools:
+    - Python: Bandit, pip-audit, safety
+    - Go: gosec, govulncheck
+    - Java/Kotlin: SpotBugs, OWASP Dependency-Check
+    - Rust: cargo-audit, cargo-deny
+    - C++: cppcheck, flawfinder
+    - C#: dotnet package audit
+    - Clojure: nvd-clojure
+    - TypeScript/JavaScript: npm audit
+  - Semgrep for cross-language static analysis
+  - Secrets detection for all languages
+  - Interactive language selection during `sapiens init --setup-examples`
+  - Conditional tool execution based on configured languages
 - **CLI Health Commands**: New monitoring commands
   - `sapiens check-stale` - Find workflows not updated within threshold
   - `sapiens health-check` - Generate system health report

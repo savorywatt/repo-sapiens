@@ -1,3 +1,7 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: weekly-test-coverage
+#
 # Weekly Test Coverage Improvement for GitHub Actions
 #
 # Runs weekly to analyze test coverage and create PRs with new tests

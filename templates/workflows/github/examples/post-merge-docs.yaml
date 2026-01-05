@@ -1,3 +1,7 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: post-merge-docs
+#
 # Post-Merge Documentation Update for GitHub Actions
 #
 # Automatically reviews changes after merges to main and updates
