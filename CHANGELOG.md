@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - C#: dotnet package audit
     - Clojure: nvd-clojure
     - TypeScript/JavaScript: npm audit
-  - Semgrep for cross-language static analysis
+  - OpenGrep for cross-language static analysis (SARIF output)
   - Secrets detection for all languages
   - Interactive language selection during `sapiens init --setup-examples`
   - Conditional tool execution based on configured languages

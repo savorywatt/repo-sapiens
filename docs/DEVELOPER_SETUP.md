@@ -372,6 +372,31 @@ chmod +x .git/hooks/pre-commit
 
 ## Documentation
 
+### Building Docs Locally
+
+```bash
+# Install doc dependencies
+uv sync --group dev
+
+# Generate API docs from docstrings
+uv run sphinx-apidoc -f -o docs/source/api repo_sapiens
+
+# Build HTML documentation
+uv run sphinx-build docs/source docs/build/html
+
+# View locally
+open docs/build/html/index.html  # macOS
+xdg-open docs/build/html/index.html  # Linux
+```
+
+For live-reloading during doc writing:
+
+```bash
+uv run sphinx-autobuild docs/source docs/build/html
+```
+
+### Doc Resources
+
 - **Contributing Guide**: See [CONTRIBUTING.md](./CONTRIBUTING.md)
 - **Agent Comparison**: See [AGENT_COMPARISON.md](./AGENT_COMPARISON.md)
 - **Goose Setup**: See [GOOSE_SETUP.md](./GOOSE_SETUP.md)

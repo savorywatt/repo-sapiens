@@ -26,19 +26,19 @@ def credentials_group():
     Examples:
 
         # Store a credential in OS keyring
-        builder credentials set gitea/api_token --backend keyring
+        sapiens credentials set gitea/api_token --backend keyring
 
         # Store in environment variable
-        builder credentials set GITEA_API_TOKEN --backend environment
+        sapiens credentials set GITEA_API_TOKEN --backend environment
 
         # Store in encrypted file
-        builder credentials set gitea/api_token --backend encrypted
+        sapiens credentials set gitea/api_token --backend encrypted
 
         # Test credential resolution
-        builder credentials get @keyring:gitea/api_token
+        sapiens credentials get @keyring:gitea/api_token
 
         # Delete credential
-        builder credentials delete gitea/api_token --backend keyring
+        sapiens credentials delete gitea/api_token --backend keyring
     """
     pass
 
@@ -72,11 +72,11 @@ def set_credential(reference: str, backend: str, value: str, master_password: st
 
     Examples:
 
-        builder credentials set gitea/api_token --backend keyring
+        sapiens credentials set gitea/api_token --backend keyring
 
-        builder credentials set GITEA_TOKEN --backend environment
+        sapiens credentials set GITEA_TOKEN --backend environment
 
-        builder credentials set claude/api_key --backend encrypted
+        sapiens credentials set claude/api_key --backend encrypted
     """
     try:
         if backend == "keyring":
@@ -117,11 +117,11 @@ def get_credential(reference: str, show_value: bool, master_password: str | None
 
     Examples:
 
-        builder credentials get @keyring:gitea/api_token
+        sapiens credentials get @keyring:gitea/api_token
 
-        builder credentials get ${GITEA_TOKEN}
+        sapiens credentials get ${GITEA_TOKEN}
 
-        builder credentials get @encrypted:claude/api_key
+        sapiens credentials get @encrypted:claude/api_key
     """
     try:
         # Create resolver with encrypted backend password if provided
@@ -181,11 +181,11 @@ def delete_credential(reference: str, backend: str, master_password: str | None)
 
     Examples:
 
-        builder credentials delete gitea/api_token --backend keyring
+        sapiens credentials delete gitea/api_token --backend keyring
 
-        builder credentials delete GITEA_TOKEN --backend environment
+        sapiens credentials delete GITEA_TOKEN --backend environment
 
-        builder credentials delete claude/api_key --backend encrypted
+        sapiens credentials delete claude/api_key --backend encrypted
     """
     try:
         if backend == "keyring":

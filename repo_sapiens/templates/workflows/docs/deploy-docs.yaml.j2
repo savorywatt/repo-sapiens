@@ -72,14 +72,15 @@ jobs:
       {% elif docs_tool == 'sphinx' -%}
       - name: Build documentation with Sphinx
         run: |
-          cd docs
-          make html
-          echo "Documentation built in docs/_build/html directory"
+          pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints myst-parser
+          sphinx-apidoc -f -o docs/source/api repo_sapiens
+          sphinx-build docs/source docs/build/html
+          echo "Documentation built in docs/build/html directory"
 
       - name: Move Sphinx output
         run: |
           mkdir -p site
-          cp -r docs/_build/html/* site/
+          cp -r docs/build/html/* site/
 
       {% endif -%}
       - name: Add .nojekyll file

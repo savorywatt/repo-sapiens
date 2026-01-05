@@ -23,6 +23,13 @@ dist/
 build/
 *.egg-info/
 
+# Documentation build
+docs/build/
+docs/source/.doctrees/
+docs/source/api/
+docs/source/_static/
+docs/source/_templates/
+
 # Type checking / Linting
 .mypy_cache/
 .ruff_cache/

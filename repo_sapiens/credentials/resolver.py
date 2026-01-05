@@ -251,7 +251,7 @@ class CredentialResolver:
                             reference=reference,
                             suggestion=(
                                 f"Store the credential with:\n"
-                                f"  builder credentials set --keyring {service}/{key}"
+                                f"  sapiens credentials set --keyring {service}/{key}"
                             ),
                         )
                     elif backend_name == "encrypted":
@@ -260,7 +260,7 @@ class CredentialResolver:
                             reference=reference,
                             suggestion=(
                                 f"Store the credential with:\n"
-                                f"  builder credentials set --encrypted {service}/{key}"
+                                f"  sapiens credentials set --encrypted {service}/{key}"
                             ),
                         )
 
@@ -317,7 +317,7 @@ class CredentialResolver:
                     reference=reference,
                     suggestion=(
                         f"Store the credential with:\n"
-                        f"  builder credentials set --keyring {service}/{key}"
+                        f"  sapiens credentials set --keyring {service}/{key}"
                     ),
                 )
 
@@ -390,7 +390,7 @@ class CredentialResolver:
                     reference=reference,
                     suggestion=(
                         f"Store the credential with:\n"
-                        f"  builder credentials set --encrypted {service}/{key}"
+                        f"  sapiens credentials set --encrypted {service}/{key}"
                     ),
                 )
 

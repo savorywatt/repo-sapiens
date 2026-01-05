@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Intelligent repository automation and management tool"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
     {name = "savorywatt", email = "maintainer@savorywatt.com"}
 ]
@@ -54,7 +54,13 @@ dev = [
     "pre-commit>=3.6.0",
     "bandit[toml]>=1.7.6",
 ]
-all = ["repo-sapiens[monitoring,analytics]"]
+docs = [
+    "sphinx>=8.0.0",
+    "sphinx-autodoc-typehints>=3.0.0",
+    "sphinx-rtd-theme>=3.0.0",
+    "myst-parser>=4.0.0",
+]
+all = ["repo-sapiens[monitoring,analytics,docs]"]
 
 [project.scripts]
 repo-sapiens = "repo_sapiens.main:cli"
@@ -62,7 +68,7 @@ sapiens = "repo_sapiens.main:cli"
 
 [project.urls]
 Homepage = "https://github.com/savorywatt/repo-sapiens"
-Documentation = "https://github.com/savorywatt/repo-sapiens#readme"
+Documentation = "https://repo-sapiens.readthedocs.io/"
 Repository = "https://github.com/savorywatt/repo-sapiens"
 "Bug Tracker" = "https://github.com/savorywatt/repo-sapiens/issues"
 
@@ -181,3 +187,11 @@ confidence = "MEDIUM"
 [tool.bandit.assert_used]
 # Allow asserts in test files and validation code
 skips = ["*/tests/*", "*/test_*.py"]
+
+[dependency-groups]
+dev = [
+    "myst-parser>=4.0.1",
+    "sphinx>=8.2.3",
+    "sphinx-autodoc-typehints>=3.5.2",
+    "sphinx-rtd-theme>=3.0.2",
+]
