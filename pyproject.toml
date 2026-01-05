@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Intelligent repository automation and management tool"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
     {name = "savorywatt", email = "maintainer@savorywatt.com"}
 ]

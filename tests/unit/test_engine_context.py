@@ -158,9 +158,7 @@ class TestWithUpdates:
         assert original.plan_id is None
         assert updated.plan_id == "42"
 
-    def test_with_updates_preserves_other_fields(
-        self, sample_issue: Issue, tmp_path: Path
-    ):
+    def test_with_updates_preserves_other_fields(self, sample_issue: Issue, tmp_path: Path):
         """Test with_updates preserves unchanged fields."""
         original = ExecutionContext(
             issue=sample_issue,

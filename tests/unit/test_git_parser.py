@@ -6,8 +6,8 @@ testing GitUrlParser class with various URL formats, edge cases, and error condi
 
 import pytest
 
-from repo_sapiens.git.parser import GitUrlParser
 from repo_sapiens.git.exceptions import InvalidGitUrlError
+from repo_sapiens.git.parser import GitUrlParser
 
 
 class TestGitUrlParserSSH:

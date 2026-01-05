@@ -3,8 +3,6 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -53,9 +51,7 @@ class TestStateManagerLock:
         lock2 = state_manager._get_lock("plan-1")
         assert lock1 is lock2
 
-    def test_get_lock_different_plans_have_different_locks(
-        self, state_manager: StateManager
-    ):
+    def test_get_lock_different_plans_have_different_locks(self, state_manager: StateManager):
         """Test different plans get different locks."""
         lock1 = state_manager._get_lock("plan-1")
         lock2 = state_manager._get_lock("plan-2")
@@ -113,6 +109,7 @@ class TestStateManagerLoadSave:
 
         # Small delay to ensure timestamp difference
         import time
+
         time.sleep(0.01)
 
         await state_manager.save_state("plan-1", state)
@@ -258,9 +255,7 @@ class TestMarkStageComplete:
         """Test marking stage complete with data."""
         await state_manager.load_state("plan-1")
 
-        await state_manager.mark_stage_complete(
-            "plan-1", "planning", data={"result": "success"}
-        )
+        await state_manager.mark_stage_complete("plan-1", "planning", data={"result": "success"})
 
         saved_state = await state_manager.load_state("plan-1")
         assert saved_state["stages"]["planning"]["data"]["result"] == "success"
@@ -335,9 +330,7 @@ class TestGetActivePlans:
         assert active == []
 
     @pytest.mark.asyncio
-    async def test_get_active_plans_filters_completed(
-        self, state_manager: StateManager
-    ):
+    async def test_get_active_plans_filters_completed(self, state_manager: StateManager):
         """Test completed plans are filtered out."""
         # Create an active plan
         state1 = await state_manager.load_state("active-plan")
@@ -411,6 +404,7 @@ class TestConcurrentAccess:
     @pytest.mark.asyncio
     async def test_concurrent_loads_same_plan(self, state_manager: StateManager):
         """Test concurrent loads of the same plan work correctly."""
+
         async def load_plan():
             return await state_manager.load_state("plan-1")
 

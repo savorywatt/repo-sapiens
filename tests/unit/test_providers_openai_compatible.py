@@ -156,9 +156,7 @@ class TestOpenAICompatibleProviderConnection:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider_custom.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider_custom.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise
             await provider_custom.connect()
 
@@ -173,9 +171,7 @@ class TestOpenAICompatibleProviderConnection:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider_custom.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider_custom.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise, just log warning
             await provider_custom.connect()
 
@@ -186,9 +182,7 @@ class TestOpenAICompatibleProviderConnection:
         mock_response.json.return_value = {"data": []}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise even with empty model list
             await provider.connect()
 
@@ -272,9 +266,7 @@ class TestOpenAICompatibleProviderContextManager:
         mock_response.json.return_value = {"data": [{"id": "default"}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
             async with provider as p:
                 assert p is provider
 
@@ -321,19 +313,13 @@ class TestOpenAICompatibleProviderExecutePrompt:
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "choices": [
-                {
-                    "message": {
-                        "content": "Here is the implementation...\nCreated file: app.py"
-                    }
-                }
+                {"message": {"content": "Here is the implementation...\nCreated file: app.py"}}
             ],
             "usage": {"total_tokens": 250},
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt(
                 "Write a function to parse JSON",
                 context={"workspace": "/tmp"},
@@ -349,9 +335,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
     async def test_execute_prompt_api_call_format(self, provider):
         """Should make correct API call to chat/completions endpoint."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Response text"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Response text"}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(
@@ -374,9 +358,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
         mock_response.json.return_value = {"choices": []}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt", task_id="task-1")
 
         assert result["success"] is False
@@ -390,9 +372,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
         mock_response.json.return_value = {}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is False
@@ -403,9 +383,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
         """Should extract error message from JSON response body."""
         mock_response_obj = MagicMock()
         mock_response_obj.status_code = 400
-        mock_response_obj.json.return_value = {
-            "error": {"message": "Invalid model specified"}
-        }
+        mock_response_obj.json.return_value = {"error": {"message": "Invalid model specified"}}
 
         with patch.object(
             provider.client,
@@ -471,9 +449,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is True
@@ -488,9 +464,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is True
@@ -499,14 +473,10 @@ class TestOpenAICompatibleProviderExecutePrompt:
     async def test_execute_prompt_with_none_context(self, provider):
         """Should handle None context."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Done"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test", context=None)
 
         assert result["success"] is True
@@ -515,14 +485,10 @@ class TestOpenAICompatibleProviderExecutePrompt:
     async def test_execute_prompt_with_none_task_id(self, provider):
         """Should handle None task_id."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Done"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test", task_id=None)
 
         assert result["success"] is True
@@ -766,14 +732,10 @@ Integrate rate limiter as middleware in the request pipeline.
 Allow rate limits to be configured via environment variables.
 """
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": plan_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": plan_output}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             plan = await provider.generate_plan(sample_issue)
 
         assert isinstance(plan, Plan)
@@ -788,14 +750,10 @@ Allow rate limits to be configured via environment variables.
         plan_output = "# Overview\nSome plan without proper task formatting."
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": plan_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": plan_output}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             plan = await provider.generate_plan(sample_issue)
 
         assert isinstance(plan, Plan)
@@ -810,18 +768,14 @@ Allow rate limits to be configured via environment variables.
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             plan = await provider.generate_plan(sample_issue)
 
         # File path should be based on issue number and title
         assert plan.file_path == "plans/42-implement-rate-limiting.md"
 
     @pytest.mark.asyncio
-    async def test_generate_plan_prompt_contains_issue_details(
-        self, provider, sample_issue
-    ):
+    async def test_generate_plan_prompt_contains_issue_details(self, provider, sample_issue):
         """Should include issue details in the prompt."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -902,9 +856,7 @@ class RateLimiter:
 Created file: src/middleware/rate_limiter.py
 """
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": task_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": task_output}}]}
         mock_response.raise_for_status = MagicMock()
 
         context = {
@@ -916,9 +868,7 @@ Created file: src/middleware/rate_limiter.py
             "workspace": "/workspace",
         }
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_task(sample_task, context)
 
         assert isinstance(result, TaskResult)
@@ -930,16 +880,12 @@ Created file: src/middleware/rate_limiter.py
     async def test_execute_task_stores_issue_number(self, provider, sample_task):
         """Should store current issue number for Q&A."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Done"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
         context = {"issue_number": 99}
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             await provider.execute_task(sample_task, context)
 
         assert provider.current_issue_number == 99
@@ -961,14 +907,10 @@ Created file: src/middleware/rate_limiter.py
     async def test_execute_task_with_empty_context(self, provider, sample_task):
         """Should handle empty context dict."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Done"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_task(sample_task, {})
 
         assert result.success is True
@@ -978,9 +920,7 @@ Created file: src/middleware/rate_limiter.py
     async def test_execute_task_prompt_format(self, provider, sample_task):
         """Should format task prompt correctly."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "Done"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
         context = {
@@ -1018,17 +958,13 @@ Good implementation:
 """
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": review_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
         mock_response.raise_for_status = MagicMock()
 
         diff = "+def new_function():\n+    pass"
         context = {"description": "Add new function"}
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code(diff, context)
 
         assert isinstance(review, Review)
@@ -1047,17 +983,13 @@ Issues found:
 """
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": review_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
         mock_response.raise_for_status = MagicMock()
 
         diff = "+def risky_function():\n+    return unsafe_operation()"
         context = {"description": "Risky change"}
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code(diff, context)
 
         assert review.approved is False
@@ -1074,14 +1006,10 @@ Issues found:
 """
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": review_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
         assert "First comment" in review.comments
@@ -1094,14 +1022,10 @@ Issues found:
         review_output = "APPROVE - This looks good overall"
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": review_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
         assert len(review.comments) == 1
@@ -1114,9 +1038,7 @@ Issues found:
         mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
         assert review.approved is False  # No APPROVE found
@@ -1128,9 +1050,7 @@ Issues found:
         large_diff = "+" * 10000
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "APPROVE"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "APPROVE"}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(
@@ -1148,14 +1068,10 @@ Issues found:
     async def test_review_code_conservative_confidence_score(self, provider):
         """Should use conservative confidence score of 0.7."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "APPROVE"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "APPROVE"}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
         assert review.confidence_score == 0.7
@@ -1174,9 +1090,7 @@ class TestOpenAICompatibleProviderResolveConflict:
     return True"""
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": resolved_content}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": resolved_content}}]}
         mock_response.raise_for_status = MagicMock()
 
         conflict_info = {
@@ -1190,9 +1104,7 @@ def function():
 >>>>>>> feature""",
         }
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.resolve_conflict(conflict_info)
 
         assert result == resolved_content
@@ -1204,9 +1116,7 @@ def function():
     async def test_resolve_conflict_prompt_format(self, provider):
         """Should include conflict details in prompt."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"content": "resolved"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "resolved"}}]}
         mock_response.raise_for_status = MagicMock()
 
         conflict_info = {
@@ -1231,9 +1141,7 @@ def function():
         mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.resolve_conflict({"file": "test.py", "content": ""})
 
         assert result == ""
@@ -1317,9 +1225,7 @@ class TestOpenAICompatibleProviderEdgeCases:
         mock_response.json.return_value = {"data": []}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider_custom.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider_custom.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise
             await provider_custom.connect()
 
@@ -1330,9 +1236,7 @@ class TestOpenAICompatibleProviderEdgeCases:
         mock_response.json.return_value = {"choices": [{}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is True
@@ -1345,9 +1249,7 @@ class TestOpenAICompatibleProviderEdgeCases:
         mock_response.json.return_value = {"choices": [{"message": {}}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is True
@@ -1368,9 +1270,7 @@ class TestOpenAICompatibleProviderEdgeCases:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
         assert review.approved is True
@@ -1380,15 +1280,11 @@ class TestOpenAICompatibleProviderEdgeCases:
         """Should detect APPROVE only on first line."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "choices": [
-                {"message": {"content": "Analysis:\nI APPROVE this change"}}
-            ]
+            "choices": [{"message": {"content": "Analysis:\nI APPROVE this change"}}]
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
         # APPROVE is not on first line, so should be False

@@ -4,7 +4,6 @@ This test module provides comprehensive coverage for repo_sapiens.git.exceptions
 testing the exception hierarchy, error messages, and hint formatting.
 """
 
-import pytest
 
 from repo_sapiens.git.exceptions import (
     GitDiscoveryError,

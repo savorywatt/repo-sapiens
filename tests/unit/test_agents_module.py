@@ -16,7 +16,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from repo_sapiens.agents.backends import (
@@ -32,7 +31,6 @@ from repo_sapiens.agents.react import (
     run_react_task,
 )
 from repo_sapiens.agents.tools import ToolDefinition, ToolExecutionError, ToolRegistry
-
 
 # =============================================================================
 # TestToolDefinition - Tool schema generation and registration
@@ -170,9 +168,7 @@ class TestToolRegistryEdgeCases:
         assert "./" in result or "level0" not in result
 
     @pytest.mark.asyncio
-    async def test_tree_catches_valueerror_for_header_path(
-        self, temp_dir: Path
-    ) -> None:
+    async def test_tree_catches_valueerror_for_header_path(self, temp_dir: Path) -> None:
         """Test that tree catches ValueError when computing header path.
 
         This covers lines 521-522 where ValueError is caught for relative_to.
@@ -488,16 +484,12 @@ class TestResolvePathSecurity:
         resolved = registry._resolve_path("subdir/file.txt")
         assert str(resolved).startswith(str(temp_dir))
 
-    def test_resolve_path_rejects_parent_traversal(
-        self, registry: ToolRegistry
-    ) -> None:
+    def test_resolve_path_rejects_parent_traversal(self, registry: ToolRegistry) -> None:
         """Test _resolve_path rejects paths with parent traversal."""
         with pytest.raises(ToolExecutionError, match="outside working directory"):
             registry._resolve_path("../../../etc/passwd")
 
-    def test_resolve_path_rejects_absolute_outside(
-        self, registry: ToolRegistry
-    ) -> None:
+    def test_resolve_path_rejects_absolute_outside(self, registry: ToolRegistry) -> None:
         """Test _resolve_path behavior with absolute paths outside working dir."""
         # Note: This depends on how the path is resolved - absolute paths
         # that resolve outside working_dir should be rejected
@@ -525,9 +517,7 @@ class TestUncoveredBranches:
         return ToolRegistry(temp_dir)
 
     @pytest.mark.asyncio
-    async def test_execute_unimplemented_tool_branch(
-        self, registry: ToolRegistry
-    ) -> None:
+    async def test_execute_unimplemented_tool_branch(self, registry: ToolRegistry) -> None:
         """Test line 201 - the else branch for unimplemented tools.
 
         This branch is defensive code that shouldn't normally be reached,
@@ -552,9 +542,7 @@ class TestUncoveredBranches:
             ToolRegistry.TOOLS = original_tools
 
     @pytest.mark.asyncio
-    async def test_tree_header_valueerror_branch(
-        self, temp_dir: Path
-    ) -> None:
+    async def test_tree_header_valueerror_branch(self, temp_dir: Path) -> None:
         """Test lines 521-522 - ValueError in tree header path calculation.
 
         This covers the edge case where resolved.relative_to(working_dir)
@@ -572,9 +560,7 @@ class TestUncoveredBranches:
         assert "subdir" in result
 
     @pytest.mark.asyncio
-    async def test_tree_header_valueerror_via_direct_call(
-        self, temp_dir: Path
-    ) -> None:
+    async def test_tree_header_valueerror_via_direct_call(self, temp_dir: Path) -> None:
         """Directly test _tree method with mocked path to cover lines 521-522.
 
         The _resolve_path security check uses str.startswith, but relative_to
@@ -657,9 +643,7 @@ class TestAgentProviderInterfaceMethods:
         assert plan.tasks[0].title == "Implement feature X"
 
     @pytest.mark.asyncio
-    async def test_generate_prompts_returns_plan_tasks(
-        self, agent: ReActAgentProvider
-    ) -> None:
+    async def test_generate_prompts_returns_plan_tasks(self, agent: ReActAgentProvider) -> None:
         """Test generate_prompts simply returns tasks from plan."""
         from repo_sapiens.models.domain import Plan, Task
 

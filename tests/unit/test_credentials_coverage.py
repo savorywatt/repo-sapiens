@@ -6,15 +6,11 @@ These tests target specific uncovered lines to improve coverage:
 - resolver.py: Lines 190-191, 249, 261-264
 """
 
-import json
-import os
 import secrets
-import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-from cryptography.fernet import Fernet
 
 from repo_sapiens.credentials.encrypted_backend import EncryptedFileBackend
 from repo_sapiens.credentials.exceptions import (
@@ -26,7 +22,6 @@ from repo_sapiens.credentials.exceptions import (
 )
 from repo_sapiens.credentials.keyring_backend import KeyringBackend
 from repo_sapiens.credentials.resolver import CredentialResolver
-
 
 # =============================================================================
 # EncryptedFileBackend - Edge Cases for Missing Coverage
@@ -112,8 +107,7 @@ class TestEncryptedBackendSaltPermissionWarning:
 
         # Check warning was logged
         assert any(
-            "Could not set salt file permissions" in record.message
-            for record in caplog.records
+            "Could not set salt file permissions" in record.message for record in caplog.records
         )
 
 
@@ -158,7 +152,7 @@ class TestEncryptedBackendLoadCredentialsErrors:
         )
 
         # Mock file read to raise an unexpected exception
-        with patch("builtins.open", side_effect=IOError("Disk read error")):
+        with patch("builtins.open", side_effect=OSError("Disk read error")):
             # First, create the file so it exists
             backend.file_path.write_bytes(b"dummy")
 
@@ -204,10 +198,7 @@ class TestEncryptedBackendSaveCredentialsErrors:
         assert backend.get("service", "key") == "value"
 
         # Check warning about permissions
-        assert any(
-            "Could not set file permissions" in record.message
-            for record in caplog.records
-        )
+        assert any("Could not set file permissions" in record.message for record in caplog.records)
 
     def test_save_credentials_generic_exception(self, temp_creds_dir):
         """Should wrap generic save exceptions in EncryptionError.
@@ -563,9 +554,7 @@ class TestKeyringBackendServiceNamespace:
                 backend = KeyringBackend()
                 backend.get("myservice", "mykey")
 
-                mock_keyring.get_password.assert_called_with(
-                    "builder/myservice", "mykey"
-                )
+                mock_keyring.get_password.assert_called_with("builder/myservice", "mykey")
 
     def test_set_uses_namespaced_service(self):
         """Should use namespaced service name in set operations."""
@@ -589,6 +578,4 @@ class TestKeyringBackendServiceNamespace:
                 backend = KeyringBackend()
                 backend.delete("delservice", "delkey")
 
-                mock_keyring.delete_password.assert_called_with(
-                    "builder/delservice", "delkey"
-                )
+                mock_keyring.delete_password.assert_called_with("builder/delservice", "delkey")

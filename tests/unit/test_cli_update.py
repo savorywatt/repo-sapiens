@@ -1,22 +1,21 @@
 """Unit tests for repo_sapiens/cli/update.py - Template update CLI."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from repo_sapiens.cli.update import (
-    update_command,
-    TemplateUpdater,
-    parse_version,
-    extract_template_info,
-    find_installed_templates,
-    find_available_templates,
-    find_templates_dir,
-    VERSION_PATTERN,
     NAME_PATTERN,
     TEMPLATE_MARKER,
+    VERSION_PATTERN,
+    TemplateUpdater,
+    extract_template_info,
+    find_available_templates,
+    find_installed_templates,
+    find_templates_dir,
+    parse_version,
+    update_command,
 )
 from repo_sapiens.git.exceptions import GitDiscoveryError
 
@@ -188,10 +187,13 @@ name: Test
 
     def test_extract_template_info_marker_beyond_first_10_lines(self, tmp_path):
         """Should return None if marker is beyond first 10 lines."""
-        content = "\n" * 15 + """# @repo-sapiens-template
+        content = (
+            "\n" * 15
+            + """# @repo-sapiens-template
 # @name: test-workflow
 # @version: 1.0.0
 """
+        )
         template_file = tmp_path / "workflow.yaml"
         template_file.write_text(content)
 

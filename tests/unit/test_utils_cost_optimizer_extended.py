@@ -1,7 +1,5 @@
 """Extended tests for repo_sapiens/utils/cost_optimizer.py - edge cases and coverage."""
 
-from dataclasses import dataclass
-from typing import Any
 
 import pytest
 
@@ -12,7 +10,6 @@ from repo_sapiens.utils.cost_optimizer import (
     ModelTier,
     TaskComplexityFactors,
 )
-
 
 # =============================================================================
 # Tests for ModelTier Enum
@@ -426,7 +423,9 @@ class TestCostSavingsRecommendations:
         recommendations = optimizer.get_cost_savings_recommendations(actual, estimated)
 
         # Should recommend structured task descriptions
-        assert any("implementation" in rec.lower() or "task" in rec.lower() for rec in recommendations)
+        assert any(
+            "implementation" in rec.lower() or "task" in rec.lower() for rec in recommendations
+        )
 
     def test_recommendations_high_advanced_usage(self):
         """Test recommendations when advanced models dominate."""
@@ -438,7 +437,10 @@ class TestCostSavingsRecommendations:
 
         recommendations = optimizer.get_cost_savings_recommendations(actual, estimated)
 
-        assert any("model" in rec.lower() or "advanced" in rec.lower() or "complexity" in rec.lower() for rec in recommendations)
+        assert any(
+            "model" in rec.lower() or "advanced" in rec.lower() or "complexity" in rec.lower()
+            for rec in recommendations
+        )
 
     def test_recommendations_zero_estimated_implementation(self):
         """Test handling zero estimated implementation (avoid division by zero)."""

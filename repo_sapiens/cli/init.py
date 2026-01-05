@@ -162,6 +162,10 @@ class RepoInitializer:
         click.echo()
         self._print_next_steps()
 
+        # Step 7: Optional test
+        if not self.non_interactive:
+            self._offer_test_run()
+
     def _detect_backend(self) -> str:
         """Detect best credential backend for current environment."""
         # Check if keyring is available
@@ -525,7 +529,13 @@ class RepoInitializer:
 
         click.echo("Recommended models for tool-calling:")
         for model in recommended_models[:4]:
-            marker = " (recommended)" if model == "qwen3:8b" else " (requires 24GB VRAM)" if model == "qwen3:14b" else ""
+            marker = (
+                " (recommended)"
+                if model == "qwen3:8b"
+                else " (requires 24GB VRAM)"
+                if model == "qwen3:14b"
+                else ""
+            )
             available = " ✓" if model in available_models else ""
             click.echo(f"  • {model}{marker}{available}")
         click.echo()
@@ -566,11 +576,21 @@ class RepoInitializer:
 
         # Model selection
         recommended_models = provider_info.get("models", ["qwen3:8b", "qwen3:14b", "llama3.1:8b"])
-        default_model = available_models[0] if available_models else provider_info.get("default_model", "qwen3:8b")
+        default_model = (
+            available_models[0]
+            if available_models
+            else provider_info.get("default_model", "qwen3:8b")
+        )
 
         click.echo("Recommended models for tool-calling:")
         for model in recommended_models[:4]:
-            marker = " (recommended)" if model == "qwen3:8b" else " (requires 24GB VRAM)" if "14b" in model else ""
+            marker = (
+                " (recommended)"
+                if model == "qwen3:8b"
+                else " (requires 24GB VRAM)"
+                if "14b" in model
+                else ""
+            )
             available = " ✓" if model in available_models else ""
             click.echo(f"  • {model}{marker}{available}")
         click.echo()
@@ -591,7 +611,9 @@ class RepoInitializer:
 
         # Model selection
         available_models = provider_info.get("models", [])
-        default_model = provider_info.get("default_model", available_models[0] if available_models else "gpt-4o")
+        default_model = provider_info.get(
+            "default_model", available_models[0] if available_models else "gpt-4o"
+        )
 
         click.echo(f"Available models for {provider_info['name']}:")
         for i, model in enumerate(available_models[:5], 1):
@@ -611,7 +633,9 @@ class RepoInitializer:
             existing_key = os.getenv(api_key_env)
 
             if existing_key:
-                use_existing = click.confirm(f"{api_key_env} found in environment. Use it?", default=True)
+                use_existing = click.confirm(
+                    f"{api_key_env} found in environment. Use it?", default=True
+                )
                 if use_existing:
                     self.agent_api_key = existing_key
                 else:
@@ -1022,3 +1046,82 @@ tags:
         click.echo("  - README.md")
         click.echo("  - QUICK_START.md")
         click.echo("  - docs/CREDENTIAL_QUICK_START.md")
+
+    def _offer_test_run(self) -> None:
+        """Offer to test the setup by summarizing the README."""
+        import subprocess
+
+        # Check if README exists
+        readme_path = self.repo_path / "README.md"
+        if not readme_path.exists():
+            return
+
+        click.echo()
+        click.echo(click.style("🧪 Test Your Setup", bold=True, fg="cyan"))
+        click.echo()
+
+        # Build the test command based on agent type
+        test_prompt = "Summarize this project's README in 2-3 sentences."
+
+        if self.agent_type == "claude":
+            test_cmd = f'claude -p "{test_prompt}"'
+        elif self.agent_type == "goose":
+            test_cmd = f'goose session start --prompt "{test_prompt}"'
+        elif self.agent_type == "builtin":
+            if self.builtin_provider in ("ollama", "vllm"):
+                model_flag = f"--model {self.builtin_model}" if self.builtin_model else ""
+                test_cmd = f"sapiens react --repl {model_flag}".strip()
+                test_prompt = f"(then type: {test_prompt})"
+            else:
+                # Cloud provider for builtin
+                test_cmd = "sapiens react --repl"
+                test_prompt = f"(then type: {test_prompt})"
+        else:
+            return
+
+        click.echo("Would you like to test your setup by having the agent summarize README.md?")
+        click.echo()
+        click.echo(click.style("Command:", fg="yellow"))
+        click.echo(f"  {test_cmd}")
+        if "(then type:" in test_prompt:
+            click.echo(f"  {test_prompt}")
+        click.echo()
+
+        if click.confirm("Run this test now?", default=False):
+            click.echo()
+            click.echo(click.style("Running test...", bold=True))
+            click.echo()
+
+            try:
+                # For builtin REPL, we can't really automate the input well
+                # So just launch it and let the user interact
+                if self.agent_type == "builtin":
+                    click.echo("Launching ReAct REPL. Type your query and press Enter.")
+                    click.echo("Type 'exit' or press Ctrl+C to quit.")
+                    click.echo()
+                    subprocess.run(test_cmd, shell=True, cwd=self.repo_path)
+                else:
+                    # For claude/goose, run the command directly
+                    result = subprocess.run(
+                        test_cmd,
+                        shell=True,
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=120,
+                    )
+                    if result.returncode == 0:
+                        click.echo(result.stdout)
+                        click.echo()
+                        click.echo(click.style("✅ Test completed successfully!", fg="green"))
+                    else:
+                        click.echo(click.style("⚠ Test returned non-zero exit code", fg="yellow"))
+                        if result.stderr:
+                            click.echo(result.stderr)
+            except subprocess.TimeoutExpired:
+                click.echo(click.style("⚠ Test timed out after 120 seconds", fg="yellow"))
+            except Exception as e:
+                click.echo(click.style(f"⚠ Test failed: {e}", fg="yellow"))
+        else:
+            click.echo()
+            click.echo("You can run this test later with the command above.")

@@ -11,7 +11,6 @@ from repo_sapiens.utils.batch_operations import (
     ParallelBatchProcessor,
 )
 
-
 # =============================================================================
 # Tests for BatchProcessor
 # =============================================================================
@@ -279,15 +278,9 @@ class TestBatchOperations:
     def mock_git_provider(self):
         """Create mock git provider."""
         mock = MagicMock()
-        mock.create_issue = AsyncMock(
-            side_effect=lambda **kwargs: {"number": 1, **kwargs}
-        )
-        mock.update_issue = AsyncMock(
-            side_effect=lambda num, **kwargs: {"number": num, **kwargs}
-        )
-        mock.add_comment = AsyncMock(
-            side_effect=lambda num, body: {"issue": num, "body": body}
-        )
+        mock.create_issue = AsyncMock(side_effect=lambda **kwargs: {"number": 1, **kwargs})
+        mock.update_issue = AsyncMock(side_effect=lambda num, **kwargs: {"number": num, **kwargs})
+        mock.add_comment = AsyncMock(side_effect=lambda num, body: {"issue": num, "body": body})
         mock.get_issue = AsyncMock(side_effect=lambda num: {"number": num})
         return mock
 
@@ -324,9 +317,7 @@ class TestBatchOperations:
     async def test_create_issues_batch_multiple(self, mock_git_provider):
         """Test creating multiple issues in batches."""
         ops = BatchOperations(mock_git_provider, batch_size=2, max_concurrent=2)
-        issues_data = [
-            {"title": f"Issue {i}", "body": f"Body {i}"} for i in range(5)
-        ]
+        issues_data = [{"title": f"Issue {i}", "body": f"Body {i}"} for i in range(5)]
 
         results = await ops.create_issues_batch(issues_data)
 
@@ -352,17 +343,13 @@ class TestBatchOperations:
         results = await ops.update_issues_batch(updates)
 
         assert len(results) == 1
-        mock_git_provider.update_issue.assert_called_once_with(
-            42, title="Updated"
-        )
+        mock_git_provider.update_issue.assert_called_once_with(42, title="Updated")
 
     @pytest.mark.asyncio
     async def test_update_issues_batch_multiple(self, mock_git_provider):
         """Test updating multiple issues in batches."""
         ops = BatchOperations(mock_git_provider, batch_size=2, max_concurrent=2)
-        updates = [
-            {"issue_number": i, "fields": {"state": "closed"}} for i in range(5)
-        ]
+        updates = [{"issue_number": i, "fields": {"state": "closed"}} for i in range(5)]
 
         results = await ops.update_issues_batch(updates)
 
@@ -394,9 +381,7 @@ class TestBatchOperations:
     async def test_add_comments_batch_multiple(self, mock_git_provider):
         """Test adding multiple comments in batches."""
         ops = BatchOperations(mock_git_provider, batch_size=2, max_concurrent=2)
-        comments = [
-            {"issue_number": i, "body": f"Comment {i}"} for i in range(5)
-        ]
+        comments = [{"issue_number": i, "body": f"Comment {i}"} for i in range(5)]
 
         results = await ops.add_comments_batch(comments)
 
@@ -439,9 +424,7 @@ class TestBatchOperations:
     @pytest.mark.asyncio
     async def test_create_issues_batch_with_error(self, mock_git_provider):
         """Test that errors in batch creation are propagated."""
-        mock_git_provider.create_issue = AsyncMock(
-            side_effect=RuntimeError("API error")
-        )
+        mock_git_provider.create_issue = AsyncMock(side_effect=RuntimeError("API error"))
         ops = BatchOperations(mock_git_provider, batch_size=2)
         issues_data = [{"title": "Issue 1"}]
 

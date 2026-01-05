@@ -1,8 +1,6 @@
 """Extended tests for repo_sapiens/utils/caching.py - CacheManager and get_cache."""
 
 import asyncio
-from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -13,7 +11,6 @@ from repo_sapiens.utils.caching import (
     cached,
     get_cache,
 )
-
 
 # =============================================================================
 # Tests for CacheManager
@@ -109,9 +106,7 @@ class TestCacheManager:
             await cache.set("key", f"value-{name}")
             return await cache.get("key")
 
-        results = await asyncio.gather(
-            *[get_and_use_cache(f"cache{i}") for i in range(10)]
-        )
+        results = await asyncio.gather(*[get_and_use_cache(f"cache{i}") for i in range(10)])
 
         assert len(results) == 10
         assert len(manager._caches) == 10
@@ -262,9 +257,7 @@ class TestAsyncCacheExtended:
             await cache.set(key, f"value-{key}")
             return await cache.get(key)
 
-        results = await asyncio.gather(
-            *[set_and_get(f"key{i}") for i in range(50)]
-        )
+        results = await asyncio.gather(*[set_and_get(f"key{i}") for i in range(50)])
 
         assert len(results) == 50
         assert all(r is not None for r in results)
@@ -399,9 +392,7 @@ class TestCachedDecoratorExtended:
             call_count += 1
             return x * x
 
-        results = await asyncio.gather(
-            square(1), square(2), square(3), square(1), square(2)
-        )
+        results = await asyncio.gather(square(1), square(2), square(3), square(1), square(2))
 
         assert results == [1, 4, 9, 1, 4]
         assert call_count == 3  # Only 3 unique calls

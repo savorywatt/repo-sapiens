@@ -12,7 +12,6 @@ from repo_sapiens.utils.connection_pool import (
     get_pool,
 )
 
-
 # =============================================================================
 # Tests for HTTPConnectionPool
 # =============================================================================
@@ -340,11 +339,9 @@ class TestConnectionPoolManager:
             return await manager.get_pool(name, f"https://{name}.example.com")
 
         # Create many pools concurrently
-        pools = await asyncio.gather(
-            *[get_pool_task(f"pool{i}") for i in range(10)]
-        )
+        pools = await asyncio.gather(*[get_pool_task(f"pool{i}") for i in range(10)])
 
-        assert len(set(p.base_url for p in pools)) == 10
+        assert len({p.base_url for p in pools}) == 10
         assert len(manager._pools) == 10
 
         await manager.close_all()

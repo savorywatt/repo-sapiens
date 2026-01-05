@@ -34,7 +34,6 @@ from repo_sapiens.models.domain import (
     TaskResult,
 )
 
-
 # ==============================================================================
 # Fixtures
 # ==============================================================================
@@ -141,9 +140,7 @@ def mock_agent_provider():
         output="Task completed successfully",
     )
 
-    mock.execute_prompt = AsyncMock(
-        return_value={"success": True, "output": "Fixes applied"}
-    )
+    mock.execute_prompt = AsyncMock(return_value={"success": True, "output": "Fixes applied"})
 
     mock.generate_prompts = AsyncMock(
         return_value=[
@@ -1228,13 +1225,9 @@ class TestMergeStageCoverage:
             settings=mock_settings,
         )
 
-        with patch(
-            "repo_sapiens.engine.stages.merge.get_branching_strategy"
-        ) as mock_branching:
+        with patch("repo_sapiens.engine.stages.merge.get_branching_strategy") as mock_branching:
             mock_strategy = MagicMock()
-            mock_strategy.create_integration = AsyncMock(
-                return_value="integration/plan-42"
-            )
+            mock_strategy.create_integration = AsyncMock(return_value="integration/plan-42")
             mock_branching.return_value = mock_strategy
 
             await stage.execute(issue)
@@ -1284,15 +1277,9 @@ class TestPlanReviewStageCoverage:
             settings=mock_settings,
         )
 
-        assert (
-            stage._extract_plan_path("Plan File: `plans/42-my-plan.md`")
-            == "plans/42-my-plan.md"
-        )
+        assert stage._extract_plan_path("Plan File: `plans/42-my-plan.md`") == "plans/42-my-plan.md"
         assert stage._extract_plan_path("No path here") == ""
-        assert (
-            stage._extract_plan_path("Plan File: `some/other/path.md`")
-            == "some/other/path.md"
-        )
+        assert stage._extract_plan_path("Plan File: `some/other/path.md`") == "some/other/path.md"
 
     def test_create_task_issue_body(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
