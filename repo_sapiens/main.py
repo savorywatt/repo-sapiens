@@ -2,6 +2,7 @@
 
 import asyncio
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import click
@@ -156,6 +157,34 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
     """Show detailed plan status."""
     settings = ctx.obj["settings"]
     asyncio.run(_show_plan_status(settings, plan_id))
+
+
+@cli.command()
+@click.option(
+    "--max-age-hours", default=24, type=int, help="Max age in hours before considered stale"
+)
+@click.pass_context
+def check_stale(ctx: click.Context, max_age_hours: int) -> None:
+    """Check for stale workflows that haven't been updated recently."""
+    settings = ctx.obj["settings"]
+    asyncio.run(_check_stale_workflows(settings, max_age_hours))
+
+
+@cli.command()
+@click.pass_context
+def health_check(ctx: click.Context) -> None:
+    """Generate health check report for the automation system."""
+    settings = ctx.obj["settings"]
+    asyncio.run(_generate_health_report(settings))
+
+
+@cli.command()
+@click.option("--since-hours", default=24, type=int, help="Check failures since N hours ago")
+@click.pass_context
+def check_failures(ctx: click.Context, since_hours: int) -> None:
+    """Check for workflow failures in the specified time period."""
+    settings = ctx.obj["settings"]
+    asyncio.run(_check_workflow_failures(settings, since_hours))
 
 
 @cli.command()
@@ -601,6 +630,200 @@ async def _show_plan_status(settings: AutomationSettings, plan_id: str) -> None:
             status = task_data.get("status", "unknown")
             emoji = "✅" if status == "completed" else "⏳" if status == "pending" else "🔄"
             click.echo(f"  {emoji} {task_id}: {status}")
+
+
+async def _check_stale_workflows(settings: AutomationSettings, max_age_hours: int) -> None:
+    """Check for stale workflows that haven't been updated recently.
+
+    Args:
+        settings: Automation settings
+        max_age_hours: Maximum age in hours before workflow is considered stale
+    """
+    state = StateManager(settings.state_dir)
+    cutoff_time = datetime.now(UTC) - timedelta(hours=max_age_hours)
+    stale_plans = []
+
+    # Check all state files
+    for state_file in state.state_dir.glob("*.json"):
+        plan_id = state_file.stem
+        try:
+            state_data = await state.load_state(plan_id)
+
+            # Skip completed or failed workflows
+            if state_data.get("status") in ["completed", "failed"]:
+                continue
+
+            # Parse updated_at timestamp
+            updated_at_str = state_data.get("updated_at", "")
+            if updated_at_str:
+                # Handle ISO format with timezone
+                updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+                if updated_at < cutoff_time:
+                    stale_plans.append(
+                        {
+                            "plan_id": plan_id,
+                            "status": state_data.get("status", "unknown"),
+                            "updated_at": updated_at_str,
+                            "age_hours": (datetime.now(UTC) - updated_at).total_seconds() / 3600,
+                        }
+                    )
+        except Exception as e:
+            log.warning("failed_to_check_plan", plan_id=plan_id, error=str(e))
+
+    if not stale_plans:
+        click.echo(f"No stale workflows found (threshold: {max_age_hours} hours)")
+        return
+
+    click.echo(f"⚠️  Found {len(stale_plans)} stale workflow(s):\n")
+    for plan in stale_plans:
+        click.echo(f"  • Plan {plan['plan_id']}")
+        click.echo(f"    Status: {plan['status']}")
+        click.echo(f"    Last updated: {plan['updated_at']}")
+        click.echo(f"    Age: {plan['age_hours']:.1f} hours")
+        click.echo()
+
+    # Exit with non-zero status if stale workflows found
+    sys.exit(1)
+
+
+async def _generate_health_report(settings: AutomationSettings) -> None:
+    """Generate health check report for the automation system.
+
+    Args:
+        settings: Automation settings
+    """
+    state = StateManager(settings.state_dir)
+    now = datetime.now(UTC)
+
+    # Collect statistics
+    total_plans = 0
+    active_plans = 0
+    completed_plans = 0
+    failed_plans = 0
+    pending_plans = 0
+
+    plan_details = []
+
+    for state_file in state.state_dir.glob("*.json"):
+        plan_id = state_file.stem
+        try:
+            state_data = await state.load_state(plan_id)
+            total_plans += 1
+
+            status = state_data.get("status", "unknown")
+            if status == "completed":
+                completed_plans += 1
+            elif status == "failed":
+                failed_plans += 1
+            elif status in ["in_progress", "pending"]:
+                active_plans += 1
+                if status == "pending":
+                    pending_plans += 1
+
+            plan_details.append(
+                {
+                    "id": plan_id,
+                    "status": status,
+                    "updated_at": state_data.get("updated_at", "unknown"),
+                }
+            )
+        except Exception as e:
+            log.warning("failed_to_load_plan", plan_id=plan_id, error=str(e))
+
+    # Generate report
+    click.echo("# Automation System Health Report")
+    click.echo(f"Generated: {now.isoformat()}")
+    click.echo()
+    click.echo("## Summary")
+    click.echo(f"- Total Plans: {total_plans}")
+    click.echo(f"- Active Plans: {active_plans}")
+    click.echo(f"- Completed Plans: {completed_plans}")
+    click.echo(f"- Failed Plans: {failed_plans}")
+    click.echo(f"- Pending Plans: {pending_plans}")
+    click.echo()
+    click.echo("## Configuration")
+    click.echo(f"- State Directory: {settings.state_dir}")
+    click.echo(f"- Git Provider: {settings.git_provider.provider_type}")
+    click.echo(f"- Agent Provider: {settings.agent_provider.provider_type}")
+    click.echo()
+    click.echo("## Provider Status")
+    click.echo("- Git Provider: Configuration loaded ✓")
+    click.echo("- Agent Provider: Configuration loaded ✓")
+    click.echo("- State Manager: Operational ✓")
+    click.echo()
+
+    if failed_plans > 0:
+        click.echo("## Failed Plans")
+        for plan in plan_details:
+            if plan["status"] == "failed":
+                click.echo(f"- {plan['id']} (updated: {plan['updated_at']})")
+        click.echo()
+
+    if active_plans > 0:
+        click.echo("## Active Plans")
+        for plan in plan_details:
+            if plan["status"] in ["in_progress", "pending"]:
+                click.echo(f"- {plan['id']}: {plan['status']} (updated: {plan['updated_at']})")
+
+
+async def _check_workflow_failures(settings: AutomationSettings, since_hours: int) -> None:
+    """Check for workflow failures in the specified time period.
+
+    Args:
+        settings: Automation settings
+        since_hours: Check failures since N hours ago
+    """
+    state = StateManager(settings.state_dir)
+    cutoff_time = datetime.now(UTC) - timedelta(hours=since_hours)
+    recent_failures = []
+
+    for state_file in state.state_dir.glob("*.json"):
+        plan_id = state_file.stem
+        try:
+            state_data = await state.load_state(plan_id)
+
+            # Check if this is a failed workflow
+            if state_data.get("status") != "failed":
+                continue
+
+            # Check if it failed within the time window
+            updated_at_str = state_data.get("updated_at", "")
+            if updated_at_str:
+                updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
+                if updated_at >= cutoff_time:
+                    # Collect failure details from stages
+                    failed_stages = []
+                    for stage_name, stage_data in state_data.get("stages", {}).items():
+                        if stage_data.get("status") == "failed":
+                            failed_stages.append(stage_name)
+
+                    recent_failures.append(
+                        {
+                            "plan_id": plan_id,
+                            "updated_at": updated_at_str,
+                            "failed_stages": failed_stages,
+                            "metadata": state_data.get("metadata", {}),
+                        }
+                    )
+        except Exception as e:
+            log.warning("failed_to_check_plan", plan_id=plan_id, error=str(e))
+
+    if not recent_failures:
+        click.echo(f"No workflow failures found in the last {since_hours} hours")
+        return
+
+    click.echo(f"❌ Found {len(recent_failures)} failure(s) in the last {since_hours} hours:\n")
+    for failure in recent_failures:
+        click.echo(f"  • Plan {failure['plan_id']}")
+        click.echo(f"    Failed at: {failure['updated_at']}")
+        if failure["failed_stages"]:
+            click.echo(f"    Failed stages: {', '.join(failure['failed_stages'])}")
+        if failure["metadata"].get("error"):
+            click.echo(f"    Error: {failure['metadata']['error']}")
+        click.echo()
+
+    # Exit with non-zero status if failures found
+    sys.exit(1)
 
 
 if __name__ == "__main__":
