@@ -1,5 +1,5 @@
 # @repo-sapiens-template
-# @version: 2.0.0
+# @version: 1.0.0
 # @name: weekly-security-review
 #
 # Weekly Security Review for GitHub Actions
@@ -12,7 +12,7 @@
 # Setup:
 # 1. Copy to .github/workflows/weekly-security-review.yaml
 # 2. Set required secrets:
-#    - ANTHROPIC_API_KEY: Claude API key
+#    - ANTHROPIC_API_KEY: Claude API key  # pragma: allowlist secret
 # 3. Configure SECURITY_LANGUAGES below with your project's languages
 # 4. Adjust schedule as needed
 
@@ -535,36 +535,55 @@ jobs:
           echo "" >> security-report.md
 
       # ============================================
-      # MULTI-LANGUAGE: SEMGREP (supports many languages)
+      # MULTI-LANGUAGE: OPENGREP (supports many languages)
       # ============================================
-      - name: Install Semgrep
-        run: pip install semgrep || pip3 install semgrep
+      - name: Install OpenGrep
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/opengrep/opengrep/main/install.sh | bash
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Run Semgrep (multi-language SAST)
+      - name: Run OpenGrep (multi-language SAST)
         continue-on-error: true
         run: |
-          echo "## Static Analysis (Semgrep)" >> security-report.md
+          echo "## Static Analysis (OpenGrep)" >> security-report.md
           echo '```' >> security-report.md
 
-          semgrep scan --config=auto --json --output=semgrep-results.json \
-            --exclude=node_modules --exclude=.venv --exclude=venv \
-            --exclude=dist --exclude=build --exclude='*.min.js' \
-            2>/dev/null || true
+          # Clone community rules for security scanning
+          git clone --depth 1 https://github.com/semgrep/semgrep-rules.git /tmp/semgrep-rules 2>/dev/null || true
 
-          if [ -f semgrep-results.json ]; then
+          # Run opengrep with security-focused rules
+          if [ -d "/tmp/semgrep-rules" ]; then
+            opengrep scan \
+              --sarif-output=opengrep-results.sarif \
+              -f /tmp/semgrep-rules/python/security \
+              -f /tmp/semgrep-rules/javascript/security \
+              -f /tmp/semgrep-rules/typescript/security \
+              -f /tmp/semgrep-rules/go/security \
+              -f /tmp/semgrep-rules/java/security \
+              -f /tmp/semgrep-rules/ruby/security \
+              -f /tmp/semgrep-rules/generic/security \
+              . 2>/dev/null || true
+          fi
+
+          if [ -f opengrep-results.sarif ]; then
             python3 -c "
           import json
           try:
-              data = json.load(open('semgrep-results.json'))
-              results = data.get('results', [])
+              data = json.load(open('opengrep-results.sarif'))
+              runs = data.get('runs', [])
+              results = []
+              for run in runs:
+                  results.extend(run.get('results', []))
               if results:
                   for r in results[:15]:
-                      rule = r.get('check_id', 'unknown')
-                      path = r.get('path', 'unknown')
-                      line = r.get('start', {}).get('line', 0)
-                      msg = r.get('extra', {}).get('message', 'No message')[:100]
-                      sev = r.get('extra', {}).get('severity', 'INFO')
-                      print(f'[{sev}] {rule}')
+                      rule = r.get('ruleId', 'unknown')
+                      msg = r.get('message', {}).get('text', 'No message')[:100]
+                      locations = r.get('locations', [{}])
+                      loc = locations[0].get('physicalLocation', {}) if locations else {}
+                      path = loc.get('artifactLocation', {}).get('uri', 'unknown')
+                      line = loc.get('region', {}).get('startLine', 0)
+                      level = r.get('level', 'note')
+                      print(f'[{level.upper()}] {rule}')
                       print(f'  {path}:{line}')
                       print(f'  {msg}')
                       print()
@@ -576,7 +595,7 @@ jobs:
               print(f'Error: {e}')
           "
           else
-            echo "Semgrep scan completed (no results file)"
+            echo "OpenGrep scan completed (no results file)"
           fi
 
           echo '```' >> security-report.md
@@ -679,9 +698,9 @@ jobs:
             TOTAL=$((TOTAL + COUNT))
           fi
 
-          if [ -f semgrep-results.json ]; then
-            COUNT=$(python3 -c "import json; d=json.load(open('semgrep-results.json')); print(len(d.get('results', [])))" 2>/dev/null || echo 0)
-            echo "| Semgrep (SAST) | $COUNT |" >> security-report.md
+          if [ -f opengrep-results.sarif ]; then
+            COUNT=$(python3 -c "import json; d=json.load(open('opengrep-results.sarif')); print(sum(len(r.get('results',[])) for r in d.get('runs',[])))" 2>/dev/null || echo 0)
+            echo "| OpenGrep (SAST) | $COUNT |" >> security-report.md
             TOTAL=$((TOTAL + COUNT))
           fi
 
@@ -719,7 +738,7 @@ jobs:
           - govulncheck-results.json (Go dependency vulnerabilities)
           - cargo-audit-results.json (Rust vulnerabilities)
           - npm-audit-results.json (JS/TS dependency vulnerabilities)
-          - semgrep-results.json (static analysis findings)
+          - opengrep-results.sarif (static analysis findings)
 
           Tasks:
           1. Review each security finding in the report
