@@ -1,3 +1,7 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: process-issue
+#
 # Process Issue Workflow for Gitea Actions
 #
 # Triggers when an issue is labeled with 'needs-planning'.

@@ -87,18 +87,28 @@ def find_available_templates(
 ) -> list[dict[str, Any]]:
     """Find all available templates in the package."""
     if provider_type == "github":
-        examples_dir = templates_dir / "github" / "examples"
+        provider_dir = templates_dir / "github"
     else:
-        examples_dir = templates_dir / "gitea" / "examples"
+        provider_dir = templates_dir / "gitea"
 
-    if not examples_dir.exists():
+    if not provider_dir.exists():
         return []
 
     templates = []
-    for yaml_file in examples_dir.glob("*.yaml"):
+
+    # Scan root provider directory for core templates
+    for yaml_file in provider_dir.glob("*.yaml"):
         info = extract_template_info(yaml_file)
         if info:
             templates.append(info)
+
+    # Scan examples subdirectory
+    examples_dir = provider_dir / "examples"
+    if examples_dir.exists():
+        for yaml_file in examples_dir.glob("*.yaml"):
+            info = extract_template_info(yaml_file)
+            if info:
+                templates.append(info)
 
     return templates
 

@@ -1,3 +1,7 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: automation-daemon
+#
 # Sapiens Automation Daemon for Gitea Actions
 #
 # This workflow runs repo-sapiens periodically to process issues automatically.
