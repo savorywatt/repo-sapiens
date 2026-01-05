@@ -273,62 +273,104 @@ class RepoInitializer:
 
     def _configure_ai_agent(self) -> None:
         """Configure AI agent interactively."""
-        from repo_sapiens.utils.agent_detector import detect_available_agents, format_agent_list
+        from repo_sapiens.utils.agent_detector import detect_available_agents
 
         click.echo(click.style("🤖 AI Agent Configuration", bold=True, fg="cyan"))
         click.echo()
 
-        # Detect available agents
-        available_agents = detect_available_agents()
+        # Detect available CLI agents
+        available_cli_agents = detect_available_agents()
 
-        # Build choices: detected CLI agents + self-hosted options + API
-        agent_choices = []
+        # Build agent choices - separate agents from providers
+        click.echo("Available agents:")
+        click.echo("  • react   - Built-in ReAct agent (recommended for most use cases)")
 
-        if available_agents:
-            click.echo(format_agent_list())
-            click.echo()
+        agent_choices = ["react"]
 
-            # Map goose-uvx back to goose for selection
-            for agent in available_agents:
-                base_agent = agent.replace("-uvx", "")
-                if base_agent not in agent_choices:
-                    agent_choices.append(base_agent)
+        if "claude" in available_cli_agents or "claude-uvx" in available_cli_agents:
+            click.echo("  • claude  - Claude Code CLI (requires subscription)")
+            agent_choices.append("claude")
 
-        # Always offer self-hosted and API options
-        agent_choices.extend(["ollama", "vllm", "api"])
+        if "goose" in available_cli_agents or "goose-uvx" in available_cli_agents:
+            click.echo("  • goose   - Goose CLI (Block/Square)")
+            agent_choices.append("goose")
 
-        # Show options
-        click.echo("Available options:")
-        for choice in agent_choices:
-            if choice == "ollama":
-                click.echo("  • ollama - Self-hosted Ollama (free, local)")
-            elif choice == "vllm":
-                click.echo("  • vllm - vLLM/OpenAI-compatible server")
-            elif choice == "api":
-                click.echo("  • api - Cloud API (Claude, OpenAI)")
-            elif choice == "claude":
-                click.echo("  • claude - Claude Code CLI")
-            elif choice == "goose":
-                click.echo("  • goose - Goose CLI")
         click.echo()
 
         self.agent_type = click.prompt(
             "Which agent do you want to use?",
             type=click.Choice(agent_choices),
-            default=agent_choices[0] if agent_choices else "ollama",
+            default="react",
         )
 
         # Configure based on agent type
-        if self.agent_type == "claude":
+        if self.agent_type == "react":
+            self._configure_react()
+        elif self.agent_type == "claude":
             self._configure_claude()
         elif self.agent_type == "goose":
             self._configure_goose()
-        elif self.agent_type == "ollama":
+
+    def _configure_react(self) -> None:
+        """Configure the built-in ReAct agent with LLM provider selection."""
+        click.echo()
+        click.echo(click.style("⚡ ReAct Agent - LLM Provider Configuration", bold=True, fg="cyan"))
+        click.echo()
+        click.echo("The ReAct agent supports various LLM providers.")
+        click.echo()
+
+        # Show provider options
+        click.echo("Available providers:")
+        click.echo("  • ollama - Local Ollama server (recommended, free)")
+        click.echo("  • vllm   - vLLM / OpenAI-compatible server")
+        click.echo("  • openai - OpenAI API (cloud)")
+        click.echo()
+
+        provider = click.prompt(
+            "Which LLM provider?",
+            type=click.Choice(["ollama", "vllm", "openai"]),
+            default="ollama",
+        )
+
+        if provider == "ollama":
             self._configure_ollama()
-        elif self.agent_type == "vllm":
+            self.agent_type = "react-ollama"
+        elif provider == "vllm":
             self._configure_vllm()
-        elif self.agent_type == "api":
-            self._configure_api()
+            self.agent_type = "react-vllm"
+        elif provider == "openai":
+            self._configure_openai_for_react()
+            self.agent_type = "react-openai"
+
+    def _configure_openai_for_react(self) -> None:
+        """Configure OpenAI API for ReAct agent."""
+        click.echo()
+        click.echo(click.style("☁️ OpenAI API Configuration", bold=True, fg="cyan"))
+        click.echo()
+        click.echo("Get your API key from: https://platform.openai.com/api-keys")
+        click.echo()
+
+        self.vllm_api_key = click.prompt(
+            "Enter your OpenAI API key",
+            hide_input=True,
+        )
+        self.agent_api_key = self.vllm_api_key
+
+        # Model selection
+        click.echo()
+        models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini"]
+        click.echo("Available models:")
+        for model in models:
+            click.echo(f"  • {model}")
+        click.echo()
+
+        self.vllm_model = click.prompt(
+            "Which model?",
+            type=click.Choice(models),
+            default="gpt-4o",
+        )
+        self.vllm_base_url = "https://api.openai.com/v1"
+        self.agent_mode = "api"
 
     def _configure_claude(self) -> None:
         """Configure Claude agent."""
@@ -535,49 +577,6 @@ class RepoInitializer:
             self.agent_api_key = self.vllm_api_key  # Store for credential management
 
         self.agent_mode = "local"
-
-    def _configure_api(self) -> None:
-        """Configure cloud API provider (Claude or OpenAI)."""
-        click.echo()
-        click.echo(click.style("☁️ Cloud API Configuration", bold=True, fg="cyan"))
-        click.echo()
-
-        provider = click.prompt(
-            "Which cloud provider?",
-            type=click.Choice(["claude", "openai"]),
-            default="claude",
-        )
-
-        if provider == "claude":
-            self.agent_type = "claude"
-            self.agent_mode = "api"
-            click.echo()
-            click.echo("Claude API Key required. Get it from:")
-            click.echo("   https://console.anthropic.com/")
-            click.echo()
-            self.agent_api_key = click.prompt(
-                "Enter your Claude API key",
-                hide_input=True,
-            )
-        else:
-            # OpenAI - use openai-compatible provider
-            self.agent_type = "vllm"  # Reuse vllm config for OpenAI
-            self.vllm_base_url = "https://api.openai.com/v1"
-            self.vllm_model = click.prompt(
-                "Which model?",
-                type=click.Choice(["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]),
-                default="gpt-4o",
-            )
-            click.echo()
-            click.echo("OpenAI API Key required. Get it from:")
-            click.echo("   https://platform.openai.com/api-keys")
-            click.echo()
-            self.vllm_api_key = click.prompt(
-                "Enter your OpenAI API key",
-                hide_input=True,
-            )
-            self.agent_api_key = self.vllm_api_key
-            self.agent_mode = "api"
 
     def _discover_ollama_models(self) -> list[str]:
         """Try to fetch available models from Ollama server."""
@@ -803,13 +802,44 @@ class RepoInitializer:
                 agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
             elif self.agent_type == "claude" and self.agent_api_key:
                 agent_api_key_ref = "${CLAUDE_API_KEY}"  # pragma: allowlist secret
-            elif self.agent_type == "vllm" and self.vllm_api_key:
+            elif self.agent_type == "react-openai" and self.vllm_api_key:
+                agent_api_key_ref = "${OPENAI_API_KEY}"  # pragma: allowlist secret
+            elif self.agent_type in ("vllm", "react-vllm") and self.vllm_api_key:
                 agent_api_key_ref = "${VLLM_API_KEY}"  # pragma: allowlist secret
             else:
                 agent_api_key_ref = "null"  # pragma: allowlist secret
 
         # Generate agent provider configuration based on type
-        if self.agent_type == "goose":
+        if self.agent_type == "react-ollama":
+            # ReAct agent with Ollama
+            agent_config = f"""agent_provider:
+  provider_type: react
+  model: {self.ollama_model}
+  base_url: {self.ollama_base_url}
+  llm_provider: ollama
+  local_mode: true"""
+
+        elif self.agent_type == "react-vllm":
+            # ReAct agent with vLLM/OpenAI-compatible
+            agent_config = f"""agent_provider:
+  provider_type: react
+  model: {self.vllm_model}
+  base_url: {self.vllm_base_url}
+  api_key: {agent_api_key_ref}
+  llm_provider: openai-compatible
+  local_mode: true"""
+
+        elif self.agent_type == "react-openai":
+            # ReAct agent with OpenAI API
+            agent_config = f"""agent_provider:
+  provider_type: react
+  model: {self.vllm_model}
+  base_url: {self.vllm_base_url}
+  api_key: {agent_api_key_ref}
+  llm_provider: openai
+  local_mode: false"""
+
+        elif self.agent_type == "goose":
             provider_type = f"goose-{self.agent_mode}"
             model = self.goose_model or "gpt-4o"
 
@@ -828,23 +858,6 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}
 {goose_config_section}"""
-
-        elif self.agent_type == "ollama":
-            # Ollama configuration
-            agent_config = f"""agent_provider:
-  provider_type: ollama
-  model: {self.ollama_model}
-  base_url: {self.ollama_base_url}
-  local_mode: true"""
-
-        elif self.agent_type == "vllm":
-            # vLLM / OpenAI-compatible configuration
-            agent_config = f"""agent_provider:
-  provider_type: openai-compatible
-  model: {self.vllm_model}
-  base_url: {self.vllm_base_url}
-  api_key: {agent_api_key_ref}
-  local_mode: {str(self.agent_mode == "local").lower()}"""
 
         else:
             # Claude configuration (default)
