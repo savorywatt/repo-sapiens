@@ -173,9 +173,9 @@ Configure in your repository settings:
 
 | Secret | Description |
 |--------|-------------|
-| `BUILDER_GITEA_TOKEN` | Gitea API token with repo access |
-| `BUILDER_GITEA_URL` | Gitea instance URL |
-| `BUILDER_CLAUDE_API_KEY` | Anthropic Claude API key |
+| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo access |
+| `SAPIENS_GITEA_URL` | Gitea instance URL |
+| `SAPIENS_CLAUDE_API_KEY` | Anthropic Claude API key |
 
 ## Architecture
 

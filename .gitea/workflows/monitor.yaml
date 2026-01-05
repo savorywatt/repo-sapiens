@@ -23,7 +23,7 @@ jobs:
 
       - name: Generate health report
         env:
-          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           sapiens health-check > health-report.md
 

@@ -1,0 +1,114 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: weekly-test-coverage
+#
+# Weekly Test Coverage Improvement for Gitea Actions
+#
+# Runs weekly to analyze test coverage and create PRs with new tests
+# for under-covered modules.
+#
+# Setup:
+# 1. Copy to .gitea/workflows/weekly-test-coverage.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo/PR write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key
+# 3. Adjust the coverage threshold and schedule as needed
+
+name: Improve Test Coverage
+
+on:
+  schedule:
+    # Every Monday at 9am UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      target_coverage:
+        description: 'Minimum coverage % to target'
+        required: false
+        default: '60'
+
+jobs:
+  improve-coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install repo-sapiens
+          pip install -e ".[dev]" 2>/dev/null || pip install -e . pytest pytest-cov
+
+      - name: Run coverage analysis
+        id: coverage
+        run: |
+          # Run tests with coverage
+          python -m pytest tests/ --cov --cov-report=json --cov-report=term -q || true
+
+          # Extract coverage summary
+          if [ -f coverage.json ]; then
+            TOTAL=$(python -c "import json; d=json.load(open('coverage.json')); print(d['totals']['percent_covered'])")
+            echo "total_coverage=$TOTAL" >> $GITHUB_OUTPUT
+            echo "Current coverage: $TOTAL%"
+          else
+            echo "total_coverage=0" >> $GITHUB_OUTPUT
+            echo "No coverage data found"
+          fi
+
+      - name: Create test improvement branch
+        run: |
+          git config user.name "repo-sapiens[bot]"
+          git config user.email "repo-sapiens[bot]@users.noreply.gitea.com"
+          BRANCH="auto/improve-coverage-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Improve test coverage
+        env:
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          TARGET=${{ github.event.inputs.target_coverage || '60' }}
+
+          sapiens react "Improve test coverage for this Python project.
+
+          Current total coverage: ${{ steps.coverage.outputs.total_coverage }}%
+          Target coverage: ${TARGET}%
+
+          Tasks:
+          1. Read coverage.json to identify files with lowest coverage
+          2. Pick ONE module with coverage below ${TARGET}% to improve
+          3. Read the source file to understand what needs testing
+          4. Write comprehensive unit tests for uncovered code paths
+          5. Run the tests to verify they pass: python -m pytest tests/ -v
+
+          Guidelines:
+          - Focus on one module at a time for reviewable PRs
+          - Write meaningful tests, not just coverage padding
+          - Include edge cases and error conditions
+          - Follow existing test patterns in the codebase
+
+          Commit your changes with message: 'test: Add tests for [module name]'"
+
+      - name: Push and create PR
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No test changes made"
+            exit 0
+          fi
+
+          git commit -m "test: Improve test coverage" || true
+          git push -u origin "$BRANCH" || true
+
+          # Create PR using Gitea API (or use gh equivalent if available)
+          echo "Branch $BRANCH pushed. Create PR manually or configure Gitea API call."

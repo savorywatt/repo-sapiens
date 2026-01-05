@@ -23,6 +23,13 @@ dist/
 build/
 *.egg-info/
 
+# Documentation build
+docs/build/
+docs/source/.doctrees/
+docs/source/api/
+docs/source/_static/
+docs/source/_templates/
+
 # Type checking / Linting
 .mypy_cache/
 .ruff_cache/
@@ -35,10 +42,17 @@ build/
 
 # Project state
 .automation/
+.sapiens/
 .benchmarks/
 .builder/
 .credentials
+plans/*
+
+# User config files (contain secrets/local settings)
+repo_sapiens/config/automation_config.yaml
 
 # Secrets baseline (keep in repo for detect-secrets)
 # .secrets.baseline
+
+# Lock file managed by uv
 uv.lock

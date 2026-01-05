@@ -19,7 +19,7 @@ jobs:
       - name: Check for recent activity
         id: check_changes
         env:
-          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           # Check both git commits and recent issue updates
           current_time=$(date +%s)
@@ -57,10 +57,10 @@ jobs:
       - name: Process all pending issues
         if: steps.check_changes.outputs.has_recent_changes == 'true'
         env:
-          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
-          CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: http://100.89.157.127:3000
           AUTOMATION__REPOSITORY__OWNER: Foxshirestudios
           AUTOMATION__REPOSITORY__NAME: builder

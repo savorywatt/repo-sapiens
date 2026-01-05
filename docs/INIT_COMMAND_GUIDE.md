@@ -79,7 +79,7 @@ sapiens init --backend environment
 
 **Headless Server** (encrypted file):
 ```bash
-export SAPIENS_MASTER_PASSWORD="secure-password"  # Legacy: BUILDER_MASTER_PASSWORD also supported
+export SAPIENS_MASTER_PASSWORD="secure-password"  # Legacy: SAPIENS_MASTER_PASSWORD also supported
 sapiens init --backend encrypted
 ```
 
@@ -469,7 +469,7 @@ sapiens credentials set gitea/api_token --backend keyring
 ### Custom Encrypted Backend Password
 
 ```bash
-export SAPIENS_MASTER_PASSWORD="my-secure-password"  # Legacy: BUILDER_MASTER_PASSWORD also supported
+export SAPIENS_MASTER_PASSWORD="my-secure-password"  # Legacy: SAPIENS_MASTER_PASSWORD also supported
 sapiens init --backend encrypted
 ```
 

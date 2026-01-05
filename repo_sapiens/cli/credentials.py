@@ -60,7 +60,7 @@ def credentials_group():
 )
 @click.option(
     "--master-password",
-    envvar="BUILDER_MASTER_PASSWORD",
+    envvar="SAPIENS_MASTER_PASSWORD",
     help="Master password for encrypted backend (can use env var)",
 )
 def set_credential(reference: str, backend: str, value: str, master_password: str | None):
@@ -103,7 +103,7 @@ def set_credential(reference: str, backend: str, value: str, master_password: st
 @click.option("--show-value", is_flag=True, help="Show full credential value (default: masked)")
 @click.option(
     "--master-password",
-    envvar="BUILDER_MASTER_PASSWORD",
+    envvar="SAPIENS_MASTER_PASSWORD",
     help="Master password for encrypted backend",
 )
 def get_credential(reference: str, show_value: bool, master_password: str | None):
@@ -168,7 +168,7 @@ def get_credential(reference: str, show_value: bool, master_password: str | None
 )
 @click.option(
     "--master-password",
-    envvar="BUILDER_MASTER_PASSWORD",
+    envvar="SAPIENS_MASTER_PASSWORD",
     help="Master password for encrypted backend",
 )
 @click.confirmation_option(prompt="Are you sure you want to delete this credential?")
@@ -210,7 +210,7 @@ def delete_credential(reference: str, backend: str, master_password: str | None)
 @credentials_group.command(name="test")
 @click.option(
     "--master-password",
-    envvar="BUILDER_MASTER_PASSWORD",
+    envvar="SAPIENS_MASTER_PASSWORD",
     help="Master password for encrypted backend",
 )
 def test_credentials(master_password: str | None):
