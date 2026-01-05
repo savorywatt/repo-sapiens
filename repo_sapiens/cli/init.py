@@ -257,7 +257,50 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
-        # Gitea token
+
+        # Check for existing Gitea token
+        existing_token = self._find_existing_gitea_token()
+
+        if existing_token:
+            click.echo(click.style("✓ Found existing Gitea token", fg="green"))
+            use_existing = click.confirm("Use existing credential?", default=True)
+            if use_existing:
+                self.gitea_token = existing_token
+                click.echo("   Using existing token")
+            else:
+                self._prompt_for_gitea_token()
+        else:
+            self._prompt_for_gitea_token()
+
+        click.echo()
+
+        # AI Agent configuration
+        self._configure_ai_agent()
+
+    def _find_existing_gitea_token(self) -> str | None:
+        """Check for existing Gitea token in keyring or environment."""
+        import os
+
+        # Check environment variables first
+        for env_var in ["GITEA_TOKEN", "BUILDER_GITEA_TOKEN", "GITEA_API_TOKEN"]:
+            token = os.getenv(env_var)
+            if token:
+                return token
+
+        # Check keyring (silently fail if not available)
+        try:
+            keyring_backend = KeyringBackend()
+            if keyring_backend.available:
+                token = keyring_backend.get("gitea", "api_token")
+                if token:
+                    return token
+        except Exception:  # nosec B110 - intentionally silent on keyring errors
+            pass
+
+        return None
+
+    def _prompt_for_gitea_token(self) -> None:
+        """Prompt user for Gitea API token."""
         click.echo(
             "Gitea API Token is required. Get it from:\n"
             f"   {self.repo_info.base_url}/user/settings/applications"
@@ -265,11 +308,6 @@ class RepoInitializer:
         click.echo()
 
         self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
-
-        click.echo()
-
-        # AI Agent configuration
-        self._configure_ai_agent()
 
     def _configure_ai_agent(self) -> None:
         """Configure AI agent interactively."""
