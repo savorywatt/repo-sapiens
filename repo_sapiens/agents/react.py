@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -110,7 +110,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
         self.client = httpx.AsyncClient(timeout=self.config.timeout)
         self._trajectory: list[TrajectoryStep] = []
 
-    async def __aenter__(self) -> "ReActAgentProvider":
+    async def __aenter__(self) -> ReActAgentProvider:
         """Async context manager entry."""
         return self
 
@@ -144,8 +144,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
                 )
         except httpx.ConnectError as e:
             raise RuntimeError(
-                f"Ollama not running at {self.config.ollama_url}. "
-                "Start it with: ollama serve"
+                f"Ollama not running at {self.config.ollama_url}. " "Start it with: ollama serve"
             ) from e
 
     def set_model(self, model: str) -> None:
@@ -253,9 +252,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             Raw LLM response
         """
         # Build the full prompt
-        system = self.SYSTEM_PROMPT.format(
-            tool_descriptions=self.tools.get_tool_descriptions()
-        )
+        system = self.SYSTEM_PROMPT.format(tool_descriptions=self.tools.get_tool_descriptions())
 
         messages = [
             {"role": "system", "content": system},
@@ -273,10 +270,12 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             messages.append({"role": "assistant", "content": assistant_msg})
 
             # Observation as user message
-            messages.append({
-                "role": "user",
-                "content": f"OBSERVATION: {step.observation}\n\nContinue with the next step.",
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"OBSERVATION: {step.observation}\n\nContinue with the next step.",
+                }
+            )
 
         try:
             response = await self.client.post(

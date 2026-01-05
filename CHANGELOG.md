@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-05
+
+### Added
+- **Builtin ReAct Agent**: New "builtin" option in `sapiens init` for local AI without external CLIs
+  - Uses Ollama with qwen3:8b (recommended) or qwen3:14b (requires 24GB VRAM)
+  - Auto-detects running Ollama and available models
+  - Generates `provider_type: ollama` configuration
+
+### Changed
+- **Keyring Namespace**: Migrated from `builder/` to `sapiens/` prefix
+  - Credentials now stored under `sapiens/gitea/api_token`, `sapiens/claude/api_key`, etc.
+- **Config Location**: Default config path changed from `repo_sapiens/config/automation_config.yaml` to `.sapiens/config.yaml`
+- **State Directory**: Changed from `.automation/state` to `.sapiens/state`
+- **Encrypted Credentials**: File path changed from `.builder/credentials.enc` to `.sapiens/credentials.enc`
+- **CLI Commands**: All documentation and suggestions now use `sapiens credentials` (was `builder credentials`)
+
+### Fixed
+- Credential suggestion messages now show correct CLI syntax: `sapiens credentials set service/key --backend keyring`
+
 ## [0.3.0] - 2026-01-02
 
 ### Changed

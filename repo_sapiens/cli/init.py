@@ -24,7 +24,7 @@ log = structlog.get_logger(__name__)
 @click.option(
     "--config-path",
     type=click.Path(path_type=Path),
-    default="repo_sapiens/config/automation_config.yaml",
+    default=".sapiens/config.yaml",
     help="Path for configuration file",
 )
 @click.option(
@@ -117,7 +117,7 @@ class RepoInitializer:
         self.repo_info = None
         self.provider_type = None  # 'github' or 'gitea' (detected)
         self.gitea_token = None
-        self.agent_type = None  # 'claude' or 'goose'
+        self.agent_type = None  # 'claude', 'goose', or 'builtin'
         self.agent_mode: Literal["local", "api"] = "local"
         self.agent_api_key = None
 
@@ -126,6 +126,10 @@ class RepoInitializer:
         self.goose_model = None
         self.goose_toolkit = "default"
         self.goose_temperature = 0.7
+
+        # Builtin ReAct agent settings
+        self.builtin_model = None
+        self.builtin_ollama_url = None
 
     def run(self) -> None:
         """Run the initialization workflow."""
@@ -256,7 +260,9 @@ class RepoInitializer:
                 self.gitea_token = existing_token
                 click.echo(f"   ✓ Using Gitea token from {source}")
             else:
-                self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
+                self.gitea_token = click.prompt(
+                    "Enter your Gitea API token", hide_input=True, type=str
+                )
         else:
             # No existing token - prompt for it
             click.echo(
@@ -292,38 +298,42 @@ class RepoInitializer:
                 if base_agent not in agent_choices:
                     agent_choices.append(base_agent)
 
+            agent_choices.append("builtin")  # Builtin ReAct agent with Ollama
             agent_choices.append("api")  # Always allow API mode
 
             self.agent_type = click.prompt(
                 "Which agent do you want to use?",
                 type=click.Choice(agent_choices),
-                default=agent_choices[0] if agent_choices else "api",
+                default=agent_choices[0] if agent_choices else "builtin",
             )
         else:
             click.echo(click.style("⚠ No AI agent CLIs detected", fg="yellow"))
             click.echo()
             click.echo("You can:")
-            click.echo("  1. Install Claude Code: https://claude.com/install.sh")
-            click.echo("  2. Install Goose: pip install goose-ai")
-            click.echo("  3. Use API mode (requires API key)")
+            click.echo("  1. Use builtin ReAct agent (requires Ollama)")
+            click.echo("  2. Install Claude Code: https://claude.com/install.sh")
+            click.echo("  3. Install Goose: pip install goose-ai")
+            click.echo("  4. Use API mode (requires API key)")
             click.echo()
 
-            use_api = click.confirm("Use API mode?", default=True)
-            if use_api:
+            self.agent_type = click.prompt(
+                "Which option?",
+                type=click.Choice(["builtin", "api"]),
+                default="builtin",
+            )
+            if self.agent_type == "api":
                 self.agent_type = click.prompt(
                     "Which API provider?", type=click.Choice(["claude", "openai"]), default="claude"
                 )
                 self.agent_mode = "api"
-            else:
-                raise click.ClickException(
-                    "No agents available. Please install an agent CLI or use API mode."
-                )
 
         # Configure based on agent type
         if self.agent_type == "claude":
             self._configure_claude()
         elif self.agent_type == "goose":
             self._configure_goose()
+        elif self.agent_type == "builtin":
+            self._configure_builtin()
 
     def _configure_claude(self) -> None:
         """Configure Claude agent."""
@@ -435,6 +445,77 @@ class RepoInitializer:
             self.goose_toolkit = click.prompt("Toolkit", type=str, default="default")
 
         self.agent_mode = "local"  # Goose runs locally
+
+    def _configure_builtin(self) -> None:
+        """Configure builtin ReAct agent with Ollama."""
+        click.echo()
+        click.echo(click.style("🧠 Builtin ReAct Agent Configuration", bold=True, fg="cyan"))
+        click.echo()
+        click.echo("The builtin agent uses a local LLM via Ollama for reasoning.")
+        click.echo()
+
+        # Check Ollama availability
+        import httpx
+
+        ollama_url = "http://localhost:11434"
+        try:
+            response = httpx.get(f"{ollama_url}/api/tags", timeout=5.0)
+            if response.status_code == 200:
+                models_data = response.json()
+                available_models = [m["name"] for m in models_data.get("models", [])]
+                click.echo(click.style("✓ Ollama is running", fg="green"))
+                if available_models:
+                    click.echo(f"  Available models: {', '.join(available_models[:5])}")
+                    if len(available_models) > 5:
+                        click.echo(f"  ... and {len(available_models) - 5} more")
+            else:
+                available_models = []
+                click.echo(click.style("⚠ Ollama responded but no models found", fg="yellow"))
+        except Exception:
+            available_models = []
+            click.echo(click.style("⚠ Ollama not detected at localhost:11434", fg="yellow"))
+            click.echo("  Install Ollama: https://ollama.ai")
+            click.echo("  Then run: ollama pull qwen3:8b")
+
+        click.echo()
+
+        # Model selection
+        recommended_models = ["qwen3:8b", "qwen3:14b", "llama3.1:8b", "mistral:7b"]
+        if available_models:
+            # Prefer available models, but allow custom input
+            model_choices = [m for m in recommended_models if m in available_models]
+            model_choices.extend([m for m in available_models if m not in model_choices][:3])
+            default_model = model_choices[0] if model_choices else "qwen3:8b"
+        else:
+            model_choices = recommended_models
+            default_model = "qwen3:8b"
+
+        click.echo("Recommended models for tool-calling:")
+        for model in recommended_models[:4]:
+            marker = (
+                " (recommended)"
+                if model == "qwen3:8b"
+                else " (requires 24GB VRAM)"
+                if model == "qwen3:14b"
+                else ""
+            )
+            available = " ✓" if model in available_models else ""
+            click.echo(f"  • {model}{marker}{available}")
+        click.echo()
+
+        self.builtin_model = click.prompt(
+            "Which model?",
+            type=str,
+            default=default_model,
+        )
+
+        # Ollama URL (usually default)
+        if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
+            self.builtin_ollama_url = ollama_url
+        else:
+            self.builtin_ollama_url = click.prompt("Ollama URL", default=ollama_url)
+
+        self.agent_mode = "local"
 
     def _store_credentials(self) -> None:
         """Store credentials in selected backend."""
@@ -656,6 +737,17 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}
 {goose_config_section}"""
+        elif self.agent_type == "builtin":
+            # Builtin ReAct agent with Ollama
+            provider_type = "ollama"
+            model = self.builtin_model or "qwen3:8b"
+            ollama_url = self.builtin_ollama_url or "http://localhost:11434"
+            agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: null
+  local_mode: true
+  ollama_url: {ollama_url}"""
         else:
             # Claude configuration
             provider_type = f"claude-{self.agent_mode}"
@@ -692,7 +784,7 @@ repository:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
   review_approval_threshold: 0.8

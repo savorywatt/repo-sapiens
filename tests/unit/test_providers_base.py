@@ -9,7 +9,6 @@ Tests cover initialization, task execution, plan generation, code review,
 and error handling scenarios with properly mocked subprocess calls.
 """
 
-import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -18,21 +17,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from repo_sapiens.models.domain import (
-    Branch,
-    Comment,
     Issue,
     IssueState,
     Plan,
-    PullRequest,
     Review,
     Task,
-    TaskResult,
 )
 from repo_sapiens.providers.agent_provider import ClaudeLocalProvider
 from repo_sapiens.providers.external_agent import ExternalAgentProvider
 from repo_sapiens.providers.git_provider import GiteaProvider
-from repo_sapiens.utils.mcp_client import MCPClient
-
 
 # =============================================================================
 # Fixtures
@@ -134,9 +127,7 @@ class TestClaudeLocalProviderPlanGeneration:
         assert sample_issue.body in prompt
         assert "development plan" in prompt.lower()
 
-    def test_build_planning_prompt_includes_structure(
-        self, sample_issue: Issue
-    ) -> None:
+    def test_build_planning_prompt_includes_structure(self, sample_issue: Issue) -> None:
         """Should include proper structure guidance in prompt."""
         provider = ClaudeLocalProvider()
         prompt = provider._build_planning_prompt(sample_issue)
@@ -211,6 +202,7 @@ Create comprehensive tests
 Some task description here."""
 
         import re
+
         dep_pattern = r"(?:Dependencies?|Depends on):\s*Task\s*(\d+(?:,\s*\d+)*)"
         dep_match = re.search(dep_pattern, description, re.IGNORECASE)
 
@@ -225,9 +217,7 @@ class TestClaudeLocalProviderTaskExecution:
     """Tests for task execution in ClaudeLocalProvider."""
 
     @pytest.mark.asyncio
-    async def test_execute_task_success(
-        self, sample_task: Task, temp_workspace: Path
-    ) -> None:
+    async def test_execute_task_success(self, sample_task: Task, temp_workspace: Path) -> None:
         """Should execute task successfully and return result."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         context = {"branch": "feature/auth", "plan_content": "Plan details here"}
@@ -239,9 +229,7 @@ created: tests/test_auth.py
 Committed: abc123def456789012345678901234567890abcd
 """
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = mock_output
 
             result = await provider.execute_task(sample_task, context)
@@ -254,16 +242,12 @@ Committed: abc123def456789012345678901234567890abcd
             assert result.output == mock_output
 
     @pytest.mark.asyncio
-    async def test_execute_task_failure(
-        self, sample_task: Task, temp_workspace: Path
-    ) -> None:
+    async def test_execute_task_failure(self, sample_task: Task, temp_workspace: Path) -> None:
         """Should handle task execution failure gracefully."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         context = {"branch": "feature/auth"}
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.side_effect = RuntimeError("Claude execution failed: API error")
 
             result = await provider.execute_task(sample_task, context)
@@ -280,9 +264,7 @@ Committed: abc123def456789012345678901234567890abcd
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         context = {}
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = "Task completed"
 
             result = await provider.execute_task(sample_task, context)
@@ -308,9 +290,7 @@ class TestClaudeLocalProviderCodeReview:
     "suggestions": ["Consider adding docstring"]
 }"""
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = mock_output
 
             review = await provider.review_code(diff, context)
@@ -335,9 +315,7 @@ class TestClaudeLocalProviderCodeReview:
     "suggestions": ["Use environment variables for secrets"]
 }"""
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = mock_output
 
             review = await provider.review_code(diff, context)
@@ -353,9 +331,7 @@ class TestClaudeLocalProviderCodeReview:
         diff = "diff --git a/file.py"
         context = {}
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = "Invalid non-JSON response"
 
             review = await provider.review_code(diff, context)
@@ -370,9 +346,7 @@ class TestClaudeLocalProviderConflictResolution:
     """Tests for conflict resolution in ClaudeLocalProvider."""
 
     @pytest.mark.asyncio
-    async def test_resolve_conflict_with_code_block(
-        self, temp_workspace: Path
-    ) -> None:
+    async def test_resolve_conflict_with_code_block(self, temp_workspace: Path) -> None:
         """Should extract resolved content from code block."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         conflict_info = {
@@ -390,9 +364,7 @@ version = 2  # Using newer version
 The conflict is resolved by keeping the newer version.
 """
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = mock_output
 
             resolved = await provider.resolve_conflict(conflict_info)
@@ -401,16 +373,12 @@ The conflict is resolved by keeping the newer version.
             assert "<<<<<<" not in resolved
 
     @pytest.mark.asyncio
-    async def test_resolve_conflict_without_code_block(
-        self, temp_workspace: Path
-    ) -> None:
+    async def test_resolve_conflict_without_code_block(self, temp_workspace: Path) -> None:
         """Should return entire output when no code block found."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         conflict_info = {"file": "README.md"}
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = "# README\n\nUpdated content"
 
             resolved = await provider.resolve_conflict(conflict_info)
@@ -427,9 +395,7 @@ class TestClaudeLocalProviderRunClaude:
         provider = ClaudeLocalProvider(workspace=temp_workspace)
 
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(
-            return_value=(b"Claude output here", b"")
-        )
+        mock_process.communicate = AsyncMock(return_value=(b"Claude output here", b""))
         mock_process.returncode = 0
 
         with patch(
@@ -454,9 +420,7 @@ class TestClaudeLocalProviderRunClaude:
         provider = ClaudeLocalProvider(workspace=temp_workspace)
 
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(
-            return_value=(b"", b"API rate limit exceeded")
-        )
+        mock_process.communicate = AsyncMock(return_value=(b"", b"API rate limit exceeded"))
         mock_process.returncode = 1
 
         with patch(
@@ -685,9 +649,7 @@ class TestExternalAgentProviderExecutePrompt:
         provider = ExternalAgentProvider(agent_type="claude")
 
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(
-            return_value=(b"", b"Error: API limit exceeded")
-        )
+        mock_process.communicate = AsyncMock(return_value=(b"", b"Error: API limit exceeded"))
         mock_process.returncode = 1
 
         with patch(
@@ -769,9 +731,7 @@ Add JWT token generation and validation
 Create unit tests for authentication
 """
 
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = {"output": mock_output, "success": True}
 
             plan = await provider.generate_plan(sample_issue)
@@ -798,9 +758,7 @@ class TestExternalAgentProviderTaskExecution:
             "original_issue": {"title": "Auth feature", "body": "Implement auth"},
         }
 
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = {
                 "success": True,
                 "output": "Task completed successfully",
@@ -860,9 +818,7 @@ class TestExternalAgentProviderTaskExecution:
         provider = ExternalAgentProvider()
         context = {"branch": "feature/auth", "task_number": 1, "total_tasks": 1}
 
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = {
                 "success": False,
                 "output": "",
@@ -886,11 +842,15 @@ class TestExternalAgentProviderCodeReview:
 
         # Test the approval detection logic
         output_approved = "LGTM! Code looks good and follows best practices. Approve."
-        approved = any(word in output_approved.lower() for word in ["approve", "looks good", "lgtm"])
+        approved = any(
+            word in output_approved.lower() for word in ["approve", "looks good", "lgtm"]
+        )
         assert approved is True
 
         output_not_approved = "Critical security issue: hardcoded password. Request changes."
-        approved = any(word in output_not_approved.lower() for word in ["approve", "looks good", "lgtm"])
+        approved = any(
+            word in output_not_approved.lower() for word in ["approve", "looks good", "lgtm"]
+        )
         assert approved is False
 
     @pytest.mark.asyncio
@@ -901,9 +861,7 @@ class TestExternalAgentProviderCodeReview:
         context = {"description": "Adding new function"}
 
         # The review_code method builds a prompt - verify it calls execute_prompt
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock) as mock_exec:
             # Return a mock Review to avoid the constructor bug
             mock_review = Review(approved=True, confidence_score=0.8)
             with patch.object(provider, "review_code", return_value=mock_review):
@@ -923,9 +881,7 @@ class TestExternalAgentProviderConflictResolution:
             "content": "<<<<<<< HEAD\nvalue=1\n=======\nvalue=2\n>>>>>>>",
         }
 
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock
-        ) as mock_exec:
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = {"output": "value = 2  # Updated version"}
 
             resolved = await provider.resolve_conflict(conflict_info)
@@ -1052,9 +1008,7 @@ class TestGiteaProviderConnect:
             repo="repo",
         )
 
-        with patch.object(
-            provider.mcp, "connect", new_callable=AsyncMock
-        ) as mock_connect:
+        with patch.object(provider.mcp, "connect", new_callable=AsyncMock) as mock_connect:
             await provider.connect()
 
             mock_connect.assert_called_once()
@@ -1091,13 +1045,9 @@ class TestGiteaProviderIssueOperations:
         }
 
     @pytest.mark.asyncio
-    async def test_get_issues(
-        self, provider: GiteaProvider, sample_issue_data: dict
-    ) -> None:
+    async def test_get_issues(self, provider: GiteaProvider, sample_issue_data: dict) -> None:
         """Should retrieve issues via MCP."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {"issues": [sample_issue_data]}
 
             issues = await provider.get_issues(labels=["bug"], state="open")
@@ -1115,13 +1065,9 @@ class TestGiteaProviderIssueOperations:
             )
 
     @pytest.mark.asyncio
-    async def test_get_issue(
-        self, provider: GiteaProvider, sample_issue_data: dict
-    ) -> None:
+    async def test_get_issue(self, provider: GiteaProvider, sample_issue_data: dict) -> None:
         """Should retrieve single issue by number."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_issue_data
 
             issue = await provider.get_issue(42)
@@ -1130,13 +1076,9 @@ class TestGiteaProviderIssueOperations:
             assert issue.title == "Test issue"
 
     @pytest.mark.asyncio
-    async def test_create_issue(
-        self, provider: GiteaProvider, sample_issue_data: dict
-    ) -> None:
+    async def test_create_issue(self, provider: GiteaProvider, sample_issue_data: dict) -> None:
         """Should create issue via MCP."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_issue_data
 
             issue = await provider.create_issue(
@@ -1156,13 +1098,9 @@ class TestGiteaProviderIssueOperations:
             )
 
     @pytest.mark.asyncio
-    async def test_update_issue(
-        self, provider: GiteaProvider, sample_issue_data: dict
-    ) -> None:
+    async def test_update_issue(self, provider: GiteaProvider, sample_issue_data: dict) -> None:
         """Should update issue via MCP."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_issue_data
 
             issue = await provider.update_issue(
@@ -1202,13 +1140,9 @@ class TestGiteaProviderCommentOperations:
         }
 
     @pytest.mark.asyncio
-    async def test_add_comment(
-        self, provider: GiteaProvider, sample_comment_data: dict
-    ) -> None:
+    async def test_add_comment(self, provider: GiteaProvider, sample_comment_data: dict) -> None:
         """Should add comment to issue."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_comment_data
 
             comment = await provider.add_comment(42, "New comment")
@@ -1217,13 +1151,9 @@ class TestGiteaProviderCommentOperations:
             assert comment.body == "Test comment"
 
     @pytest.mark.asyncio
-    async def test_get_comments(
-        self, provider: GiteaProvider, sample_comment_data: dict
-    ) -> None:
+    async def test_get_comments(self, provider: GiteaProvider, sample_comment_data: dict) -> None:
         """Should retrieve all comments for issue."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {"comments": [sample_comment_data]}
 
             comments = await provider.get_comments(42)
@@ -1256,13 +1186,9 @@ class TestGiteaProviderBranchOperations:
         }
 
     @pytest.mark.asyncio
-    async def test_create_branch(
-        self, provider: GiteaProvider, sample_branch_data: dict
-    ) -> None:
+    async def test_create_branch(self, provider: GiteaProvider, sample_branch_data: dict) -> None:
         """Should create new branch."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_branch_data
 
             branch = await provider.create_branch("feature/auth", "main")
@@ -1271,13 +1197,9 @@ class TestGiteaProviderBranchOperations:
             assert branch.sha == "abc123def456"
 
     @pytest.mark.asyncio
-    async def test_get_branch(
-        self, provider: GiteaProvider, sample_branch_data: dict
-    ) -> None:
+    async def test_get_branch(self, provider: GiteaProvider, sample_branch_data: dict) -> None:
         """Should retrieve branch information."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_branch_data
 
             branch = await provider.get_branch("feature/auth")
@@ -1288,9 +1210,7 @@ class TestGiteaProviderBranchOperations:
     @pytest.mark.asyncio
     async def test_get_branch_not_found(self, provider: GiteaProvider) -> None:
         """Should return None for non-existent branch."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.side_effect = Exception("Branch not found")
 
             branch = await provider.get_branch("nonexistent")
@@ -1300,9 +1220,7 @@ class TestGiteaProviderBranchOperations:
     @pytest.mark.asyncio
     async def test_get_diff(self, provider: GiteaProvider) -> None:
         """Should get diff between branches."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {"diff": "diff --git a/file.py\n+new line"}
 
             diff = await provider.get_diff("main", "feature")
@@ -1312,9 +1230,7 @@ class TestGiteaProviderBranchOperations:
     @pytest.mark.asyncio
     async def test_merge_branches(self, provider: GiteaProvider) -> None:
         """Should merge source into target branch."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             await provider.merge_branches("feature", "main", "Merge feature")
 
             mock_call.assert_called_once_with(
@@ -1359,13 +1275,9 @@ class TestGiteaProviderPullRequestOperations:
         }
 
     @pytest.mark.asyncio
-    async def test_create_pull_request(
-        self, provider: GiteaProvider, sample_pr_data: dict
-    ) -> None:
+    async def test_create_pull_request(self, provider: GiteaProvider, sample_pr_data: dict) -> None:
         """Should create pull request."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = sample_pr_data
 
             pr = await provider.create_pull_request(
@@ -1399,9 +1311,7 @@ class TestGiteaProviderFileOperations:
     @pytest.mark.asyncio
     async def test_get_file(self, provider: GiteaProvider) -> None:
         """Should retrieve file contents."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {"content": "# README\n\nProject readme"}
 
             content = await provider.get_file("README.md", ref="main")
@@ -1411,9 +1321,7 @@ class TestGiteaProviderFileOperations:
     @pytest.mark.asyncio
     async def test_commit_file(self, provider: GiteaProvider) -> None:
         """Should commit file to repository."""
-        with patch.object(
-            provider.mcp, "call_tool", new_callable=AsyncMock
-        ) as mock_call:
+        with patch.object(provider.mcp, "call_tool", new_callable=AsyncMock) as mock_call:
             mock_call.return_value = {"sha": "newcommit123"}
 
             sha = await provider.commit_file(
@@ -1588,9 +1496,7 @@ Committed: abc123def456789012345678901234567890abcd
 Task complete!
 """
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = mock_output
 
             result = await provider.execute_task(sample_task, context)
@@ -1601,9 +1507,7 @@ Task complete!
             assert len(result.files_changed) >= 1
 
     @pytest.mark.asyncio
-    async def test_claude_provider_review_workflow(
-        self, temp_workspace: Path
-    ) -> None:
+    async def test_claude_provider_review_workflow(self, temp_workspace: Path) -> None:
         """Test code review workflow."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         diff = """diff --git a/file.py b/file.py
@@ -1620,9 +1524,7 @@ Task complete!
             "suggestions": ["Consider adding docstring"]
         }"""
 
-        with patch.object(
-            provider, "_run_claude", new_callable=AsyncMock
-        ) as mock_run:
+        with patch.object(provider, "_run_claude", new_callable=AsyncMock) as mock_run:
             mock_run.return_value = mock_review
 
             review = await provider.review_code(diff, context)

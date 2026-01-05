@@ -7,12 +7,9 @@ Tests cover:
 - CredentialResolver: Reference parsing, multi-backend resolution
 """
 
-import base64
-import json
 import os
 import secrets
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from cryptography.fernet import Fernet, InvalidToken
@@ -27,7 +24,6 @@ from repo_sapiens.credentials.exceptions import (
 )
 from repo_sapiens.credentials.keyring_backend import KeyringBackend
 from repo_sapiens.credentials.resolver import CredentialResolver
-
 
 # =============================================================================
 # EnvironmentBackend Tests
@@ -242,9 +238,7 @@ class TestKeyringBackendGet:
                 result = backend.get("gitea", "api_token")
 
                 assert result == "secret_token"
-                mock_keyring.get_password.assert_called_once_with(
-                    "builder/gitea", "api_token"
-                )
+                mock_keyring.get_password.assert_called_once_with("sapiens/gitea", "api_token")
 
     def test_get_nonexistent_credential(self):
         """Should return None for non-existent credential."""
@@ -300,7 +294,7 @@ class TestKeyringBackendSet:
                 backend.set("gitea", "api_token", "ghp_abc123")
 
                 mock_keyring.set_password.assert_called_once_with(
-                    "builder/gitea", "api_token", "ghp_abc123"
+                    "sapiens/gitea", "api_token", "ghp_abc123"
                 )
 
     def test_set_empty_value_raises_error(self):
@@ -356,9 +350,7 @@ class TestKeyringBackendDelete:
                 result = backend.delete("gitea", "api_token")
 
                 assert result is True
-                mock_keyring.delete_password.assert_called_once_with(
-                    "builder/gitea", "api_token"
-                )
+                mock_keyring.delete_password.assert_called_once_with("sapiens/gitea", "api_token")
 
     def test_delete_nonexistent_credential(self):
         """Should return False when credential doesn't exist."""
@@ -771,7 +763,6 @@ class TestEncryptedFileBackendAtomicOperations:
         encrypted_backend.set("service", "key", "value")
 
         # Check file permissions (Unix only)
-        import stat
 
         mode = encrypted_backend.file_path.stat().st_mode
         # Owner read/write only
@@ -1035,7 +1026,7 @@ class TestCredentialResolverLazyBackend:
 
         backend = resolver.encrypted_backend
 
-        assert ".builder/credentials.enc" in str(backend.file_path)
+        assert ".sapiens/credentials.enc" in str(backend.file_path)
 
 
 # =============================================================================
@@ -1094,7 +1085,7 @@ class TestEncryptionRoundTrip:
 
     def test_special_characters_in_credentials(self, encrypted_backend):
         """Should handle special characters in credential values."""
-        special_value = 'secret!@#$%^&*()_+-=[]{}|;\':",./<>?`~\n\t'
+        special_value = "secret!@#$%^&*()_+-=[]{}|;':\",./<>?`~\n\t"
 
         encrypted_backend.set("service", "special", special_value)
         result = encrypted_backend.get("service", "special")

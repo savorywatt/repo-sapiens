@@ -341,7 +341,7 @@ class GitDiscovery:
         }
 
     def detect_gitea_config(self, remote_name: str | None = None) -> dict[str, str]:
-        """Detect Gitea configuration for .builder/config.toml
+        """Detect Gitea configuration for .sapiens/config.toml
 
         Detects repository configuration and returns a dictionary suitable
         for generating configuration files.

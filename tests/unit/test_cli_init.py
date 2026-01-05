@@ -1,12 +1,12 @@
 """Unit tests for repo_sapiens/cli/init.py - Repository initialization CLI."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import os
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from click.testing import CliRunner
 from click import ClickException
+from click.testing import CliRunner
 
 from repo_sapiens.cli.init import RepoInitializer, init_command
 from repo_sapiens.git.exceptions import GitDiscoveryError
@@ -725,9 +725,7 @@ class TestRepoInitializerStoreCredentials:
         mock_keyring.set.assert_any_call("openai", "api_key", "sk-openai-key")
 
     @patch("repo_sapiens.cli.init.EnvironmentBackend")
-    def test_store_in_environment_gitea_only(
-        self, mock_env_class, tmp_path, mock_repo_info
-    ):
+    def test_store_in_environment_gitea_only(self, mock_env_class, tmp_path, mock_repo_info):
         """Should store Gitea token in environment."""
         mock_env = Mock()
         mock_env_class.return_value = mock_env
@@ -1028,7 +1026,11 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         with patch.dict(
             "sys.modules",
-            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))}
+            {
+                "repo_sapiens.providers.github_rest": MagicMock(
+                    GitHubRestProvider=Mock(return_value=mock_github)
+                )
+            },
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1059,7 +1061,11 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         with patch.dict(
             "sys.modules",
-            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))}
+            {
+                "repo_sapiens.providers.github_rest": MagicMock(
+                    GitHubRestProvider=Mock(return_value=mock_github)
+                )
+            },
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1077,9 +1083,7 @@ class TestRepoInitializerValidateSetup:
     """Tests for setup validation."""
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
-    def test_validate_setup_keyring_success(
-        self, mock_resolver_class, tmp_path, mock_repo_info
-    ):
+    def test_validate_setup_keyring_success(self, mock_resolver_class, tmp_path, mock_repo_info):
         """Should validate keyring credentials successfully."""
         mock_resolver = Mock()
         mock_resolver.resolve.return_value = "resolved-token"
@@ -1496,9 +1500,7 @@ class TestRepoInitializerEdgeCases:
         initializer.agent_type = "claude"
         initializer.agent_mode = "local"
 
-        with patch.object(
-            initializer, "_setup_github_secrets", side_effect=Exception("API error")
-        ):
+        with patch.object(initializer, "_setup_github_secrets", side_effect=Exception("API error")):
             # Should not raise, just warn
             initializer._setup_gitea_secrets()
 

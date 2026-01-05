@@ -44,12 +44,10 @@ docs/source/_templates/
 .automation/
 .sapiens/
 .benchmarks/
-.builder/
 .credentials
 plans/*
 
-# User config files (contain secrets/local settings)
-repo_sapiens/config/automation_config.yaml
+# User config is now in .sapiens/ (already ignored above)
 
 # Secrets baseline (keep in repo for detect-secrets)
 # .secrets.baseline

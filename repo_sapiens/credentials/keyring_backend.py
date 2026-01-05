@@ -88,8 +88,8 @@ class KeyringBackend:
             )
 
         try:
-            # Namespace credentials under 'builder' to avoid conflicts
-            full_service = f"builder/{service}"
+            # Namespace credentials under 'sapiens' to avoid conflicts
+            full_service = f"sapiens/{service}"
             credential = cast(str | None, keyring.get_password(full_service, key))
 
             if credential is not None:
@@ -124,7 +124,7 @@ class KeyringBackend:
             raise ValueError("Credential value cannot be empty")
 
         try:
-            full_service = f"builder/{service}"
+            full_service = f"sapiens/{service}"
             keyring.set_password(full_service, key, value)
             logger.info(f"Stored credential in keyring: {service}/{key}")
 
@@ -151,7 +151,7 @@ class KeyringBackend:
             raise BackendNotAvailableError("Keyring backend is not available")
 
         try:
-            full_service = f"builder/{service}"
+            full_service = f"sapiens/{service}"
             keyring.delete_password(full_service, key)
             logger.info(f"Deleted credential from keyring: {service}/{key}")
             return True

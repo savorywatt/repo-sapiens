@@ -151,7 +151,7 @@ class TestResolveCredentialString:
         credential_error = CredentialError(
             "API token not found",
             reference="@keyring:gitea/api_token",
-            suggestion="Run: builder credentials set --keyring gitea/api_token",
+            suggestion="Run: sapiens credentials set gitea/api_token --backend keyring",
         )
         mock_resolver.resolve.side_effect = credential_error
         set_resolver(mock_resolver)

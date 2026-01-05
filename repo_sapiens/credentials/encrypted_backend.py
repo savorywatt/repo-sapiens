@@ -3,7 +3,7 @@
 Security Model:
 - Master key derived from user password or stored in keyring
 - Credentials encrypted with Fernet (AES-128-CBC + HMAC)
-- File stored at .builder/credentials.enc
+- File stored at .sapiens/credentials.enc
 - Suitable for headless systems without keyring support
 """
 
@@ -38,7 +38,7 @@ class EncryptedFileBackend:
 
     Example:
         >>> backend = EncryptedFileBackend(
-        ...     file_path=Path(".builder/credentials.enc"),
+        ...     file_path=Path(".sapiens/credentials.enc"),
         ...     master_password="secure-password"
         ... )
         >>> backend.set('gitea', 'api_token', 'ghp_abc123')
@@ -118,7 +118,7 @@ class EncryptedFileBackend:
     def _load_or_generate_salt(self) -> bytes:
         """Load salt from file or generate new one.
 
-        Salt is stored in .builder/credentials.salt
+        Salt is stored in .sapiens/credentials.salt
 
         Returns:
             16-byte cryptographic salt

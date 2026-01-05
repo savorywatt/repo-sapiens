@@ -6,7 +6,6 @@ branch management, label operations, and error handling scenarios.
 """
 
 import base64
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -14,7 +13,6 @@ import pytest
 
 from repo_sapiens.models.domain import IssueState
 from repo_sapiens.providers.gitea_rest import GiteaRestProvider
-
 
 # =============================================================================
 # Fixtures
@@ -199,9 +197,7 @@ class TestGiteaRestProviderConnection:
         assert provider.client is None
 
     @pytest.mark.asyncio
-    async def test_disconnect_when_not_connected(
-        self, provider: GiteaRestProvider
-    ) -> None:
+    async def test_disconnect_when_not_connected(self, provider: GiteaRestProvider) -> None:
         """Should handle disconnect when no client exists."""
         assert provider.client is None
 
@@ -992,9 +988,7 @@ class TestGiteaRestProviderPullRequests:
         mock_httpx_client: AsyncMock,
     ) -> None:
         """Should return None for non-existent PR."""
-        mock_httpx_client.get = AsyncMock(
-            side_effect=Exception("Not found")
-        )
+        mock_httpx_client.get = AsyncMock(side_effect=Exception("Not found"))
         provider.client = mock_httpx_client
 
         pr = await provider.get_pull_request(999)
@@ -1072,9 +1066,7 @@ class TestGiteaRestProviderLabels:
         mock_httpx_client.get = AsyncMock(return_value=mock_response)
         provider.client = mock_httpx_client
 
-        label_ids = await provider._get_or_create_label_ids(
-            ["bug", "documentation"]
-        )
+        label_ids = await provider._get_or_create_label_ids(["bug", "documentation"])
 
         assert label_ids == [1, 3]
         # Should not have called POST (no new labels needed)
@@ -1102,9 +1094,7 @@ class TestGiteaRestProviderLabels:
         mock_httpx_client.post = AsyncMock(return_value=create_response)
         provider.client = mock_httpx_client
 
-        label_ids = await provider._get_or_create_label_ids(
-            ["bug", "new-label"]
-        )
+        label_ids = await provider._get_or_create_label_ids(["bug", "new-label"])
 
         assert label_ids == [1, 100]
 
@@ -1150,9 +1140,7 @@ class TestGiteaRestProviderErrorHandling:
         mock_httpx_client: AsyncMock,
     ) -> None:
         """Should propagate network errors."""
-        mock_httpx_client.get = AsyncMock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        mock_httpx_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
         provider.client = mock_httpx_client
 
         with pytest.raises(httpx.ConnectError):
@@ -1269,9 +1257,7 @@ class TestGiteaRestProviderParsing:
         assert pr.head == "feature-branch"
         assert pr.base == "main"
 
-    def test_parse_pull_request_missing_body(
-        self, provider: GiteaRestProvider
-    ) -> None:
+    def test_parse_pull_request_missing_body(self, provider: GiteaRestProvider) -> None:
         """Should handle missing PR body."""
         data = {
             "id": 501,

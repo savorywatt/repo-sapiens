@@ -10,13 +10,13 @@ pip install keyring cryptography
 
 ```bash
 # OS Keyring (recommended)
-builder credentials set gitea/api_token --backend keyring
+sapiens credentials set gitea/api_token --backend keyring
 
 # Environment Variable
-builder credentials set GITEA_TOKEN --backend environment
+sapiens credentials set GITEA_TOKEN --backend environment
 
 # Encrypted File
-builder credentials set gitea/api_token --backend encrypted
+sapiens credentials set gitea/api_token --backend encrypted
 ```
 
 ## Use in Config
@@ -37,10 +37,10 @@ agent_provider:
 
 ```bash
 # Test resolution
-builder credentials get @keyring:gitea/api_token
+sapiens credentials get @keyring:gitea/api_token
 
 # Check backends
-builder credentials test
+sapiens credentials test
 ```
 
 ## Reference Syntax
@@ -55,33 +55,33 @@ builder credentials test
 
 ```bash
 # Store
-builder credentials set service/key --backend keyring
+sapiens credentials set service/key --backend keyring
 
 # Retrieve (masked)
-builder credentials get @keyring:service/key
+sapiens credentials get @keyring:service/key
 
 # Retrieve (full value)
-builder credentials get @keyring:service/key --show-value
+sapiens credentials get @keyring:service/key --show-value
 
 # Delete
-builder credentials delete service/key --backend keyring
+sapiens credentials delete service/key --backend keyring
 
 # Test backends
-builder credentials test
+sapiens credentials test
 ```
 
 ## Migration from Direct Values
 
 ```bash
 # 1. Store credential
-builder credentials set gitea/api_token --backend keyring
+sapiens credentials set gitea/api_token --backend keyring
 
 # 2. Update config file
 # Change: api_token: "ghp_actual_value"
 # To:     api_token: "@keyring:gitea/api_token"
 
 # 3. Test
-builder credentials get @keyring:gitea/api_token
+sapiens credentials get @keyring:gitea/api_token
 
 # 4. Commit (safe - no secrets)
 git add repo_sapiens/config/automation_config.yaml
@@ -106,8 +106,8 @@ export GITEA_API_TOKEN="your-token"
 
 ### Wrong encrypted file password
 ```bash
-rm .builder/credentials.enc .builder/credentials.salt
-builder credentials set gitea/api_token --backend encrypted
+rm .sapiens/credentials.enc .sapiens/credentials.salt
+sapiens credentials set gitea/api_token --backend encrypted
 ```
 
 ## Security Best Practices

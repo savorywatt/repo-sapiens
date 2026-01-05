@@ -19,7 +19,6 @@ import pytest
 
 from repo_sapiens.git.discovery import GitDiscovery, detect_git_origin
 from repo_sapiens.git.exceptions import (
-    InvalidGitUrlError,
     MultipleRemotesError,
     NoRemotesError,
     NotGitRepositoryError,
@@ -605,7 +604,7 @@ class TestPreferredRemotes:
 
     def test_preferred_remotes_constant(self) -> None:
         """Test that PREFERRED_REMOTES is defined correctly."""
-        assert GitDiscovery.PREFERRED_REMOTES == ["origin", "upstream"]
+        assert ["origin", "upstream"] == GitDiscovery.PREFERRED_REMOTES
 
     @patch("repo_sapiens.git.discovery.git.Repo")
     def test_origin_preferred_over_upstream(self, mock_repo_class: Mock) -> None:

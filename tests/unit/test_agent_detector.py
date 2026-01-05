@@ -30,7 +30,9 @@ class TestDetectAvailableAgents:
     def test_detect_both_agents_available(self):
         """Should detect both Claude and Goose when both are installed."""
         with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
-            mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
+            mock_which.side_effect = (
+                lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
+            )
 
             agents = detect_available_agents()
 
@@ -70,7 +72,9 @@ class TestDetectAvailableAgents:
         """Should not add goose-uvx if goose is already detected."""
         with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             # Both goose and uvx are available
-            mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
+            mock_which.side_effect = (
+                lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
+            )
 
             agents = detect_available_agents()
 

@@ -118,9 +118,7 @@ class TestOllamaProviderConnection:
         ) as mock_get:
             await provider.connect()
 
-            mock_get.assert_called_once_with(
-                "http://localhost:11434/api/tags"
-            )
+            mock_get.assert_called_once_with("http://localhost:11434/api/tags")
 
     @pytest.mark.asyncio
     async def test_connect_model_not_found(self, provider):
@@ -133,9 +131,7 @@ class TestOllamaProviderConnection:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise, just log warning
             await provider.connect()
 
@@ -159,11 +155,13 @@ class TestOllamaProviderConnection:
         with patch.object(
             provider.client,
             "get",
-            AsyncMock(side_effect=httpx.HTTPStatusError(
-                "Server error",
-                request=MagicMock(),
-                response=MagicMock(status_code=500),
-            )),
+            AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    "Server error",
+                    request=MagicMock(),
+                    response=MagicMock(status_code=500),
+                )
+            ),
         ):
             with pytest.raises(httpx.HTTPStatusError):
                 await provider.connect()
@@ -181,9 +179,7 @@ class TestOllamaProviderContextManager:
         mock_response.json.return_value = {"models": [{"name": "llama3.1:8b"}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "get", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
             async with provider as p:
                 assert p is provider
 
@@ -217,9 +213,7 @@ class TestOllamaProviderExecutePrompt:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt(
                 "Write a function",
                 context={"test": "value"},
@@ -259,11 +253,13 @@ class TestOllamaProviderExecutePrompt:
         with patch.object(
             provider.client,
             "post",
-            AsyncMock(side_effect=httpx.HTTPStatusError(
-                "API Error",
-                request=MagicMock(),
-                response=MagicMock(status_code=500),
-            )),
+            AsyncMock(
+                side_effect=httpx.HTTPStatusError(
+                    "API Error",
+                    request=MagicMock(),
+                    response=MagicMock(status_code=500),
+                )
+            ),
         ):
             result = await provider.execute_prompt("Test prompt", task_id="task-1")
 
@@ -278,9 +274,7 @@ class TestOllamaProviderExecutePrompt:
         mock_response.json.return_value = {}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is True
@@ -358,9 +352,7 @@ Add token generation and validation.
         mock_response.json.return_value = {"response": plan_output}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             plan = await provider.generate_plan(sample_issue)
 
         assert isinstance(plan, Plan)
@@ -378,9 +370,7 @@ Add token generation and validation.
         mock_response.json.return_value = {"response": plan_output}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             plan = await provider.generate_plan(sample_issue)
 
         assert isinstance(plan, Plan)
@@ -505,9 +495,7 @@ Created file: src/models/user.py
             "workspace": "/workspace",
         }
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_task(sample_task, context)
 
         assert isinstance(result, TaskResult)
@@ -524,9 +512,7 @@ Created file: src/models/user.py
 
         context = {"issue_number": 99}
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             await provider.execute_task(sample_task, context)
 
         assert provider.current_issue_number == 99
@@ -572,9 +558,7 @@ Good implementation. Code follows best practices."""
         diff = "+def new_function():\n+    pass"
         context = {"description": "Add new function"}
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             with pytest.raises(TypeError) as exc_info:
                 await provider.review_code(diff, context)
 
@@ -720,9 +704,7 @@ def function():
 >>>>>>> feature""",
         }
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.resolve_conflict(conflict_info)
 
         assert result == resolved_content
@@ -737,6 +719,7 @@ class TestOllamaProviderGeneratePrompts:
     @pytest.mark.asyncio
     async def test_generate_prompts_returns_plan_tasks(self, provider):
         """Should return tasks from plan."""
+
         # Create mock tasks
         class MockTask:
             def __init__(self, task_id, title):
@@ -794,9 +777,7 @@ Add main functionality.
         plan_response.raise_for_status = MagicMock()
 
         task_response = MagicMock()
-        task_response.json.return_value = {
-            "response": "Created file: main.py\nDone."
-        }
+        task_response.json.return_value = {"response": "Created file: main.py\nDone."}
         task_response.raise_for_status = MagicMock()
 
         responses = [connect_response, plan_response, task_response, task_response]
@@ -842,9 +823,7 @@ class TestOllamaProviderEdgeCases:
         mock_response.json.return_value = {"response": "Test"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test", context=None)
 
         assert result["success"] is True
@@ -856,9 +835,7 @@ class TestOllamaProviderEdgeCases:
         mock_response.json.return_value = {"response": "Test"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test", task_id=None)
 
         assert result["success"] is True
@@ -876,9 +853,7 @@ class TestOllamaProviderEdgeCases:
         mock_response.json.return_value = {"response": "Done"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_task(sample_task, {})
 
         assert result.success is True
