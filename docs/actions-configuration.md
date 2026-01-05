@@ -2,215 +2,47 @@
 
 This document explains the Gitea Actions workflows and how to configure them for your repository.
 
-## Workflow Architecture Overview
+## Workflow Files Overview
 
-The system uses a **label-driven architecture** where workflows are triggered by adding specific labels to issues. This provides fine-grained control over the automation pipeline.
+The system includes five workflow files in `.gitea/workflows/`:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         WORKFLOW PIPELINE                                │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  Issue Created                                                           │
-│       │                                                                  │
-│       ▼                                                                  │
-│  [needs-planning] ──► needs-planning.yaml ──► Plan Proposal              │
-│       │                                                                  │
-│       ▼                                                                  │
-│  [approved] ──► approved.yaml ──► Task Creation                          │
-│       │                                                                  │
-│       ▼                                                                  │
-│  [execute] ──► execute-task.yaml ──► Implementation                      │
-│       │                                                                  │
-│       ▼                                                                  │
-│  [needs-review] ──► needs-review.yaml ──► Code Review                    │
-│       │                                                                  │
-│       ├──► [requires-qa] ──► requires-qa.yaml ──► QA Testing             │
-│       │                                                                  │
-│       └──► [needs-fix] ──► needs-fix.yaml ──► Fix Proposal               │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+### 1. automation-trigger.yaml
 
-## Workflow Files
-
-The system includes **11 workflow files** in `.gitea/workflows/`:
-
-### Label-Triggered Workflows (6)
-
-#### 1. needs-planning.yaml
-
-**Purpose:** Creates a development plan when an issue needs planning
-
-**Trigger:** `needs-planning` label added to issue
-
-**Process:**
-1. Checks out repository
-2. Installs sapiens (prefers pre-built wheel if available)
-3. Calls `sapiens process-issue` to generate plan proposal
-4. Comments success/failure status on issue
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Timeout: 30 minutes
-
-**Next step:** Add `approved` label to proceed with task creation
-
----
-
-#### 2. approved.yaml
-
-**Purpose:** Creates executable tasks from an approved plan
-
-**Trigger:** `approved` label added to issue that also has `proposed` label
-
-**Process:**
-1. Checks out repository
-2. Calls `sapiens process-issue` to break plan into tasks
-3. Comments completion status
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Timeout: 20 minutes
-
-**Next step:** Tasks are created and can be executed with `execute` label
-
----
-
-#### 3. execute-task.yaml
-
-**Purpose:** Executes a task implementation
-
-**Trigger:** `execute` label added to issue that also has `task` label
-
-**Process:**
-1. Checks out repository with full history
-2. Configures git for commits (Builder Bot)
-3. Calls `sapiens process-issue` to implement the task
-4. Uploads state artifacts
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Timeout: 45 minutes
-- Artifacts: `task-state-{issue}` (7 days retention)
-
-**Next step:** Add `needs-review` label for code review
-
----
-
-#### 4. needs-review.yaml
-
-**Purpose:** Performs automated code review
-
-**Trigger:** `needs-review` label added to issue
-
-**Process:**
-1. Checks out repository with full history
-2. Calls `sapiens process-issue` to review code changes
-3. Uploads review artifacts
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Timeout: 30 minutes
-- Artifacts: `review-artifacts-{issue}` (30 days retention)
-
-**Next step:** Either `requires-qa` for testing or `needs-fix` for corrections
-
----
-
-#### 5. requires-qa.yaml
-
-**Purpose:** Runs QA build and tests
-
-**Trigger:** `requires-qa` label added to issue
-
-**Process:**
-1. Checks out repository with full history
-2. Sets up Python 3.11 and Node.js 20
-3. Configures git for commits
-4. Calls `sapiens process-issue` to run QA
-5. Uploads test results and coverage
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Node.js: 20
-- Timeout: 30 minutes
-- Artifacts: `qa-results-{issue}` (30 days retention)
-
----
-
-#### 6. needs-fix.yaml
-
-**Purpose:** Generates fix proposals after code review
-
-**Trigger:** `needs-fix` label added to issue
-
-**Process:**
-1. Checks out repository with full history
-2. Calls `sapiens process-issue` to create fix proposal
-3. Comments completion status
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Timeout: 20 minutes
-
-**Next step:** Add `approved` label to apply fixes
-
----
-
-### Scheduled/Push Workflows (5)
-
-#### 7. automation-daemon.yaml
-
-**Purpose:** Periodically processes all pending issues
+**Purpose:** Responds to issue events in real-time
 
 **Triggers:**
-- Schedule: Every 5 minutes (cron)
-- Manual: workflow_dispatch
+- Issues: opened, labeled, unlabeled, edited, closed
+- Issue comments: created
 
 **Process:**
-1. Checks for recent activity (commits or issues updated in last 10 minutes)
-2. **Skips processing if no recent activity** (optimization)
-3. If active: processes all pending issues
-4. Checks for stale workflows
-5. Uploads state artifacts
+1. Checks issue labels
+2. Determines which stage to execute
+3. Calls `sapiens process-issue` with appropriate stage
+4. Reports success/failure
 
 **Configuration:**
 - Runs on: `ubuntu-latest`
 - Python: 3.11
-- Schedule: `*/5 * * * *`
-- Activity window: 10 minutes
-- Artifact retention: 7 days
+- Timeout: Default (uses cicd.timeout_minutes from config)
 
 **Customization:**
 ```yaml
-# Change schedule frequency
-schedule:
-  - cron: '*/15 * * * *'  # Every 15 minutes
-
-# Change activity window (in check step)
-cutoff_time=$((current_time - 1200))  # 20 minutes
+# Add custom stage
+elif 'custom-label' in labels:
+    stage = 'custom-stage'
 ```
 
----
-
-#### 8. plan-merged.yaml
+### 2. plan-merged.yaml
 
 **Purpose:** Generates prompts when plan files are merged to main
 
 **Triggers:**
 - Push to main branch
-- Modified files in `plans/**/*.md`
+- Modified files in `plans/` directory
 
 **Process:**
-1. Detects changed plan files (compares with previous commit)
-2. Extracts plan ID from filename (e.g., `plans/42-feature.md` → `42`)
+1. Detects changed plan files
+2. Extracts plan ID from filename
 3. Calls `sapiens generate-prompts` for each plan
 4. Lists active plans for visibility
 
@@ -221,15 +53,40 @@ cutoff_time=$((current_time - 1200))  # 20 minutes
 
 **Customization:**
 ```yaml
-# Add additional branches
+# Change branch
 branches:
   - main
-  - develop
+  - develop  # Add additional branches
 ```
 
----
+### 3. automation-daemon.yaml
 
-#### 9. monitor.yaml
+**Purpose:** Periodically processes all pending issues
+
+**Triggers:**
+- Schedule: Every 5 minutes (cron)
+- Manual: workflow_dispatch
+
+**Process:**
+1. Processes all pending issues
+2. Checks for stale workflows
+3. Uploads state artifacts
+
+**Configuration:**
+- Runs on: `ubuntu-latest`
+- Schedule: `*/5 * * * *` (every 5 minutes)
+- Artifact retention: 7 days
+
+**Customization:**
+```yaml
+# Change schedule
+schedule:
+  - cron: '*/15 * * * *'  # Every 15 minutes
+  - cron: '0 * * * *'     # Every hour
+  - cron: '0 0 * * *'     # Daily at midnight
+```
+
+### 4. monitor.yaml
 
 **Purpose:** System health monitoring and failure detection
 
@@ -238,14 +95,13 @@ branches:
 - Manual: workflow_dispatch
 
 **Process:**
-1. Generates health report via `sapiens health-check`
+1. Generates health report
 2. Checks for failures in last 24 hours
 3. Uploads report as artifact
 
 **Configuration:**
 - Runs on: `ubuntu-latest`
-- Python: 3.11
-- Schedule: `0 */6 * * *`
+- Schedule: `0 */6 * * *` (every 6 hours)
 
 **Customization:**
 ```yaml
@@ -254,9 +110,7 @@ branches:
   run: sapiens check-failures --since-hours 48
 ```
 
----
-
-#### 10. test.yaml
+### 5. test.yaml
 
 **Purpose:** Run tests on pull requests and pushes
 
@@ -274,147 +128,57 @@ branches:
 - Runs on: `ubuntu-latest`
 - Python: 3.11
 
-**Note:** All checks use `|| true` to prevent failures from blocking - review logs for actual issues.
-
----
-
-#### 11. build-artifacts.yaml
-
-**Purpose:** Builds reusable Python package and Docker image
-
-**Triggers:**
-- Push to main (changes to `repo_sapiens/`, `pyproject.toml`, `Dockerfile`)
-- Pull requests to main
-- Manual: workflow_dispatch
-- Schedule: Daily at 2 AM (keeps artifacts fresh)
-
-**Process:**
-1. **build-package job:**
-   - Builds Python wheel and source distribution
-   - Uploads `sapiens-wheel` and `sapiens-sdist` artifacts
-   - Creates package metadata JSON
-
-2. **build-docker job:**
-   - Builds Docker image with buildx
-   - Tags as `latest` and commit SHA
-   - Uploads `docker-image` artifact
-
-3. **test-artifacts job:**
-   - Downloads and tests wheel installation
-   - Verifies package imports
-   - Loads and tests Docker image
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Wheel retention: 30 days
-- Docker image retention: 7 days
-
-**Usage in other workflows:**
+**Customization:**
 ```yaml
-- name: Download pre-built wheel (if available)
-  uses: actions/download-artifact@v3
-  with:
-    name: sapiens-wheel
-    path: dist/
-  continue-on-error: true
+# Add more test steps
+- name: Security scan
+  run: bandit -r repo_sapiens/
 
-- name: Install sapiens
-  run: |
-    if [ -f dist/*.whl ]; then
-      pip install dist/*.whl
-    else
-      pip install -e .
-    fi
+- name: Dependency check
+  run: safety check
 ```
-
----
 
 ## Environment Variables
 
-### Required Secrets
+All workflows use these environment variables:
 
-All workflows require these secrets to be configured in repository settings:
-
-```yaml
-secrets:
-  SAPIENS_GITEA_TOKEN: # Gitea API token with repo access
-  SAPIENS_CLAUDE_API_KEY: # Claude API key for AI operations
-  SAPIENS_GITEA_URL: # Gitea server URL (e.g., http://gitea.local:3000)
-```
-
-### Environment Variable Mapping
-
-Workflows map secrets to automation config environment variables:
-
+### Secrets (Required)
 ```yaml
 env:
-  # Direct usage
-  GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-  CLAUDE_API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
-
-  # Automation config mapping
-  AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
-  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-  AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-  AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+  GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+  CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
 ```
 
-### Gitea Context Variables
-
-Automatically available in workflows:
-
+### Automation Config Mapping
 ```yaml
-${{ gitea.repository_owner }}  # Repository owner
-${{ gitea.repository }}        # Repository name
-${{ gitea.ref_name }}          # Branch/tag name
-${{ gitea.sha }}               # Commit SHA
-${{ gitea.event.issue.number }} # Issue number (for issue events)
-${{ gitea.event.label.name }}  # Label that triggered the event
+env:
+  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
 ```
 
----
+### GitHub Actions Variables
+```yaml
+# Automatically available:
+# - GITHUB_REPOSITORY_OWNER
+# - GITHUB_REPOSITORY
+# - GITHUB_REF_NAME
+# - GITHUB_SERVER_URL
+```
 
 ## Workflow Dependencies
 
-### Python Installation
+### Python Dependencies
 
-Standard workflows install from source:
+All workflows install the package:
 ```yaml
-- name: Install sapiens
+- name: Install dependencies
   run: pip install -e .
 ```
 
-Optimized workflows try pre-built wheel first:
+For development workflows (test.yaml):
 ```yaml
-- name: Download pre-built wheel (if available)
-  uses: actions/download-artifact@v3
-  with:
-    name: sapiens-wheel
-    path: dist/
-  continue-on-error: true
-
-- name: Install sapiens
-  run: |
-    pip install --upgrade pip
-    if [ -f dist/*.whl ]; then
-      echo "✅ Using pre-built wheel"
-      pip install dist/*.whl
-    else
-      echo "⚠️ Building from source"
-      pip install -e .
-    fi
-```
-
-### Git Configuration
-
-Workflows that make commits configure git identity:
-```yaml
-- name: Configure git
-  run: |
-    git config --global user.name "Builder Bot"
-    git config --global user.email "bot@builder.local"
+- name: Install dependencies
+  run: pip install -e ".[dev]"
 ```
 
 ### Caching
@@ -422,31 +186,25 @@ Workflows that make commits configure git identity:
 Workflows use pip caching for faster runs:
 ```yaml
 - name: Setup Python
-  uses: actions/setup-python@v5
+  uses: actions/setup-python@v4
   with:
     python-version: '3.11'
-    cache: 'pip'
+    cache: 'pip'  # Cache pip dependencies
 ```
-
----
 
 ## Workflow Outputs
 
-### Artifacts by Workflow
+### Artifacts
 
-| Workflow | Artifact Name | Contents | Retention |
-|----------|---------------|----------|-----------|
-| automation-daemon | `workflow-state` | `.automation/state/` | 7 days |
-| execute-task | `task-state-{issue}` | `.automation/state/` | 7 days |
-| needs-review | `review-artifacts-{issue}` | `.automation/reviews/` | 30 days |
-| requires-qa | `qa-results-{issue}` | QA results, coverage | 30 days |
-| monitor | `health-report` | `health-report.md` | default |
-| test | `coverage-report` | `htmlcov/` | default |
-| build-artifacts | `sapiens-wheel` | Python wheel | 30 days |
-| build-artifacts | `sapiens-sdist` | Source distribution | 30 days |
-| build-artifacts | `docker-image` | Docker tar | 7 days |
-| build-artifacts | `package-metadata` | `package-info.json` | 30 days |
-| build-artifacts | `docker-metadata` | `image-info.json` | 7 days |
+**automation-daemon.yaml:**
+- `workflow-state`: State files from `.automation/state/`
+- Retention: 7 days
+
+**monitor.yaml:**
+- `health-report`: Health check report (markdown)
+
+**test.yaml:**
+- `coverage-report`: HTML coverage report from `htmlcov/`
 
 ### Accessing Artifacts
 
@@ -461,65 +219,42 @@ curl -H "Authorization: token $GITEA_TOKEN" \
   "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"
 ```
 
----
-
 ## Custom Workflows
 
-### Creating a Label-Triggered Workflow
+### Creating Custom Workflow
 
-Create `.gitea/workflows/custom-label.yaml`:
+Create `.gitea/workflows/custom.yaml`:
 
 ```yaml
-name: Custom Label Handler
+name: Custom Workflow
 
 on:
-  issues:
-    types: [labeled]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
 
 jobs:
-  handle-custom:
-    name: Handle Custom Label
-    if: gitea.event.label.name == 'custom-label'
+  custom-job:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install sapiens
+      - name: Install dependencies
         run: pip install -e .
 
-      - name: Process issue
+      - name: Run custom command
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
         run: |
-          sapiens process-issue --issue ${{ gitea.event.issue.number }}
-
-      - name: Comment on completion
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '✅ Custom processing complete!\n\n🤖 Posted by Builder Automation'
-            })
+          sapiens custom-command --option value
 ```
 
 ### Adding Custom CLI Command
@@ -540,74 +275,58 @@ async def _custom_command(settings: AutomationSettings, option: str):
     # Your logic here
 ```
 
----
-
 ## Performance Optimization
 
-### Activity Check (Daemon)
+### Reduce Workflow Runs
 
-The daemon workflow includes an activity check to avoid unnecessary runs:
-
+**Limit triggers:**
 ```yaml
-- name: Check for recent activity
-  id: check_changes
-  run: |
-    current_time=$(date +%s)
-    cutoff_time=$((current_time - 600))  # 10 minutes ago
-
-    # Check latest commit
-    latest_commit_time=$(git log -1 --format=%ct origin/main 2>/dev/null || echo 0)
-
-    # Check for recently updated issues via API
-    recent_issues=$(curl -s -H "Authorization: token $GITEA_TOKEN" \
-      "$GITEA_URL/api/v1/repos/$OWNER/$REPO/issues?state=open&since=..." \
-      | jq length 2>/dev/null || echo 0)
-
-    if [ "$latest_commit_time" -gt "$cutoff_time" ] || [ "$recent_issues" -gt 0 ]; then
-      echo "has_recent_changes=true" >> $GITHUB_OUTPUT
-    else
-      echo "has_recent_changes=false" >> $GITHUB_OUTPUT
-    fi
+on:
+  issues:
+    types: [labeled]  # Only on label changes
 ```
 
-### Pre-built Artifacts
-
-Use `build-artifacts.yaml` outputs to speed up installations:
-- Wheel artifacts avoid recompiling on every run
-- Docker images provide consistent environments
-
-### Path Filters
-
-Limit triggers to relevant file changes:
+**Add path filters:**
 ```yaml
 on:
   push:
     paths:
       - 'repo_sapiens/**'
       - 'tests/**'
-      - 'pyproject.toml'
 ```
 
-### Parallel Jobs
+### Concurrent Jobs
 
-Run independent jobs concurrently:
+Run independent jobs in parallel:
 ```yaml
 jobs:
-  lint:
+  job1:
     runs-on: ubuntu-latest
     steps: [...]
 
-  test:
+  job2:
     runs-on: ubuntu-latest
     steps: [...]
 
-  build:
-    needs: [lint, test]  # Wait for both
+  job3:
+    needs: [job1, job2]  # Wait for job1 and job2
     runs-on: ubuntu-latest
     steps: [...]
 ```
 
----
+### Caching Dependencies
+
+Cache more than just pip:
+```yaml
+- name: Cache all dependencies
+  uses: actions/cache@v3
+  with:
+    path: |
+      ~/.cache/pip
+      .mypy_cache
+      .pytest_cache
+    key: ${{ runner.os }}-deps-${{ hashFiles('**/pyproject.toml') }}
+```
 
 ## Security Best Practices
 
@@ -617,42 +336,41 @@ jobs:
 ```yaml
 - name: Use secret
   run: |
-    # DON'T: echo ${{ secrets.SAPIENS_GITEA_TOKEN }}
+    # DON'T: echo ${{ secrets.GITEA_TOKEN }}
     # DO: Use secret without logging
     sapiens process-issue --issue 42
   env:
-    GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+    GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
 ```
 
-2. **Use dedicated tokens:**
-   - `SAPIENS_GITEA_TOKEN`: Repository access for automation
-   - `SAPIENS_CLAUDE_API_KEY`: AI provider access
-   - Separate concerns, rotate regularly
+2. **Limit secret scope:**
+- Only add secrets that are needed
+- Use separate tokens for different purposes
+- Rotate secrets regularly
 
 ### Workflow Security
 
 1. **Pin action versions:**
 ```yaml
-# Recommended: use specific versions
-uses: actions/checkout@v4
-uses: actions/setup-python@v5
+# DON'T: uses: actions/checkout@v4
+# DO: uses: actions/checkout@v4.1.0
 ```
 
-2. **Use timeouts:**
+2. **Restrict triggers:**
+```yaml
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize]
+```
+
+3. **Use timeout:**
 ```yaml
 jobs:
   job:
     timeout-minutes: 30
     runs-on: ubuntu-latest
 ```
-
-3. **Validate label conditions:**
-```yaml
-# Require multiple labels for sensitive operations
-if: gitea.event.label.name == 'execute' && contains(gitea.event.issue.labels.*.name, 'task')
-```
-
----
 
 ## Debugging Workflows
 
@@ -668,62 +386,74 @@ if: gitea.event.label.name == 'execute' && contains(gitea.event.issue.labels.*.n
 ```yaml
 - name: Debug info
   run: |
-    echo "Event: ${{ gitea.event_name }}"
-    echo "Label: ${{ gitea.event.label.name }}"
-    echo "Issue: ${{ gitea.event.issue.number }}"
-    echo "Labels: ${{ join(gitea.event.issue.labels.*.name, ', ') }}"
+    echo "GitHub ref: ${{ github.ref }}"
+    echo "Event name: ${{ github.event_name }}"
+    echo "Working directory:"
+    pwd
+    ls -la
 ```
 
 ### Manual Trigger
 
-All scheduled workflows support `workflow_dispatch`:
+Add to any workflow:
 ```yaml
 on:
-  schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:  # Enable manual trigger
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Enable debug mode'
+        required: false
+        default: 'false'
 ```
 
-### Debug Mode
-
+Then:
 ```yaml
 - name: Run with debug
-  run: sapiens --log-level DEBUG process-issue --issue ${{ gitea.event.issue.number }}
+  if: ${{ github.event.inputs.debug == 'true' }}
+  run: sapiens --log-level DEBUG process-all
 ```
 
----
+## Monitoring
+
+### Workflow Notifications
+
+Configure in Gitea:
+1. Repository Settings → Webhooks
+2. Add webhook for workflow status
+3. Notify on workflow failures
+
+### Metrics Collection
+
+Add metrics step:
+```yaml
+- name: Collect metrics
+  run: |
+    sapiens health-check | tee health.txt
+    # Send to monitoring system
+```
 
 ## Troubleshooting
 
 ### Workflow Not Triggering
 
-1. **Check label name:** Label must exactly match (case-sensitive)
-2. **Check conditions:** Some workflows require multiple labels (e.g., `approved` + `proposed`)
-3. **Check runner:** Ensure runner is available and connected
-4. **Check secrets:** Verify all required secrets are configured
+1. Check workflow file syntax
+2. Verify trigger conditions
+3. Check runner availability
+4. Review event payload in logs
 
 ### Workflow Fails
 
-1. View step logs for error messages
-2. Check secrets are configured correctly
-3. Verify repository permissions
-4. Test commands locally first
-
-### Activity Check Skipping
-
-The daemon skips processing when no activity is detected. Check:
-1. Recent commits in last 10 minutes
-2. Recently updated issues
-3. Manual trigger bypasses the check
+1. View step logs
+2. Check secrets are configured
+3. Verify permissions
+4. Test locally with same commands
 
 ### Slow Workflows
 
-1. Use pre-built wheel artifacts
-2. Enable pip caching
-3. Reduce timeout if appropriate
-4. Check for network issues
-
----
+1. Enable caching
+2. Reduce frequency
+3. Parallelize jobs
+4. Optimize dependencies
 
 ## Resources
 

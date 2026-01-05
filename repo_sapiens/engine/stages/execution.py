@@ -4,7 +4,6 @@ import re
 
 import structlog
 
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue
 
@@ -22,13 +21,12 @@ class TaskExecutionStage(WorkflowStage):
     5. Updates task label to 'review'
     """
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute task implementation.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Task issue with 'execute' label
         """
-        issue = context.issue
         log.info("task_execution_start", issue=issue.number)
 
         # Verify this is a task issue

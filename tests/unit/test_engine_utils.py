@@ -13,7 +13,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -38,11 +38,13 @@ from repo_sapiens.engine.recovery import (
     ErrorType,
     ManualInterventionStrategy,
     RecoveryError,
+    RecoveryStrategy,
     RetryRecoveryStrategy,
     TestFixRecoveryStrategy,
 )
 from repo_sapiens.models.domain import Branch, Task
 from repo_sapiens.providers.base import GitProvider
+
 
 # =============================================================================
 # Fixtures
@@ -81,7 +83,7 @@ def mock_settings(tmp_path: Path) -> AutomationSettings:
             "provider_type": "gitea",
             "mcp_server": "test-mcp",
             "base_url": "https://gitea.test.com",
-            "api_token": "test-token",  # pragma: allowlist secret
+            "api_token": "test-token",
         },
         repository={
             "owner": "test-owner",
@@ -91,7 +93,7 @@ def mock_settings(tmp_path: Path) -> AutomationSettings:
         agent_provider={
             "provider_type": "claude-local",
             "model": "claude-sonnet-4.5",
-            "api_key": "test-key",  # pragma: allowlist secret
+            "api_key": "test-key",
             "local_mode": True,
         },
         workflow={
@@ -184,7 +186,10 @@ class TestParallelExecutor:
             return value * 2
 
         executor = ParallelExecutor(max_workers=3)
-        tasks = [ExecutionTask(id=f"task-{i}", func=compute_task, args=(i,)) for i in range(5)]
+        tasks = [
+            ExecutionTask(id=f"task-{i}", func=compute_task, args=(i,))
+            for i in range(5)
+        ]
 
         results = await executor.execute_tasks(tasks)
 
@@ -263,7 +268,9 @@ class TestParallelExecutor:
 
         executor = ParallelExecutor(max_workers=1)
         tasks = [
-            ExecutionTask(id="low", func=tracking_task, args=("low",), priority=TaskPriority.LOW),
+            ExecutionTask(
+                id="low", func=tracking_task, args=("low",), priority=TaskPriority.LOW
+            ),
             ExecutionTask(
                 id="critical",
                 func=tracking_task,
@@ -365,7 +372,9 @@ class TestTaskScheduler:
         scheduler = TaskScheduler(executor)
 
         tasks = [
-            ExecutionTask(id="task-1", func=simple_task, priority=TaskPriority.NORMAL),
+            ExecutionTask(
+                id="task-1", func=simple_task, priority=TaskPriority.NORMAL
+            ),
             ExecutionTask(
                 id="task-2",
                 func=simple_task,
@@ -397,7 +406,9 @@ class TestTaskScheduler:
 
         tasks = [
             ExecutionTask(id="task-1", func=simple_task, args=(1,)),
-            ExecutionTask(id="task-2", func=simple_task, args=(2,), dependencies={"task-1"}),
+            ExecutionTask(
+                id="task-2", func=simple_task, args=(2,), dependencies={"task-1"}
+            ),
         ]
 
         results = await scheduler.execute_with_optimization(tasks)
@@ -686,14 +697,9 @@ class TestAdvancedRecovery:
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
         assert recovery._classify_error({"error": "Connection timeout"}) == ErrorType.TIMEOUT
-        assert (
-            recovery._classify_error({"error": "Merge conflict in file"})
-            == ErrorType.MERGE_CONFLICT
-        )
+        assert recovery._classify_error({"error": "Merge conflict in file"}) == ErrorType.MERGE_CONFLICT
         assert recovery._classify_error({"error": "Test failed"}) == ErrorType.TEST_FAILURE
-        assert (
-            recovery._classify_error({"error": "API rate limit"}) == ErrorType.TRANSIENT_API_ERROR
-        )
+        assert recovery._classify_error({"error": "API rate limit"}) == ErrorType.TRANSIENT_API_ERROR
         assert recovery._classify_error({"error": "Random error"}) == ErrorType.UNKNOWN
 
     def test_select_recovery_strategy(
@@ -746,9 +752,7 @@ class TestAdvancedRecovery:
         assert recovery._infer_error_type(TimeoutError("timeout")) == ErrorType.TIMEOUT
         assert recovery._infer_error_type(Exception("merge conflict")) == ErrorType.MERGE_CONFLICT
         assert recovery._infer_error_type(Exception("API error")) == ErrorType.TRANSIENT_API_ERROR
-        assert (
-            recovery._infer_error_type(Exception("validation failed")) == ErrorType.VALIDATION_ERROR
-        )
+        assert recovery._infer_error_type(Exception("validation failed")) == ErrorType.VALIDATION_ERROR
         assert recovery._infer_error_type(Exception("random")) == ErrorType.UNKNOWN
 
 
@@ -805,7 +809,9 @@ class TestCheckpointManager:
         assert latest["data"]["step"] == 2
 
     @pytest.mark.asyncio
-    async def test_get_latest_checkpoint_by_stage(self, checkpoint_manager: CheckpointManager):
+    async def test_get_latest_checkpoint_by_stage(
+        self, checkpoint_manager: CheckpointManager
+    ):
         """Test retrieving latest checkpoint for specific stage."""
         await checkpoint_manager.create_checkpoint("plan-42", "planning", {"v": 1})
         await checkpoint_manager.create_checkpoint("plan-42", "implementation", {"v": 2})
@@ -817,7 +823,9 @@ class TestCheckpointManager:
         assert latest["data"]["v"] == 1
 
     @pytest.mark.asyncio
-    async def test_get_latest_checkpoint_not_found(self, checkpoint_manager: CheckpointManager):
+    async def test_get_latest_checkpoint_not_found(
+        self, checkpoint_manager: CheckpointManager
+    ):
         """Test behavior when no checkpoint exists."""
         result = await checkpoint_manager.get_latest_checkpoint("nonexistent")
         assert result is None
@@ -883,7 +891,9 @@ class TestCheckpointManager:
         assert len(recent_files) == 1
 
     @pytest.mark.asyncio
-    async def test_cleanup_handles_invalid_files(self, checkpoint_manager: CheckpointManager):
+    async def test_cleanup_handles_invalid_files(
+        self, checkpoint_manager: CheckpointManager
+    ):
         """Test cleanup handles corrupted checkpoint files gracefully."""
         # Create invalid JSON file
         invalid_file = checkpoint_manager.checkpoint_dir / "invalid-checkpoint.json"
@@ -894,7 +904,9 @@ class TestCheckpointManager:
         assert deleted >= 0
 
     @pytest.mark.asyncio
-    async def test_concurrent_checkpoint_creation(self, checkpoint_manager: CheckpointManager):
+    async def test_concurrent_checkpoint_creation(
+        self, checkpoint_manager: CheckpointManager
+    ):
         """Test concurrent checkpoint creation with locking."""
 
         async def create_checkpoint(plan_id: str, stage: str, data: dict[str, Any]) -> str:
@@ -902,7 +914,10 @@ class TestCheckpointManager:
 
         # Create multiple checkpoints concurrently with different stages
         # Since checkpoint IDs include stage name, different stages give unique IDs
-        tasks = [create_checkpoint("plan-1", f"stage-{i}", {"task": i}) for i in range(5)]
+        tasks = [
+            create_checkpoint("plan-1", f"stage-{i}", {"task": i})
+            for i in range(5)
+        ]
         results = await asyncio.gather(*tasks)
 
         assert len(results) == 5

@@ -2,9 +2,8 @@
 
 import structlog
 
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
-from repo_sapiens.models.domain import Task
+from repo_sapiens.models.domain import Issue, Task
 
 log = structlog.get_logger(__name__)
 
@@ -12,16 +11,15 @@ log = structlog.get_logger(__name__)
 class PlanReviewStage(WorkflowStage):
     """Review plan and generate prompt issues for implementation."""
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute plan review stage.
 
         Extracts plan information, generates prompts for each task,
         and creates implementation issues.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Issue tagged with plan-review
         """
-        issue = context.issue
         log.info("plan_review_stage_started", issue=issue.number)
 
         try:
@@ -99,7 +97,7 @@ class PlanReviewStage(WorkflowStage):
 
         except Exception as e:
             log.error("plan_review_stage_failed", error=str(e))
-            await self._handle_stage_error(context, e)
+            await self._handle_stage_error(issue, "plan_review", e)
             raise
 
     def _extract_plan_id(self, issue_body: str) -> str:

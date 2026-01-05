@@ -16,12 +16,12 @@ Each stage is tested for:
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from repo_sapiens.config.settings import AutomationSettings
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.approval import ApprovalStage
 from repo_sapiens.engine.stages.code_review import CodeReviewStage
 from repo_sapiens.engine.stages.execution import TaskExecutionStage
@@ -39,6 +39,7 @@ from repo_sapiens.models.domain import (
     Task,
     TaskResult,
 )
+
 
 # ==============================================================================
 # Fixtures
@@ -160,7 +161,9 @@ def mock_agent_provider():
         output="Task completed successfully",
     )
 
-    mock.execute_prompt = AsyncMock(return_value={"success": True, "output": "Tests created"})
+    mock.execute_prompt = AsyncMock(
+        return_value={"success": True, "output": "Tests created"}
+    )
 
     # Add working_dir attribute for execution stage
     mock.working_dir = "/tmp/workspace"
@@ -211,7 +214,7 @@ def mock_settings(tmp_path):
         agent_provider={
             "provider_type": "claude-local",
             "model": "claude-sonnet-4.5",
-            "api_key": "test-key",  # pragma: allowlist secret
+            "api_key": "test-key",
             "local_mode": True,
         },
         workflow={
@@ -304,7 +307,7 @@ class TestApprovalStageInitialization:
         )
 
         expected_keywords = ["ok", "approve", "approved", "lgtm", "looks good"]
-        assert expected_keywords == stage.APPROVAL_KEYWORDS
+        assert stage.APPROVAL_KEYWORDS == expected_keywords
 
 
 class TestApprovalStageExecute:
@@ -327,7 +330,7 @@ class TestApprovalStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=closed_issue))
+        await stage.execute(closed_issue)
 
         # Should not get comments if already closed
         mock_git_provider.get_comments.assert_not_called()
@@ -371,7 +374,7 @@ class TestApprovalStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should only get comments, not create anything
         mock_git_provider.get_comments.assert_called_once_with(50)
@@ -415,7 +418,7 @@ Description of task 2
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should process approval
         assert mock_git_provider.add_comment.called
@@ -464,7 +467,7 @@ Description of task 1
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should process approval and create tasks
         assert mock_git_provider.add_comment.called
@@ -509,7 +512,7 @@ Description of task 1
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should not create issues since bot comment is ignored
         mock_git_provider.create_issue.assert_not_called()
@@ -545,7 +548,7 @@ Description of task 1
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should not create anything if title cannot be parsed
         mock_git_provider.create_issue.assert_not_called()
@@ -653,7 +656,7 @@ class TestApprovalStageErrorHandling:
         )
 
         with pytest.raises(Exception, match="API Error"):
-            await stage.execute(ExecutionContext(issue=issue))
+            await stage.execute(issue)
 
         # Check that failure comment was posted
         calls = mock_git_provider.add_comment.call_args_list
@@ -723,7 +726,7 @@ class TestCodeReviewStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should have reviewed code
         mock_agent_provider.review_code.assert_called_once()
@@ -771,7 +774,7 @@ class TestCodeReviewStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should have posted rejection comment
         calls = mock_git_provider.add_comment.call_args_list
@@ -815,7 +818,7 @@ class TestCodeReviewStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Labels should not be updated to merge-ready due to low confidence
         update_calls = mock_git_provider.update_issue.call_args_list
@@ -859,8 +862,8 @@ class TestCodeReviewStageExecute:
             settings=mock_settings,
         )
 
-        with pytest.raises(Exception):  # noqa: B017
-            await stage.execute(ExecutionContext(issue=issue))
+        with pytest.raises(Exception):
+            await stage.execute(issue)
 
 
 class TestCodeReviewStageHelperMethods:
@@ -1007,7 +1010,7 @@ class TestTaskExecutionStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should not execute anything
         mock_agent_provider.execute_task.assert_not_called()
@@ -1041,7 +1044,7 @@ class TestTaskExecutionStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         mock_agent_provider.execute_task.assert_not_called()
 
@@ -1074,7 +1077,7 @@ class TestTaskExecutionStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         mock_agent_provider.execute_task.assert_not_called()
 
@@ -1217,8 +1220,7 @@ class TestPlanningStageExecute:
             settings=mock_settings,
         )
 
-        context = ExecutionContext(issue=open_issue)
-        await stage.execute(context)
+        await stage.execute(open_issue)
 
         # Should generate plan
         mock_agent_provider.generate_plan.assert_called_once_with(open_issue)
@@ -1252,7 +1254,7 @@ class TestPlanningStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=open_issue))
+        await stage.execute(open_issue)
 
         # First call should be the start notification
         first_comment_call = mock_git_provider.add_comment.call_args_list[0]
@@ -1278,7 +1280,7 @@ class TestPlanningStageExecute:
         )
 
         with pytest.raises(Exception, match="Agent error"):
-            await stage.execute(ExecutionContext(issue=open_issue))
+            await stage.execute(open_issue)
 
     @pytest.mark.asyncio
     async def test_plan_fallback_file_path(
@@ -1307,7 +1309,7 @@ class TestPlanningStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=open_issue))
+        await stage.execute(open_issue)
 
         # Should still work with fallback path
         mock_git_provider.commit_file.assert_called_once()
@@ -1542,7 +1544,7 @@ class TestQAStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         mock_git_provider.get_pull_request.assert_not_called()
 
@@ -1575,7 +1577,7 @@ class TestQAStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         mock_git_provider.get_pull_request.assert_not_called()
 
@@ -1610,7 +1612,7 @@ class TestQAStageExecute:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Should not post any comments about QA
         for call in mock_git_provider.add_comment.call_args_list:
@@ -1827,9 +1829,8 @@ class TestWorkflowStageErrorHandling:
         )
 
         test_error = Exception("Test error message")
-        context = ExecutionContext(issue=open_issue)
 
-        await stage._handle_stage_error(context, test_error)
+        await stage._handle_stage_error(open_issue, test_error)
 
         # Should add error comment
         mock_git_provider.add_comment.assert_called()
@@ -1882,13 +1883,11 @@ class TestStageIntegration:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=open_issue))
+        await stage.execute(open_issue)
 
         # Verify review issue was created with correct label
         create_call = mock_git_provider.create_issue.call_args
-        assert "Plan Review" in create_call.kwargs.get(
-            "title", create_call.args[0] if create_call.args else ""
-        )
+        assert "Plan Review" in create_call.kwargs.get("title", create_call.args[0] if create_call.args else "")
 
         # Verify original issue labels were updated
         update_call = mock_git_provider.update_issue.call_args
@@ -1932,7 +1931,7 @@ class TestStageIntegration:
             settings=mock_settings,
         )
 
-        await stage.execute(ExecutionContext(issue=issue))
+        await stage.execute(issue)
 
         # Verify state was updated
         mock_state_manager.mark_task_status.assert_called_once()

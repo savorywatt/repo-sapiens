@@ -9,7 +9,6 @@ from pathlib import Path
 
 import structlog
 
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue, Plan
 
@@ -27,16 +26,15 @@ class PlanningStage(WorkflowStage):
     5. Updates workflow state
     """
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute planning stage.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Issue to generate plan for
 
         Raises:
             Exception: If plan generation fails
         """
-        issue = context.issue
         log.info("planning_stage_start", issue=issue.number, title=issue.title)
 
         # Notify user that planning has started
@@ -103,7 +101,7 @@ class PlanningStage(WorkflowStage):
 
         except Exception as e:
             log.error("planning_stage_failed", issue=issue.number, error=str(e), exc_info=True)
-            await self._handle_stage_error(context, e)
+            await self._handle_stage_error(issue, e)
             raise
 
     def _format_plan(self, plan: Plan, issue: Issue) -> str:

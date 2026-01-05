@@ -42,24 +42,12 @@ log = structlog.get_logger(__name__)
     default=True,
     help="Set up Gitea Actions secrets (default: true)",
 )
-@click.option(
-    "--setup-workflows/--no-setup-workflows",
-    default=None,
-    help="Set up CI/CD workflow files (prompts if not specified)",
-)
-@click.option(
-    "--setup-examples/--no-setup-examples",
-    default=None,
-    help="Set up example recurring task workflows (prompts if not specified)",
-)
 def init_command(
     repo_path: Path,
     config_path: Path,
     backend: str | None,
     non_interactive: bool,
     setup_secrets: bool,
-    setup_workflows: bool | None,
-    setup_examples: bool | None,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -67,10 +55,8 @@ def init_command(
     1. Discover Git repository configuration
     2. Prompt for credentials (or use environment variables)
     3. Store credentials securely
-    4. Set up Gitea/GitHub Actions secrets (if requested)
+    4. Set up Gitea Actions secrets (if requested)
     5. Generate configuration file
-    6. Set up CI/CD workflow files (if requested)
-    7. Set up example recurring task workflows (if requested)
 
     Examples:
 
@@ -79,20 +65,11 @@ def init_command(
 
         # Non-interactive setup (for CI/CD)
         export GITEA_TOKEN="your-token"
-        export CLAUDE_API_KEY="your-key"  # pragma: allowlist secret
+        export CLAUDE_API_KEY="your-key"
         sapiens init --non-interactive
 
         # Skip Gitea Actions secret setup
         sapiens init --no-setup-secrets
-
-        # Include workflow files
-        sapiens init --setup-workflows
-
-        # Include example recurring task workflows
-        sapiens init --setup-examples
-
-        # Create CI-specific config
-        sapiens init --config-path sapiens_config.ci.yaml
     """
     try:
         initializer = RepoInitializer(
@@ -101,8 +78,6 @@ def init_command(
             backend=backend,
             non_interactive=non_interactive,
             setup_secrets=setup_secrets,
-            setup_workflows=setup_workflows,
-            setup_examples=setup_examples,
         )
         initializer.run()
 
@@ -132,16 +107,12 @@ class RepoInitializer:
         backend: str | None,
         non_interactive: bool,
         setup_secrets: bool,
-        setup_workflows: bool | None,
-        setup_examples: bool | None,
     ):
         self.repo_path = repo_path
         self.config_path = config_path
         self.backend = backend or self._detect_backend()
         self.non_interactive = non_interactive
         self.setup_secrets = setup_secrets
-        self.setup_workflows = setup_workflows  # None means prompt
-        self.setup_examples = setup_examples  # None means prompt
 
         self.repo_info = None
         self.provider_type = None  # 'github' or 'gitea' (detected)
@@ -155,13 +126,6 @@ class RepoInitializer:
         self.goose_model = None
         self.goose_toolkit = "default"
         self.goose_temperature = 0.7
-
-        # Ollama/vLLM settings
-        self.ollama_base_url = "http://localhost:11434"
-        self.ollama_model = "qwen3:latest"
-        self.vllm_base_url = "http://localhost:8000/v1"
-        self.vllm_model = None
-        self.vllm_api_key = None
 
     def run(self) -> None:
         """Run the initialization workflow."""
@@ -177,20 +141,14 @@ class RepoInitializer:
         # Step 3: Store credentials locally
         self._store_credentials()
 
-        # Step 4: Set up Gitea/GitHub Actions secrets (optional)
+        # Step 4: Set up Gitea Actions secrets (optional)
         if self.setup_secrets:
             self._setup_gitea_secrets()
 
         # Step 5: Generate configuration file
         self._generate_config()
 
-        # Step 6: Set up CI/CD workflow files (optional)
-        self._setup_workflow_files()
-
-        # Step 7: Set up example recurring task workflows (optional)
-        self._setup_example_workflows()
-
-        # Step 8: Validate setup
+        # Step 6: Validate setup
         self._validate_setup()
 
         # Done!
@@ -257,50 +215,7 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
-
-        # Check for existing Gitea token
-        existing_token = self._find_existing_gitea_token()
-
-        if existing_token:
-            click.echo(click.style("✓ Found existing Gitea token", fg="green"))
-            use_existing = click.confirm("Use existing credential?", default=True)
-            if use_existing:
-                self.gitea_token = existing_token
-                click.echo("   Using existing token")
-            else:
-                self._prompt_for_gitea_token()
-        else:
-            self._prompt_for_gitea_token()
-
-        click.echo()
-
-        # AI Agent configuration
-        self._configure_ai_agent()
-
-    def _find_existing_gitea_token(self) -> str | None:
-        """Check for existing Gitea token in keyring or environment."""
-        import os
-
-        # Check environment variables first
-        for env_var in ["GITEA_TOKEN", "SAPIENS_GITEA_TOKEN", "GITEA_API_TOKEN"]:
-            token = os.getenv(env_var)
-            if token:
-                return token
-
-        # Check keyring (silently fail if not available)
-        try:
-            keyring_backend = KeyringBackend()
-            if keyring_backend.available:
-                token = keyring_backend.get("gitea", "api_token")
-                if token:
-                    return token
-        except Exception:  # nosec B110 - intentionally silent on keyring errors
-            pass
-
-        return None
-
-    def _prompt_for_gitea_token(self) -> None:
-        """Prompt user for Gitea API token."""
+        # Gitea token
         click.echo(
             "Gitea API Token is required. Get it from:\n"
             f"   {self.repo_info.base_url}/user/settings/applications"
@@ -309,106 +224,64 @@ class RepoInitializer:
 
         self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
 
+        click.echo()
+
+        # AI Agent configuration
+        self._configure_ai_agent()
+
     def _configure_ai_agent(self) -> None:
-        """Configure AI agent interactively."""
-        from repo_sapiens.utils.agent_detector import detect_available_agents
+        """Configure AI agent (Claude or Goose) interactively."""
+        from repo_sapiens.utils.agent_detector import detect_available_agents, format_agent_list
 
         click.echo(click.style("🤖 AI Agent Configuration", bold=True, fg="cyan"))
         click.echo()
 
-        # Detect available CLI agents
-        available_cli_agents = detect_available_agents()
+        # Detect available agents
+        available_agents = detect_available_agents()
 
-        # Build agent choices - separate agents from providers
-        click.echo("Available agents:")
-        click.echo("  • react   - Built-in ReAct agent (recommended for most use cases)")
+        if available_agents:
+            click.echo(format_agent_list())
+            click.echo()
 
-        agent_choices = ["react"]
+            # Map goose-uvx back to goose for selection
+            agent_choices = []
+            for agent in available_agents:
+                base_agent = agent.replace("-uvx", "")
+                if base_agent not in agent_choices:
+                    agent_choices.append(base_agent)
 
-        if "claude" in available_cli_agents or "claude-uvx" in available_cli_agents:
-            click.echo("  • claude  - Claude Code CLI (requires subscription)")
-            agent_choices.append("claude")
+            agent_choices.append("api")  # Always allow API mode
 
-        if "goose" in available_cli_agents or "goose-uvx" in available_cli_agents:
-            click.echo("  • goose   - Goose CLI (Block/Square)")
-            agent_choices.append("goose")
+            self.agent_type = click.prompt(
+                "Which agent do you want to use?",
+                type=click.Choice(agent_choices),
+                default=agent_choices[0] if agent_choices else "api",
+            )
+        else:
+            click.echo(click.style("⚠ No AI agent CLIs detected", fg="yellow"))
+            click.echo()
+            click.echo("You can:")
+            click.echo("  1. Install Claude Code: https://claude.com/install.sh")
+            click.echo("  2. Install Goose: pip install goose-ai")
+            click.echo("  3. Use API mode (requires API key)")
+            click.echo()
 
-        click.echo()
-
-        self.agent_type = click.prompt(
-            "Which agent do you want to use?",
-            type=click.Choice(agent_choices),
-            default="react",
-        )
+            use_api = click.confirm("Use API mode?", default=True)
+            if use_api:
+                self.agent_type = click.prompt(
+                    "Which API provider?", type=click.Choice(["claude", "openai"]), default="claude"
+                )
+                self.agent_mode = "api"
+            else:
+                raise click.ClickException(
+                    "No agents available. Please install an agent CLI or use API mode."
+                )
 
         # Configure based on agent type
-        if self.agent_type == "react":
-            self._configure_react()
-        elif self.agent_type == "claude":
+        if self.agent_type == "claude":
             self._configure_claude()
         elif self.agent_type == "goose":
             self._configure_goose()
-
-    def _configure_react(self) -> None:
-        """Configure the built-in ReAct agent with LLM provider selection."""
-        click.echo()
-        click.echo(click.style("⚡ ReAct Agent - LLM Provider Configuration", bold=True, fg="cyan"))
-        click.echo()
-        click.echo("The ReAct agent supports various LLM providers.")
-        click.echo()
-
-        # Show provider options
-        click.echo("Available providers:")
-        click.echo("  • ollama - Local Ollama server (recommended, free)")
-        click.echo("  • vllm   - vLLM / OpenAI-compatible server")
-        click.echo("  • openai - OpenAI API (cloud)")
-        click.echo()
-
-        provider = click.prompt(
-            "Which LLM provider?",
-            type=click.Choice(["ollama", "vllm", "openai"]),
-            default="ollama",
-        )
-
-        if provider == "ollama":
-            self._configure_ollama()
-            self.agent_type = "react-ollama"
-        elif provider == "vllm":
-            self._configure_vllm()
-            self.agent_type = "react-vllm"
-        elif provider == "openai":
-            self._configure_openai_for_react()
-            self.agent_type = "react-openai"
-
-    def _configure_openai_for_react(self) -> None:
-        """Configure OpenAI API for ReAct agent."""
-        click.echo()
-        click.echo(click.style("☁️ OpenAI API Configuration", bold=True, fg="cyan"))
-        click.echo()
-        click.echo("Get your API key from: https://platform.openai.com/api-keys")
-        click.echo()
-
-        self.vllm_api_key = click.prompt(
-            "Enter your OpenAI API key",
-            hide_input=True,
-        )
-        self.agent_api_key = self.vllm_api_key
-
-        # Model selection
-        click.echo()
-        models = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini"]
-        click.echo("Available models:")
-        for model in models:
-            click.echo(f"  • {model}")
-        click.echo()
-
-        self.vllm_model = click.prompt(
-            "Which model?",
-            type=click.Choice(models),
-            default="gpt-4o",
-        )
-        self.vllm_base_url = "https://api.openai.com/v1"
-        self.agent_mode = "api"
 
     def _configure_claude(self) -> None:
         """Configure Claude agent."""
@@ -521,114 +394,6 @@ class RepoInitializer:
 
         self.agent_mode = "local"  # Goose runs locally
 
-    def _configure_ollama(self) -> None:
-        """Configure Ollama as the AI provider."""
-        click.echo()
-        click.echo(click.style("🦙 Ollama Configuration", bold=True, fg="cyan"))
-        click.echo()
-
-        # Base URL
-        self.ollama_base_url = click.prompt(
-            "Ollama server URL",
-            default="http://localhost:11434",
-        )
-
-        # Try to discover available models
-        models = self._discover_ollama_models()
-
-        if models:
-            click.echo()
-            click.echo("Available models:")
-            for i, model in enumerate(models[:10], 1):  # Show first 10
-                click.echo(f"  {i}. {model}")
-            if len(models) > 10:
-                click.echo(f"  ... and {len(models) - 10} more")
-            click.echo()
-
-            # Suggest good models for coding
-            recommended = ["qwen3:14b", "qwen3:latest", "qwen3:8b", "llama3.1:8b", "codellama:7b"]
-            default_model = next((m for m in recommended if m in models), models[0])
-
-            self.ollama_model = click.prompt(
-                "Which model?",
-                default=default_model,
-            )
-        else:
-            click.echo()
-            click.echo(click.style("⚠ Could not connect to Ollama", fg="yellow"))
-            click.echo("Make sure Ollama is running: ollama serve")
-            click.echo()
-            click.echo("Recommended models for code tasks:")
-            click.echo("  • qwen3:14b - Best quality (requires 16GB+ RAM)")
-            click.echo("  • qwen3:8b - Good balance")
-            click.echo("  • llama3.1:8b - General purpose")
-            click.echo("  • codellama:7b - Fast, code-focused")
-            click.echo()
-
-            self.ollama_model = click.prompt(
-                "Which model? (will be pulled if not present)",
-                default="qwen3:latest",
-            )
-
-        self.agent_mode = "local"
-        click.echo()
-        click.echo(
-            click.style("💡 Tip:", fg="green")
-            + f" Pull the model with: ollama pull {self.ollama_model}"
-        )
-
-    def _configure_vllm(self) -> None:
-        """Configure vLLM or OpenAI-compatible server as the AI provider."""
-        click.echo()
-        click.echo(click.style("⚡ vLLM / OpenAI-Compatible Configuration", bold=True, fg="cyan"))
-        click.echo()
-        click.echo("This works with vLLM, LMStudio, text-generation-inference, and other")
-        click.echo("servers that expose an OpenAI-compatible API endpoint.")
-        click.echo()
-
-        # Base URL
-        self.vllm_base_url = click.prompt(
-            "Server URL (including /v1 if needed)",
-            default="http://localhost:8000/v1",
-        )
-
-        # Model name
-        click.echo()
-        click.echo("Enter the model name as it appears on your server.")
-        click.echo("Examples: Qwen/Qwen3-14B-AWQ, meta-llama/Llama-3.1-8B-Instruct")
-        click.echo()
-
-        self.vllm_model = click.prompt(
-            "Model name",
-            default="Qwen/Qwen3-14B-AWQ",
-        )
-
-        # API key (optional for some deployments)
-        click.echo()
-        needs_key = click.confirm("Does your server require an API key?", default=False)
-        if needs_key:
-            self.vllm_api_key = click.prompt(
-                "Enter API key",
-                hide_input=True,
-                default="",
-            )
-            self.agent_api_key = self.vllm_api_key  # Store for credential management
-
-        self.agent_mode = "local"
-
-    def _discover_ollama_models(self) -> list[str]:
-        """Try to fetch available models from Ollama server."""
-        import json
-        import urllib.request
-
-        try:
-            url = f"{self.ollama_base_url}/api/tags"
-            with urllib.request.urlopen(url, timeout=5) as response:  # nosec B310
-                data = json.loads(response.read().decode())
-                return [m["name"] for m in data.get("models", [])]
-        except Exception:
-            return []
-
     def _store_credentials(self) -> None:
         """Store credentials in selected backend."""
         click.echo()
@@ -663,11 +428,6 @@ class RepoInitializer:
             elif self.agent_type == "claude":
                 backend.set("claude", "api_key", self.agent_api_key)
                 click.echo("   ✓ Stored: claude/api_key")
-            elif self.agent_type == "vllm" and self.vllm_api_key:
-                backend.set("vllm", "api_key", self.vllm_api_key)
-                click.echo("   ✓ Stored: vllm/api_key")
-
-        # Note: Ollama doesn't require API key storage
 
     def _store_in_environment(self) -> None:
         """Store credentials in environment (for current session)."""
@@ -687,11 +447,6 @@ class RepoInitializer:
             elif self.agent_type == "claude":
                 backend.set("CLAUDE_API_KEY", self.agent_api_key)
                 click.echo("   ✓ Set: CLAUDE_API_KEY")
-            elif self.agent_type == "vllm" and self.vllm_api_key:
-                backend.set("VLLM_API_KEY", self.vllm_api_key)
-                click.echo("   ✓ Set: VLLM_API_KEY")
-
-        # Note: Ollama doesn't require API key
 
         click.echo()
         click.echo(
@@ -746,9 +501,7 @@ class RepoInitializer:
         asyncio.run(github.connect())
 
         # Set GitHub token secret (for workflows)
-        token_secret_name = (  # pragma: allowlist secret
-            "GITHUB_TOKEN" if self.provider_type == "github" else "GITEA_TOKEN"
-        )
+        token_secret_name = "GITHUB_TOKEN" if self.provider_type == "github" else "GITEA_TOKEN"
         click.echo(f"   ⏳ Setting {token_secret_name} secret...")
         asyncio.run(github.set_repository_secret(token_secret_name, self.gitea_token))
         click.echo(f"   ✓ Set repository secret: {token_secret_name}")
@@ -818,66 +571,31 @@ class RepoInitializer:
         if self.backend == "keyring":
             gitea_token_ref = "@keyring:gitea/api_token"  # nosec B105 # Template placeholder for keyring reference
 
-            # Determine API key reference based on agent type
+            # For Goose, use provider-specific keyring path
             if self.agent_type == "goose" and self.goose_llm_provider:
                 agent_api_key_ref = (
                     f"@keyring:{self.goose_llm_provider}/api_key" if self.agent_api_key else "null"
                 )
-            elif self.agent_type == "claude" and self.agent_api_key:
-                agent_api_key_ref = "@keyring:claude/api_key"
-            elif self.agent_type == "vllm" and self.vllm_api_key:
-                agent_api_key_ref = "@keyring:vllm/api_key"
+            elif self.agent_type == "claude":
+                agent_api_key_ref = "@keyring:claude/api_key" if self.agent_api_key else "null"
             else:
-                agent_api_key_ref = "null"  # pragma: allowlist secret
+                agent_api_key_ref = "null"
         else:
             # fmt: off
             gitea_token_ref = "${GITEA_TOKEN}"  # nosec B105 # Template placeholder for environment variable
             # fmt: on
 
-            # Determine API key reference based on agent type
+            # For Goose, use provider-specific environment variable
             if self.agent_type == "goose" and self.goose_llm_provider:
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
                 agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
-            elif self.agent_type == "claude" and self.agent_api_key:
-                agent_api_key_ref = "${CLAUDE_API_KEY}"  # pragma: allowlist secret
-            elif self.agent_type == "react-openai" and self.vllm_api_key:
-                agent_api_key_ref = "${OPENAI_API_KEY}"  # pragma: allowlist secret
-            elif self.agent_type in ("vllm", "react-vllm") and self.vllm_api_key:
-                agent_api_key_ref = "${VLLM_API_KEY}"  # pragma: allowlist secret
+            elif self.agent_type == "claude":
+                agent_api_key_ref = "${CLAUDE_API_KEY}" if self.agent_api_key else "null"
             else:
-                agent_api_key_ref = "null"  # pragma: allowlist secret
+                agent_api_key_ref = "null"
 
-        # Generate agent provider configuration based on type
-        if self.agent_type == "react-ollama":
-            # ReAct agent with Ollama
-            agent_config = f"""agent_provider:
-  provider_type: react
-  model: {self.ollama_model}
-  base_url: {self.ollama_base_url}
-  llm_provider: ollama
-  local_mode: true"""
-
-        elif self.agent_type == "react-vllm":
-            # ReAct agent with vLLM/OpenAI-compatible
-            agent_config = f"""agent_provider:
-  provider_type: react
-  model: {self.vllm_model}
-  base_url: {self.vllm_base_url}
-  api_key: {agent_api_key_ref}
-  llm_provider: openai-compatible
-  local_mode: true"""
-
-        elif self.agent_type == "react-openai":
-            # ReAct agent with OpenAI API
-            agent_config = f"""agent_provider:
-  provider_type: react
-  model: {self.vllm_model}
-  base_url: {self.vllm_base_url}
-  api_key: {agent_api_key_ref}
-  llm_provider: openai
-  local_mode: false"""
-
-        elif self.agent_type == "goose":
+        # Generate agent provider configuration
+        if self.agent_type == "goose":
             provider_type = f"goose-{self.agent_mode}"
             model = self.goose_model or "gpt-4o"
 
@@ -896,9 +614,8 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}
 {goose_config_section}"""
-
         else:
-            # Claude configuration (default)
+            # Claude configuration
             provider_type = f"claude-{self.agent_mode}"
             model = "claude-sonnet-4.5"
             agent_config = f"""agent_provider:
@@ -981,320 +698,6 @@ tags:
         except Exception as e:
             click.echo(click.style(f"   ⚠ Warning: Validation failed: {e}", fg="yellow"))
             click.echo()
-
-    def _setup_workflow_files(self) -> None:
-        """Set up CI/CD workflow files for Gitea or GitHub Actions."""
-        # Determine if we should set up workflows
-        should_setup = self.setup_workflows
-
-        if should_setup is None and not self.non_interactive:
-            # Prompt user
-            click.echo()
-            provider_name = "GitHub" if self.provider_type == "github" else "Gitea"
-            click.echo(click.style(f"📦 {provider_name} Actions Workflows", bold=True, fg="cyan"))
-            click.echo()
-            click.echo(f"Would you like to add {provider_name} Actions workflow files?")
-            click.echo("This will add ready-to-use CI/CD workflows for automated issue processing.")
-            click.echo()
-            should_setup = click.confirm("Add workflow files?", default=True)
-
-        if not should_setup:
-            return
-
-        click.echo()
-        click.echo(click.style("📦 Setting up workflow files...", bold=True))
-
-        # Determine source and destination directories
-        templates_dir = self._find_templates_dir()
-        if not templates_dir:
-            click.echo(
-                click.style(
-                    "   ⚠ Warning: Could not find workflow templates. Skipping.", fg="yellow"
-                )
-            )
-            return
-
-        if self.provider_type == "github":
-            source_dir = templates_dir / "github"
-            dest_dir = self.repo_path / ".github" / "workflows"
-        else:
-            source_dir = templates_dir / "gitea"
-            dest_dir = self.repo_path / ".gitea" / "workflows"
-
-        if not source_dir.exists():
-            click.echo(
-                click.style(
-                    f"   ⚠ Warning: Template directory not found: {source_dir}", fg="yellow"
-                )
-            )
-            return
-
-        # Create destination directory
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy workflow files
-        copied_files = []
-        for src_file in source_dir.glob("*.yaml"):
-            dest_file = dest_dir / src_file.name
-
-            # Check if file already exists
-            if dest_file.exists():
-                if not self.non_interactive:
-                    overwrite = click.confirm(
-                        f"   {src_file.name} already exists. Overwrite?", default=False
-                    )
-                    if not overwrite:
-                        click.echo(f"   ⏭ Skipped: {src_file.name}")
-                        continue
-                else:
-                    click.echo(f"   ⏭ Skipped (exists): {src_file.name}")
-                    continue
-
-            # Copy and customize the file
-            content = src_file.read_text()
-
-            # Replace CONFIG_FILE with actual config path
-            config_filename = self.config_path.name
-            content = content.replace(
-                "CONFIG_FILE: sapiens_config.yaml",
-                f"CONFIG_FILE: {config_filename}",
-            )
-
-            dest_file.write_text(content)
-            copied_files.append(src_file.name)
-            click.echo(f"   ✓ Created: {dest_file.relative_to(self.repo_path)}")
-
-        if copied_files:
-            click.echo()
-            click.echo(click.style(f"   ✓ Added {len(copied_files)} workflow file(s)", fg="green"))
-        click.echo()
-
-    # Supported languages for security workflow
-    SECURITY_LANGUAGES = [
-        ("python", "Python", "bandit, pip-audit, safety"),
-        ("go", "Go", "gosec, govulncheck"),
-        ("java", "Java", "SpotBugs, OWASP Dependency-Check"),
-        ("kotlin", "Kotlin", "detekt, OWASP Dependency-Check"),
-        ("rust", "Rust", "cargo-audit, cargo-deny"),
-        ("cpp", "C/C++", "cppcheck, flawfinder"),
-        ("csharp", "C#", "dotnet package audit"),
-        ("clojure", "Clojure", "nvd-clojure"),
-        ("typescript", "TypeScript", "npm audit, eslint-plugin-security"),
-        ("javascript", "JavaScript", "npm audit, eslint-plugin-security"),
-    ]
-
-    def _setup_example_workflows(self) -> None:
-        """Set up example recurring task workflows (cron-style automation)."""
-        # Available example workflows with descriptions
-        example_workflows = [
-            (
-                "post-merge-docs.yaml",
-                "Post-merge documentation updates",
-                "Automatically updates docs after merges to main",
-            ),
-            (
-                "weekly-test-coverage.yaml",
-                "Weekly test coverage improvement",
-                "Analyzes coverage and writes tests for under-covered code",
-            ),
-            (
-                "weekly-dependency-audit.yaml",
-                "Weekly dependency audit",
-                "Checks for outdated/vulnerable dependencies, creates update PRs",
-            ),
-            (
-                "weekly-security-review.yaml",
-                "Weekly security review",
-                "Multi-language security scans with auto-fix support",
-            ),
-            (
-                "daily-issue-triage.yaml",
-                "Daily issue triage",
-                "Labels and categorizes new issues, adds initial assessments",
-            ),
-        ]
-
-        # Determine if we should prompt for examples
-        should_prompt = self.setup_examples
-
-        if should_prompt is None and not self.non_interactive:
-            # Ask if user wants to see example workflows
-            click.echo()
-            click.echo(click.style("📅 Example Recurring Task Workflows", bold=True, fg="cyan"))
-            click.echo()
-            click.echo("repo-sapiens includes example workflows for common recurring tasks.")
-            click.echo("These demonstrate how to automate tasks with scheduled CI/CD jobs.")
-            click.echo()
-            should_prompt = click.confirm(
-                "Would you like to select example workflows to add?", default=False
-            )
-
-        if not should_prompt:
-            return
-
-        # Find templates directory
-        templates_dir = self._find_templates_dir()
-        if not templates_dir:
-            click.echo(
-                click.style(
-                    "   ⚠ Warning: Could not find workflow templates. Skipping.", fg="yellow"
-                )
-            )
-            return
-
-        if self.provider_type == "github":
-            source_dir = templates_dir / "github" / "examples"
-            dest_dir = self.repo_path / ".github" / "workflows"
-        else:
-            source_dir = templates_dir / "gitea" / "examples"
-            dest_dir = self.repo_path / ".gitea" / "workflows"
-
-        if not source_dir.exists():
-            click.echo(
-                click.style(f"   ⚠ Warning: Example templates not found: {source_dir}", fg="yellow")
-            )
-            return
-
-        click.echo()
-        click.echo(click.style("Select which example workflows to add:", bold=True))
-        click.echo()
-
-        # Ask about each workflow individually
-        selected_workflows = []
-        for filename, title, description in example_workflows:
-            src_file = source_dir / filename
-            if not src_file.exists():
-                continue
-
-            dest_file = dest_dir / filename
-            exists_note = " (already exists)" if dest_file.exists() else ""
-
-            click.echo(f"  {click.style(title, bold=True)}{exists_note}")
-            click.echo(f"    {description}")
-
-            if self.non_interactive:
-                # In non-interactive mode with --setup-examples, add all
-                if not dest_file.exists():
-                    selected_workflows.append((src_file, dest_file, filename))
-                    click.echo("    → Adding (non-interactive mode)")
-            else:
-                if dest_file.exists():
-                    add_it = click.confirm("    Add (overwrite existing)?", default=False)
-                else:
-                    add_it = click.confirm("    Add this workflow?", default=False)
-
-                if add_it:
-                    selected_workflows.append((src_file, dest_file, filename))
-
-            click.echo()
-
-        if not selected_workflows:
-            click.echo("   No example workflows selected.")
-            return
-
-        # Check if security workflow is selected and prompt for languages
-        security_languages = None
-        security_workflow_selected = any(
-            f == "weekly-security-review.yaml" for _, _, f in selected_workflows
-        )
-
-        if security_workflow_selected:
-            security_languages = self._prompt_security_languages()
-
-        # Create destination directory and copy selected workflows
-        dest_dir.mkdir(parents=True, exist_ok=True)
-
-        click.echo(click.style("📅 Adding selected example workflows...", bold=True))
-
-        copied_files = []
-        for src_file, dest_file, filename in selected_workflows:
-            content = src_file.read_text()
-
-            # Replace security languages placeholder if this is the security workflow
-            if filename == "weekly-security-review.yaml" and security_languages:
-                content = content.replace("{{SECURITY_LANGUAGES}}", security_languages)
-
-            dest_file.write_text(content)
-            copied_files.append(filename)
-            click.echo(f"   ✓ Created: {dest_file.relative_to(self.repo_path)}")
-
-        if copied_files:
-            click.echo()
-            click.echo(
-                click.style(f"   ✓ Added {len(copied_files)} example workflow(s)", fg="green")
-            )
-            click.echo()
-            click.echo("   See templates/workflows/examples-README.md for customization tips.")
-        click.echo()
-
-    def _prompt_security_languages(self) -> str:
-        """Prompt user to select project languages for security scanning."""
-        click.echo()
-        click.echo(click.style("🔒 Security Workflow Configuration", bold=True, fg="cyan"))
-        click.echo()
-        click.echo("Select the programming languages used in your project.")
-        click.echo("The security workflow will run appropriate scanners for each language.")
-        click.echo()
-
-        if self.non_interactive:
-            # Default to Python in non-interactive mode
-            click.echo("   Using default: python (non-interactive mode)")
-            return "python"
-
-        click.echo("Available languages:")
-        for lang_id, lang_name, tools in self.SECURITY_LANGUAGES:
-            click.echo(f"  • {lang_id:12} - {lang_name} ({tools})")
-        click.echo()
-
-        # Prompt for languages
-        click.echo("Enter languages separated by spaces (e.g., 'python go rust'):")
-        click.echo("Or press Enter for 'python' (default)")
-        click.echo()
-
-        selected = click.prompt(
-            "Languages",
-            default="python",
-            show_default=True,
-        )
-
-        # Validate selection
-        valid_langs = {lang[0] for lang in self.SECURITY_LANGUAGES}
-        selected_list = selected.lower().split()
-        validated = [lang for lang in selected_list if lang in valid_langs]
-
-        if not validated:
-            click.echo(click.style("   ⚠ No valid languages selected, using 'python'", fg="yellow"))
-            validated = ["python"]
-
-        result = " ".join(validated)
-        click.echo()
-        click.echo(f"   ✓ Security scanning configured for: {result}")
-        click.echo()
-
-        return result
-
-    def _find_templates_dir(self) -> Path | None:
-        """Find the workflow templates directory."""
-        # Try relative to package
-        import repo_sapiens
-
-        package_dir = Path(repo_sapiens.__file__).parent.parent
-        templates_dir = package_dir / "templates" / "workflows"
-
-        if templates_dir.exists():
-            return templates_dir
-
-        # Try relative to current working directory (for development)
-        cwd_templates = Path.cwd() / "templates" / "workflows"
-        if cwd_templates.exists():
-            return cwd_templates
-
-        # Try relative to repo path
-        repo_templates = self.repo_path / "templates" / "workflows"
-        if repo_templates.exists():
-            return repo_templates
-
-        return None
 
     def _print_next_steps(self) -> None:
         """Print next steps for the user."""

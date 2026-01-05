@@ -11,7 +11,6 @@ Key Components:
     - BranchingStrategy: Git branching strategy implementations
     - AdvancedRecovery: Error recovery and retry mechanisms
     - ParallelExecutor: Optimized parallel task execution
-    - ExecutionContext: State carrier through workflow stages
 
 Workflow Stages:
     - Planning: Generate development plan from issue
@@ -28,11 +27,7 @@ Workflow Stages:
     - Merge: Create and merge pull requests
 
 Example:
-    >>> from repo_sapiens.engine import WorkflowOrchestrator, ExecutionContext
+    >>> from repo_sapiens.engine import WorkflowOrchestrator
     >>> orchestrator = WorkflowOrchestrator(settings, git, agent, state)
     >>> await orchestrator.process_issue(issue)
 """
-
-from repo_sapiens.engine.context import ExecutionContext
-
-__all__ = ["ExecutionContext"]

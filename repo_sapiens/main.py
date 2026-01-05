@@ -2,7 +2,6 @@
 
 import asyncio
 import sys
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import click
@@ -10,7 +9,6 @@ import structlog
 
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.init import init_command
-from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
@@ -38,9 +36,8 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
     configure_logging(log_level)
 
     # Skip config loading for commands that don't need it
-    # (init creates the config, credentials manages credentials, react is standalone,
-    # update only checks workflow templates)
-    commands_without_config = ["init", "credentials", "react", "update"]
+    # (init creates the config, credentials manages credentials, react is standalone)
+    commands_without_config = ["init", "credentials", "react"]
     if ctx.invoked_subcommand in commands_without_config:
         ctx.obj = {"settings": None}
         return
@@ -162,44 +159,9 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 
 
 @cli.command()
-@click.option(
-    "--max-age-hours", default=24, type=int, help="Max age in hours before considered stale"
-)
-@click.pass_context
-def check_stale(ctx: click.Context, max_age_hours: int) -> None:
-    """Check for stale workflows that haven't been updated recently."""
-    settings = ctx.obj["settings"]
-    asyncio.run(_check_stale_workflows(settings, max_age_hours))
-
-
-@cli.command()
-@click.pass_context
-def health_check(ctx: click.Context) -> None:
-    """Generate health check report for the automation system."""
-    settings = ctx.obj["settings"]
-    asyncio.run(_generate_health_report(settings))
-
-
-@cli.command()
-@click.option("--since-hours", default=24, type=int, help="Check failures since N hours ago")
-@click.pass_context
-def check_failures(ctx: click.Context, since_hours: int) -> None:
-    """Check for workflow failures in the specified time period."""
-    settings = ctx.obj["settings"]
-    asyncio.run(_check_workflow_failures(settings, since_hours))
-
-
-@cli.command()
 @click.argument("task", required=False)
-@click.option("--model", default="qwen3:latest", help="Model to use")
-@click.option(
-    "--backend",
-    default="ollama",
-    type=click.Choice(["ollama", "openai"]),
-    help="LLM backend: ollama or openai-compatible (vLLM, etc.)",
-)
-@click.option("--base-url", default=None, help="Backend server URL (default: auto-detected)")
-@click.option("--api-key", default=None, help="API key for OpenAI-compatible backends")
+@click.option("--model", default="qwen3:latest", help="Ollama model to use")
+@click.option("--ollama-url", default="http://localhost:11434", help="Ollama server URL")
 @click.option("--max-iterations", default=10, type=int, help="Max ReAct iterations")
 @click.option("--working-dir", default=".", help="Working directory for file operations")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed trajectory")
@@ -207,24 +169,20 @@ def check_failures(ctx: click.Context, since_hours: int) -> None:
 def react(
     task: str | None,
     model: str,
-    backend: str,
-    base_url: str | None,
-    api_key: str | None,
+    ollama_url: str,
     max_iterations: int,
     working_dir: str,
     verbose: bool,
     repl: bool,
 ) -> None:
-    """Run a task using the ReAct agent.
+    """Run a task using the ReAct agent with Ollama.
 
     The ReAct agent reasons step-by-step and uses tools (read/write files,
-    run commands) to complete the task. Supports both Ollama and OpenAI-compatible
-    backends (vLLM, LMStudio, etc.).
+    run commands) to complete the task.
 
     Examples:
         sapiens react "Create a hello.py file that prints Hello World"
         sapiens react --repl  # Start interactive mode
-        sapiens react --backend openai --base-url http://localhost:8000/v1 "task"
     """
     from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
     from repo_sapiens.models.domain import Task as DomainTask
@@ -276,7 +234,7 @@ def react(
         click.echo("ReAct Agent REPL")
         click.echo("=" * 60)
         click.echo(f"Model: {agent.config.model}")
-        click.echo(f"Backend: {agent.config.backend} @ {agent.backend.base_url}")
+        click.echo(f"Ollama: {ollama_url}")
         click.echo(f"Working directory: {Path(working_dir).resolve()}")
         if available_models:
             click.echo(f"Available models: {', '.join(available_models[:5])}")
@@ -316,10 +274,7 @@ def react(
                         click.echo("Goodbye!")
                         break
                     elif cmd == "/help":
-                        click.echo(
-                            "\nCommands: /help, /models, /model <name>, "
-                            "/pwd, /verbose, /clear, /quit"
-                        )
+                        click.echo("\nCommands: /help, /models, /model <name>, /pwd, /verbose, /clear, /quit")
                         click.echo("Or type any task for the agent to execute.\n")
                     elif cmd == "/models":
                         models = await agent.list_models()
@@ -366,17 +321,11 @@ def react(
                 break
 
     async def run() -> None:
-        config = ReActConfig(
-            model=model,
-            backend=backend,
-            base_url=base_url,
-            api_key=api_key,
-            max_iterations=max_iterations,
-        )
+        config = ReActConfig(model=model, max_iterations=max_iterations, ollama_url=ollama_url)
         agent = ReActAgentProvider(working_dir=working_dir, config=config)
 
         click.echo(f"Starting ReAct agent with model: {model}")
-        click.echo(f"Backend: {backend}" + (f" @ {base_url}" if base_url else " (default URL)"))
+        click.echo(f"Ollama server: {ollama_url}")
         click.echo(f"Working directory: {Path(working_dir).resolve()}")
 
         async with agent:
@@ -409,9 +358,6 @@ cli.add_command(credentials_group)
 # Add init command
 cli.add_command(init_command)
 
-# Add update command
-cli.add_command(update_command)
-
 
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:
     """Create and initialize orchestrator.
@@ -437,22 +383,6 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
         agent = OllamaProvider(
             base_url=base_url,
             model=settings.agent_provider.model,
-            working_dir=str(Path.cwd()),
-            qa_handler=qa_handler,
-        )
-    elif settings.agent_provider.provider_type == "openai-compatible":
-        from repo_sapiens.providers.openai_compatible import OpenAICompatibleProvider
-
-        base_url = settings.agent_provider.base_url or "http://localhost:8000/v1"
-        # Resolve API key if it's a credential reference
-        api_key = None
-        if settings.agent_provider.api_key:
-            api_key = settings.agent_provider.api_key.get_secret_value()
-
-        agent = OpenAICompatibleProvider(
-            base_url=base_url,
-            model=settings.agent_provider.model,
-            api_key=api_key,
             working_dir=str(Path.cwd()),
             qa_handler=qa_handler,
         )
@@ -635,200 +565,6 @@ async def _show_plan_status(settings: AutomationSettings, plan_id: str) -> None:
             status = task_data.get("status", "unknown")
             emoji = "✅" if status == "completed" else "⏳" if status == "pending" else "🔄"
             click.echo(f"  {emoji} {task_id}: {status}")
-
-
-async def _check_stale_workflows(settings: AutomationSettings, max_age_hours: int) -> None:
-    """Check for stale workflows that haven't been updated recently.
-
-    Args:
-        settings: Automation settings
-        max_age_hours: Maximum age in hours before workflow is considered stale
-    """
-    state = StateManager(settings.state_dir)
-    cutoff_time = datetime.now(UTC) - timedelta(hours=max_age_hours)
-    stale_plans = []
-
-    # Check all state files
-    for state_file in state.state_dir.glob("*.json"):
-        plan_id = state_file.stem
-        try:
-            state_data = await state.load_state(plan_id)
-
-            # Skip completed or failed workflows
-            if state_data.get("status") in ["completed", "failed"]:
-                continue
-
-            # Parse updated_at timestamp
-            updated_at_str = state_data.get("updated_at", "")
-            if updated_at_str:
-                # Handle ISO format with timezone
-                updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
-                if updated_at < cutoff_time:
-                    stale_plans.append(
-                        {
-                            "plan_id": plan_id,
-                            "status": state_data.get("status", "unknown"),
-                            "updated_at": updated_at_str,
-                            "age_hours": (datetime.now(UTC) - updated_at).total_seconds() / 3600,
-                        }
-                    )
-        except Exception as e:
-            log.warning("failed_to_check_plan", plan_id=plan_id, error=str(e))
-
-    if not stale_plans:
-        click.echo(f"No stale workflows found (threshold: {max_age_hours} hours)")
-        return
-
-    click.echo(f"⚠️  Found {len(stale_plans)} stale workflow(s):\n")
-    for plan in stale_plans:
-        click.echo(f"  • Plan {plan['plan_id']}")
-        click.echo(f"    Status: {plan['status']}")
-        click.echo(f"    Last updated: {plan['updated_at']}")
-        click.echo(f"    Age: {plan['age_hours']:.1f} hours")
-        click.echo()
-
-    # Exit with non-zero status if stale workflows found
-    sys.exit(1)
-
-
-async def _generate_health_report(settings: AutomationSettings) -> None:
-    """Generate health check report for the automation system.
-
-    Args:
-        settings: Automation settings
-    """
-    state = StateManager(settings.state_dir)
-    now = datetime.now(UTC)
-
-    # Collect statistics
-    total_plans = 0
-    active_plans = 0
-    completed_plans = 0
-    failed_plans = 0
-    pending_plans = 0
-
-    plan_details = []
-
-    for state_file in state.state_dir.glob("*.json"):
-        plan_id = state_file.stem
-        try:
-            state_data = await state.load_state(plan_id)
-            total_plans += 1
-
-            status = state_data.get("status", "unknown")
-            if status == "completed":
-                completed_plans += 1
-            elif status == "failed":
-                failed_plans += 1
-            elif status in ["in_progress", "pending"]:
-                active_plans += 1
-                if status == "pending":
-                    pending_plans += 1
-
-            plan_details.append(
-                {
-                    "id": plan_id,
-                    "status": status,
-                    "updated_at": state_data.get("updated_at", "unknown"),
-                }
-            )
-        except Exception as e:
-            log.warning("failed_to_load_plan", plan_id=plan_id, error=str(e))
-
-    # Generate report
-    click.echo("# Automation System Health Report")
-    click.echo(f"Generated: {now.isoformat()}")
-    click.echo()
-    click.echo("## Summary")
-    click.echo(f"- Total Plans: {total_plans}")
-    click.echo(f"- Active Plans: {active_plans}")
-    click.echo(f"- Completed Plans: {completed_plans}")
-    click.echo(f"- Failed Plans: {failed_plans}")
-    click.echo(f"- Pending Plans: {pending_plans}")
-    click.echo()
-    click.echo("## Configuration")
-    click.echo(f"- State Directory: {settings.state_dir}")
-    click.echo(f"- Git Provider: {settings.git_provider.provider_type}")
-    click.echo(f"- Agent Provider: {settings.agent_provider.provider_type}")
-    click.echo()
-    click.echo("## Provider Status")
-    click.echo("- Git Provider: Configuration loaded ✓")
-    click.echo("- Agent Provider: Configuration loaded ✓")
-    click.echo("- State Manager: Operational ✓")
-    click.echo()
-
-    if failed_plans > 0:
-        click.echo("## Failed Plans")
-        for plan in plan_details:
-            if plan["status"] == "failed":
-                click.echo(f"- {plan['id']} (updated: {plan['updated_at']})")
-        click.echo()
-
-    if active_plans > 0:
-        click.echo("## Active Plans")
-        for plan in plan_details:
-            if plan["status"] in ["in_progress", "pending"]:
-                click.echo(f"- {plan['id']}: {plan['status']} (updated: {plan['updated_at']})")
-
-
-async def _check_workflow_failures(settings: AutomationSettings, since_hours: int) -> None:
-    """Check for workflow failures in the specified time period.
-
-    Args:
-        settings: Automation settings
-        since_hours: Check failures since N hours ago
-    """
-    state = StateManager(settings.state_dir)
-    cutoff_time = datetime.now(UTC) - timedelta(hours=since_hours)
-    recent_failures = []
-
-    for state_file in state.state_dir.glob("*.json"):
-        plan_id = state_file.stem
-        try:
-            state_data = await state.load_state(plan_id)
-
-            # Check if this is a failed workflow
-            if state_data.get("status") != "failed":
-                continue
-
-            # Check if it failed within the time window
-            updated_at_str = state_data.get("updated_at", "")
-            if updated_at_str:
-                updated_at = datetime.fromisoformat(updated_at_str.replace("Z", "+00:00"))
-                if updated_at >= cutoff_time:
-                    # Collect failure details from stages
-                    failed_stages = []
-                    for stage_name, stage_data in state_data.get("stages", {}).items():
-                        if stage_data.get("status") == "failed":
-                            failed_stages.append(stage_name)
-
-                    recent_failures.append(
-                        {
-                            "plan_id": plan_id,
-                            "updated_at": updated_at_str,
-                            "failed_stages": failed_stages,
-                            "metadata": state_data.get("metadata", {}),
-                        }
-                    )
-        except Exception as e:
-            log.warning("failed_to_check_plan", plan_id=plan_id, error=str(e))
-
-    if not recent_failures:
-        click.echo(f"No workflow failures found in the last {since_hours} hours")
-        return
-
-    click.echo(f"❌ Found {len(recent_failures)} failure(s) in the last {since_hours} hours:\n")
-    for failure in recent_failures:
-        click.echo(f"  • Plan {failure['plan_id']}")
-        click.echo(f"    Failed at: {failure['updated_at']}")
-        if failure["failed_stages"]:
-            click.echo(f"    Failed stages: {', '.join(failure['failed_stages'])}")
-        if failure["metadata"].get("error"):
-            click.echo(f"    Error: {failure['metadata']['error']}")
-        click.echo()
-
-    # Exit with non-zero status if failures found
-    sys.exit(1)
 
 
 if __name__ == "__main__":

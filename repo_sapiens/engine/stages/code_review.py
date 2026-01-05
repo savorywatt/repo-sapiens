@@ -2,9 +2,8 @@
 
 import structlog
 
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
-from repo_sapiens.models.domain import Review
+from repo_sapiens.models.domain import Issue, Review
 
 log = structlog.get_logger(__name__)
 
@@ -12,15 +11,14 @@ log = structlog.get_logger(__name__)
 class CodeReviewStage(WorkflowStage):
     """Review implemented code using AI agent."""
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute code review stage.
 
         Gets diff, runs AI review, and updates issue based on results.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Issue tagged with code-review
         """
-        issue = context.issue
         log.info("code_review_stage_started", issue=issue.number)
 
         try:
@@ -109,7 +107,7 @@ class CodeReviewStage(WorkflowStage):
 
         except Exception as e:
             log.error("code_review_stage_failed", error=str(e))
-            await self._handle_stage_error(context, e)
+            await self._handle_stage_error(issue, "code_review", e)
             raise
 
     def _extract_task_id(self, issue_body: str) -> str:

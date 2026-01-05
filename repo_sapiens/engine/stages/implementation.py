@@ -3,7 +3,6 @@
 import structlog
 
 from repo_sapiens.engine.branching import get_branching_strategy
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue, Task
 
@@ -13,15 +12,14 @@ log = structlog.get_logger(__name__)
 class ImplementationStage(WorkflowStage):
     """Execute implementation tasks using AI agent."""
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute implementation stage.
 
         Checks dependencies, creates branch, executes task, and updates state.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Issue tagged with needs-implementation
         """
-        issue = context.issue
         log.info("implementation_stage_started", issue=issue.number)
 
         try:
@@ -91,7 +89,7 @@ class ImplementationStage(WorkflowStage):
 
         except Exception as e:
             log.error("implementation_stage_failed", error=str(e))
-            await self._handle_stage_error(context, e)
+            await self._handle_stage_error(issue, "implementation", e)
             raise
 
     def _extract_task_from_issue(self, issue: Issue) -> Task:

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import structlog
 
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
+from repo_sapiens.models.domain import Issue
 
 log = structlog.get_logger(__name__)
 
@@ -23,13 +23,12 @@ class FixExecutionStage(WorkflowStage):
     5. Updates PR and closes fix proposal
     """
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute fix implementation.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Fix proposal issue with 'approved' label
         """
-        issue = context.issue
         log.info("fix_execution_start", issue=issue.number)
 
         # Verify this is a fix proposal

@@ -1,6 +1,6 @@
 # Deployment Guide - Gitea Actions Integration
 
-This guide walks through deploying repo-sapiens to a Gitea repository with Actions enabled.
+This guide walks through deploying the automation system to a Gitea repository with Actions enabled.
 
 ## Prerequisites
 
@@ -26,8 +26,8 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
 
 # Pull recommended models (in another terminal)
-ollama pull qwen3:latest       # Default model, good balance
 ollama pull codellama:13b      # Best for code tasks
+ollama pull llama3.1:8b        # Good general purpose
 
 # Verify installation
 curl http://localhost:11434/api/tags
@@ -76,24 +76,34 @@ git push -u origin main
 
 #### Required Secrets (All Setups)
 
-**Secret: SAPIENS_GITEA_TOKEN**
-- Name: `SAPIENS_GITEA_TOKEN`
+**Secret: AUTOMATION__GIT_PROVIDER__API_TOKEN**
+- Name: `AUTOMATION__GIT_PROVIDER__API_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
   1. User Settings → Applications → Generate New Token
-  2. Name: "repo-sapiens CI/CD"
+  2. Name: "Automation CI/CD"
   3. Scopes: Select `repo`, `write:issue`, `write:pull_request`
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret: SAPIENS_GITEA_URL**
-- Name: `SAPIENS_GITEA_URL`
+**Secret: AUTOMATION__GIT_PROVIDER__BASE_URL**
+- Name: `AUTOMATION__GIT_PROVIDER__BASE_URL`
 - Value: Your Gitea instance URL (e.g., `https://gitea.example.com`)
+
+#### For Ollama Setup (Recommended for Testing)
+
+**Secret: AUTOMATION__OLLAMA__BASE_URL**
+- Name: `AUTOMATION__OLLAMA__BASE_URL`
+- Value: `http://localhost:11434` (or your Ollama server URL)
+
+**Secret: AUTOMATION__OLLAMA__MODEL**
+- Name: `AUTOMATION__OLLAMA__MODEL`
+- Value: `codellama:13b` (or your preferred model)
 
 #### For Claude API Setup (Production)
 
-**Secret: SAPIENS_CLAUDE_API_KEY**
-- Name: `SAPIENS_CLAUDE_API_KEY`
+**Secret: AUTOMATION__CLAUDE__API_KEY**
+- Name: `AUTOMATION__CLAUDE__API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
   1. Go to https://console.anthropic.com
@@ -101,11 +111,6 @@ git push -u origin main
   3. Navigate to API Keys
   4. Create new key
   5. Copy the key (starts with `sk-ant-`)
-
-> **Note:** For local development with Ollama, you can use the ReAct agent directly:
-> ```bash
-> sapiens react --base-url http://localhost:11434 "your task"
-> ```
 
 ### 3. Verify Gitea Actions
 
@@ -133,18 +138,12 @@ Check that workflow files are present:
 
 ```bash
 ls -la .gitea/workflows/
-# Should show label-triggered workflows:
-# - needs-planning.yaml     # Triggered when 'needs-planning' label added
-# - needs-fix.yaml          # Triggered when 'needs-fix' label added
-# - needs-review.yaml       # Triggered when 'needs-review' label added
-# - requires-qa.yaml        # Triggered when 'requires-qa' label added
-# - approved.yaml           # Triggered when 'approved' label added
-# - execute-task.yaml       # General task execution
-# - automation-daemon.yaml  # Scheduled polling
-# - plan-merged.yaml        # Triggered on plan PR merge
-# - monitor.yaml            # Health check workflow
-# - test.yaml               # Test runner
-# - build-artifacts.yaml    # Build and publish artifacts
+# Should show:
+# - automation-trigger.yaml
+# - plan-merged.yaml
+# - automation-daemon.yaml
+# - monitor.yaml
+# - test.yaml
 ```
 
 ### 5. Test the System
@@ -175,15 +174,15 @@ ls -la .gitea/workflows/
 **Check workflow execution:**
 
 ```bash
-# From local machine with configured environment
-export AUTOMATION__GIT_PROVIDER__API_TOKEN="your-token"
-export AUTOMATION__GIT_PROVIDER__BASE_URL="https://gitea.example.com"
+# From local machine with configured tokens
+export GITEA_TOKEN="your-token"
+export CLAUDE_API_KEY="your-key"
+
+# Run health check
+sapiens health-check
 
 # List active plans
-sapiens list-plans
-
-# Show plan details
-sapiens show-plan --plan-id <plan-id>
+sapiens list-active-plans
 ```
 
 **View in Gitea:**
@@ -199,11 +198,11 @@ For real-time processing instead of cron-based:
 1. Deploy webhook server:
    ```bash
    # On server
-   uvicorn repo_sapiens.webhook_server:app --host 0.0.0.0 --port 8000
+   uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
 
    # Or with systemd service
-   sudo systemctl enable repo-sapiens-webhook
-   sudo systemctl start repo-sapiens-webhook
+   sudo systemctl enable automation-webhook
+   sudo systemctl start automation-webhook
    ```
 
 2. Configure in Gitea:
@@ -223,17 +222,18 @@ For real-time processing instead of cron-based:
 ## Verification Checklist
 
 - [ ] Code pushed to Gitea
-- [ ] Core secrets configured:
-  - [ ] `SAPIENS_GITEA_TOKEN` - Gitea API token
-  - [ ] `SAPIENS_GITEA_URL` - Gitea instance URL
-  - [ ] `SAPIENS_CLAUDE_API_KEY` - Claude API key (for production)
+- [ ] Core secrets configured (AUTOMATION__GIT_PROVIDER__API_TOKEN, AUTOMATION__GIT_PROVIDER__BASE_URL)
+- [ ] AI provider secrets configured:
+  - [ ] **Ollama**: AUTOMATION__OLLAMA__BASE_URL, AUTOMATION__OLLAMA__MODEL
+  - [ ] **Claude**: AUTOMATION__CLAUDE__API_KEY
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
 - [ ] Workflow files present in `.gitea/workflows/`
-- [ ] Test issue created with `needs-planning` label
+- [ ] (Ollama only) Ollama server running and model pulled
+- [ ] Test issue created with label
 - [ ] Workflow triggered successfully
 - [ ] Workflow logs show no errors
-- [ ] `sapiens list-plans` runs successfully
+- [ ] Health check passes
 - [ ] (Optional) Webhook configured and tested
 
 ## Troubleshooting
@@ -254,47 +254,44 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" in workflow logs
 
 **Solutions:**
-1. Verify `SAPIENS_GITEA_TOKEN` secret is set correctly
-2. Check token has correct scopes (`repo`, `write:issue`, `write:pull_request`)
+1. Verify AUTOMATION__GIT_PROVIDER__API_TOKEN secret is set
+2. Check token has correct scopes
 3. Regenerate token if expired
 4. Ensure secret name matches exactly (case-sensitive)
 
-### Claude API Errors
-
-**Problem:** "401 Unauthorized" or "Invalid API Key" from Claude
-
-**Solutions:**
-1. Verify `SAPIENS_CLAUDE_API_KEY` secret is set correctly
-2. Check API key starts with `sk-ant-`
-3. Verify API key hasn't been revoked in Anthropic console
-4. Check API usage limits haven't been exceeded
-
-### Local Ollama Issues (Development)
+### Ollama Connection Issues
 
 **Problem:** "Ollama not running" or "Connection refused" errors
 
 **Solutions:**
 1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
-2. Ensure model is pulled: `ollama pull qwen3:latest`
-3. For remote Ollama, check network/firewall settings
+2. Check AUTOMATION__OLLAMA__BASE_URL is correct
+3. Ensure runner can reach Ollama server (network/firewall)
+4. Verify model is pulled: `ollama list`
 
 ```bash
-# Debug Ollama connectivity
+# Debug Ollama connectivity from runner
 curl http://localhost:11434/api/tags
 
-# List available models
-ollama list
-
-# Pull default model
-ollama pull qwen3:latest
+# If using remote Ollama, test connectivity
+curl http://ollama-server:11434/api/tags
 ```
+
+### Ollama Model Not Found
+
+**Problem:** "Model not found" errors
+
+**Solutions:**
+1. Pull the model: `ollama pull codellama:13b`
+2. Check model name matches AUTOMATION__OLLAMA__MODEL exactly
+3. List available models: `ollama list`
 
 ### Ollama Out of Memory
 
 **Problem:** Model fails to load or runs very slowly
 
 **Solutions:**
-1. Use smaller model: `qwen3:latest` instead of larger variants
+1. Use smaller model: `codellama:7b` instead of `codellama:34b`
 2. Ensure sufficient RAM (model size + 2GB overhead)
 3. Check GPU memory if using GPU acceleration
 4. Close other applications using GPU memory
@@ -352,7 +349,7 @@ ollama pull qwen3:latest
    - Immediately if compromised
 
 2. **Use minimal permissions:**
-   - `SAPIENS_GITEA_TOKEN`: Only required scopes
+   - GITEA_TOKEN: Only required scopes
    - Repository access: Only what's needed
 
 3. **Monitor secret usage:**
@@ -398,7 +395,7 @@ ollama pull qwen3:latest
 
 2. **Backup state files:**
    - State artifacts uploaded every run
-   - Regular backups of `.repo-sapiens/state/`
+   - Regular backups of `.automation/state/`
 
 3. **Error recovery:**
    - Automatic retries configured
@@ -414,14 +411,16 @@ ollama pull qwen3:latest
 Create a simple dashboard to monitor automation:
 
 ```bash
-# View active plans
-sapiens list-plans
+# View recent activity
+sapiens list-active-plans
 
-# Show specific plan details
-sapiens show-plan --plan-id <plan-id>
+# Check for issues
+sapiens check-stale --max-age-hours 12
+sapiens check-failures --since-hours 24
 
-# Check workflow runs in Gitea Actions tab
-# or use the Gitea API to query workflow status
+# Generate report
+sapiens health-check > /tmp/health.txt
+cat /tmp/health.txt
 ```
 
 ## Next Steps After Deployment

@@ -5,7 +5,6 @@ import asyncio
 import structlog
 
 from repo_sapiens.config.settings import AutomationSettings
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.approval import ApprovalStage
 from repo_sapiens.engine.stages.code_review import CodeReviewStage
 from repo_sapiens.engine.stages.execution import TaskExecutionStage
@@ -122,11 +121,8 @@ class WorkflowOrchestrator:
 
         log.info("executing_stage", issue=issue.number, stage=stage)
 
-        # Create execution context from the issue
-        context = ExecutionContext(issue=issue)
-
         try:
-            await self.stages[stage].execute(context)
+            await self.stages[stage].execute(issue)
         except Exception as e:
             log.error(
                 "stage_execution_failed",
@@ -276,17 +272,14 @@ class WorkflowOrchestrator:
         # Get task issue
         issue = await self.git.get_issue(task.prompt_issue_id)
 
-        # Create execution context with plan_id for multi-task workflow
-        context = ExecutionContext(issue=issue, plan_id=plan_id)
-
         # Execute implementation stage
-        await self.stages["implementation"].execute(context)
+        await self.stages["implementation"].execute(issue)
 
         # Wait a bit for state to update
         await asyncio.sleep(1)
 
-        # Execute code review stage (context may have been updated by implementation)
-        await self.stages["code_review"].execute(context)
+        # Execute code review stage
+        await self.stages["code_review"].execute(issue)
 
     def _determine_stage(self, issue: Issue) -> str | None:
         """Determine which stage to execute based on issue labels.

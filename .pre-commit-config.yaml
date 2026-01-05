@@ -102,19 +102,19 @@ repos:
 
   # Validate pyproject.toml
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24.1
+    rev: v0.16
     hooks:
       - id: validate-pyproject
         name: Validate pyproject.toml
 
   # Check for secrets (API keys, passwords, etc.)
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.5.0
+    rev: v1.4.0
     hooks:
       - id: detect-secrets
         name: Detect secrets
         args: ['--baseline', '.secrets.baseline']
-        exclude: ^\.venv/|^venv/|^\.git/|^uv\.lock$
+        exclude: ^\.venv/|^venv/|^\.git/
 
 # Configuration for specific hooks
 # Additional configuration is in pyproject.toml

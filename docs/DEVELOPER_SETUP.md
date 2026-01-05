@@ -6,26 +6,6 @@ This guide covers setting up your development environment, including AI provider
 
 ### 1. Install Development Dependencies
 
-**Option A: Using uv (Recommended)**
-
-```bash
-# Clone the repository
-git clone https://github.com/savorywatt/repo-sapiens.git
-cd repo-sapiens
-
-# Install uv if you don't have it
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install dependencies (creates .venv automatically)
-uv sync --all-extras
-
-# Run commands with uv
-uv run sapiens --help
-uv run pytest
-```
-
-**Option B: Using pip**
-
 ```bash
 # Clone the repository
 git clone https://github.com/savorywatt/repo-sapiens.git
@@ -127,8 +107,8 @@ curl http://localhost:11434/api/generate -d '{
   "stream": false
 }' | jq .response
 
-# Test the ReAct agent with a simple task
-sapiens react "List the Python files in this directory"
+# Run the sapiens health check
+sapiens --config repo_sapiens/config/local_config.yaml health-check
 
 # Process a test issue (if you have a Gitea instance)
 sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
@@ -144,10 +124,6 @@ This project uses pre-commit hooks to ensure code quality.
 
 ```bash
 # Install the git hooks (one-time setup)
-# If using uv:
-uv run pre-commit install
-
-# If using pip (with activated venv):
 pre-commit install
 
 # Verify installation
@@ -193,14 +169,11 @@ vim repo_sapiens/some_file.py
 git add repo_sapiens/some_file.py
 
 # Commit (hooks run automatically)
-# If using uv:
-uv run git commit -m "Add new feature"
-# If using activated venv:
 git commit -m "Add new feature"
 
 # If hooks modified files
 git add -u
-uv run git commit -m "Add new feature"
+git commit -m "Add new feature"
 ```
 
 ### Manual Hook Runs
@@ -295,24 +268,21 @@ git commit --no-verify -m "emergency fix"
 ### VS Code
 
 Install extensions:
-- Python (Microsoft)
-- Ruff (charliermarsh.ruff)
-- Pylance (Microsoft)
-- Mypy Type Checker (Microsoft)
+- Python
+- Black Formatter
+- Ruff
+- Pylance
 
 Add to `.vscode/settings.json`:
 ```json
 {
-  "[python]": {
-    "editor.defaultFormatter": "charliermarsh.ruff",
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll.ruff": "explicit",
-      "source.organizeImports.ruff": "explicit"
-    }
-  },
-  "python.analysis.typeCheckingMode": "basic",
-  "mypy-type-checker.args": ["--config-file=pyproject.toml"]
+  "python.formatting.provider": "black",
+  "python.linting.ruffEnabled": true,
+  "python.linting.mypyEnabled": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": true
+  }
 }
 ```
 
@@ -372,39 +342,15 @@ chmod +x .git/hooks/pre-commit
 
 ## Documentation
 
-### Building Docs Locally
-
-```bash
-# Install doc dependencies
-uv sync --group dev
-
-# Generate API docs from docstrings
-uv run sphinx-apidoc -f -o docs/source/api repo_sapiens
-
-# Build HTML documentation
-uv run sphinx-build docs/source docs/build/html
-
-# View locally
-open docs/build/html/index.html  # macOS
-xdg-open docs/build/html/index.html  # Linux
-```
-
-For live-reloading during doc writing:
-
-```bash
-uv run sphinx-autobuild docs/source docs/build/html
-```
-
-### Doc Resources
-
-- **Contributing Guide**: See [CONTRIBUTING.md](./CONTRIBUTING.md)
-- **Agent Comparison**: See [AGENT_COMPARISON.md](./AGENT_COMPARISON.md)
-- **Goose Setup**: See [GOOSE_SETUP.md](./GOOSE_SETUP.md)
+- **Quick Reference**: See `.pre-commit-quick-reference.md`
+- **Detailed Guide**: See `.pre-commit-hooks-guide.md`
+- **Contributing Guide**: See `CONTRIBUTING.md`
+- **Setup Summary**: See `PRE_COMMIT_SETUP_SUMMARY.md`
 
 ## Getting Help
 
-1. Check the cheat sheet below for common commands
-2. Review pre-commit output for specific error messages
+1. Check `.pre-commit-quick-reference.md` for common commands
+2. Check `.pre-commit-hooks-guide.md` for detailed info
 3. Ask in pull request comments
 4. Open an issue
 

@@ -8,6 +8,8 @@ This module tests the main CLI entry point including:
 - Async helper functions
 """
 
+import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,6 +17,7 @@ from click.testing import CliRunner
 
 from repo_sapiens.exceptions import ConfigurationError, RepoSapiensError
 from repo_sapiens.main import cli
+
 
 # =============================================================================
 # Fixtures
@@ -98,7 +101,7 @@ class TestCLIHelpText:
         """Test main CLI help displays correctly."""
         result = cli_runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "repo-sapiens" in result.output
+        assert "Gitea automation system CLI" in result.output
         assert "--config" in result.output
         assert "--log-level" in result.output
 
@@ -112,10 +115,7 @@ class TestCLIHelpText:
         # Alternatively, test with missing config - help may still work
         result_alt = cli_runner.invoke(cli, ["process-issue", "--help"])
         # One of them should contain the help text
-        assert (
-            "Process a single issue" in result.output
-            or "Process a single issue" in result_alt.output
-        )
+        assert "Process a single issue" in result.output or "Process a single issue" in result_alt.output
         assert "--issue" in result.output or "--issue" in result_alt.output
 
     def test_process_all_help(self, cli_runner, mock_config_file):
@@ -138,22 +138,26 @@ class TestCLIHelpText:
 
     def test_daemon_help(self, cli_runner, mock_config_file):
         """Test daemon command help."""
-        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "daemon", "--help"])
+        result = cli_runner.invoke(
+            cli, ["--config", str(mock_config_file), "daemon", "--help"]
+        )
         result_alt = cli_runner.invoke(cli, ["daemon", "--help"])
         assert "daemon mode" in result.output or "daemon mode" in result_alt.output
         assert "--interval" in result.output or "--interval" in result_alt.output
 
     def test_list_plans_help(self, cli_runner, mock_config_file):
         """Test list-plans command help."""
-        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "list-plans", "--help"])
-        result_alt = cli_runner.invoke(cli, ["list-plans", "--help"])
-        assert (
-            "List all active plans" in result.output or "List all active plans" in result_alt.output
+        result = cli_runner.invoke(
+            cli, ["--config", str(mock_config_file), "list-plans", "--help"]
         )
+        result_alt = cli_runner.invoke(cli, ["list-plans", "--help"])
+        assert "List all active plans" in result.output or "List all active plans" in result_alt.output
 
     def test_show_plan_help(self, cli_runner, mock_config_file):
         """Test show-plan command help."""
-        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "show-plan", "--help"])
+        result = cli_runner.invoke(
+            cli, ["--config", str(mock_config_file), "show-plan", "--help"]
+        )
         result_alt = cli_runner.invoke(cli, ["show-plan", "--help"])
         assert "plan status" in result.output or "plan status" in result_alt.output
         assert "--plan-id" in result.output or "--plan-id" in result_alt.output
@@ -164,8 +168,7 @@ class TestCLIHelpText:
         assert result.exit_code == 0
         assert "Run a task using the ReAct agent" in result.output
         assert "--model" in result.output
-        assert "--base-url" in result.output
-        assert "--backend" in result.output
+        assert "--ollama-url" in result.output
         assert "--max-iterations" in result.output
         assert "--working-dir" in result.output
         assert "--verbose" in result.output
@@ -211,7 +214,9 @@ class TestConfigurationLoading:
     def test_config_not_required_for_react(self, cli_runner):
         """Test react command does not require config file."""
         # React should fail for other reasons but not config
-        result = cli_runner.invoke(cli, ["--config", "/nonexistent/config.yaml", "react", "--help"])
+        result = cli_runner.invoke(
+            cli, ["--config", "/nonexistent/config.yaml", "react", "--help"]
+        )
         assert result.exit_code == 0  # Help should work
 
     def test_config_not_required_for_credentials(self, cli_runner):
@@ -544,9 +549,7 @@ class TestReactCommand:
 
     def test_react_ollama_url_option(self, cli_runner):
         """Test react command accepts --ollama-url option."""
-        result = cli_runner.invoke(
-            cli, ["react", "--ollama-url", "http://localhost:12345", "--help"]
-        )
+        result = cli_runner.invoke(cli, ["react", "--ollama-url", "http://localhost:12345", "--help"])
         assert "--ollama-url" in result.output
 
     def test_react_max_iterations_option(self, cli_runner):
@@ -556,7 +559,9 @@ class TestReactCommand:
 
     def test_react_working_dir_option(self, cli_runner, tmp_path):
         """Test react command accepts --working-dir option."""
-        result = cli_runner.invoke(cli, ["react", "--working-dir", str(tmp_path), "--help"])
+        result = cli_runner.invoke(
+            cli, ["react", "--working-dir", str(tmp_path), "--help"]
+        )
         assert "--working-dir" in result.output
 
     def test_react_verbose_flag(self, cli_runner):
@@ -958,7 +963,9 @@ class TestCLIOptions:
         with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
             "repo_sapiens.main.asyncio.run"
         ):
-            result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "list-plans"])
+            result = cli_runner.invoke(
+                cli, ["--config", str(mock_config_file), "list-plans"]
+            )
 
         # Should use provided config path
         assert result.exit_code in [0, 1]  # May fail for other reasons
@@ -1057,6 +1064,8 @@ class TestCLIAsyncIntegration:
 
         with patch("repo_sapiens.main._daemon_mode") as mock_func:
             with patch("repo_sapiens.main.asyncio.run") as mock_run:
-                result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "daemon"])
+                result = cli_runner.invoke(
+                    cli, ["--config", str(mock_config_file), "daemon"]
+                )
 
                 mock_run.assert_called_once()

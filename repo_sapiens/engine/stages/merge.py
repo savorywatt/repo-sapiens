@@ -3,8 +3,8 @@
 import structlog
 
 from repo_sapiens.engine.branching import get_branching_strategy
-from repo_sapiens.engine.context import ExecutionContext
 from repo_sapiens.engine.stages.base import WorkflowStage
+from repo_sapiens.models.domain import Issue
 
 log = structlog.get_logger(__name__)
 
@@ -12,16 +12,15 @@ log = structlog.get_logger(__name__)
 class MergeStage(WorkflowStage):
     """Merge completed tasks and create pull request."""
 
-    async def execute(self, context: ExecutionContext) -> None:
+    async def execute(self, issue: Issue) -> None:
         """Execute merge stage.
 
         Checks all tasks are ready, creates integration branch (if needed),
         and creates pull request.
 
         Args:
-            context: Execution context containing the issue and workflow state
+            issue: Issue tagged with merge-ready
         """
-        issue = context.issue
         log.info("merge_stage_started", issue=issue.number)
 
         try:
@@ -104,7 +103,7 @@ class MergeStage(WorkflowStage):
 
         except Exception as e:
             log.error("merge_stage_failed", error=str(e))
-            await self._handle_stage_error(context, e)
+            await self._handle_stage_error(issue, "merge", e)
             raise
 
     def _extract_plan_id(self, issue_body: str) -> str:

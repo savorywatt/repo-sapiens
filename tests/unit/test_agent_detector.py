@@ -30,9 +30,7 @@ class TestDetectAvailableAgents:
     def test_detect_both_agents_available(self):
         """Should detect both Claude and Goose when both are installed."""
         with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
-            mock_which.side_effect = (
-                lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
-            )
+            mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
 
             agents = detect_available_agents()
 
@@ -72,9 +70,7 @@ class TestDetectAvailableAgents:
         """Should not add goose-uvx if goose is already detected."""
         with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             # Both goose and uvx are available
-            mock_which.side_effect = (
-                lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
-            )
+            mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
 
             agents = detect_available_agents()
 
@@ -402,7 +398,7 @@ class TestGetProviderInfo:
         assert info["name"] == "OpenAI"
         assert "gpt-4o" in info["models"]
         assert info["tool_support"] == "excellent"
-        assert info["api_key_env"] == "OPENAI_API_KEY"  # pragma: allowlist secret
+        assert info["api_key_env"] == "OPENAI_API_KEY"
 
     def test_get_anthropic_info(self):
         """Should return Anthropic provider information."""
@@ -410,7 +406,7 @@ class TestGetProviderInfo:
 
         assert info["name"] == "Anthropic (Claude)"
         assert "claude-3-5-sonnet-20241022" in info["models"]
-        assert info["api_key_env"] == "ANTHROPIC_API_KEY"  # pragma: allowlist secret
+        assert info["api_key_env"] == "ANTHROPIC_API_KEY"
 
     def test_get_ollama_info(self):
         """Should return Ollama provider information."""
@@ -435,7 +431,7 @@ class TestGetProviderInfo:
 
         assert info["name"] == "Groq"
         assert info["speed"] == "ultra-fast"
-        assert info["api_key_env"] == "GROQ_API_KEY"  # pragma: allowlist secret
+        assert info["api_key_env"] == "GROQ_API_KEY"
 
     def test_get_databricks_info(self):
         """Should return Databricks provider information."""
@@ -583,13 +579,13 @@ class TestAgentInfoRegistry:
 
     def test_all_agents_have_boolean_flags(self):
         """Should ensure all agents have support flags."""
-        for _agent_key, info in AGENT_INFO.items():
+        for agent_key, info in AGENT_INFO.items():
             assert "supports_local" in info
             assert isinstance(info["supports_local"], bool)
 
     def test_models_are_lists(self):
         """Should ensure models are lists of strings."""
-        for _agent_key, info in AGENT_INFO.items():
+        for agent_key, info in AGENT_INFO.items():
             assert isinstance(info["models"], list)
             for model in info["models"]:
                 assert isinstance(model, str)
@@ -616,7 +612,7 @@ class TestLLMProviderInfoRegistry:
 
     def test_all_providers_have_pros_and_cons(self):
         """Should ensure all providers have pros and cons lists."""
-        for _provider_key, info in LLM_PROVIDER_INFO.items():
+        for provider_key, info in LLM_PROVIDER_INFO.items():
             assert "pros" in info
             assert "cons" in info
             assert isinstance(info["pros"], list)
@@ -624,13 +620,13 @@ class TestLLMProviderInfoRegistry:
 
     def test_all_providers_have_recommended_for(self):
         """Should ensure all providers have recommended_for field."""
-        for _provider_key, info in LLM_PROVIDER_INFO.items():
+        for provider_key, info in LLM_PROVIDER_INFO.items():
             assert "recommended_for" in info
             assert isinstance(info["recommended_for"], str)
 
     def test_api_key_env_field_exists(self):
         """Should ensure all providers have api_key_env field (can be None for local)."""
-        for _provider_key, info in LLM_PROVIDER_INFO.items():
+        for provider_key, info in LLM_PROVIDER_INFO.items():
             assert "api_key_env" in info
 
 

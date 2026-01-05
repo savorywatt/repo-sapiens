@@ -20,21 +20,17 @@ RepoSapiensError (base)
 │   ├── BackendNotAvailableError
 │   └── EncryptionError
 ├── GitOperationError (see repo_sapiens.git.exceptions)
-│   └── GitDiscoveryError
-│       ├── NotGitRepositoryError
-│       ├── NoRemotesError
-│       ├── MultipleRemotesError
-│       ├── InvalidGitUrlError
-│       └── UnsupportedHostError
+│   ├── NotGitRepositoryError
+│   ├── NoRemotesError
+│   ├── MultipleRemotesError
+│   ├── InvalidGitUrlError
+│   └── UnsupportedHostError
 ├── TemplateError
 │   └── Template rendering/validation failures
 ├── WorkflowError
 │   └── Workflow execution/orchestration failures
 └── ExternalServiceError
     └── HTTP errors, API failures, timeouts, rate limiting
-
-ToolExecutionError (standalone, in repo_sapiens.agents.tools)
-└── Tool execution failures in ReAct agent (file operations, shell commands)
 ```
 
 ## Exception Handling Patterns
@@ -241,40 +237,6 @@ except httpx.HTTPStatusError as e:
     ) from e
 ```
 
-## ReAct Agent Error Handling
-
-The ReAct agent handles errors during tool execution gracefully:
-
-```python
-from repo_sapiens.agents.tools import ToolExecutionError
-
-try:
-    result = await registry.execute_tool(action, action_input)
-except ToolExecutionError as e:
-    # Tool errors are converted to observations for the agent
-    observation = f"Error: {e}"
-    # Agent continues reasoning with the error as feedback
-```
-
-**LLM Backend Errors:**
-
-```python
-# Backend connection errors raise RuntimeError
-try:
-    await agent.connect()
-except RuntimeError as e:
-    click.echo(f"Failed to connect to LLM backend: {e}", err=True)
-    # e.g., "Ollama not running at http://localhost:11434"
-```
-
-**Tool Execution Errors:**
-- File read/write failures
-- Shell command timeouts
-- Permission errors
-- Path traversal attempts (security)
-
-The agent treats tool errors as observations, allowing it to retry or try alternative approaches.
-
 ## Logging Best Practices
 
 ### Log Levels
@@ -317,11 +279,11 @@ The following patterns were found and fixed:
 
 ### Bare Except Clauses
 
-**Found and fixed in:** `repo_sapiens/providers/gitea_rest.py:282`
+**Found in:** `repo_sapiens/providers/gitea_rest.py:285`
 
-**Problem:** Bare `except:` clauses silently catch all exceptions including KeyboardInterrupt and SystemExit.
+**Problem:** Silently catches all exceptions including KeyboardInterrupt and SystemExit.
 
-**Fix applied:**
+**Fix:**
 ```python
 # Before
 except:
