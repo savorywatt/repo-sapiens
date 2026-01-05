@@ -22,8 +22,8 @@ cp templates/workflows/gitea/examples/weekly-test-coverage.yaml \
    .gitea/workflows/weekly-test-coverage.yaml
 
 # Set required secrets in Gitea repo settings:
-# - BUILDER_GITEA_TOKEN
-# - BUILDER_CLAUDE_API_KEY
+# - SAPIENS_GITEA_TOKEN
+# - SAPIENS_CLAUDE_API_KEY
 ```
 
 ### For GitHub
@@ -86,8 +86,8 @@ The examples use Claude by default. For Ollama:
 
 | Secret | Description |
 |--------|-------------|
-| `BUILDER_GITEA_TOKEN` | Gitea API token with repo/issue/PR write access |
-| `BUILDER_CLAUDE_API_KEY` | Anthropic Claude API key |
+| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo/issue/PR write access |
+| `SAPIENS_CLAUDE_API_KEY` | Anthropic Claude API key |
 
 ### GitHub
 

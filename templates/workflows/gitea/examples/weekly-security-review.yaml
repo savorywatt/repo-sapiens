@@ -12,8 +12,8 @@
 # Setup:
 # 1. Copy to .gitea/workflows/weekly-security-review.yaml
 # 2. Set required secrets:
-#    - BUILDER_GITEA_TOKEN: Gitea API token with repo write access
-#    - BUILDER_CLAUDE_API_KEY: Claude API key  # pragma: allowlist secret
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key  # pragma: allowlist secret
 # 3. Configure SECURITY_LANGUAGES below with your project's languages
 # 4. Adjust schedule as needed
 
@@ -35,7 +35,7 @@ on:
         default: 'medium'
 
 env:
-  GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+  GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
   # Configure which languages to scan (space-separated)
   # Options: python go java cpp csharp kotlin clojure rust typescript javascript
   SECURITY_LANGUAGES: "{{SECURITY_LANGUAGES}}"
@@ -717,7 +717,7 @@ jobs:
       - name: Auto-fix security issues
         if: env.TOTAL_ISSUES != '0' && (github.event.inputs.auto_fix != 'false')
         env:
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           pip install repo-sapiens || pip3 install repo-sapiens
 

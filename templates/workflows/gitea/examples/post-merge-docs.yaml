@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitea/workflows/post-merge-docs.yaml
 # 2. Set required secrets:
-#    - BUILDER_GITEA_TOKEN: Gitea API token with repo write access
-#    - BUILDER_CLAUDE_API_KEY: Claude API key (or configure for Ollama)
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key (or configure for Ollama)
 # 3. Customize the task prompt as needed
 
 name: Update Documentation
@@ -53,9 +53,9 @@ jobs:
 
       - name: Update documentation
         env:
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           sapiens react "Review the recent commits and update documentation if needed.
 

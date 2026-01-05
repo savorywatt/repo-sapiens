@@ -76,8 +76,8 @@ git push -u origin main
 
 #### Required Secrets (All Setups)
 
-**Secret: BUILDER_GITEA_TOKEN**
-- Name: `BUILDER_GITEA_TOKEN`
+**Secret: SAPIENS_GITEA_TOKEN**
+- Name: `SAPIENS_GITEA_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
   1. User Settings → Applications → Generate New Token
@@ -86,14 +86,14 @@ git push -u origin main
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret: BUILDER_GITEA_URL**
-- Name: `BUILDER_GITEA_URL`
+**Secret: SAPIENS_GITEA_URL**
+- Name: `SAPIENS_GITEA_URL`
 - Value: Your Gitea instance URL (e.g., `https://gitea.example.com`)
 
 #### For Claude API Setup (Production)
 
-**Secret: BUILDER_CLAUDE_API_KEY**
-- Name: `BUILDER_CLAUDE_API_KEY`
+**Secret: SAPIENS_CLAUDE_API_KEY**
+- Name: `SAPIENS_CLAUDE_API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
   1. Go to https://console.anthropic.com
@@ -224,9 +224,9 @@ For real-time processing instead of cron-based:
 
 - [ ] Code pushed to Gitea
 - [ ] Core secrets configured:
-  - [ ] `BUILDER_GITEA_TOKEN` - Gitea API token
-  - [ ] `BUILDER_GITEA_URL` - Gitea instance URL
-  - [ ] `BUILDER_CLAUDE_API_KEY` - Claude API key (for production)
+  - [ ] `SAPIENS_GITEA_TOKEN` - Gitea API token
+  - [ ] `SAPIENS_GITEA_URL` - Gitea instance URL
+  - [ ] `SAPIENS_CLAUDE_API_KEY` - Claude API key (for production)
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
 - [ ] Workflow files present in `.gitea/workflows/`
@@ -254,7 +254,7 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" in workflow logs
 
 **Solutions:**
-1. Verify `BUILDER_GITEA_TOKEN` secret is set correctly
+1. Verify `SAPIENS_GITEA_TOKEN` secret is set correctly
 2. Check token has correct scopes (`repo`, `write:issue`, `write:pull_request`)
 3. Regenerate token if expired
 4. Ensure secret name matches exactly (case-sensitive)
@@ -264,7 +264,7 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" or "Invalid API Key" from Claude
 
 **Solutions:**
-1. Verify `BUILDER_CLAUDE_API_KEY` secret is set correctly
+1. Verify `SAPIENS_CLAUDE_API_KEY` secret is set correctly
 2. Check API key starts with `sk-ant-`
 3. Verify API key hasn't been revoked in Anthropic console
 4. Check API usage limits haven't been exceeded
@@ -352,7 +352,7 @@ ollama pull qwen3:latest
    - Immediately if compromised
 
 2. **Use minimal permissions:**
-   - `BUILDER_GITEA_TOKEN`: Only required scopes
+   - `SAPIENS_GITEA_TOKEN`: Only required scopes
    - Repository access: Only what's needed
 
 3. **Monitor secret usage:**

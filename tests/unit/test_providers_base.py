@@ -796,7 +796,7 @@ class TestExternalAgentProviderTaskExecution:
             if call_count["count"] == 1:
                 return {
                     "success": True,
-                    "output": "BUILDER_QUESTION: What encryption should I use?",
+                    "output": "SAPIENS_QUESTION: What encryption should I use?",
                     "files_changed": [],
                 }
             return {
@@ -926,7 +926,7 @@ Saved: data.txt
         provider = ExternalAgentProvider()
 
         output = """Working on task...
-BUILDER_QUESTION: What database should I use?
+SAPIENS_QUESTION: What database should I use?
 Continuing work...
 """
         question = provider._extract_question(output)

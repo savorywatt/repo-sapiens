@@ -429,7 +429,7 @@ Format as JSON list.
 - Make sure all code is complete and functional
 
 NOTE: If you have questions during implementation, you can ask by outputting:
-BUILDER_QUESTION: Your question here
+SAPIENS_QUESTION: Your question here
 
 The system will post your question to the issue and wait for a response.
 """
@@ -438,7 +438,7 @@ The system will post your question to the issue and wait for a response.
 
         # Check if agent asked any questions
         output = result.get("output", "")
-        if "BUILDER_QUESTION:" in output:
+        if "SAPIENS_QUESTION:" in output:
             question = self._extract_question(output)
             if question and self.qa_handler and self.current_issue_number:
                 # Ask user via issue comment
@@ -470,13 +470,13 @@ Please continue with the task using this information.
 
     def _extract_question(self, output: str) -> str | None:
         """Extract question from agent output."""
-        if "BUILDER_QUESTION:" not in output:
+        if "SAPIENS_QUESTION:" not in output:
             return None
 
         lines = output.split("\n")
         for line in lines:
-            if "BUILDER_QUESTION:" in line:
-                return line.split("BUILDER_QUESTION:", 1)[1].strip()
+            if "SAPIENS_QUESTION:" in line:
+                return line.split("SAPIENS_QUESTION:", 1)[1].strip()
 
         return None
 

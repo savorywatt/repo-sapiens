@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitea/workflows/weekly-test-coverage.yaml
 # 2. Set required secrets:
-#    - BUILDER_GITEA_TOKEN: Gitea API token with repo/PR write access
-#    - BUILDER_CLAUDE_API_KEY: Claude API key
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo/PR write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key
 # 3. Adjust the coverage threshold and schedule as needed
 
 name: Improve Test Coverage
@@ -71,9 +71,9 @@ jobs:
 
       - name: Improve test coverage
         env:
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           TARGET=${{ github.event.inputs.target_coverage || '60' }}
 
@@ -99,7 +99,7 @@ jobs:
 
       - name: Push and create PR
         env:
-          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           git add -A
           if git diff --staged --quiet; then

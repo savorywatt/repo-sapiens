@@ -79,8 +79,8 @@ Create a local configuration file:
 cat > repo_sapiens/config/local_config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
-  base_url: ${BUILDER_GITEA_URL:-http://localhost:3000}
-  api_token: ${BUILDER_GITEA_TOKEN}
+  base_url: ${SAPIENS_GITEA_URL:-http://localhost:3000}
+  api_token: ${SAPIENS_GITEA_TOKEN}
 
 repository:
   owner: ${REPO_OWNER:-your-username}
@@ -111,8 +111,8 @@ Set environment variables:
 
 ```bash
 # Add to your shell profile (.bashrc, .zshrc, etc.)
-export BUILDER_GITEA_URL="http://localhost:3000"
-export BUILDER_GITEA_TOKEN="your-gitea-token"
+export SAPIENS_GITEA_URL="http://localhost:3000"
+export SAPIENS_GITEA_TOKEN="your-gitea-token"
 export OLLAMA_BASE_URL="http://localhost:11434"
 export OLLAMA_MODEL="qwen3:latest"
 ```

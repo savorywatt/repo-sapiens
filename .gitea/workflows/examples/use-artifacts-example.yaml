@@ -43,11 +43,11 @@ jobs:
 
       - name: Run sapiens
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           sapiens process-issue --issue ${{ gitea.event.issue.number }}
 
@@ -83,11 +83,11 @@ jobs:
 
       - name: Run sapiens in Docker
         env:
-          GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
-          CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          CLAUDE_API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           docker run --rm \
-            -e AUTOMATION__GIT_PROVIDER__BASE_URL="${{ secrets.BUILDER_GITEA_URL }}" \
+            -e AUTOMATION__GIT_PROVIDER__BASE_URL="${{ secrets.SAPIENS_GITEA_URL }}" \
             -e AUTOMATION__GIT_PROVIDER__API_TOKEN="$GITEA_TOKEN" \
             -e AUTOMATION__REPOSITORY__OWNER="${{ gitea.repository_owner }}" \
             -e AUTOMATION__REPOSITORY__NAME="${{ gitea.repository }}" \

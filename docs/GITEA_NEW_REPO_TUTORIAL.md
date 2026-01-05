@@ -395,14 +395,14 @@ The secrets you need depend on your chosen AI provider:
 
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
-| `BUILDER_GITEA_TOKEN` | Your Gitea API token | Used to interact with issues, PRs, and labels |
-| `BUILDER_GITEA_URL` | `https://gitea.example.com` | Your Gitea instance URL |
+| `SAPIENS_GITEA_TOKEN` | Your Gitea API token | Used to interact with issues, PRs, and labels |
+| `SAPIENS_GITEA_URL` | `https://gitea.example.com` | Your Gitea instance URL |
 
 #### If Using Claude API
 
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
-| `BUILDER_CLAUDE_API_KEY` | Your Claude API key | From https://console.anthropic.com/ |
+| `SAPIENS_CLAUDE_API_KEY` | Your Claude API key | From https://console.anthropic.com/ |
 
 #### If Using Ollama or vLLM
 
@@ -420,15 +420,15 @@ To add each secret:
 
 **For Claude API setup:**
 ```
-BUILDER_GITEA_TOKEN     *****
-BUILDER_GITEA_URL       *****
-BUILDER_CLAUDE_API_KEY  *****
+SAPIENS_GITEA_TOKEN     *****
+SAPIENS_GITEA_URL       *****
+SAPIENS_CLAUDE_API_KEY  *****
 ```
 
 **For Ollama/vLLM setup:**
 ```
-BUILDER_GITEA_TOKEN       *****
-BUILDER_GITEA_URL         *****
+SAPIENS_GITEA_TOKEN       *****
+SAPIENS_GITEA_URL         *****
 ```
 
 > **Note:** Ollama and vLLM configuration (base URL, model name) is stored in the repository's `repo_sapiens/config/automation_config.yaml` file, not in secrets.
@@ -481,7 +481,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -495,11 +495,11 @@ jobs:
 
       - name: Create plan proposal
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "Processing issue #${{ gitea.event.issue.number }} for planning"
           sapiens process-issue --issue ${{ gitea.event.issue.number }}
@@ -508,7 +508,7 @@ jobs:
         if: success()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          github-token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           script: |
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -921,7 +921,7 @@ ls -la .gitea/workflows/
 
 **Checklist:**
 1. Are the secrets configured in repository settings?
-2. Are the secret names correct? (`BUILDER_GITEA_TOKEN`, etc.)
+2. Are the secret names correct? (`SAPIENS_GITEA_TOKEN`, etc.)
 3. Is the API token still valid (not expired)?
 4. Does the token have sufficient permissions?
 
@@ -937,7 +937,7 @@ curl -H "Authorization: token YOUR_TOKEN" \
 **Symptoms:** Workflow runs but fails at "Create plan proposal" step.
 
 **Checklist:**
-1. Is `BUILDER_CLAUDE_API_KEY` configured?
+1. Is `SAPIENS_CLAUDE_API_KEY` configured?
 2. Is your Claude API key valid and has credits?
 3. Check the workflow logs for specific error messages
 
@@ -1105,14 +1105,14 @@ sapiens react --prompt "Your prompt here"
 
 | Secret | Purpose |
 |--------|---------|
-| `BUILDER_GITEA_TOKEN` | Gitea API access |
-| `BUILDER_GITEA_URL` | Gitea instance URL |
+| `SAPIENS_GITEA_TOKEN` | Gitea API access |
+| `SAPIENS_GITEA_URL` | Gitea instance URL |
 
 **Claude API:**
 
 | Secret | Purpose |
 |--------|---------|
-| `BUILDER_CLAUDE_API_KEY` | Claude AI API access |
+| `SAPIENS_CLAUDE_API_KEY` | Claude AI API access |
 
 **Ollama / vLLM:**
 

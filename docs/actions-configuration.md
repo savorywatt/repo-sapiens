@@ -338,9 +338,9 @@ All workflows require these secrets to be configured in repository settings:
 
 ```yaml
 secrets:
-  BUILDER_GITEA_TOKEN: # Gitea API token with repo access
-  BUILDER_CLAUDE_API_KEY: # Claude API key for AI operations
-  BUILDER_GITEA_URL: # Gitea server URL (e.g., http://gitea.local:3000)
+  SAPIENS_GITEA_TOKEN: # Gitea API token with repo access
+  SAPIENS_CLAUDE_API_KEY: # Claude API key for AI operations
+  SAPIENS_GITEA_URL: # Gitea server URL (e.g., http://gitea.local:3000)
 ```
 
 ### Environment Variable Mapping
@@ -350,15 +350,15 @@ Workflows map secrets to automation config environment variables:
 ```yaml
 env:
   # Direct usage
-  GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
-  CLAUDE_API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+  GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+  CLAUDE_API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
 
   # Automation config mapping
-  AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
-  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+  AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
+  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
   AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
   AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
 ```
 
 ### Gitea Context Variables
@@ -487,7 +487,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -500,11 +500,11 @@ jobs:
 
       - name: Process issue
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           sapiens process-issue --issue ${{ gitea.event.issue.number }}
 
@@ -512,7 +512,7 @@ jobs:
         if: success()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          github-token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           script: |
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -617,16 +617,16 @@ jobs:
 ```yaml
 - name: Use secret
   run: |
-    # DON'T: echo ${{ secrets.BUILDER_GITEA_TOKEN }}
+    # DON'T: echo ${{ secrets.SAPIENS_GITEA_TOKEN }}
     # DO: Use secret without logging
     sapiens process-issue --issue 42
   env:
-    GITEA_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+    GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 ```
 
 2. **Use dedicated tokens:**
-   - `BUILDER_GITEA_TOKEN`: Repository access for automation
-   - `BUILDER_CLAUDE_API_KEY`: AI provider access
+   - `SAPIENS_GITEA_TOKEN`: Repository access for automation
+   - `SAPIENS_CLAUDE_API_KEY`: AI provider access
    - Separate concerns, rotate regularly
 
 ### Workflow Security

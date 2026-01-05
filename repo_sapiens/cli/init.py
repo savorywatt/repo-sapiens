@@ -282,7 +282,7 @@ class RepoInitializer:
         import os
 
         # Check environment variables first
-        for env_var in ["GITEA_TOKEN", "BUILDER_GITEA_TOKEN", "GITEA_API_TOKEN"]:
+        for env_var in ["GITEA_TOKEN", "SAPIENS_GITEA_TOKEN", "GITEA_API_TOKEN"]:
             token = os.getenv(env_var)
             if token:
                 return token

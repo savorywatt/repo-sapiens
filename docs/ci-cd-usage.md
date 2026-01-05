@@ -363,9 +363,9 @@ Configure these as repository secrets:
 
 | Secret | Description |
 |--------|-------------|
-| `BUILDER_GITEA_TOKEN` | Gitea API token with repo access |
-| `BUILDER_GITEA_URL` | Gitea server URL |
-| `BUILDER_CLAUDE_API_KEY` | Claude API key for agent |
+| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo access |
+| `SAPIENS_GITEA_URL` | Gitea server URL |
+| `SAPIENS_CLAUDE_API_KEY` | Claude API key for agent |
 
 ### Configuration Overrides
 

@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitea/workflows/daily-issue-triage.yaml
 # 2. Set required secrets:
-#    - BUILDER_GITEA_TOKEN: Gitea API token with issue write access
-#    - BUILDER_CLAUDE_API_KEY: Claude API key
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with issue write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key
 # 3. Create labels: bug, enhancement, question, needs-triage, priority-high
 
 name: Daily Issue Triage
@@ -42,11 +42,11 @@ jobs:
 
       - name: Triage issues
         env:
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           sapiens react "Triage open issues in this repository.
 

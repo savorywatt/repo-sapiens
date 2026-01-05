@@ -42,10 +42,14 @@ docs/source/_templates/
 
 # Project state
 .automation/
+.sapiens/
 .benchmarks/
 .builder/
 .credentials
 plans/*
+
+# User config files (contain secrets/local settings)
+repo_sapiens/config/automation_config.yaml
 
 # Secrets baseline (keep in repo for detect-secrets)
 # .secrets.baseline

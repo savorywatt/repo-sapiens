@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -30,11 +30,11 @@ jobs:
 
       - name: Create fix proposal
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.BUILDER_GITEA_URL }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "🔧 Creating fix proposal for issue/PR #${{ gitea.event.issue.number }}"
           sapiens process-issue --issue ${{ gitea.event.issue.number }}
@@ -43,7 +43,7 @@ jobs:
         if: success()
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          github-token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           script: |
             github.rest.issues.createComment({
               issue_number: context.issue.number,

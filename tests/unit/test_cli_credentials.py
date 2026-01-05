@@ -708,17 +708,17 @@ class TestEnvironmentVariableHandling:
     """Tests for environment variable handling in CLI."""
 
     def test_master_password_from_envvar(self, cli_runner, mock_credential_resolver):
-        """Should read master password from BUILDER_MASTER_PASSWORD env var."""
+        """Should read master password from SAPIENS_MASTER_PASSWORD env var."""
         mock_credential_resolver.resolve.return_value = "secret_value"
 
         with patch.dict(
             os.environ,
-            {"BUILDER_MASTER_PASSWORD": "env_master_pass"},  # pragma: allowlist secret
+            {"SAPIENS_MASTER_PASSWORD": "env_master_pass"},  # pragma: allowlist secret
         ):
             result = cli_runner.invoke(
                 credentials_group,
                 ["get", "@encrypted:test/key", "--show-value"],
-                env={"BUILDER_MASTER_PASSWORD": "env_master_pass"},  # pragma: allowlist secret
+                env={"SAPIENS_MASTER_PASSWORD": "env_master_pass"},  # pragma: allowlist secret
             )
 
             assert result.exit_code == 0
@@ -727,7 +727,7 @@ class TestEnvironmentVariableHandling:
         """Should prefer CLI option over environment variable."""
         with patch("repo_sapiens.cli.credentials._delete_encrypted") as mock_delete, patch.dict(
             os.environ,
-            {"BUILDER_MASTER_PASSWORD": "env_password"},  # pragma: allowlist secret
+            {"SAPIENS_MASTER_PASSWORD": "env_password"},  # pragma: allowlist secret
         ):
             mock_delete.return_value = True
 

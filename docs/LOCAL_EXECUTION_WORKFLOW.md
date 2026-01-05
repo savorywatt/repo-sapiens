@@ -218,7 +218,7 @@ Configure repo-sapiens to use Ollama for issue processing:
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
-  api_token: ${BUILDER_GITEA_TOKEN}
+  api_token: ${SAPIENS_GITEA_TOKEN}
 
 repository:
   owner: your-username
@@ -276,7 +276,7 @@ claude auth
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
-  api_token: ${BUILDER_GITEA_TOKEN}
+  api_token: ${SAPIENS_GITEA_TOKEN}
 
 repository:
   owner: your-username
@@ -444,7 +444,7 @@ cat > repo_sapiens/config/local_config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
-  api_token: ${BUILDER_GITEA_TOKEN}
+  api_token: ${SAPIENS_GITEA_TOKEN}
 
 repository:
   owner: myorg
@@ -458,7 +458,7 @@ agent_provider:
 EOF
 
 # 2. Set credentials
-export BUILDER_GITEA_TOKEN="your-gitea-token"
+export SAPIENS_GITEA_TOKEN="your-gitea-token"
 
 # 3. Process an issue
 sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 15
@@ -534,8 +534,8 @@ agent_provider:
 
 ```bash
 # Gitea credentials
-export BUILDER_GITEA_URL="http://localhost:3000"
-export BUILDER_GITEA_TOKEN="your-token"
+export SAPIENS_GITEA_URL="http://localhost:3000"
+export SAPIENS_GITEA_TOKEN="your-token"
 
 # Ollama settings
 export OLLAMA_BASE_URL="http://localhost:11434"

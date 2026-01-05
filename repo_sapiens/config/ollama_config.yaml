@@ -1,7 +1,7 @@
 git_provider:
   provider_type: gitea
-  base_url: ${BUILDER_GITEA_URL:-http://localhost:3000}
-  api_token: ${BUILDER_GITEA_TOKEN}
+  base_url: ${SAPIENS_GITEA_URL:-http://localhost:3000}
+  api_token: ${SAPIENS_GITEA_TOKEN}
 
 repository:
   owner: ${REPO_OWNER:-Foxshirestudios}

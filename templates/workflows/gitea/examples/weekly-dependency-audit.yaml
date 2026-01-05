@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitea/workflows/weekly-dependency-audit.yaml
 # 2. Set required secrets:
-#    - BUILDER_GITEA_TOKEN: Gitea API token with repo/PR write access
-#    - BUILDER_CLAUDE_API_KEY: Claude API key
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo/PR write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key
 # 3. Adjust schedule as needed
 
 name: Dependency Audit
@@ -91,9 +91,9 @@ jobs:
 
       - name: Analyze and update dependencies
         env:
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.BUILDER_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           sapiens react "Review the dependency audit report and update safe dependencies.
 
