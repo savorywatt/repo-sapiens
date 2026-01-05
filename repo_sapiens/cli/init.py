@@ -167,6 +167,35 @@ class RepoInitializer:
         # Fall back to environment
         return "environment"
 
+    def _detect_existing_gitea_token(self) -> tuple[str | None, str | None]:
+        """Check for existing Gitea token in keyring or environment.
+
+        Checks in order:
+        1. Keyring (gitea/api_token)
+        2. Environment (GITEA_TOKEN, SAPIENS_GITEA_TOKEN)
+
+        Returns (token, source) tuple where source describes where it was found.
+        """
+        import os
+
+        # Check keyring first
+        try:
+            keyring_backend = KeyringBackend()
+            if keyring_backend.available:
+                token = keyring_backend.get("gitea", "api_token")
+                if token:
+                    return token, "keyring (gitea/api_token)"
+        except Exception:
+            pass  # Keyring not available or error
+
+        # Check environment variables
+        for env_var in ("GITEA_TOKEN", "SAPIENS_GITEA_TOKEN"):
+            token = os.getenv(env_var)
+            if token:
+                return token, f"environment (${env_var})"
+
+        return None, None
+
     def _discover_repository(self) -> None:
         """Discover Git repository configuration."""
         click.echo(click.style("🔍 Discovering repository configuration...", bold=True))
@@ -215,14 +244,27 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
-        # Gitea token
-        click.echo(
-            "Gitea API Token is required. Get it from:\n"
-            f"   {self.repo_info.base_url}/user/settings/applications"
-        )
-        click.echo()
+        # Check for existing Gitea token in keyring or environment
+        existing_token, source = self._detect_existing_gitea_token()
 
-        self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
+        if existing_token:
+            use_existing = click.confirm(
+                click.style(f"✓ Gitea token found in {source}. Use it?", fg="green"),
+                default=True,
+            )
+            if use_existing:
+                self.gitea_token = existing_token
+                click.echo(f"   ✓ Using Gitea token from {source}")
+            else:
+                self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
+        else:
+            # No existing token - prompt for it
+            click.echo(
+                "Gitea API Token is required. Get it from:\n"
+                f"   {self.repo_info.base_url}/user/settings/applications"
+            )
+            click.echo()
+            self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
 
         click.echo()
 
