@@ -98,7 +98,7 @@ class TestCLIHelpText:
         """Test main CLI help displays correctly."""
         result = cli_runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "Gitea automation system CLI" in result.output
+        assert "repo-sapiens" in result.output
         assert "--config" in result.output
         assert "--log-level" in result.output
 
@@ -164,7 +164,8 @@ class TestCLIHelpText:
         assert result.exit_code == 0
         assert "Run a task using the ReAct agent" in result.output
         assert "--model" in result.output
-        assert "--ollama-url" in result.output
+        assert "--base-url" in result.output
+        assert "--backend" in result.output
         assert "--max-iterations" in result.output
         assert "--working-dir" in result.output
         assert "--verbose" in result.output

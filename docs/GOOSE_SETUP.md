@@ -697,13 +697,40 @@ The ReAct agent has access to these tools:
 sapiens react [OPTIONS] [TASK]
 
 Options:
-  --model TEXT           Ollama model to use (default: qwen3:latest)
-  --ollama-url TEXT      Ollama server URL (default: http://localhost:11434)
-  --max-iterations INT   Max ReAct iterations (default: 10)
-  --working-dir TEXT     Working directory for file operations (default: .)
-  -v, --verbose          Show detailed trajectory (reasoning steps)
-  --repl                 Start interactive REPL mode
+  --model TEXT                Model to use (default: qwen3:latest)
+  --backend [ollama|openai]   LLM backend (default: ollama)
+  --base-url TEXT             Backend server URL (auto-detected if omitted)
+  --api-key TEXT              API key for OpenAI-compatible backends
+  --max-iterations INT        Max ReAct iterations (default: 10)
+  --working-dir TEXT          Working directory for file operations (default: .)
+  -v, --verbose               Show detailed trajectory (reasoning steps)
+  --repl                      Start interactive REPL mode
 ```
+
+### Using with vLLM (OpenAI-Compatible)
+
+The ReAct agent also supports vLLM and other OpenAI-compatible servers:
+
+```bash
+# Start vLLM server
+vllm serve Qwen/Qwen2.5-Coder-32B-Instruct --port 8000
+
+# Run ReAct with vLLM
+sapiens react --backend openai --base-url http://localhost:8000/v1 "Create hello.py"
+
+# With API key (if required)
+sapiens react --backend openai --base-url http://localhost:8000/v1 --api-key token "task"
+
+# Interactive mode with vLLM
+sapiens react --backend openai --base-url http://localhost:8000/v1 --repl
+```
+
+**Supported OpenAI-compatible servers:**
+- vLLM
+- LMStudio
+- text-generation-inference (TGI)
+- LocalAI
+- Any server implementing the OpenAI API
 
 ### Example Use Cases
 
@@ -732,8 +759,8 @@ sapiens react "Add docstrings to all functions in src/utils.py"
 | Feature | Built-in ReAct | Goose |
 |---------|---------------|-------|
 | **Installation** | None (built-in) | Requires `pip install goose-ai` |
-| **LLM Providers** | Ollama only | OpenAI, Anthropic, Ollama, OpenRouter, Groq |
-| **Cloud Support** | ❌ (local only) | ✅ |
+| **LLM Providers** | Ollama, vLLM, OpenAI-compatible | OpenAI, Anthropic, Ollama, OpenRouter, Groq |
+| **Cloud Support** | ✅ (via OpenAI-compatible) | ✅ |
 | **Tool Calling** | Custom implementation | LLM native function calling |
 | **Toolkits** | Fixed set of tools | Multiple specialized toolkits |
 | **REPL Mode** | ✅ | ✅ |

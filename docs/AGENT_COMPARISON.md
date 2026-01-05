@@ -8,7 +8,7 @@ repo-sapiens supports four agent options:
 
 | Agent | Type | LLM Providers | Best For |
 |-------|------|---------------|----------|
-| [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama (local) | Simple tasks, experimentation, privacy |
+| [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama, vLLM, OpenAI-compatible | Simple tasks, experimentation, local inference |
 | [Goose](#goose-ai) | External CLI | OpenAI, Anthropic, Ollama, OpenRouter, Groq | Flexibility, cloud providers |
 | [Claude Code](#claude-code) | External CLI | Anthropic only | Best coding performance, simplicity |
 | [Ollama Provider](#ollama-provider) | Built-in | Ollama (local) | Automation workflows, local inference |
@@ -31,46 +31,50 @@ Do you need cloud LLM providers (OpenAI, Anthropic API)?
 
 ## Built-in ReAct Agent
 
-The ReAct (Reasoning + Acting) agent is built directly into repo-sapiens. It uses Ollama for inference and includes a curated set of tools for file operations and shell commands.
+The ReAct (Reasoning + Acting) agent is built directly into repo-sapiens. It supports both Ollama and OpenAI-compatible backends (vLLM, LMStudio, etc.) and includes a curated set of tools for file operations and shell commands.
 
 ### Pros
-- **Zero installation**: No external CLI needed—just Ollama
+- **Zero installation**: No external CLI needed
+- **Multiple backends**: Ollama, vLLM, and any OpenAI-compatible server
 - **Transparent reasoning**: See step-by-step thinking with `--verbose`
 - **Interactive REPL**: Experiment with tasks interactively
-- **Privacy**: 100% local execution
+- **Privacy**: Local execution with Ollama or vLLM
 - **Simple**: Minimal configuration
 
 ### Cons
-- **Ollama only**: No cloud provider support
 - **Fixed toolset**: Cannot extend with custom tools
 - **Standalone**: Not integrated into daemon/automation workflows (yet)
 
 ### When to Use
 - Quick local tasks and experimentation
 - Learning how agents work (verbose mode shows reasoning)
+- Using vLLM for better tool support than Ollama
 - Privacy-sensitive environments
 - Simple file operations and code generation
 
 ### Quick Start
 
+**With Ollama:**
 ```bash
-# Ensure Ollama is running
 ollama serve
 ollama pull qwen3:latest
-
-# Run a task
 sapiens react "Create a Python script that sorts a list"
+```
 
-# Interactive mode
-sapiens react --repl
+**With vLLM:**
+```bash
+vllm serve Qwen/Qwen2.5-Coder-32B-Instruct --port 8000
+sapiens react --backend openai --base-url http://localhost:8000/v1 "Create hello.py"
 ```
 
 ### Configuration
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--model` | `qwen3:latest` | Ollama model to use |
-| `--ollama-url` | `http://localhost:11434` | Ollama server URL |
+| `--model` | `qwen3:latest` | Model to use |
+| `--backend` | `ollama` | Backend: `ollama` or `openai` |
+| `--base-url` | auto | Server URL (auto-detected per backend) |
+| `--api-key` | none | API key for OpenAI-compatible backends |
 | `--max-iterations` | `10` | Maximum reasoning steps |
 | `--working-dir` | `.` | Working directory |
 | `-v, --verbose` | `false` | Show reasoning trajectory |
@@ -274,8 +278,8 @@ agent_provider:
 | Feature | ReAct Agent | Goose | Claude Code | Ollama Provider |
 |---------|-------------|-------|-------------|-----------------|
 | **Installation** | None | `pip install goose-ai` | `npm install -g @anthropic/claude-code` | None |
-| **Cloud Providers** | - | OpenAI, Anthropic, OpenRouter, Groq | Anthropic | - |
-| **Local Models** | Ollama | Ollama | - | Ollama |
+| **Cloud Providers** | OpenAI-compatible | OpenAI, Anthropic, OpenRouter, Groq | Anthropic | - |
+| **Local Models** | Ollama, vLLM | Ollama | - | Ollama |
 | **Tool Calling** | Custom | Native LLM | Native LLM | Prompt-based |
 | **REPL Mode** | Yes | Yes | Yes | - |
 | **Daemon Mode** | - | Yes | Yes | Yes |
