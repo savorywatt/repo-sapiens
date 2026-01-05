@@ -2,7 +2,7 @@
 # Convenient commands for development
 
 .PHONY: help install dev test test-unit test-integration lint format type-check \
-        pre-commit clean build docker-build docker-run repl
+        pre-commit clean build docker-build docker-run repl docs docs-serve
 
 # Default target
 help:
@@ -22,6 +22,8 @@ help:
 	@echo "  make docker-build   Build Docker image"
 	@echo "  make docker-run     Run Docker container"
 	@echo "  make repl           Start ReAct agent REPL"
+	@echo "  make docs           Build documentation"
+	@echo "  make docs-serve     Build and serve docs with live reload"
 	@echo ""
 
 # Installation
@@ -65,6 +67,7 @@ pre-commit:
 clean:
 	rm -rf build/ dist/ *.egg-info/ .pytest_cache/ .mypy_cache/ .ruff_cache/
 	rm -rf htmlcov/ .coverage coverage.xml
+	rm -rf docs/build/ docs/source/api/
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
@@ -89,3 +92,13 @@ run:
 # Health check
 health:
 	uv run sapiens health-check
+
+# Documentation
+docs:
+	uv run sphinx-apidoc -f -o docs/source/api repo_sapiens
+	uv run sphinx-build docs/source docs/build/html
+	@echo "Documentation built in docs/build/html/"
+
+docs-serve:
+	uv run sphinx-apidoc -f -o docs/source/api repo_sapiens
+	uv run sphinx-autobuild docs/source docs/build/html
