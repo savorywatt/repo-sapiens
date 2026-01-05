@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2026-01-04
 
 ### Added
+- **Enhanced Init Command**: Major improvements to `sapiens init`
+  - `--setup-workflows` flag to install CI/CD workflow files
+  - `--setup-examples` flag to install example recurring task workflows
+  - `--non-interactive` mode for CI/CD environments
+  - Automatic Gitea/GitHub Actions secret configuration
+  - Support for multiple AI providers (Claude, Goose, Ollama, vLLM)
+- **Workflow Templates**: New `templates/workflows/` directory
+  - Base templates for Gitea and GitHub Actions
+  - Example recurring task workflows:
+    - `daily-issue-triage.yaml` - Automated issue classification
+    - `post-merge-docs.yaml` - Documentation updates after merge
+    - `weekly-dependency-audit.yaml` - Dependency version checking
+    - `weekly-security-review.yaml` - Security audit workflow
+    - `weekly-test-coverage.yaml` - Test coverage monitoring
+- **CLI Health Commands**: New monitoring commands
+  - `sapiens check-stale` - Find workflows not updated within threshold
+  - `sapiens health-check` - Generate system health report
+  - `sapiens check-failures` - Find failed workflows in time window
 - **ExecutionContext Pattern**: New dataclass for workflow stage state management
   - `ExecutionContext` in `repo_sapiens/engine/context.py` with issue, plan_id, workspace_path, branch_name, stage_outputs
   - Enables inter-stage communication via `get_stage_output()` and `set_stage_output()`
@@ -49,6 +67,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduced code duplication in test fixtures
   - Simplified mock setups
 - **.gitignore**: Added `plans/*` to ignore plan working files
+
+### Documentation
+- **GETTING_STARTED.md**: Complete rewrite with Quick Start guide
+  - New credential management guide (keyring, environment, encrypted)
+  - Basic workflows and common tasks
+  - Troubleshooting section
+- **GITEA_NEW_REPO_TUTORIAL.md**: Comprehensive setup tutorial
+  - Multi-provider AI setup (Claude, Ollama, vLLM)
+  - Full workflow file setup
+  - Label creation and configuration reference
+- **ERROR_HANDLING.md**: Expanded error handling guide
+  - Exception hierarchy documentation
+  - CLI error handling patterns
+  - ReAct agent error handling
+- **ci-cd-usage.md**: Updated to reflect actual implementation
+  - Correct workflow file listings
+  - Accurate CLI commands
+  - Label-to-workflow mappings
+- **workflow-diagram.md**: Rewritten with accurate label-driven flow
+  - Per-label workflow architecture
+  - Fix flow documentation
+  - CLI commands reference
 
 ### Fixed
 - **ARCHITECTURE.md Accuracy**: Documentation now matches actual implementation

@@ -16,6 +16,7 @@ Before you begin, ensure you have:
   - **Claude API** - Anthropic API key (https://console.anthropic.com/)
   - **Claude Code** - Claude Code CLI installed locally
   - **Ollama** - Ollama running locally or on a server (https://ollama.ai/)
+  - **vLLM** - vLLM or other OpenAI-compatible server
 
 ---
 
@@ -67,7 +68,7 @@ flowchart TD
     B -->|Yes| C{Budget?}
     B -->|No| D{Local resources?}
     C -->|Higher| E[Claude API]
-    C -->|Lower| F[Ollama + cloud model]
+    C -->|Lower| F[vLLM + cloud model]
     D -->|Strong GPU| G[Ollama local]
     D -->|Limited| H[Claude Code CLI]
 
@@ -79,6 +80,7 @@ flowchart TD
     style E fill:#6B4C9A,color:#fff
     style H fill:#6B4C9A,color:#fff
     style G fill:#00A67E,color:#fff
+    style F fill:#00B8D9,color:#fff
 ```
 
 ### Option A: Claude API (Recommended for Production)
@@ -138,16 +140,36 @@ flowchart TD
 - A pulled model: `ollama pull llama3.1:8b` or `ollama pull codellama`
 - Sufficient RAM (8GB+ for small models, 16GB+ for larger)
 
+### Option D: vLLM (OpenAI-Compatible Servers)
+
+**Best for:** Teams running their own model servers, using OpenRouter, or other OpenAI-compatible APIs
+
+**Pros:**
+- Flexibility to use any OpenAI-compatible endpoint
+- Can use cloud services like OpenRouter
+- Works with self-hosted vLLM, text-generation-inference, etc.
+- Standard API format
+
+**Cons:**
+- Requires server setup for self-hosted
+- Variable costs depending on provider
+- Quality depends on model choice
+
+**Requirements:**
+- An OpenAI-compatible API endpoint
+- API key (if required by your provider)
+- Model name supported by your endpoint
+
 ### Quick Comparison
 
-| Feature | Claude API | Claude Code | Ollama |
-|---------|------------|-------------|--------|
-| Cost | Pay per use | Subscription | Free |
-| Quality | Excellent | Excellent | Good to Very Good |
-| Privacy | Cloud | Cloud | Local |
-| CI/CD Ready | ✅ | ❌ | ✅ |
-| Offline | ❌ | ❌ | ✅ |
-| Setup | Easy | Easy | Moderate |
+| Feature | Claude API | Claude Code | Ollama | vLLM |
+|---------|------------|-------------|--------|------|
+| Cost | Pay per use | Subscription | Free | Varies |
+| Quality | Excellent | Excellent | Good to Very Good | Varies by model |
+| Privacy | Cloud | Cloud | Local | Depends |
+| CI/CD Ready | Yes | No | Yes | Yes |
+| Offline | No | No | Yes | Depends |
+| Setup | Easy | Easy | Moderate | Moderate |
 
 ---
 
@@ -192,80 +214,135 @@ The init wizard will:
 #### Example: Claude API Setup
 
 ```
-🚀 Initializing repo-sapiens
+Initializing repo-sapiens
 
-🔍 Discovering repository configuration...
-   ✓ Found Git repository: /home/user/my-project
-   ✓ Detected remote: origin
-   ✓ Parsed: owner=your-username, repo=my-project
-   ✓ Base URL: https://gitea.example.com
+Discovering repository configuration...
+   Found Git repository: /home/user/my-project
+   Detected remote: origin
+   Parsed: owner=your-username, repo=my-project
+   Base URL: https://gitea.example.com
 
-🔑 Setting up credentials...
+Setting up credentials...
 
 Gitea API Token is required. Get it from:
    https://gitea.example.com/user/settings/applications
 
-Enter your Gitea API token: ●●●●●●●●●●●●
+Enter your Gitea API token: ************
 
 Select AI provider:
-  1. Claude API (cloud)
-  2. Claude Code (local CLI)
-  3. Ollama (self-hosted)
+  1. claude  - Claude API (cloud)
+  2. goose   - Goose CLI (local)
+  3. ollama  - Ollama (self-hosted)
+  4. vllm    - vLLM/OpenAI-compatible (self-hosted or cloud)
+  5. api     - Generic API provider
 
 Enter choice [1]: 1
 
-Enter your Claude API key: ●●●●●●●●●●●●
+Enter your Claude API key: ************
 
-📦 Storing credentials in keyring backend...
-   ✓ Stored: gitea/api_token
-   ✓ Stored: claude/api_key
-   ✓ Credentials stored securely
+Storing credentials in keyring backend...
+   Stored: gitea/api_token
+   Stored: claude/api_key
+   Credentials stored securely
 
-📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+Creating configuration file...
+   Created: repo_sapiens/config/automation_config.yaml
 
-✅ Initialization complete!
+Initialization complete!
 ```
 
 #### Example: Ollama Setup
 
 ```
-🚀 Initializing repo-sapiens
+Initializing repo-sapiens
 
-🔍 Discovering repository configuration...
-   ✓ Found Git repository: /home/user/my-project
-   ✓ Detected remote: origin
-   ✓ Parsed: owner=your-username, repo=my-project
-   ✓ Base URL: https://gitea.example.com
+Discovering repository configuration...
+   Found Git repository: /home/user/my-project
+   Detected remote: origin
+   Parsed: owner=your-username, repo=my-project
+   Base URL: https://gitea.example.com
 
-🔑 Setting up credentials...
+Setting up credentials...
 
 Gitea API Token is required. Get it from:
    https://gitea.example.com/user/settings/applications
 
-Enter your Gitea API token: ●●●●●●●●●●●●
+Enter your Gitea API token: ************
 
 Select AI provider:
-  1. Claude API (cloud)
-  2. Claude Code (local CLI)
-  3. Ollama (self-hosted)
+  1. claude  - Claude API (cloud)
+  2. goose   - Goose CLI (local)
+  3. ollama  - Ollama (self-hosted)
+  4. vllm    - vLLM/OpenAI-compatible (self-hosted or cloud)
+  5. api     - Generic API provider
 
 Enter choice [1]: 3
 
-Enter Ollama base URL [http://localhost:11434]: http://localhost:11434
-Enter model name [qwen3:latest]: qwen3:latest
+Discovering Ollama models...
+   Found Ollama server at http://localhost:11434
+   Available models:
+     1. qwen3:latest
+     2. llama3.1:8b
+     3. deepseek-coder:6.7b
+     4. codellama:7b
 
-📦 Storing credentials in keyring backend...
-   ✓ Stored: gitea/api_token
-   ✓ Ollama configured (no API key needed)
+Select model [1]: 1
 
-📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+Storing credentials in keyring backend...
+   Stored: gitea/api_token
+   Ollama configured (no API key needed)
 
-✅ Initialization complete!
+Creating configuration file...
+   Created: repo_sapiens/config/automation_config.yaml
 
-💡 Make sure Ollama is running: ollama serve
-💡 Pull your model if needed: ollama pull qwen3:latest
+Initialization complete!
+
+Note: Ollama configuration is stored in the YAML config file.
+      Make sure Ollama is running: ollama serve
+```
+
+#### Example: vLLM Setup
+
+```
+Initializing repo-sapiens
+
+Discovering repository configuration...
+   Found Git repository: /home/user/my-project
+   Detected remote: origin
+   Parsed: owner=your-username, repo=my-project
+   Base URL: https://gitea.example.com
+
+Setting up credentials...
+
+Gitea API Token is required. Get it from:
+   https://gitea.example.com/user/settings/applications
+
+Enter your Gitea API token: ************
+
+Select AI provider:
+  1. claude  - Claude API (cloud)
+  2. goose   - Goose CLI (local)
+  3. ollama  - Ollama (self-hosted)
+  4. vllm    - vLLM/OpenAI-compatible (self-hosted or cloud)
+  5. api     - Generic API provider
+
+Enter choice [1]: 4
+
+Enter OpenAI-compatible base URL [http://localhost:8000/v1]: http://localhost:8000/v1
+Enter model name: meta-llama/Llama-3.1-8B-Instruct
+Enter API key (press Enter if not required):
+
+Storing credentials in keyring backend...
+   Stored: gitea/api_token
+   vLLM configured
+
+Creating configuration file...
+   Created: repo_sapiens/config/automation_config.yaml
+
+Initialization complete!
+
+Note: vLLM configuration is stored in the YAML config file.
+      Make sure your vLLM server is running.
 ```
 
 #### Setting Up Ollama Before Init
@@ -327,14 +404,11 @@ The secrets you need depend on your chosen AI provider:
 |-------------|-------|-------------|
 | `BUILDER_CLAUDE_API_KEY` | Your Claude API key | From https://console.anthropic.com/ |
 
-#### If Using Ollama
+#### If Using Ollama or vLLM
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `BUILDER_OLLAMA_BASE_URL` | `http://ollama-server:11434` | Ollama API endpoint |
-| `BUILDER_OLLAMA_MODEL` | `qwen3:latest` | Model to use |
+No additional secrets are needed for Ollama or vLLM. These providers are configured directly in the `automation_config.yaml` file since they typically run locally or on your own infrastructure without API keys.
 
-> **Note:** If Ollama runs on the same machine as your Gitea runner, use `http://localhost:11434`. For remote Ollama, ensure the runner can reach it.
+> **Note:** If your vLLM endpoint requires an API key, you can add it to your keyring locally or set it via environment variable override in your workflows.
 
 To add each secret:
 1. Click **Add Secret**
@@ -351,13 +425,13 @@ BUILDER_GITEA_URL       *****
 BUILDER_CLAUDE_API_KEY  *****
 ```
 
-**For Ollama setup:**
+**For Ollama/vLLM setup:**
 ```
 BUILDER_GITEA_TOKEN       *****
 BUILDER_GITEA_URL         *****
-BUILDER_OLLAMA_BASE_URL   *****
-BUILDER_OLLAMA_MODEL      *****
 ```
+
+> **Note:** Ollama and vLLM configuration (base URL, model name) is stored in the repository's `repo_sapiens/config/automation_config.yaml` file, not in secrets.
 
 ---
 
@@ -365,13 +439,13 @@ BUILDER_OLLAMA_MODEL      *****
 
 The automation is driven by Gitea Actions workflows. You need to copy these to your repository.
 
-### Step 4.1: Create the Workflows Directory
+### Step 5.1: Create the Workflows Directory
 
 ```bash
 mkdir -p .gitea/workflows
 ```
 
-### Step 4.2: Copy the Core Workflow Files
+### Step 5.2: Copy the Core Workflow Files
 
 You can either copy from the repo-sapiens source or create them manually.
 
@@ -427,7 +501,7 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.BUILDER_CLAUDE_API_KEY }}
         run: |
-          echo "🔍 Processing issue #${{ gitea.event.issue.number }} for planning"
+          echo "Processing issue #${{ gitea.event.issue.number }} for planning"
           sapiens process-issue --issue ${{ gitea.event.issue.number }}
 
       - name: Comment on success
@@ -440,12 +514,12 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '✅ **Plan proposal created!**\n\nReview the plan and add the `approved` label to proceed.\n\n🤖 Posted by repo-sapiens'
+              body: '**Plan proposal created!**\n\nReview the plan and add the `approved` label to proceed.\n\nPosted by repo-sapiens'
             })
 EOF
 ```
 
-### Step 4.3: Full Workflow Set (Recommended)
+### Step 5.3: Full Workflow Set (Recommended)
 
 For the complete automation pipeline, copy these workflow files:
 
@@ -461,7 +535,7 @@ For the complete automation pipeline, copy these workflow files:
 | `automation-daemon.yaml` | Scheduled polling for pending work |
 | `monitor.yaml` | Health monitoring |
 
-### Step 4.4: Commit and Push Workflows
+### Step 5.4: Commit and Push Workflows
 
 ```bash
 git add .gitea/workflows/
@@ -475,13 +549,13 @@ git push origin main
 
 The automation uses labels to track workflow state. Create these in Gitea.
 
-### Step 5.1: Navigate to Labels
+### Step 6.1: Navigate to Labels
 
 1. Go to your repository
 2. Click **Issues** → **Labels**
 3. Click **New Label** for each label below
 
-### Step 5.2: Create the Labels
+### Step 6.2: Create the Labels
 
 Create these labels (colors are suggestions):
 
@@ -489,12 +563,12 @@ Create these labels (colors are suggestions):
 |------------|-------|-------------|
 | `needs-planning` | `#0052CC` (blue) | Issue needs a development plan |
 | `proposed` | `#36B37E` (green) | Plan has been proposed |
-| `approved` | `#00875A` (dark green) | Plan approved, ready for tasks |
-| `task` | `#6554C0` (purple) | This is a task issue |
-| `execute` | `#FF5630` (red) | Task ready to execute |
-| `needs-review` | `#FFAB00` (yellow) | PR needs code review |
-| `needs-fix` | `#FF8B00` (orange) | Changes needed based on review |
-| `requires-qa` | `#00B8D9` (cyan) | Ready for QA/testing |
+| `approved` | `#00875A` (dark green) | Plan approved, triggers task creation |
+| `task` | `#6554C0` (purple) | Marks issue as a task |
+| `execute` | `#FF5630` (red) | Triggers task execution |
+| `needs-review` | `#FFAB00` (yellow) | Triggers code review |
+| `needs-fix` | `#FF8B00` (orange) | Triggers fix proposal |
+| `requires-qa` | `#00B8D9` (cyan) | Triggers QA/testing |
 | `qa-passed` | `#36B37E` (green) | QA passed |
 | `qa-failed` | `#FF5630` (red) | QA failed |
 | `completed` | `#6B778C` (gray) | Work completed |
@@ -526,13 +600,13 @@ done
 
 ## Part 7: Verify Gitea Actions Is Enabled
 
-### Step 6.1: Check Repository Settings
+### Step 7.1: Check Repository Settings
 
 1. Go to your repository → **Settings**
 2. Look for **Actions** in the sidebar
 3. Ensure **Enable Repository Actions** is checked
 
-### Step 6.2: Verify Runner Availability
+### Step 7.2: Verify Runner Availability
 
 1. Go to **Settings** → **Actions** → **Runners**
 2. You should see at least one runner listed and **Online**
@@ -546,7 +620,7 @@ If no runners are available, you'll need to:
 
 ## Part 8: Test Your Setup
 
-### Step 7.1: Create a Test Issue
+### Step 8.1: Create a Test Issue
 
 1. Go to your repository → **Issues** → **New Issue**
 2. Create an issue:
@@ -561,13 +635,13 @@ If no runners are available, you'll need to:
      - Include a docstring
      ```
 
-### Step 7.2: Trigger the Automation
+### Step 8.2: Trigger the Automation
 
 1. On the issue page, click **Labels**
 2. Add the `needs-planning` label
 3. Watch the magic happen!
 
-### Step 7.3: Monitor Progress
+### Step 8.3: Monitor Progress
 
 **Via Gitea UI:**
 1. Go to **Actions** tab
@@ -583,10 +657,10 @@ sapiens --config repo_sapiens/config/automation_config.yaml list-plans
 sapiens --config repo_sapiens/config/automation_config.yaml show-plan --plan-id 1
 ```
 
-### Step 7.4: Expected Flow
+### Step 8.4: Expected Flow
 
 1. **Workflow triggers** when `needs-planning` label is added
-2. **Plan is generated** by Claude AI
+2. **Plan is generated** by AI
 3. **Comment is posted** on the issue with the plan
 4. **`proposed` label** is added automatically
 5. **You review** the plan
@@ -607,7 +681,7 @@ After running `sapiens init`, your config is at:
 
 ```
 my-project/
-└── automation/
+└── repo_sapiens/
     └── config/
         └── automation_config.yaml
 ```
@@ -643,8 +717,16 @@ workflow:
 
 tags:
   needs_planning: needs-planning
-  plan_review: plan-review
-  ready_to_implement: ready-to-implement
+  proposed: proposed
+  approved: approved
+  task: task
+  execute: execute
+  needs_review: needs-review
+  needs_fix: needs-fix
+  requires_qa: requires-qa
+  qa_passed: qa-passed
+  qa_failed: qa-failed
+  completed: completed
 ```
 
 #### Claude Code (Local CLI) Configuration
@@ -676,8 +758,16 @@ workflow:
 
 tags:
   needs_planning: needs-planning
-  plan_review: plan-review
-  ready_to_implement: ready-to-implement
+  proposed: proposed
+  approved: approved
+  task: task
+  execute: execute
+  needs_review: needs-review
+  needs_fix: needs-fix
+  requires_qa: requires-qa
+  qa_passed: qa-passed
+  qa_failed: qa-failed
+  completed: completed
 ```
 
 #### Ollama Configuration
@@ -711,8 +801,58 @@ workflow:
 
 tags:
   needs_planning: needs-planning
-  plan_review: plan-review
-  ready_to_implement: ready-to-implement
+  proposed: proposed
+  approved: approved
+  task: task
+  execute: execute
+  needs_review: needs-review
+  needs_fix: needs-fix
+  requires_qa: requires-qa
+  qa_passed: qa-passed
+  qa_failed: qa-failed
+  completed: completed
+```
+
+#### vLLM (OpenAI-Compatible) Configuration
+
+```yaml
+# repo_sapiens/config/automation_config.yaml
+
+git_provider:
+  provider_type: gitea
+  base_url: https://gitea.example.com
+  api_token: "@keyring:gitea/api_token"
+
+repository:
+  owner: your-username
+  name: my-project
+  default_branch: main
+
+agent_provider:
+  provider_type: openai-compatible
+  model: meta-llama/Llama-3.1-8B-Instruct  # Your model name
+  base_url: http://localhost:8000/v1  # vLLM endpoint
+  api_key: "@keyring:vllm/api_key"  # Optional, if your endpoint requires auth
+  local_mode: true
+
+workflow:
+  plans_directory: plans
+  state_directory: .automation/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 1
+
+tags:
+  needs_planning: needs-planning
+  proposed: proposed
+  approved: approved
+  task: task
+  execute: execute
+  needs_review: needs-review
+  needs_fix: needs-fix
+  requires_qa: requires-qa
+  qa_passed: qa-passed
+  qa_failed: qa-failed
+  completed: completed
 ```
 
 ### Environment Variable Overrides
@@ -738,6 +878,17 @@ AUTOMATION__REPOSITORY__NAME=my-project
 AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE=ollama
 AUTOMATION__AGENT_PROVIDER__BASE_URL=http://localhost:11434
 AUTOMATION__AGENT_PROVIDER__MODEL=qwen3:latest
+```
+
+**vLLM:**
+```bash
+AUTOMATION__GIT_PROVIDER__BASE_URL=https://gitea.example.com
+AUTOMATION__GIT_PROVIDER__API_TOKEN=your-token
+AUTOMATION__REPOSITORY__OWNER=your-username
+AUTOMATION__REPOSITORY__NAME=my-project
+AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE=openai-compatible
+AUTOMATION__AGENT_PROVIDER__BASE_URL=http://localhost:8000/v1
+AUTOMATION__AGENT_PROVIDER__MODEL=meta-llama/Llama-3.1-8B-Instruct
 ```
 
 ---
@@ -893,7 +1044,7 @@ The `automation-daemon.yaml` workflow polls for pending work every 5 minutes. En
 ### Monitor and Manage
 
 ```bash
-# List all active plans
+# List all plans
 sapiens list-plans
 
 # Check system health
@@ -904,6 +1055,9 @@ sapiens process-all
 
 # View specific plan status
 sapiens show-plan --plan-id 1
+
+# Run standalone ReAct agent
+sapiens react --prompt "Analyze the codebase structure"
 ```
 
 ### Customize Workflow Behavior
@@ -929,7 +1083,7 @@ sapiens process-issue --issue 42
 # Process all pending issues
 sapiens process-all
 
-# List active plans
+# List plans
 sapiens list-plans
 
 # Show plan details
@@ -940,6 +1094,9 @@ sapiens health-check
 
 # Run as daemon
 sapiens daemon --interval 60
+
+# Run standalone ReAct agent
+sapiens react --prompt "Your prompt here"
 ```
 
 ### Required Gitea Secrets
@@ -957,12 +1114,9 @@ sapiens daemon --interval 60
 |--------|---------|
 | `BUILDER_CLAUDE_API_KEY` | Claude AI API access |
 
-**Ollama:**
+**Ollama / vLLM:**
 
-| Secret | Purpose |
-|--------|---------|
-| `BUILDER_OLLAMA_BASE_URL` | Ollama API endpoint |
-| `BUILDER_OLLAMA_MODEL` | Model to use (e.g., `qwen3:latest`) |
+No additional secrets required. Configuration (base URL, model) is stored in `repo_sapiens/config/automation_config.yaml`.
 
 ### Label Flow
 
@@ -984,7 +1138,7 @@ flowchart TD
     M -->|Pass| N[qa-passed]
     M -->|Fail| O[qa-failed]
     O -->|Fixed| L
-    N --> P[Ready to merge!]
+    N --> P[completed]
 
     style C fill:#0052CC,color:#fff
     style D fill:#36B37E,color:#fff
@@ -995,7 +1149,7 @@ flowchart TD
     style L fill:#00B8D9,color:#fff
     style N fill:#36B37E,color:#fff
     style O fill:#FF5630,color:#fff
-    style P fill:#00875A,color:#fff
+    style P fill:#6B778C,color:#fff
 ```
 
 ---

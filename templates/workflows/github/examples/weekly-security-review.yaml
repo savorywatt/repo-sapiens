@@ -1,0 +1,400 @@
+# Weekly Security Review for GitHub Actions
+#
+# Runs comprehensive security scans, generates a report, and automatically
+# fixes identified vulnerabilities where safe to do so.
+#
+# Setup:
+# 1. Copy to .github/workflows/weekly-security-review.yaml
+# 2. Set required secrets:
+#    - ANTHROPIC_API_KEY: Claude API key
+# 3. Adjust schedule and scan tools as needed
+
+name: Weekly Security Review
+
+on:
+  schedule:
+    # Every Friday at 2pm UTC (before weekend, gives time to review)
+    - cron: '0 14 * * 5'
+  workflow_dispatch:
+    inputs:
+      auto_fix:
+        description: 'Automatically fix vulnerabilities'
+        required: false
+        default: 'true'
+      severity_threshold:
+        description: 'Minimum severity to report (low, medium, high, critical)'
+        required: false
+        default: 'medium'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  security-events: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install security tools
+        run: |
+          pip install repo-sapiens bandit safety pip-audit semgrep
+
+      - name: Initialize security report
+        run: |
+          echo "# Security Review Report" > security-report.md
+          echo "Generated: $(date -u '+%Y-%m-%d %H:%M UTC')" >> security-report.md
+          echo "Repository: ${{ github.repository }}" >> security-report.md
+          echo "" >> security-report.md
+
+      - name: Run Bandit (Python security linter)
+        continue-on-error: true
+        run: |
+          echo "## Python Security (Bandit)" >> security-report.md
+          echo '```' >> security-report.md
+
+          if ls *.py &>/dev/null || [ -d "src" ] || [ -d "lib" ]; then
+            bandit -r . -f json -o bandit-results.json --exclude .venv,venv,node_modules,dist,build 2>/dev/null || true
+
+            if [ -f bandit-results.json ]; then
+              python -c "
+          import json
+          try:
+              data = json.load(open('bandit-results.json'))
+              results = data.get('results', [])
+              if results:
+                  for r in results[:20]:
+                      sev = r.get('issue_severity', 'UNKNOWN')
+                      conf = r.get('issue_confidence', 'UNKNOWN')
+                      text = r.get('issue_text', 'No description')
+                      fname = r.get('filename', 'unknown')
+                      line = r.get('line_number', 0)
+                      print(f'[{sev}/{conf}] {fname}:{line}')
+                      print(f'  {text}')
+                      print()
+                  if len(results) > 20:
+                      print(f'... and {len(results) - 20} more issues')
+              else:
+                  print('No issues found!')
+          except Exception as e:
+              print(f'Error parsing results: {e}')
+          "
+            else
+              echo "No Bandit results generated"
+            fi
+          else
+            echo "No Python files found"
+          fi
+
+          echo '```' >> security-report.md
+          echo "" >> security-report.md
+
+      - name: Run pip-audit (dependency vulnerabilities)
+        continue-on-error: true
+        run: |
+          echo "## Dependency Vulnerabilities (pip-audit)" >> security-report.md
+          echo '```' >> security-report.md
+
+          if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
+            pip-audit --format=json --output=pip-audit-results.json 2>/dev/null || true
+
+            if [ -f pip-audit-results.json ] && [ -s pip-audit-results.json ]; then
+              python -c "
+          import json
+          try:
+              data = json.load(open('pip-audit-results.json'))
+              if data:
+                  for vuln in data[:15]:
+                      name = vuln.get('name', 'unknown')
+                      version = vuln.get('version', '?')
+                      vuln_id = vuln.get('id', 'N/A')
+                      fix = vuln.get('fix_versions', ['N/A'])
+                      fix_ver = fix[0] if fix else 'N/A'
+                      print(f'{name}=={version}: {vuln_id}')
+                      print(f'  Fix available: {fix_ver}')
+                      print()
+                  if len(data) > 15:
+                      print(f'... and {len(data) - 15} more vulnerabilities')
+              else:
+                  print('No vulnerabilities found!')
+          except Exception as e:
+              print(f'Error: {e}')
+          "
+            else
+              echo "No vulnerabilities found or audit skipped"
+            fi
+          else
+            echo "No Python dependency files found"
+          fi
+
+          echo '```' >> security-report.md
+          echo "" >> security-report.md
+
+      - name: Run Semgrep (multi-language SAST)
+        continue-on-error: true
+        run: |
+          echo "## Static Analysis (Semgrep)" >> security-report.md
+          echo '```' >> security-report.md
+
+          semgrep scan --config=auto --json --output=semgrep-results.json \
+            --exclude=node_modules --exclude=.venv --exclude=venv \
+            --exclude=dist --exclude=build --exclude='*.min.js' \
+            2>/dev/null || true
+
+          if [ -f semgrep-results.json ]; then
+            python -c "
+          import json
+          try:
+              data = json.load(open('semgrep-results.json'))
+              results = data.get('results', [])
+              if results:
+                  for r in results[:15]:
+                      rule = r.get('check_id', 'unknown')
+                      path = r.get('path', 'unknown')
+                      line = r.get('start', {}).get('line', 0)
+                      msg = r.get('extra', {}).get('message', 'No message')[:100]
+                      sev = r.get('extra', {}).get('severity', 'INFO')
+                      print(f'[{sev}] {rule}')
+                      print(f'  {path}:{line}')
+                      print(f'  {msg}')
+                      print()
+                  if len(results) > 15:
+                      print(f'... and {len(results) - 15} more findings')
+              else:
+                  print('No issues found!')
+          except Exception as e:
+              print(f'Error: {e}')
+          "
+          else
+            echo "Semgrep scan completed (no results file)"
+          fi
+
+          echo '```' >> security-report.md
+          echo "" >> security-report.md
+
+      - name: Check for secrets in code
+        continue-on-error: true
+        run: |
+          echo "## Secrets Detection" >> security-report.md
+          echo '```' >> security-report.md
+
+          # Simple pattern-based secret detection
+          python -c "
+          import os
+          import re
+
+          patterns = [
+              (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*['\"]?[a-zA-Z0-9_-]{20,}', 'API Key'),
+              (r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*['\"]?[^\s'\",]{8,}', 'Secret/Password'),
+              (r'(?i)bearer\s+[a-zA-Z0-9_-]{20,}', 'Bearer Token'),
+              (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
+              (r'sk-[a-zA-Z0-9]{48}', 'OpenAI Key'),
+              (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
+          ]
+
+          findings = []
+          skip_dirs = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'dist', 'build'}
+          skip_ext = {'.pyc', '.so', '.dll', '.exe', '.bin', '.png', '.jpg', '.gif', '.ico'}
+
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d not in skip_dirs]
+              for fname in files:
+                  if any(fname.endswith(ext) for ext in skip_ext):
+                      continue
+                  fpath = os.path.join(root, fname)
+                  try:
+                      with open(fpath, 'r', errors='ignore') as f:
+                          content = f.read()
+                          for pattern, desc in patterns:
+                              if re.search(pattern, content):
+                                  findings.append((fpath, desc))
+                                  break
+                  except:
+                      pass
+
+          if findings:
+              print('Potential secrets found:')
+              for path, desc in findings[:10]:
+                  print(f'  [{desc}] {path}')
+              if len(findings) > 10:
+                  print(f'  ... and {len(findings) - 10} more')
+          else:
+              print('No hardcoded secrets detected')
+          "
+
+          echo '```' >> security-report.md
+          echo "" >> security-report.md
+
+      - name: Generate summary
+        run: |
+          echo "## Summary" >> security-report.md
+          echo "" >> security-report.md
+
+          # Count issues from each tool
+          BANDIT_COUNT=0
+          AUDIT_COUNT=0
+          SEMGREP_COUNT=0
+
+          if [ -f bandit-results.json ]; then
+            BANDIT_COUNT=$(python -c "import json; d=json.load(open('bandit-results.json')); print(len(d.get('results', [])))" 2>/dev/null || echo 0)
+          fi
+
+          if [ -f pip-audit-results.json ] && [ -s pip-audit-results.json ]; then
+            AUDIT_COUNT=$(python -c "import json; print(len(json.load(open('pip-audit-results.json'))))" 2>/dev/null || echo 0)
+          fi
+
+          if [ -f semgrep-results.json ]; then
+            SEMGREP_COUNT=$(python -c "import json; d=json.load(open('semgrep-results.json')); print(len(d.get('results', [])))" 2>/dev/null || echo 0)
+          fi
+
+          echo "| Scanner | Issues Found |" >> security-report.md
+          echo "|---------|--------------|" >> security-report.md
+          echo "| Bandit (Python) | $BANDIT_COUNT |" >> security-report.md
+          echo "| pip-audit (Dependencies) | $AUDIT_COUNT |" >> security-report.md
+          echo "| Semgrep (SAST) | $SEMGREP_COUNT |" >> security-report.md
+
+          TOTAL=$((BANDIT_COUNT + AUDIT_COUNT + SEMGREP_COUNT))
+          echo "" >> security-report.md
+          echo "**Total issues: $TOTAL**" >> security-report.md
+
+          echo "TOTAL_ISSUES=$TOTAL" >> $GITHUB_ENV
+
+      - name: Create fix branch
+        if: env.TOTAL_ISSUES != '0'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="auto/security-fixes-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Auto-fix security issues
+        if: env.TOTAL_ISSUES != '0' && (github.event.inputs.auto_fix != 'false')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          sapiens react "Review the security report and fix identified vulnerabilities.
+
+          $(cat security-report.md)
+
+          Raw scan results are available in:
+          - bandit-results.json (Python security issues)
+          - pip-audit-results.json (dependency vulnerabilities)
+          - semgrep-results.json (static analysis findings)
+
+          Tasks:
+          1. Review each security finding in the report
+          2. For dependency vulnerabilities:
+             - Update vulnerable packages to fixed versions in pyproject.toml or requirements.txt
+             - Only update to versions that fix the vulnerability
+          3. For code vulnerabilities (Bandit/Semgrep):
+             - Fix SQL injection by using parameterized queries
+             - Fix command injection by using subprocess with lists
+             - Fix path traversal by validating/sanitizing paths
+             - Fix hardcoded secrets by using environment variables
+             - Fix insecure deserialization by using safe alternatives
+          4. Run tests after fixes: python -m pytest tests/ -x (if tests exist)
+          5. Skip fixes that:
+             - Are false positives (explain why in commit message)
+             - Would require significant refactoring
+             - Are in third-party or generated code
+
+          Guidelines:
+          - Be conservative - only fix clear vulnerabilities
+          - Don't break functionality to fix security issues
+          - Add comments explaining security fixes where helpful
+          - Group related fixes in logical commits
+
+          Commit format: 'security: Fix [vulnerability type] in [file/module]'"
+
+      - name: Create Pull Request
+        if: env.TOTAL_ISSUES != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No security fixes made - creating issue with report instead"
+
+            gh issue create \
+              --title "Weekly Security Review - $(date +%Y-%m-%d)" \
+              --body "$(cat << 'ISSUE_EOF'
+          ## Weekly Security Review
+
+          Security scan completed but no automatic fixes were applied.
+
+          $(cat security-report.md)
+
+          ### Next Steps
+          - Review findings manually
+          - Address false positives by adding tool-specific ignore comments
+          - Update dependencies where safe to do so
+
+          ---
+          Generated by repo-sapiens weekly security review workflow.
+          ISSUE_EOF
+          )" \
+              --label "security" || echo "Issue creation failed"
+
+            exit 0
+          fi
+
+          git commit -m "security: Weekly security fixes
+
+          Automated fixes for vulnerabilities identified by:
+          - Bandit (Python security linter)
+          - pip-audit (dependency vulnerabilities)
+          - Semgrep (static analysis)
+
+          See PR description for full security report." || true
+
+          git push -u origin "$BRANCH" || true
+
+          gh pr create \
+            --title "security: Weekly security fixes ($(date +%Y-%m-%d))" \
+            --body "$(cat << 'PR_EOF'
+          ## Security Review Report
+
+          $(cat security-report.md)
+
+          ## Changes Made
+          This PR contains automated fixes for the security issues identified above.
+
+          ### Review Checklist
+          - [ ] Verify fixes don't break functionality
+          - [ ] Check for false positives
+          - [ ] Run full test suite
+          - [ ] Review any skipped issues
+
+          ---
+          Generated by repo-sapiens weekly security review workflow.
+          PR_EOF
+          )" \
+            --base main \
+            --head "$BRANCH" || echo "PR creation failed or already exists"
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: |
+            security-report.md
+            bandit-results.json
+            pip-audit-results.json
+            semgrep-results.json
+          retention-days: 30
+
+      - name: Add to job summary
+        run: |
+          cat security-report.md >> $GITHUB_STEP_SUMMARY

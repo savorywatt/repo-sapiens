@@ -71,23 +71,46 @@ The easiest way to install repo-sapiens is from PyPI:
 pip install repo-sapiens
 
 # Verify installation
-repo-sapiens --version
+sapiens --help
 ```
 
 ### Installing from Source
 
 For development or to use the latest features:
 
+**Option A: Using uv (Recommended)**
+
 ```bash
 # Clone the repository
 git clone https://github.com/savorywatt/repo-sapiens.git
 cd repo-sapiens
 
+# Install uv if needed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
+
+# Verify installation
+uv run sapiens --help
+```
+
+**Option B: Using pip**
+
+```bash
+# Clone the repository
+git clone https://github.com/savorywatt/repo-sapiens.git
+cd repo-sapiens
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
 # Install in development mode
 pip install -e .
 
 # Verify installation
-sapiens --version
+sapiens --help
 ```
 
 ### Optional Dependencies
@@ -117,7 +140,7 @@ sapiens --help
 # Expected output:
 # Usage: sapiens [OPTIONS] COMMAND [ARGS]...
 #
-#   Gitea automation system CLI.
+#   repo-sapiens: Intelligent repository automation CLI.
 #
 # Options:
 #   --config TEXT     Path to configuration file
@@ -125,13 +148,15 @@ sapiens --help
 #   --help            Show this message and exit.
 #
 # Commands:
-#   credentials      Manage credentials
-#   daemon          Run in daemon mode, polling for new issues
-#   list-plans      List all active plans
-#   process-issue   Process a single issue manually
-#   process-all     Process all issues with optional tag filter
-#   process-plan    Process entire plan end-to-end
-#   show-plan       Show detailed plan status
+#   credentials      Manage credentials for the automation system
+#   daemon           Run in daemon mode, polling for new issues
+#   init             Initialize repo-sapiens in your Git repository
+#   list-plans       List all active plans
+#   process-all      Process all issues with optional tag filter
+#   process-issue    Process a single issue manually
+#   process-plan     Process entire plan end-to-end
+#   react            Run a task using the ReAct agent
+#   show-plan        Show detailed plan status
 ```
 
 ---
@@ -140,16 +165,34 @@ sapiens --help
 
 This section gets you from zero to running your first automation in 5 minutes.
 
-### Step 1: Create a Configuration File
+### Step 1: Initialize Your Repository (Recommended)
 
-Copy the default configuration template:
+The easiest way to set up repo-sapiens is with the interactive init command:
 
 ```bash
-# From the source directory
-cp repo_sapiens/config/automation_config.yaml ./my_config.yaml
+# Navigate to your Git repository
+cd /path/to/your/repo
 
-# Or create a new one with this basic template:
-cat > my_config.yaml << 'EOF'
+# Run interactive setup
+sapiens init
+
+# The wizard will:
+# 1. Detect your Git remote (Gitea/GitHub)
+# 2. Prompt for credentials
+# 3. Let you choose an AI agent (Claude, Goose, or local Ollama)
+# 4. Generate a configuration file
+# 5. Optionally set up Gitea Actions secrets
+```
+
+See [INIT_COMMAND_GUIDE.md](./INIT_COMMAND_GUIDE.md) for detailed options.
+
+### Alternative: Manual Configuration
+
+If you prefer manual setup, create a configuration file:
+
+```bash
+# Create a new configuration file:
+cat > sapiens_config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
   base_url: https://your-gitea-instance.com
@@ -162,7 +205,7 @@ repository:
 
 agent_provider:
   provider_type: claude-api
-  model: claude-opus-4-5
+  model: claude-sonnet-4-20250514
   api_key: "${CLAUDE_API_KEY}"
 
 workflow:
@@ -320,7 +363,7 @@ repository:
 # Supports: claude-api, claude-local, openai, ollama
 agent_provider:
   provider_type: claude-api
-  model: claude-opus-4-5
+  model: claude-sonnet-4-20250514
   api_key: "${CLAUDE_API_KEY}"  # Optional: required for API providers
   local_mode: false  # Set to true to use local Claude Code CLI
   base_url: null  # Optional: for Ollama or custom endpoints
@@ -630,37 +673,33 @@ sudo systemctl start sapiens
 sudo systemctl status sapiens
 ```
 
-### Workflow 3: Webhook Integration
+### Workflow 3: Using the ReAct Agent
 
-Real-time event processing when issues are created or updated:
+Run local AI-powered tasks without external API costs using the built-in ReAct agent:
 
 ```bash
-# Start the webhook server (optional, for real-time processing)
-sapiens webhook-server --host 0.0.0.0 --port 8000
+# Start Ollama (if not already running)
+ollama serve &
+ollama pull qwen3:latest
 
-# Output:
-# Uvicorn running on http://0.0.0.0:8000
-# Webhook endpoint: POST /webhook/gitea
+# Run a single task
+sapiens react "Create a Python function that calculates fibonacci numbers"
+
+# Start interactive REPL mode
+sapiens react --repl
+
+# Use with verbose output to see reasoning
+sapiens react -v "List all Python files and summarize their purpose"
 ```
 
-**Configure Webhook in Gitea**:
+**ReAct Agent Features**:
 
-1. Go to Repository Settings → Webhooks
-2. Add Webhook:
-   - **URL**: `https://your-server.com:8000/webhook/gitea`
-   - **Content Type**: `application/json`
-   - **Events**: Issues, Pushes
-   - **Active**: Yes
+- **Local inference**: Uses Ollama or vLLM for free, private execution
+- **Built-in tools**: File operations, shell commands, code search
+- **Transparent reasoning**: See step-by-step thinking with `-v` flag
+- **Interactive mode**: Explore tasks in REPL mode
 
-**Webhook Server Configuration**:
-
-```yaml
-# In my_config.yaml
-webhook:
-  host: 0.0.0.0
-  port: 8000
-  secret: "${WEBHOOK_SECRET}"  # Optional: validates webhook signature
-```
+See [AGENT_COMPARISON.md](./AGENT_COMPARISON.md) for more agent options.
 
 ---
 
@@ -704,23 +743,20 @@ sapiens --config my_config.yaml \
 # ✅ Issue #42 processed successfully
 ```
 
-### Task 3: Check System Health
+### Task 3: Test Credentials
 
-Verify all connections and dependencies are working:
+Verify your credentials are properly configured:
 
 ```bash
-sapiens health-check
+sapiens credentials test
 
 # Output:
-# 🏥 System Health Check
+# Testing credential backends...
+# ✅ Keyring: Available
+# ✅ Environment: Available
+# ✅ Encrypted: Available
 #
-# Git Provider:     ✅ Connected
-# Agent Provider:   ✅ Connected
-# State Directory:  ✅ Accessible
-# Credentials:      ✅ Valid
-# Network:          ✅ Online
-#
-# Status: All systems operational
+# All credential systems operational
 ```
 
 ### Task 4: View Detailed Plan Status
@@ -934,12 +970,11 @@ tail -f sapiens.log | jq 'select(.module=="orchestrator")'
 
 When you need assistance:
 
-1. **Check the FAQ** - See docs/FAQ.md for common questions
-2. **Review logs** - Enable debug logging and check error messages
-3. **Test credentials** - Run `sapiens credentials test`
-4. **Test health** - Run `sapiens health-check`
-5. **Open an issue** - https://github.com/savorywatt/repo-sapiens/issues
-6. **Check documentation** - https://github.com/savorywatt/repo-sapiens#readme
+1. **Review logs** - Enable debug logging and check error messages
+2. **Test credentials** - Run `sapiens credentials test`
+3. **Check configuration** - Verify your config file syntax with `sapiens --config my_config.yaml list-plans`
+4. **Open an issue** - https://github.com/savorywatt/repo-sapiens/issues
+5. **Check documentation** - https://github.com/savorywatt/repo-sapiens#readme
 
 ---
 
@@ -955,7 +990,7 @@ Once you're comfortable with the basics, explore:
 - **Cost Optimization**: Fine-tune AI model selection for cost/quality tradeoff
 - **Monitoring**: Enable Prometheus metrics for production deployments
 
-See: [Advanced Configuration Guide](advanced-config.md)
+See: [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details.
 
 ### CI/CD Integration
 
@@ -966,7 +1001,21 @@ Set up automated workflows:
 - **GitLab CI**: Schedule automation jobs
 - **Jenkins**: Integrate with Jenkins pipelines
 
-See: [CI/CD Integration Guide](ci-cd-usage.md)
+**Multi-Environment Setup**: Use different agents for local vs CI/CD:
+
+```bash
+# Create local config (free, private with Ollama)
+sapiens init --config-path sapiens_config.yaml
+# Choose: Ollama
+
+# Create CI/CD config (better quality with Goose/Claude)
+sapiens init --config-path sapiens_config.ci.yaml
+# Choose: Goose → OpenAI
+```
+
+Then in your workflow: `sapiens --config sapiens_config.ci.yaml process-all`
+
+See: [ci-cd-usage.md](./ci-cd-usage.md) for complete CI/CD setup
 
 ### Template Customization
 
@@ -977,7 +1026,7 @@ Customize how plans and prompts are generated:
 - **Custom Stages**: Add custom workflow stages
 - **Custom Tags**: Define custom issue labels and their meaning
 
-See: [Template Customization Guide](template-customization.md)
+See: The `repo_sapiens/templates/` directory for Jinja2 templates.
 
 ### Monitoring and Observability
 
@@ -988,7 +1037,7 @@ Monitor production deployments:
 - **Alerting**: Set up alerts for failures
 - **Dashboards**: Create dashboards from metrics
 
-See: [Monitoring Guide](monitoring.md)
+See: Install with `pip install repo-sapiens[monitoring]` for Prometheus support.
 
 ### Production Deployment
 
@@ -1000,7 +1049,7 @@ Deploy to production safely:
 - **High Availability**: Multi-instance setup with shared state
 - **Backup & Recovery**: State backup and disaster recovery
 
-See: [Production Deployment Guide](deployment.md)
+See: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
 ### API Reference
 
@@ -1011,7 +1060,7 @@ Integrate with other systems:
 - **Python SDK**: Use repo-sapiens as a library
 - **Plugin System**: Extend functionality with plugins
 
-See: [API Reference](api-reference.md)
+See: [ARCHITECTURE.md](./ARCHITECTURE.md) for module structure.
 
 ---
 
@@ -1029,22 +1078,26 @@ See: [API Reference](api-reference.md)
 # Installation
 pip install repo-sapiens
 
+# Setup
+sapiens init                                 # Interactive setup wizard
+sapiens init --non-interactive               # CI/CD setup (uses env vars)
+
 # Basic commands
-sapiens --help                                # Show all commands
-sapiens list-plans                            # List active plans
+sapiens --help                               # Show all commands
+sapiens list-plans                           # List active plans
 sapiens show-plan --plan-id 42               # View plan status
 sapiens process-issue --issue 42             # Process one issue
 sapiens process-all                          # Process all issues
 sapiens daemon --interval 60                 # Run continuous automation
-sapiens health-check                         # Check system health
 
-# ReAct agent (local execution with Ollama, default model: qwen3:latest)
+# ReAct agent (local execution with Ollama)
 sapiens react --repl                         # Interactive REPL mode
 sapiens react "task description"             # Run single task
-sapiens react --repl --model qwen3:latest    # Use specific model
+sapiens react -v "task"                      # Verbose mode (show reasoning)
+sapiens react --backend openai --base-url http://localhost:8000/v1 "task"  # Use vLLM
 
 # Credentials management
-sapiens credentials test                     # Verify credentials work
+sapiens credentials test                     # Test credential backends
 sapiens credentials set gitea/api_token      # Store a credential
 sapiens credentials get gitea/api_token      # Retrieve a credential
 
@@ -1060,8 +1113,7 @@ Having trouble? Here's how to get help:
 1. **Check the docs** - Most questions are answered in the documentation
 2. **Review logs** - Enable debug logging to see what's happening
 3. **Test credentials** - Run `sapiens credentials test`
-4. **Health check** - Run `sapiens health-check`
-5. **Open an issue** - Include logs and your configuration (without secrets!)
+4. **Open an issue** - Include logs and your configuration (without secrets!)
 
 ---
 

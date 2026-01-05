@@ -2,6 +2,84 @@
 
 This guide explains how to use repo-sapiens in CI/CD environments.
 
+## Multi-Environment Configuration
+
+A common pattern is using different AI agents for local development vs CI/CD:
+- **Local**: Use Ollama for free, private execution
+- **CI/CD**: Use Goose or Claude for better quality
+
+### Setup: Two Configuration Files
+
+Create separate configs for each environment:
+
+```bash
+# Create local config (uses Ollama)
+sapiens init --config-path sapiens_config.yaml
+# Choose: Ollama → qwen3:latest
+
+# Create CI/CD config (uses Goose with OpenAI)
+sapiens init --config-path sapiens_config.ci.yaml
+# Choose: Goose → OpenAI → gpt-4o
+```
+
+**Local config (`sapiens_config.yaml`):**
+```yaml
+agent_provider:
+  provider_type: ollama
+  model: qwen3:latest
+  base_url: http://localhost:11434
+```
+
+**CI/CD config (`sapiens_config.ci.yaml`):**
+```yaml
+agent_provider:
+  provider_type: goose-local
+  model: gpt-4o
+  api_key: "${OPENAI_API_KEY}"
+  goose_config:
+    llm_provider: openai
+```
+
+### Using the CI Config in Workflows
+
+Copy the workflow templates to your repository:
+
+```bash
+# For Gitea
+mkdir -p .gitea/workflows
+cp templates/workflows/gitea/*.yaml .gitea/workflows/
+
+# For GitHub
+mkdir -p .github/workflows
+cp templates/workflows/github/*.yaml .github/workflows/
+```
+
+Then edit the workflow to use your CI config:
+
+```yaml
+# In .gitea/workflows/automation-daemon.yaml (or .github/workflows/)
+env:
+  CONFIG_FILE: sapiens_config.ci.yaml  # Use CI config with Goose/Claude
+```
+
+See [templates/workflows/README.md](../templates/workflows/README.md) for full documentation.
+
+### Alternative: Environment Variable Override
+
+Use a single config file and override the agent in CI/CD:
+
+```yaml
+# In workflow
+env:
+  AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: goose-local
+  AUTOMATION__AGENT_PROVIDER__MODEL: gpt-4o
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+This overrides values from the config file using pydantic-settings.
+
+---
+
 ## Overview
 
 The automation system provides several workflows that run automatically in response to repository events:
@@ -140,16 +218,17 @@ curl -X POST "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/work
 
 **How It Works:**
 
-1. Generates health report with `sapiens health-check`
-2. Checks for failures in last 24 hours with `sapiens check-failures`
-3. Uploads reports as artifacts
+1. Lists all plans with `sapiens list-plans`
+2. Shows detailed status for active plans with `sapiens show-plan`
+3. Tests credential availability with `sapiens credentials test`
+4. Uploads reports as artifacts
 
 **Viewing Reports:**
 
 1. Go to Actions tab
 2. Find completed "Sapiens Monitor" run
-3. Download "health-report" artifact
-4. View `health-report.md`
+3. Download artifacts
+4. Review plan status
 
 ## Test Workflow
 
@@ -261,86 +340,6 @@ Tasks (3):
   ✅ task-1: completed
   🔄 task-2: in_progress
   ⏳ task-3: pending
-```
-
-### check-stale
-
-Check for stale workflows that haven't been updated recently.
-
-```bash
-sapiens check-stale --max-age-hours 24
-```
-
-**Options:**
-- `--max-age-hours`: Maximum age before considering stale (default: 24)
-
-**Exit Codes:**
-- 0: No stale workflows found
-- 1: Stale workflows detected
-
-**Usage in Workflows:**
-```yaml
-- name: Check for stale workflows
-  run: sapiens check-stale --max-age-hours 24
-```
-
-### health-check
-
-Generate health check report.
-
-```bash
-sapiens health-check
-```
-
-**Output:**
-```markdown
-# Automation System Health Report
-Generated: 2025-12-20T10:30:00+00:00
-
-## Summary
-- Total Plans: 5
-- Active Plans: 2
-- Completed Plans: 2
-- Failed Plans: 1
-- Pending Plans: 0
-
-## Configuration
-- State Directory: .automation/state
-- Git Provider: gitea
-- Agent Provider: claude
-
-## Provider Status
-- Git Provider: Configuration loaded ✓
-- Agent Provider: Configuration loaded ✓
-- State Manager: Operational ✓
-
-## Failed Plans
-- plan-99 (updated: 2025-12-19T08:00:00+00:00)
-
-## Active Plans
-- plan-42: in_progress (updated: 2025-12-20T10:00:00+00:00)
-- plan-43: pending (updated: 2025-12-20T09:15:00+00:00)
-```
-
-### check-failures
-
-Check for workflow failures in a time period.
-
-```bash
-sapiens check-failures --since-hours 24
-```
-
-**Options:**
-- `--since-hours`: Check failures since N hours (default: 24)
-
-**Exit Codes:**
-- 0: No failures found
-- 1: Failures detected
-
-**Usage in Workflows:**
-```yaml
-- name: Check for failures
-  run: sapiens check-failures --since-hours 24
 ```
 
 ### daemon
@@ -493,12 +492,16 @@ ls -la .automation/state/
 cat .automation/state/42.json | jq .
 ```
 
-### Health Check
+### Verify Setup
 
-Run health check locally:
+Test your configuration locally:
 
 ```bash
-sapiens health-check
+# Test credentials
+sapiens credentials test
+
+# List plans to verify config works
+sapiens --config sapiens_config.yaml list-plans
 ```
 
 ## Additional Resources
