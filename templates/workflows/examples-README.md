@@ -10,6 +10,7 @@ These example workflows demonstrate how to use repo-sapiens for automated, recur
 | `weekly-test-coverage.yaml` | Mondays 9am UTC | Analyzes coverage and writes tests for under-covered code |
 | `weekly-dependency-audit.yaml` | Wednesdays 10am UTC | Checks for outdated/vulnerable dependencies, creates update PRs |
 | `weekly-security-review.yaml` | Fridays 2pm UTC | Runs security scans (Bandit, Semgrep, pip-audit) and auto-fixes vulnerabilities |
+| `weekly-sbom-license.yaml` | Mondays 6am UTC | Generates SBOM, scans for CVEs, checks license compliance |
 | `daily-issue-triage.yaml` | Daily 8am UTC | Labels and categorizes new issues, adds initial assessments |
 
 ## Quick Setup
@@ -144,6 +145,20 @@ Runs comprehensive security scans and:
 - Secret detection for hardcoded credentials
 - Auto-fixes vulnerabilities where safe to do so
 - Creates a PR with fixes or an issue with the report
+
+### Weekly SBOM & License Compliance
+
+Generates Software Bill of Materials and checks compliance:
+- Creates SBOM in CycloneDX and SPDX formats using [Syft](https://github.com/anchore/syft)
+- Scans for vulnerabilities using [Grype](https://github.com/anchore/grype)
+- Analyzes licenses for copyleft/incompatible licenses
+- Creates issues for critical vulnerabilities or license conflicts
+- AI analyzes findings and prioritizes by actual risk
+- Commits SBOM to `.sbom/` directory for tracking
+
+Configure by setting:
+- `PROJECT_LICENSE`: Your project's license (e.g., "MIT", "Apache-2.0")
+- `DENY_LICENSES`: Comma-separated licenses to flag (e.g., "GPL-3.0,AGPL-3.0")
 
 ### Daily Issue Triage
 
