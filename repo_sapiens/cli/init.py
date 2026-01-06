@@ -1068,8 +1068,8 @@ tags:
         elif self.agent_type == "goose":
             test_cmd = f'goose session start --prompt "{test_prompt}"'
         elif self.agent_type == "builtin":
-            model_flag = f"--model {self.builtin_model}" if self.builtin_model else ""
-            test_cmd = f'sapiens react "{test_prompt}" {model_flag}'.strip()
+            # react command reads model from config, so no --model needed
+            test_cmd = f'sapiens --config {self.config_path} react "{test_prompt}"'
         else:
             return
 
@@ -1108,8 +1108,7 @@ tags:
         # Suggest REPL for further exploration
         click.echo()
         if self.agent_type == "builtin":
-            model_flag = f"--model {self.builtin_model}" if self.builtin_model else ""
-            repl_cmd = f"sapiens react --repl {model_flag}".strip()
+            repl_cmd = f"sapiens --config {self.config_path} react --repl"
         elif self.agent_type == "claude":
             repl_cmd = "claude"
         elif self.agent_type == "goose":

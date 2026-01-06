@@ -10,6 +10,7 @@ import pytest
 # The connection_pool module uses http2=True which requires h2
 try:
     import h2  # noqa: F401
+
     HAS_H2 = True
 except ImportError:
     HAS_H2 = False

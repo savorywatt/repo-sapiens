@@ -37,9 +37,22 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
     configure_logging(log_level)
 
     # Skip config loading for commands that don't need it
-    # (init creates the config, credentials manages credentials, react is standalone, update checks templates)
-    commands_without_config = ["init", "credentials", "react", "update"]
+    # (init creates the config, credentials manages credentials, update checks templates)
+    commands_without_config = ["init", "credentials", "update"]
     if ctx.invoked_subcommand in commands_without_config:
+        ctx.obj = {"settings": None}
+        return
+
+    # React can optionally use config but doesn't require it
+    if ctx.invoked_subcommand == "react":
+        config_path = Path(config)
+        if config_path.exists():
+            try:
+                settings = AutomationSettings.from_yaml(str(config_path))
+                ctx.obj = {"settings": settings}
+                return
+            except Exception:
+                pass  # Fall through to use defaults
         ctx.obj = {"settings": None}
         return
 
@@ -161,25 +174,29 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 
 @cli.command()
 @click.argument("task", required=False)
-@click.option("--model", default="qwen3:latest", help="Ollama model to use")
-@click.option("--ollama-url", default="http://localhost:11434", help="Ollama server URL")
+@click.option("--model", default=None, help="Model to use (default: from config or qwen3:8b)")
+@click.option("--ollama-url", default=None, help="Ollama server URL (default: from config)")
 @click.option("--max-iterations", default=10, type=int, help="Max ReAct iterations")
 @click.option("--working-dir", default=".", help="Working directory for file operations")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed trajectory")
 @click.option("--repl", is_flag=True, help="Start interactive REPL mode")
+@click.pass_context
 def react(
+    ctx: click.Context,
     task: str | None,
-    model: str,
-    ollama_url: str,
+    model: str | None,
+    ollama_url: str | None,
     max_iterations: int,
     working_dir: str,
     verbose: bool,
     repl: bool,
 ) -> None:
-    """Run a task using the ReAct agent with Ollama.
+    """Run a task using the ReAct agent with Ollama/vLLM.
 
     The ReAct agent reasons step-by-step and uses tools (read/write files,
     run commands) to complete the task.
+
+    Settings are read from the config file (--config). CLI options override config.
 
     Examples:
         sapiens react "Create a hello.py file that prints Hello World"
@@ -191,6 +208,22 @@ def react(
     if not task and not repl:
         click.echo("Error: Either provide a TASK or use --repl for interactive mode", err=True)
         sys.exit(1)
+
+    # Get settings from config (may be None if config doesn't exist)
+    settings = ctx.obj.get("settings") if ctx.obj else None
+
+    # Resolve model and URL from config or defaults
+    if model is None:
+        if settings and settings.agent_provider:
+            model = settings.agent_provider.model or "qwen3:8b"
+        else:
+            model = "qwen3:8b"
+
+    if ollama_url is None:
+        if settings and settings.agent_provider and settings.agent_provider.base_url:
+            ollama_url = settings.agent_provider.base_url
+        else:
+            ollama_url = "http://localhost:11434"
 
     async def execute_single_task(agent: ReActAgentProvider, task_text: str) -> bool:
         """Execute a single task and display results. Returns success status."""
