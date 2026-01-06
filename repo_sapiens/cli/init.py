@@ -1068,14 +1068,8 @@ tags:
         elif self.agent_type == "goose":
             test_cmd = f'goose session start --prompt "{test_prompt}"'
         elif self.agent_type == "builtin":
-            if self.builtin_provider in ("ollama", "vllm"):
-                model_flag = f"--model {self.builtin_model}" if self.builtin_model else ""
-                test_cmd = f"sapiens react --repl {model_flag}".strip()
-                test_prompt = f"(then type: {test_prompt})"
-            else:
-                # Cloud provider for builtin
-                test_cmd = "sapiens react --repl"
-                test_prompt = f"(then type: {test_prompt})"
+            model_flag = f"--model {self.builtin_model}" if self.builtin_model else ""
+            test_cmd = f'sapiens react "{test_prompt}" {model_flag}'.strip()
         else:
             return
 
@@ -1083,8 +1077,6 @@ tags:
         click.echo()
         click.echo(click.style("Command:", fg="yellow"))
         click.echo(f"  {test_cmd}")
-        if "(then type:" in test_prompt:
-            click.echo(f"  {test_prompt}")
         click.echo()
 
         if click.confirm("Run this test now?", default=False):
@@ -1093,31 +1085,18 @@ tags:
             click.echo()
 
             try:
-                # For builtin REPL, we can't really automate the input well
-                # So just launch it and let the user interact
-                if self.agent_type == "builtin":
-                    click.echo("Launching ReAct REPL. Type your query and press Enter.")
-                    click.echo("Type 'exit' or press Ctrl+C to quit.")
+                # Run the command directly (output streams to terminal)
+                result = subprocess.run(
+                    test_cmd,
+                    shell=True,
+                    cwd=self.repo_path,
+                    timeout=120,
+                )
+                if result.returncode == 0:
                     click.echo()
-                    subprocess.run(test_cmd, shell=True, cwd=self.repo_path)
+                    click.echo(click.style("✅ Test completed successfully!", fg="green"))
                 else:
-                    # For claude/goose, run the command directly
-                    result = subprocess.run(
-                        test_cmd,
-                        shell=True,
-                        cwd=self.repo_path,
-                        capture_output=True,
-                        text=True,
-                        timeout=120,
-                    )
-                    if result.returncode == 0:
-                        click.echo(result.stdout)
-                        click.echo()
-                        click.echo(click.style("✅ Test completed successfully!", fg="green"))
-                    else:
-                        click.echo(click.style("⚠ Test returned non-zero exit code", fg="yellow"))
-                        if result.stderr:
-                            click.echo(result.stderr)
+                    click.echo(click.style("⚠ Test returned non-zero exit code", fg="yellow"))
             except subprocess.TimeoutExpired:
                 click.echo(click.style("⚠ Test timed out after 120 seconds", fg="yellow"))
             except Exception as e:
@@ -1125,3 +1104,19 @@ tags:
         else:
             click.echo()
             click.echo("You can run this test later with the command above.")
+
+        # Suggest REPL for further exploration
+        click.echo()
+        if self.agent_type == "builtin":
+            model_flag = f"--model {self.builtin_model}" if self.builtin_model else ""
+            repl_cmd = f"sapiens react --repl {model_flag}".strip()
+        elif self.agent_type == "claude":
+            repl_cmd = "claude"
+        elif self.agent_type == "goose":
+            repl_cmd = "goose session start"
+        else:
+            repl_cmd = None
+
+        if repl_cmd:
+            click.echo(click.style("💡 Try the interactive REPL:", fg="cyan"))
+            click.echo(f"  {repl_cmd}")

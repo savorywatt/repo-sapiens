@@ -6,6 +6,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+# Skip all tests in this module if h2 is not installed
+# The connection_pool module uses http2=True which requires h2
+try:
+    import h2  # noqa: F401
+    HAS_H2 = True
+except ImportError:
+    HAS_H2 = False
+
+pytestmark = pytest.mark.skipif(not HAS_H2, reason="h2 package required for http2 support")
+
 from repo_sapiens.utils.connection_pool import (
     ConnectionPoolManager,
     HTTPConnectionPool,
