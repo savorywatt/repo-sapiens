@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.1] - 2026-01-05
 
 ### Added
+- **`sapiens run` Command**: New universal command that dispatches to configured agent
+  - Reads `agent_provider.provider_type` from config and dispatches appropriately
+  - `claude-local`: Runs `claude -p "task"` via Claude CLI
+  - `goose-local`: Runs `goose session start --prompt "task"` via Goose CLI
+  - `ollama`/`openai-compatible`: Uses builtin ReAct agent with local model
+  - `openai`/`anthropic`: Uses builtin ReAct agent with cloud API
+  - Supports stdin for long prompts: `cat task.txt | sapiens run`
+  - Options: `--timeout`, `--working-dir`, `--verbose`
+- **Reusable Composite Actions**: Deployed during `sapiens init`
+  - `.github/actions/sapiens-task/action.yaml` for GitHub Actions
+  - `.gitea/actions/sapiens-task/action.yaml` for Gitea Actions
+  - Direct secret handling (anthropic-api-key, openai-api-key, gitea-token)
+  - Use in workflows: `uses: ./.github/actions/sapiens-task`
 - **Builtin ReAct Agent**: New "builtin" option in `sapiens init` with full LLM provider selection
   - Supports Ollama, vLLM, OpenAI, Anthropic, OpenRouter, and Groq
   - Shows provider comparison table and recommendations
@@ -28,9 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Simple usage: `sapiens react "task"` or `sapiens react --repl`
 
 ### Changed
+- **Init Command**: Now deploys reusable composite action by default
+  - `--deploy-actions/--no-deploy-actions` flag controls action deployment
+  - Action enables simplified workflow: `uses: ./.github/actions/sapiens-task`
 - **Keyring Namespace**: Migrated from `builder/` to `sapiens/` prefix
   - Credentials now stored under `sapiens/gitea/api_token`, `sapiens/claude/api_key`, etc.
-
 - **Config Location**: Default config path changed from `repo_sapiens/config/automation_config.yaml` to `.sapiens/config.yaml`
 - **State Directory**: Changed from `.automation/state` to `.sapiens/state`
 - **Encrypted Credentials**: File path changed from `.builder/credentials.enc` to `.sapiens/credentials.enc`

@@ -1338,11 +1338,7 @@ class TestPlanReviewStageCoverage:
     async def test_execute_no_plan_id(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
     ):
-        """Test execute when plan_id cannot be extracted.
-
-        Note: Due to signature mismatch in _handle_stage_error calls in the codebase,
-        this raises TypeError rather than the expected ValueError.
-        """
+        """Test execute when plan_id cannot be extracted."""
         issue = Issue(
             id=50,
             number=50,
@@ -1363,19 +1359,14 @@ class TestPlanReviewStageCoverage:
             settings=mock_settings,
         )
 
-        # Raises TypeError due to _handle_stage_error signature mismatch in codebase
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError, match="Could not extract plan_id"):
             await stage.execute(issue)
 
     @pytest.mark.asyncio
     async def test_execute_no_plan_path(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
     ):
-        """Test execute when plan_path cannot be extracted.
-
-        Note: Due to signature mismatch in _handle_stage_error calls in the codebase,
-        this raises TypeError rather than the expected ValueError.
-        """
+        """Test execute when plan_path cannot be extracted."""
         issue = Issue(
             id=50,
             number=50,
@@ -1396,19 +1387,14 @@ class TestPlanReviewStageCoverage:
             settings=mock_settings,
         )
 
-        # Raises TypeError due to _handle_stage_error signature mismatch in codebase
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError, match="Could not extract plan_path"):
             await stage.execute(issue)
 
     @pytest.mark.asyncio
     async def test_execute_success(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
     ):
-        """Test successful plan review execution.
-
-        Note: Due to signature mismatch in _handle_stage_error calls in the codebase
-        that affects error paths, we need to ensure the happy path doesn't trigger errors.
-        """
+        """Test successful plan review execution."""
         issue = Issue(
             id=50,
             number=50,
@@ -1466,29 +1452,17 @@ Plan File: `plans/42-feature.md`
 
 # ==============================================================================
 # Base class error handling (_handle_stage_error)
-# Note: Several stages have a signature mismatch bug - they call
-# _handle_stage_error(issue, "stage_name", e) with 3 args, but the base
-# class signature is _handle_stage_error(issue, error) with only 2 args.
-# This causes TypeError in the error paths.
 # ==============================================================================
 
 
 class TestHandleStageError:
-    """Test error handling for stages.
-
-    Note: These tests document the current behavior where TypeError is raised
-    due to signature mismatch in _handle_stage_error calls.
-    """
+    """Test error handling for stages."""
 
     @pytest.mark.asyncio
     async def test_implementation_handle_error(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
     ):
-        """Test ImplementationStage error handling triggers _handle_stage_error.
-
-        Note: Due to signature mismatch bug, TypeError is raised instead of
-        the original exception being re-raised cleanly.
-        """
+        """Test ImplementationStage error handling triggers _handle_stage_error."""
         mock_state_manager.load_state.side_effect = Exception("State load failed")
 
         issue = Issue(
@@ -1511,19 +1485,14 @@ class TestHandleStageError:
             settings=mock_settings,
         )
 
-        # Raises TypeError due to _handle_stage_error signature mismatch
-        with pytest.raises(TypeError):
+        with pytest.raises(Exception, match="State load failed"):
             await stage.execute(issue)
 
     @pytest.mark.asyncio
     async def test_merge_handle_error(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
     ):
-        """Test MergeStage error handling.
-
-        Note: Due to signature mismatch bug, TypeError is raised instead of
-        the original exception being re-raised cleanly.
-        """
+        """Test MergeStage error handling."""
         mock_state_manager.load_state.side_effect = Exception("State load failed")
 
         issue = Issue(
@@ -1546,19 +1515,14 @@ class TestHandleStageError:
             settings=mock_settings,
         )
 
-        # Raises TypeError due to _handle_stage_error signature mismatch
-        with pytest.raises(TypeError):
+        with pytest.raises(Exception, match="State load failed"):
             await stage.execute(issue)
 
     @pytest.mark.asyncio
     async def test_plan_review_handle_error(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
     ):
-        """Test PlanReviewStage error handling.
-
-        Note: Due to signature mismatch bug, TypeError is raised instead of
-        the original exception being re-raised cleanly.
-        """
+        """Test PlanReviewStage error handling."""
         mock_git_provider.get_file.side_effect = Exception("File not found")
 
         issue = Issue(
@@ -1581,6 +1545,5 @@ class TestHandleStageError:
             settings=mock_settings,
         )
 
-        # Raises TypeError due to _handle_stage_error signature mismatch
-        with pytest.raises(TypeError):
+        with pytest.raises(Exception, match="File not found"):
             await stage.execute(issue)

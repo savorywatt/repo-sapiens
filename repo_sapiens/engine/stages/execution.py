@@ -5,6 +5,7 @@ import re
 import structlog
 
 from repo_sapiens.engine.stages.base import WorkflowStage
+from repo_sapiens.exceptions import TaskExecutionError, WorkflowError
 from repo_sapiens.models.domain import Issue
 
 log = structlog.get_logger(__name__)
@@ -92,44 +93,60 @@ class TaskExecutionStage(WorkflowStage):
             log.info("branch_created", branch=branch_name)
 
             # Checkout branch locally in the playground repo
-            import subprocess  # nosec B404 # Required for git operations with controlled input
             from pathlib import Path
+
+            from repo_sapiens.utils.async_subprocess import run_command
 
             # Assume playground repo is in ../playground relative to builder
             # __file__ = .../builder/repo_sapiens/engine/stages/execution.py
             # parent x5 = .../Workspace
             playground_dir = Path(__file__).parent.parent.parent.parent.parent / "playground"
             if not playground_dir.exists():
-                raise Exception(f"Playground repo not found at {playground_dir}")
+                raise WorkflowError(f"Playground repo not found at {playground_dir}")
 
             log.info("checking_out_branch", branch=branch_name, path=str(playground_dir))
 
             # Fetch latest from remote
-            subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
+            await run_command("git", "fetch", "origin", cwd=playground_dir, check=True)
 
             # Check if the plan branch exists on remote
-            branch_check = subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                ["git", "rev-parse", f"origin/{branch_name}"],
+            _, _, branch_check_code = await run_command(
+                "git",
+                "rev-parse",
+                f"origin/{branch_name}",
                 cwd=playground_dir,
-                capture_output=True,
+                check=False,
             )
 
-            if branch_check.returncode == 0:
+            if branch_check_code == 0:
                 # Plan branch exists on remote, check it out and pull latest
                 log.info("plan_branch_exists_on_remote", branch=branch_name)
-                subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                    ["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
+                await run_command(
+                    "git",
+                    "checkout",
+                    "-B",
+                    branch_name,
+                    f"origin/{branch_name}",
                     cwd=playground_dir,
                     check=True,
                 )
             else:
                 # Plan branch doesn't exist yet, create from base branch
                 log.info("creating_new_plan_branch", branch=branch_name, base=base_branch)
-                subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                    ["git", "checkout", f"origin/{base_branch}"], cwd=playground_dir, check=True
+                await run_command(
+                    "git",
+                    "checkout",
+                    f"origin/{base_branch}",
+                    cwd=playground_dir,
+                    check=True,
                 )
-                subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                    ["git", "checkout", "-B", branch_name], cwd=playground_dir, check=True
+                await run_command(
+                    "git",
+                    "checkout",
+                    "-B",
+                    branch_name,
+                    cwd=playground_dir,
+                    check=True,
                 )
 
             log.info("branch_checked_out", branch=branch_name)
@@ -175,7 +192,12 @@ class TaskExecutionStage(WorkflowStage):
                 result = await self.agent.execute_task(task, context)
 
                 if not result.success:
-                    raise Exception(f"Task execution failed: {result.error}")
+                    raise TaskExecutionError(
+                        f"Task execution failed: {result.error}",
+                        task_id=task.id,
+                        stage="execution",
+                        recoverable=True,
+                    )
 
                 log.info("agent_execution_complete", task=task_num)
 
@@ -183,18 +205,18 @@ class TaskExecutionStage(WorkflowStage):
                 log.info("committing_changes", branch=branch_name)
 
                 # Git add all changes
-                subprocess.run(["git", "add", "."], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
+                await run_command("git", "add", ".", cwd=playground_dir, check=True)
 
                 # Check if there are changes to commit
-                status_result = subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                    ["git", "status", "--porcelain"],
+                status_stdout, _, _ = await run_command(
+                    "git",
+                    "status",
+                    "--porcelain",
                     cwd=playground_dir,
-                    capture_output=True,
-                    text=True,
                     check=True,
                 )
 
-                if status_result.stdout.strip():
+                if status_stdout.strip():
                     # Commit changes with conventional commit format
                     # Extract task title without the [TASK N/M] prefix
                     task_title = issue.title.replace(f"[TASK {task_num}/{total_tasks}] ", "")
@@ -227,13 +249,23 @@ class TaskExecutionStage(WorkflowStage):
                         f"Task {task_num}/{total_tasks} for {plan_label}\n"
                         f"Original issue: #{original_issue_number}"
                     )
-                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                        ["git", "commit", "-m", commit_message], cwd=playground_dir, check=True
+                    await run_command(
+                        "git",
+                        "commit",
+                        "-m",
+                        commit_message,
+                        cwd=playground_dir,
+                        check=True,
                     )
 
                     # Push to remote
-                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                        ["git", "push", "origin", branch_name], cwd=playground_dir, check=True
+                    await run_command(
+                        "git",
+                        "push",
+                        "origin",
+                        branch_name,
+                        cwd=playground_dir,
+                        check=True,
                     )
 
                     log.info("changes_committed_and_pushed", branch=branch_name)

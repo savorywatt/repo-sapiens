@@ -42,12 +42,18 @@ log = structlog.get_logger(__name__)
     default=True,
     help="Set up Gitea Actions secrets (default: true)",
 )
+@click.option(
+    "--deploy-actions/--no-deploy-actions",
+    default=True,
+    help="Deploy reusable composite action for AI tasks (default: true)",
+)
 def init_command(
     repo_path: Path,
     config_path: Path,
     backend: str | None,
     non_interactive: bool,
     setup_secrets: bool,
+    deploy_actions: bool,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -55,8 +61,9 @@ def init_command(
     1. Discover Git repository configuration
     2. Prompt for credentials (or use environment variables)
     3. Store credentials securely
-    4. Set up Gitea Actions secrets (if requested)
+    4. Set up Actions secrets (if requested)
     5. Generate configuration file
+    6. Deploy reusable composite action (if requested)
 
     Examples:
 
@@ -68,8 +75,11 @@ def init_command(
         export CLAUDE_API_KEY="your-key"
         sapiens init --non-interactive
 
-        # Skip Gitea Actions secret setup
+        # Skip Actions secret setup
         sapiens init --no-setup-secrets
+
+        # Skip action deployment
+        sapiens init --no-deploy-actions
     """
     try:
         initializer = RepoInitializer(
@@ -78,6 +88,7 @@ def init_command(
             backend=backend,
             non_interactive=non_interactive,
             setup_secrets=setup_secrets,
+            deploy_actions=deploy_actions,
         )
         initializer.run()
 
@@ -107,12 +118,14 @@ class RepoInitializer:
         backend: str | None,
         non_interactive: bool,
         setup_secrets: bool,
+        deploy_actions: bool = True,
     ):
         self.repo_path = repo_path
         self.config_path = config_path
         self.backend = backend or self._detect_backend()
         self.non_interactive = non_interactive
         self.setup_secrets = setup_secrets
+        self.deploy_actions = deploy_actions
 
         self.repo_info = None
         self.provider_type = None  # 'github' or 'gitea' (detected)
@@ -153,7 +166,11 @@ class RepoInitializer:
         # Step 5: Generate configuration file
         self._generate_config()
 
-        # Step 6: Validate setup
+        # Step 6: Deploy reusable composite action
+        if self.deploy_actions:
+            self._deploy_composite_action()
+
+        # Step 7: Validate setup
         self._validate_setup()
 
         # Done!
@@ -162,7 +179,7 @@ class RepoInitializer:
         click.echo()
         self._print_next_steps()
 
-        # Step 7: Optional test
+        # Step 8: Optional test
         if not self.non_interactive:
             self._offer_test_run()
 
@@ -976,6 +993,59 @@ tags:
         click.echo(f"   ✓ Created: {self.config_path}")
         click.echo()
 
+    def _deploy_composite_action(self) -> None:
+        """Deploy reusable composite action for AI tasks."""
+        import importlib.resources
+
+        click.echo(click.style("📦 Deploying reusable composite action...", bold=True))
+
+        # Determine target directory based on provider type
+        if self.provider_type == "github":
+            action_dir = self.repo_path / ".github" / "actions" / "sapiens-task"
+            template_subpath = "actions/github/sapiens-task/action.yaml"
+        else:
+            action_dir = self.repo_path / ".gitea" / "actions" / "sapiens-task"
+            template_subpath = "actions/gitea/sapiens-task/action.yaml"
+
+        # Create the action directory
+        action_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get the template from package resources
+        try:
+            # Try importlib.resources (Python 3.9+)
+            template_files = (
+                importlib.resources.files("repo_sapiens") / "templates" / template_subpath
+            )
+            if hasattr(template_files, "read_text"):
+                action_content = template_files.read_text()
+            else:
+                # Fallback: read from file system
+                package_dir = Path(__file__).parent.parent
+                template_path = package_dir / "templates" / template_subpath
+                if template_path.exists():
+                    action_content = template_path.read_text()
+                else:
+                    # Try relative to repo root (development mode)
+                    repo_root = Path(__file__).parent.parent.parent
+                    template_path = repo_root / "templates" / template_subpath
+                    action_content = template_path.read_text()
+
+            # Write the action file
+            action_file = action_dir / "action.yaml"
+            action_file.write_text(action_content)
+            click.echo(f"   ✓ Created: {action_file.relative_to(self.repo_path)}")
+
+        except Exception as e:
+            click.echo(click.style(f"   ⚠ Warning: Could not deploy action: {e}", fg="yellow"))
+            click.echo(
+                click.style(
+                    "   You can manually copy the action from the repo-sapiens templates.",
+                    fg="yellow",
+                )
+            )
+
+        click.echo()
+
     def _validate_setup(self) -> None:
         """Validate the setup."""
         click.echo(click.style("✓ Validating setup...", bold=True))
@@ -1064,7 +1134,11 @@ tags:
         test_prompt = "Summarize this project's README in 2-3 sentences."
 
         # Only include --config if non-default path
-        config_flag = "" if str(self.config_path) == ".sapiens/config.yaml" else f"--config {self.config_path} "
+        config_flag = (
+            ""
+            if str(self.config_path) == ".sapiens/config.yaml"
+            else f"--config {self.config_path} "
+        )
 
         if self.agent_type == "claude":
             test_cmd = f'claude -p "{test_prompt}"'

@@ -98,7 +98,7 @@ class TestCLIHelpText:
         """Test main CLI help displays correctly."""
         result = cli_runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "Gitea automation system CLI" in result.output
+        assert "repo-sapiens" in result.output
         assert "--config" in result.output
         assert "--log-level" in result.output
 

@@ -18,6 +18,7 @@ from repo_sapiens.engine.stages.pr_review import PRReviewStage
 from repo_sapiens.engine.stages.proposal import ProposalStage
 from repo_sapiens.engine.stages.qa import QAStage
 from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.engine.types import StageState, WorkflowState
 from repo_sapiens.models.domain import Issue, Task
 from repo_sapiens.processors.dependency_tracker import DependencyTracker
 from repo_sapiens.providers.base import AgentProvider, GitProvider
@@ -143,11 +144,12 @@ class WorkflowOrchestrator:
         """
         log.info("processing_plan", plan_id=plan_id)
 
-        # Load plan state
-        state = await self.state.load_state(plan_id)
+        # Load plan state (typed as WorkflowState)
+        state: WorkflowState = await self.state.load_state(plan_id)
 
         # Get planning issue
-        planning_stage = state.get("stages", {}).get("planning", {})
+        stages = state.get("stages", {})
+        planning_stage: StageState = stages.get("planning", {"status": "pending"})
         if planning_stage.get("status") != "completed":
             log.warning("plan_not_ready", plan_id=plan_id)
             return

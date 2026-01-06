@@ -12,6 +12,12 @@ Key Components:
     - AdvancedRecovery: Error recovery and retry mechanisms
     - ParallelExecutor: Optimized parallel task execution
 
+Type Definitions:
+    - WorkflowState: TypedDict for complete workflow state
+    - StageState: TypedDict for individual stage state
+    - TaskState: TypedDict for task state within workflows
+    - StagesDict: TypedDict for stage collection
+
 Workflow Stages:
     - Planning: Generate development plan from issue
     - Proposal: Create review issue for plan approval
@@ -30,4 +36,21 @@ Example:
     >>> from repo_sapiens.engine import WorkflowOrchestrator
     >>> orchestrator = WorkflowOrchestrator(settings, git, agent, state)
     >>> await orchestrator.process_issue(issue)
+
+    >>> from repo_sapiens.engine.types import WorkflowState
+    >>> state: WorkflowState = await state_manager.load_state("plan-123")
 """
+
+from repo_sapiens.engine.types import (
+    StagesDict,
+    StageState,
+    TaskState,
+    WorkflowState,
+)
+
+__all__ = [
+    "StageState",
+    "StagesDict",
+    "TaskState",
+    "WorkflowState",
+]

@@ -107,7 +107,7 @@ class CodeReviewStage(WorkflowStage):
 
         except Exception as e:
             log.error("code_review_stage_failed", error=str(e))
-            await self._handle_stage_error(issue, "code_review", e)
+            await self._handle_stage_error(issue, e)
             raise
 
     def _extract_task_id(self, issue_body: str) -> str:

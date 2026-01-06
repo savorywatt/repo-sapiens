@@ -103,7 +103,7 @@ class MergeStage(WorkflowStage):
 
         except Exception as e:
             log.error("merge_stage_failed", error=str(e))
-            await self._handle_stage_error(issue, "merge", e)
+            await self._handle_stage_error(issue, e)
             raise
 
     def _extract_plan_id(self, issue_body: str) -> str:

@@ -554,7 +554,7 @@ class TestKeyringBackendServiceNamespace:
                 backend = KeyringBackend()
                 backend.get("myservice", "mykey")
 
-                mock_keyring.get_password.assert_called_with("builder/myservice", "mykey")
+                mock_keyring.get_password.assert_called_with("sapiens/myservice", "mykey")
 
     def test_set_uses_namespaced_service(self):
         """Should use namespaced service name in set operations."""
@@ -566,7 +566,7 @@ class TestKeyringBackendServiceNamespace:
                 backend.set("testservice", "testkey", "testvalue")
 
                 mock_keyring.set_password.assert_called_with(
-                    "builder/testservice", "testkey", "testvalue"
+                    "sapiens/testservice", "testkey", "testvalue"
                 )
 
     def test_delete_uses_namespaced_service(self):
@@ -578,4 +578,4 @@ class TestKeyringBackendServiceNamespace:
                 backend = KeyringBackend()
                 backend.delete("delservice", "delkey")
 
-                mock_keyring.delete_password.assert_called_with("builder/delservice", "delkey")
+                mock_keyring.delete_password.assert_called_with("sapiens/delservice", "delkey")

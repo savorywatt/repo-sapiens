@@ -40,21 +40,24 @@ class TestStateManagerInit:
 class TestStateManagerLock:
     """Tests for lock management."""
 
-    def test_get_lock_creates_new_lock(self, state_manager: StateManager):
+    @pytest.mark.asyncio
+    async def test_get_lock_creates_new_lock(self, state_manager: StateManager):
         """Test lock creation for new plan_id."""
-        lock1 = state_manager._get_lock("plan-1")
+        lock1 = await state_manager._get_lock("plan-1")
         assert isinstance(lock1, asyncio.Lock)
 
-    def test_get_lock_reuses_existing_lock(self, state_manager: StateManager):
+    @pytest.mark.asyncio
+    async def test_get_lock_reuses_existing_lock(self, state_manager: StateManager):
         """Test lock reuse for same plan_id."""
-        lock1 = state_manager._get_lock("plan-1")
-        lock2 = state_manager._get_lock("plan-1")
+        lock1 = await state_manager._get_lock("plan-1")
+        lock2 = await state_manager._get_lock("plan-1")
         assert lock1 is lock2
 
-    def test_get_lock_different_plans_have_different_locks(self, state_manager: StateManager):
+    @pytest.mark.asyncio
+    async def test_get_lock_different_plans_have_different_locks(self, state_manager: StateManager):
         """Test different plans get different locks."""
-        lock1 = state_manager._get_lock("plan-1")
-        lock2 = state_manager._get_lock("plan-2")
+        lock1 = await state_manager._get_lock("plan-1")
+        lock2 = await state_manager._get_lock("plan-2")
         assert lock1 is not lock2
 
 
@@ -213,7 +216,7 @@ class TestTransaction:
     async def test_transaction_nested_not_supported(self, state_manager: StateManager):
         """Test nested transactions block correctly (single lock)."""
         # This test verifies that the same plan_id uses the same lock
-        lock = state_manager._get_lock("plan-1")
+        lock = await state_manager._get_lock("plan-1")
 
         # Acquire the lock manually first
         await lock.acquire()
@@ -221,7 +224,7 @@ class TestTransaction:
         try:
             # The transaction should wait for the lock
             # We can't really test blocking without threads, but we can verify lock reuse
-            lock2 = state_manager._get_lock("plan-1")
+            lock2 = await state_manager._get_lock("plan-1")
             assert lock is lock2
         finally:
             lock.release()
@@ -332,14 +335,15 @@ class TestGetActivePlans:
     @pytest.mark.asyncio
     async def test_get_active_plans_filters_completed(self, state_manager: StateManager):
         """Test completed plans are filtered out."""
-        # Create an active plan
+        # Create an active plan with in_progress stage
         state1 = await state_manager.load_state("active-plan")
-        state1["status"] = "in_progress"
+        state1["stages"]["planning"]["status"] = "in_progress"
         await state_manager.save_state("active-plan", state1)
 
-        # Create a completed plan
+        # Create a completed plan by marking all stages completed
         state2 = await state_manager.load_state("completed-plan")
-        state2["status"] = "completed"
+        for stage in state2["stages"]:
+            state2["stages"][stage]["status"] = "completed"
         await state_manager.save_state("completed-plan", state2)
 
         active = await state_manager.get_active_plans()
@@ -350,9 +354,9 @@ class TestGetActivePlans:
     @pytest.mark.asyncio
     async def test_get_active_plans_filters_failed(self, state_manager: StateManager):
         """Test failed plans are filtered out."""
-        # Create a failed plan
+        # Create a failed plan by marking a stage as failed
         state = await state_manager.load_state("failed-plan")
-        state["status"] = "failed"
+        state["stages"]["planning"]["status"] = "failed"
         await state_manager.save_state("failed-plan", state)
 
         active = await state_manager.get_active_plans()

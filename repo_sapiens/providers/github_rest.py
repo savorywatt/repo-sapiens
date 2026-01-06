@@ -1,5 +1,9 @@
 """GitHub provider implementation using PyGithub and REST API."""
 
+import asyncio
+from collections.abc import Callable
+from typing import TypeVar
+
 import structlog
 from github import Github, GithubException  # type: ignore[import-not-found]
 from github.Branch import Branch as GHBranch  # type: ignore[import-not-found]
@@ -12,6 +16,17 @@ from repo_sapiens.models.domain import Branch, Comment, Issue, IssueState, PullR
 from repo_sapiens.providers.base import GitProvider
 
 log = structlog.get_logger(__name__)
+
+T = TypeVar("T")
+
+
+async def _run_sync(func: Callable[[], T]) -> T:
+    """Run a synchronous function in a thread pool.
+
+    This prevents blocking the event loop when calling synchronous
+    PyGithub methods.
+    """
+    return await asyncio.to_thread(func)
 
 
 class GitHubRestProvider(GitProvider):
@@ -42,9 +57,13 @@ class GitHubRestProvider(GitProvider):
 
     async def connect(self) -> None:
         """Initialize GitHub client."""
-        # PyGithub is synchronous, but we wrap it in async for consistency
-        self._client = Github(self.token, base_url=self.base_url)
-        self._repo = self._client.get_repo(f"{self.owner}/{self.repo}")
+
+        def _connect() -> tuple[Github, GHRepository]:
+            client = Github(self.token, base_url=self.base_url)
+            repo = client.get_repo(f"{self.owner}/{self.repo}")
+            return client, repo
+
+        self._client, self._repo = await _run_sync(_connect)
         log.info(
             "github_connected",
             base_url=self.base_url,
@@ -55,7 +74,7 @@ class GitHubRestProvider(GitProvider):
     async def disconnect(self) -> None:
         """Close GitHub client."""
         if self._client:
-            self._client.close()
+            await _run_sync(self._client.close)
             self._client = None
             self._repo = None
 
@@ -70,11 +89,10 @@ class GitHubRestProvider(GitProvider):
         gh_state = state if state in ("open", "closed", "all") else "open"
 
         try:
-            if labels:
-                # GitHub API expects label objects or names
-                gh_issues = self._repo.get_issues(state=gh_state, labels=labels)
-            else:
-                gh_issues = self._repo.get_issues(state=gh_state)
+            # Wrap synchronous iteration in thread pool
+            gh_issues = await _run_sync(
+                lambda: list(self._repo.get_issues(state=gh_state, labels=labels or []))
+            )
 
             # Convert to our Issue model
             return [self._convert_issue(gh_issue) for gh_issue in gh_issues]
@@ -88,7 +106,7 @@ class GitHubRestProvider(GitProvider):
         log.info("get_issue", number=issue_number)
 
         try:
-            gh_issue = self._repo.get_issue(issue_number)
+            gh_issue = await _run_sync(lambda: self._repo.get_issue(issue_number))
             return self._convert_issue(gh_issue)
 
         except GithubException as e:
@@ -105,10 +123,12 @@ class GitHubRestProvider(GitProvider):
         log.info("create_issue", title=title, labels=labels)
 
         try:
-            gh_issue = self._repo.create_issue(
-                title=title,
-                body=body,
-                labels=labels or [],
+            gh_issue = await _run_sync(
+                lambda: self._repo.create_issue(
+                    title=title,
+                    body=body,
+                    labels=labels or [],
+                )
             )
             return self._convert_issue(gh_issue)
 
@@ -128,20 +148,24 @@ class GitHubRestProvider(GitProvider):
         log.info("update_issue", number=issue_number)
 
         try:
-            gh_issue = self._repo.get_issue(issue_number)
 
-            # Update fields if provided
-            if title is not None:
-                gh_issue.edit(title=title)
-            if body is not None:
-                gh_issue.edit(body=body)
-            if labels is not None:
-                gh_issue.edit(labels=labels)
-            if state is not None:
-                gh_issue.edit(state=state)
+            def _update() -> GHIssue:
+                gh_issue = self._repo.get_issue(issue_number)
 
-            # Refresh to get updated data
-            gh_issue = self._repo.get_issue(issue_number)
+                # Update fields if provided
+                if title is not None:
+                    gh_issue.edit(title=title)
+                if body is not None:
+                    gh_issue.edit(body=body)
+                if labels is not None:
+                    gh_issue.edit(labels=labels)
+                if state is not None:
+                    gh_issue.edit(state=state)
+
+                # Refresh to get updated data
+                return self._repo.get_issue(issue_number)
+
+            gh_issue = await _run_sync(_update)
             return self._convert_issue(gh_issue)
 
         except GithubException as e:
@@ -153,8 +177,12 @@ class GitHubRestProvider(GitProvider):
         log.info("add_comment", number=issue_number)
 
         try:
-            gh_issue = self._repo.get_issue(issue_number)
-            gh_comment = gh_issue.create_comment(comment)
+
+            def _add_comment() -> GHComment:
+                gh_issue = self._repo.get_issue(issue_number)
+                return gh_issue.create_comment(comment)
+
+            gh_comment = await _run_sync(_add_comment)
             return self._convert_comment(gh_comment)
 
         except GithubException as e:
@@ -166,8 +194,12 @@ class GitHubRestProvider(GitProvider):
         log.info("get_comments", number=issue_number)
 
         try:
-            gh_issue = self._repo.get_issue(issue_number)
-            gh_comments = gh_issue.get_comments()
+
+            def _get_comments() -> list[GHComment]:
+                gh_issue = self._repo.get_issue(issue_number)
+                return list(gh_issue.get_comments())
+
+            gh_comments = await _run_sync(_get_comments)
             return [self._convert_comment(c) for c in gh_comments]
 
         except GithubException as e:
@@ -179,18 +211,22 @@ class GitHubRestProvider(GitProvider):
         log.info("create_branch", branch=branch_name, from_branch=from_branch)
 
         try:
-            # Get the source branch reference
-            source_ref = self._repo.get_git_ref(f"heads/{from_branch}")
-            source_sha = source_ref.object.sha
 
-            # Create new branch from source SHA
-            self._repo.create_git_ref(
-                ref=f"refs/heads/{branch_name}",
-                sha=source_sha,
-            )
+            def _create_branch() -> GHBranch:
+                # Get the source branch reference
+                source_ref = self._repo.get_git_ref(f"heads/{from_branch}")
+                source_sha = source_ref.object.sha
 
-            # Get branch details
-            gh_branch = self._repo.get_branch(branch_name)
+                # Create new branch from source SHA
+                self._repo.create_git_ref(
+                    ref=f"refs/heads/{branch_name}",
+                    sha=source_sha,
+                )
+
+                # Get branch details
+                return self._repo.get_branch(branch_name)
+
+            gh_branch = await _run_sync(_create_branch)
             return self._convert_branch(gh_branch)
 
         except GithubException as e:
@@ -207,7 +243,7 @@ class GitHubRestProvider(GitProvider):
         log.info("get_branch", branch=branch_name)
 
         try:
-            gh_branch = self._repo.get_branch(branch_name)
+            gh_branch = await _run_sync(lambda: self._repo.get_branch(branch_name))
             return self._convert_branch(gh_branch)
 
         except GithubException as e:
@@ -222,16 +258,20 @@ class GitHubRestProvider(GitProvider):
         log.info("get_diff", base=base, head=head)
 
         try:
-            comparison = self._repo.compare(base, head)
 
-            # Build unified diff from files
-            diff_parts = []
-            for file in comparison.files:
-                if file.patch:
-                    diff_parts.append(f"diff --git a/{file.filename} b/{file.filename}")
-                    diff_parts.append(file.patch)
+            def _get_diff() -> str:
+                comparison = self._repo.compare(base, head)
 
-            return "\n".join(diff_parts)
+                # Build unified diff from files
+                diff_parts = []
+                for file in comparison.files:
+                    if file.patch:
+                        diff_parts.append(f"diff --git a/{file.filename} b/{file.filename}")
+                        diff_parts.append(file.patch)
+
+                return "\n".join(diff_parts)
+
+            return await _run_sync(_get_diff)
 
         except GithubException as e:
             log.error("github_get_diff_failed", base=base, head=head, error=str(e))
@@ -252,10 +292,12 @@ class GitHubRestProvider(GitProvider):
             # Better approach: Use Git API directly
 
             # Create merge commit
-            self._repo.merge(
-                base=target,
-                head=source,
-                commit_message=message,
+            await _run_sync(
+                lambda: self._repo.merge(
+                    base=target,
+                    head=source,
+                    commit_message=message,
+                )
             )
 
         except GithubException as e:
@@ -279,17 +321,22 @@ class GitHubRestProvider(GitProvider):
         log.info("create_pull_request", title=title, head=head, base=base)
 
         try:
-            gh_pr = self._repo.create_pull(
-                title=title,
-                body=body,
-                head=head,
-                base=base,
-            )
 
-            # Add labels if provided
-            if labels:
-                gh_pr.add_to_labels(*labels)
+            def _create_pr() -> GHPullRequest:
+                gh_pr = self._repo.create_pull(
+                    title=title,
+                    body=body,
+                    head=head,
+                    base=base,
+                )
 
+                # Add labels if provided
+                if labels:
+                    gh_pr.add_to_labels(*labels)
+
+                return gh_pr
+
+            gh_pr = await _run_sync(_create_pr)
             return self._convert_pull_request(gh_pr)
 
         except GithubException as e:
@@ -301,13 +348,17 @@ class GitHubRestProvider(GitProvider):
         log.info("get_file", path=path, ref=ref)
 
         try:
-            contents = self._repo.get_contents(path, ref=ref)
 
-            # Handle if it's a file (not directory)
-            if isinstance(contents, list):
-                raise ValueError(f"Path {path} is a directory, not a file")
+            def _get_file() -> str:
+                contents = self._repo.get_contents(path, ref=ref)
 
-            return contents.decoded_content.decode("utf-8")
+                # Handle if it's a file (not directory)
+                if isinstance(contents, list):
+                    raise ValueError(f"Path {path} is a directory, not a file")
+
+                return contents.decoded_content.decode("utf-8")
+
+            return await _run_sync(_get_file)
 
         except GithubException as e:
             log.error("github_get_file_failed", path=path, ref=ref, error=str(e))
@@ -324,30 +375,34 @@ class GitHubRestProvider(GitProvider):
         log.info("commit_file", path=path, branch=branch)
 
         try:
-            # Check if file exists
-            try:
-                existing_file = self._repo.get_contents(path, ref=branch)
-                # Update existing file
-                result = self._repo.update_file(
-                    path=path,
-                    message=message,
-                    content=content,
-                    sha=existing_file.sha,
-                    branch=branch,
-                )
-            except GithubException as e:
-                if e.status == 404:
-                    # Create new file
-                    result = self._repo.create_file(
+
+            def _commit_file() -> str:
+                # Check if file exists
+                try:
+                    existing_file = self._repo.get_contents(path, ref=branch)
+                    # Update existing file
+                    result = self._repo.update_file(
                         path=path,
                         message=message,
                         content=content,
+                        sha=existing_file.sha,
                         branch=branch,
                     )
-                else:
-                    raise
+                except GithubException as e:
+                    if e.status == 404:
+                        # Create new file
+                        result = self._repo.create_file(
+                            path=path,
+                            message=message,
+                            content=content,
+                            branch=branch,
+                        )
+                    else:
+                        raise
 
-            return result["commit"].sha
+                return result["commit"].sha
+
+            return await _run_sync(_commit_file)
 
         except GithubException as e:
             log.error("github_commit_file_failed", path=path, branch=branch, error=str(e))
@@ -356,30 +411,20 @@ class GitHubRestProvider(GitProvider):
     async def set_repository_secret(self, name: str, value: str) -> None:
         """Set repository secret for GitHub Actions.
 
-        Note: This requires the public key from the repository to encrypt the secret.
+        Note: PyGithub handles encryption internally via its PyNaCl dependency.
         """
         log.info("set_repository_secret", name=name)
 
         try:
-            from nacl import encoding, public  # noqa: F401
-
-            # Create or update the secret
-            self._repo.create_secret(
-                secret_name=name,
-                unencrypted_value=value,
-                secret_type="actions",  # nosec B106 # Literal constant for GitHub API, not a password
+            # Create or update the secret (PyGithub handles encryption via PyNaCl)
+            await _run_sync(
+                lambda: self._repo.create_secret(
+                    secret_name=name,
+                    unencrypted_value=value,
+                    secret_type="actions",  # nosec B106 # Literal constant for GitHub API, not a password
+                )
             )
-
             log.info("github_secret_set", name=name)
-
-        except ImportError as e:
-            log.error(
-                "github_secret_encryption_unavailable",
-                error="PyNaCl not installed. Install with: pip install PyNaCl",
-            )
-            raise RuntimeError(
-                "PyNaCl is required for GitHub secret encryption. Install with: pip install PyNaCl"
-            ) from e
 
         except GithubException as e:
             log.error("github_set_secret_failed", name=name, error=str(e))

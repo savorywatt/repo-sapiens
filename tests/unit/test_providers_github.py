@@ -845,7 +845,11 @@ class TestGitHubRestProviderSetRepositorySecret:
     @pytest.mark.asyncio
     @patch("repo_sapiens.providers.github_rest.Github")
     async def test_set_repository_secret_import_error(self, mock_github_class, provider):
-        """Should raise RuntimeError when PyNaCl is not installed."""
+        """Should propagate ImportError when PyNaCl is not installed.
+
+        PyGithub handles encryption internally and raises ImportError if PyNaCl
+        is missing. The error propagates from the thread pool.
+        """
         mock_repo = Mock()
 
         # Make create_secret trigger the ImportError path by patching the import
@@ -861,7 +865,7 @@ class TestGitHubRestProviderSetRepositorySecret:
 
         await provider.connect()
 
-        with pytest.raises(RuntimeError, match="PyNaCl"):
+        with pytest.raises(ImportError, match="nacl"):
             await provider.set_repository_secret("SECRET", "value")
 
 

@@ -5,7 +5,18 @@ from pathlib import Path
 
 import pytest
 
+from repo_sapiens.config import credential_fields
 from repo_sapiens.config.settings import AutomationSettings
+
+
+@pytest.fixture(autouse=True)
+def reset_credential_resolver():
+    """Reset global credential resolver after each test to prevent pollution."""
+    yield
+    # Reset to None so next test creates a fresh resolver
+    credential_fields._resolver = None
+
+
 from repo_sapiens.engine.state_manager import StateManager
 from repo_sapiens.models.domain import Issue, IssueState, Plan, Task
 from repo_sapiens.utils.mcp_client import MockMCPClient
