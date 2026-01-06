@@ -1063,13 +1063,16 @@ tags:
         # Build the test command based on agent type
         test_prompt = "Summarize this project's README in 2-3 sentences."
 
+        # Only include --config if non-default path
+        config_flag = "" if str(self.config_path) == ".sapiens/config.yaml" else f"--config {self.config_path} "
+
         if self.agent_type == "claude":
             test_cmd = f'claude -p "{test_prompt}"'
         elif self.agent_type == "goose":
             test_cmd = f'goose session start --prompt "{test_prompt}"'
         elif self.agent_type == "builtin":
             # react command reads model from config, so no --model needed
-            test_cmd = f'sapiens --config {self.config_path} react "{test_prompt}"'
+            test_cmd = f'sapiens {config_flag}react "{test_prompt}"'.replace("  ", " ")
         else:
             return
 
@@ -1108,7 +1111,7 @@ tags:
         # Suggest REPL for further exploration
         click.echo()
         if self.agent_type == "builtin":
-            repl_cmd = f"sapiens --config {self.config_path} react --repl"
+            repl_cmd = f"sapiens {config_flag}react --repl".replace("  ", " ")
         elif self.agent_type == "claude":
             repl_cmd = "claude"
         elif self.agent_type == "goose":
