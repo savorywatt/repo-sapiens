@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Setup Test**: Optional test at end of `sapiens init`
   - Offers to summarize README.md with configured agent
   - Shows exact command that will be run for the selected agent
+- **React Config Integration**: `sapiens react` now reads settings from config
+  - Model and base URL automatically loaded from `agent_provider` config
+  - CLI options override config when specified
+  - Simple usage: `sapiens react "task"` or `sapiens react --repl`
 
 ### Changed
 - **Keyring Namespace**: Migrated from `builder/` to `sapiens/` prefix
