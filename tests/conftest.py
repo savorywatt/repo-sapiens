@@ -1,12 +1,37 @@
 """Pytest configuration and shared fixtures."""
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from repo_sapiens.config import credential_fields
+
+
+@pytest.fixture(autouse=True)
+def fast_asyncio_sleep():
+    """Replace asyncio.sleep with instant return for faster tests.
+
+    This eliminates delays from retry backoff, timeouts, etc.
+    Tests that specifically need real timing should use pytest.mark.slow.
+    """
+    original_sleep = asyncio.sleep
+
+    async def instant_sleep(delay):
+        """Instant sleep - just yield control without waiting."""
+        if delay > 0:
+            await original_sleep(0)  # Yield control but don't wait
+
+    with patch("asyncio.sleep", instant_sleep):
+        yield
+
+
 from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.models.domain import Issue, IssueState, Plan, Task
+from repo_sapiens.utils.mcp_client import MockMCPClient
 
 
 @pytest.fixture(autouse=True)
@@ -15,11 +40,6 @@ def reset_credential_resolver():
     yield
     # Reset to None so next test creates a fresh resolver
     credential_fields._resolver = None
-
-
-from repo_sapiens.engine.state_manager import StateManager
-from repo_sapiens.models.domain import Issue, IssueState, Plan, Task
-from repo_sapiens.utils.mcp_client import MockMCPClient
 
 
 @pytest.fixture

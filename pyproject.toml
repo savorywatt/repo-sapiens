@@ -32,6 +32,7 @@ dependencies = [
     "gitpython>=3.1.40",
     "jinja2>=3.1.3",
     "pygithub>=2.1.1",  # GitHub API client (includes PyNaCl for secret encryption)
+    "h2>=4.3.0",
 ]
 
 [project.optional-dependencies]
@@ -153,7 +154,16 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "--cov=repo_sapiens --cov-report=html --cov-report=term-missing --cov-fail-under=10"
+# Fast by default; use `make test-cov` for coverage
+addopts = "-n auto --dist loadgroup -q"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+# Support parallel test execution with pytest-xdist
+concurrency = ["thread", "multiprocessing"]
+parallel = true
 
 [tool.bandit]
 # Bandit security linter configuration
@@ -183,3 +193,8 @@ confidence = "MEDIUM"
 [tool.bandit.assert_used]
 # Allow asserts in test files and validation code
 skips = ["*/tests/*", "*/test_*.py"]
+
+[dependency-groups]
+dev = [
+    "pytest-xdist>=3.8.0",
+]
