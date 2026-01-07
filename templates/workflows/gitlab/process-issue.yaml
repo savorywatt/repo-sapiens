@@ -33,20 +33,26 @@ variables:
 stages:
   - process
 
+# Default settings for all jobs
+default:
+  interruptible: true
+
 # Process a specific issue
 process-issue:
   stage: process
-  image: python:${PYTHON_VERSION}
+  image: python:${PYTHON_VERSION}-slim
+  timeout: 30 minutes
   rules:
     # Only run when ISSUE_NUMBER is provided
     - if: $ISSUE_NUMBER != ""
   variables:
     GITLAB_TOKEN: $GITLAB_TOKEN
-    # AI provider credentials (set in CI/CD variables)
+    PIP_NO_CACHE_DIR: "1"
+    # AI provider credentials (set in CI/CD variables as masked/protected)
     # OPENAI_API_KEY: $OPENAI_API_KEY
     # ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
   before_script:
-    - pip install --quiet repo-sapiens
+    - pip install --quiet --no-cache-dir repo-sapiens
   script:
     - echo "Processing issue #${ISSUE_NUMBER}"
     - sapiens --config $CONFIG_FILE process-issue --issue $ISSUE_NUMBER
@@ -67,14 +73,16 @@ process-issue:
 # Scan for issues with 'needs-planning' label (alternative to webhook trigger)
 scan-labeled-issues:
   stage: process
-  image: python:${PYTHON_VERSION}
+  image: python:${PYTHON_VERSION}-slim
+  timeout: 30 minutes
   rules:
     # Run on schedule to check for new labeled issues
     - if: $CI_PIPELINE_SOURCE == "schedule" && $ISSUE_NUMBER == ""
   variables:
     GITLAB_TOKEN: $GITLAB_TOKEN
+    PIP_NO_CACHE_DIR: "1"
   before_script:
-    - pip install --quiet repo-sapiens
+    - pip install --quiet --no-cache-dir repo-sapiens
   script:
     - |
       echo "Scanning for issues with 'needs-planning' label..."

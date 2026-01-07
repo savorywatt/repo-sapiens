@@ -1,0 +1,74 @@
+# @repo-sapiens-template
+# @version: 1.1.0
+# @name: process-issue
+#
+# Process Issue Workflow for Gitea Actions
+#
+# Triggers when an issue is labeled with 'needs-planning'.
+#
+# Setup:
+# 1. Copy to .gitea/workflows/process-issue.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITEA_TOKEN (your Gitea API token)
+#    - Your AI provider key (OPENAI_API_KEY or CLAUDE_API_KEY)
+#    Note: Gitea reserves GITEA_* prefix, so we use SAPIENS_GITEA_TOKEN
+# 3. Create the 'needs-planning' label in your repository
+
+name: Process Issue
+
+on:
+  issues:
+    types: [labeled]
+
+env:
+  CONFIG_FILE: sapiens_config.yaml
+
+jobs:
+  process:
+    if: gitea.event.label.name == 'needs-planning'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Process issue
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          GITEA_API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          # Uncomment your AI provider:
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: |
+          echo "Processing issue #${{ gitea.event.issue.number }}"
+          sapiens --config $CONFIG_FILE process-issue --issue ${{ gitea.event.issue.number }}
+
+      - name: Post success comment
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "Plan generated successfully. Review the plan and add `approved` label to proceed."}' \
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          curl -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "Failed to generate plan. Check the [workflow logs](${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }})."}' \
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"

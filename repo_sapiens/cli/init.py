@@ -158,22 +158,149 @@ class RepoInitializer:
         self.builtin_model = None
         self.builtin_base_url = None  # For ollama/vllm
 
+        # Existing config tracking
+        self.existing_config: dict | None = None
+        self.update_git_provider = True
+        self.update_agent_provider = True
+        self.update_credentials = True
+
+    def _load_existing_config(self) -> bool:
+        """Load existing configuration if present.
+
+        Returns True if config exists and was loaded.
+        """
+        import yaml
+
+        config_file = self.repo_path / self.config_path
+        if not config_file.exists():
+            return False
+
+        try:
+            with open(config_file) as f:
+                self.existing_config = yaml.safe_load(f)
+            return True
+        except Exception:
+            return False
+
+    def _show_existing_config(self) -> None:
+        """Display current configuration summary."""
+        if not self.existing_config:
+            return
+
+        click.echo(click.style("📋 Existing configuration found:", bold=True, fg="yellow"))
+        click.echo()
+
+        # Git provider section
+        git = self.existing_config.get("git_provider", {})
+        if git:
+            click.echo(click.style("  Git Provider:", bold=True))
+            click.echo(f"    Type: {git.get('provider_type', 'unknown')}")
+            click.echo(f"    URL: {git.get('base_url', 'unknown')}")
+            click.echo()
+
+        # Repository section
+        repo = self.existing_config.get("repository", {})
+        if repo:
+            click.echo(click.style("  Repository:", bold=True))
+            click.echo(f"    {repo.get('owner', '?')}/{repo.get('name', '?')}")
+            click.echo()
+
+        # Agent provider section
+        agent = self.existing_config.get("agent_provider", {})
+        if agent:
+            click.echo(click.style("  Agent Provider:", bold=True))
+            click.echo(f"    Type: {agent.get('provider_type', 'unknown')}")
+            click.echo(f"    Model: {agent.get('model', 'unknown')}")
+            if agent.get("base_url"):
+                click.echo(f"    URL: {agent.get('base_url')}")
+            click.echo()
+
+    def _prompt_update_sections(self) -> None:
+        """Ask user which sections to update."""
+        if self.non_interactive:
+            # In non-interactive mode, update everything
+            return
+
+        click.echo(click.style("What would you like to update?", bold=True))
+        click.echo()
+
+        self.update_git_provider = click.confirm("  Update git provider settings?", default=False)
+        self.update_agent_provider = click.confirm(
+            "  Update agent provider settings?", default=False
+        )
+        self.update_credentials = click.confirm("  Update stored credentials?", default=False)
+
+        # If nothing selected, offer to start fresh
+        if not any([self.update_git_provider, self.update_agent_provider, self.update_credentials]):
+            click.echo()
+            if click.confirm(
+                "No updates selected. Start fresh with new configuration?", default=False
+            ):
+                self.update_git_provider = True
+                self.update_agent_provider = True
+                self.update_credentials = True
+                self.existing_config = None  # Treat as fresh install
+            else:
+                click.echo()
+                click.echo("No changes made. Exiting.")
+                raise SystemExit(0)
+
+        click.echo()
+
+    def _load_agent_type_from_config(self) -> None:
+        """Load agent type from existing config for downstream steps."""
+        if not self.existing_config:
+            return
+
+        agent = self.existing_config.get("agent_provider", {})
+        provider_type = agent.get("provider_type", "")
+
+        if provider_type.startswith("claude"):
+            self.agent_type = "claude"
+            self.agent_mode = "api" if provider_type == "claude-api" else "local"
+        elif provider_type.startswith("goose"):
+            self.agent_type = "goose"
+            self.agent_mode = "api" if provider_type == "goose-api" else "local"
+            goose_config = agent.get("goose_config", {})
+            self.goose_llm_provider = goose_config.get("llm_provider")
+            self.goose_model = agent.get("model")
+        elif provider_type in ("ollama", "openai-compatible"):
+            self.agent_type = "builtin"
+            self.builtin_provider = "ollama" if provider_type == "ollama" else "vllm"
+            self.builtin_model = agent.get("model")
+            self.builtin_base_url = agent.get("base_url")
+        else:
+            self.agent_type = "builtin"
+            self.builtin_provider = provider_type
+            self.builtin_model = agent.get("model")
+
     def run(self) -> None:
         """Run the initialization workflow."""
         click.echo(click.style("🚀 Initializing repo-sapiens", bold=True, fg="cyan"))
         click.echo()
 
-        # Step 1: Discover repository
+        # Check for existing configuration
+        has_existing = self._load_existing_config()
+        if has_existing and not self.non_interactive:
+            self._show_existing_config()
+            self._prompt_update_sections()
+
+        # Step 1: Discover repository (always needed for repo_info)
         self._discover_repository()
 
-        # Step 2: Collect credentials
-        self._collect_credentials()
+        # Step 2: Collect credentials (only if updating)
+        if self.update_git_provider or self.update_agent_provider or self.update_credentials:
+            self._collect_credentials()
+        else:
+            # Load agent type from existing config for downstream steps
+            self._load_agent_type_from_config()
 
-        # Step 3: Store credentials locally
-        self._store_credentials()
+        # Step 3: Store credentials locally (only if updating)
+        if self.update_credentials:
+            self._store_credentials()
 
-        # Step 4: Set up Gitea Actions secrets (optional)
-        if self.setup_secrets:
+        # Step 4: Set up Gitea Actions secrets (optional, only if updating credentials)
+        if self.setup_secrets and self.update_credentials:
             self._setup_gitea_secrets()
 
         # Step 5: Generate configuration file
@@ -213,7 +340,7 @@ class RepoInitializer:
         return "environment"
 
     def _normalize_url(self, url: str, service_name: str = "service") -> str:
-        """Normalize a URL by ensuring it has a protocol prefix.
+        """Normalize a URL by ensuring it has a protocol prefix and verify connectivity.
 
         Args:
             url: The URL to normalize (may or may not have http/https prefix)
@@ -224,9 +351,10 @@ class RepoInitializer:
         """
         url = url.strip()
 
-        # Already has protocol - return as-is
+        # Already has protocol - just verify
         if url.startswith("http://") or url.startswith("https://"):
-            return url.rstrip("/")
+            normalized = url.rstrip("/")
+            return self._verify_url_connectivity(normalized, service_name)
 
         # No protocol - ask user which one to use
         click.echo()
@@ -237,10 +365,69 @@ class RepoInitializer:
         )
 
         protocol = "https" if use_https else "http"
-        normalized = f"{protocol}://{url}"
+        normalized = f"{protocol}://{url}".rstrip("/")
         click.echo(f"  Using: {normalized}")
 
-        return normalized.rstrip("/")
+        return self._verify_url_connectivity(normalized, service_name)
+
+    def _verify_url_connectivity(self, url: str, service_name: str) -> str:
+        """Verify URL is reachable, allow user to retry or save anyway.
+
+        Args:
+            url: Full URL with protocol
+            service_name: Name of the service for display
+
+        Returns:
+            The URL (possibly modified by user)
+        """
+        import socket
+        import urllib.parse
+
+        if self.non_interactive:
+            return url
+
+        # Parse the URL to get host and port
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        click.echo(f"  Checking connectivity to {host}:{port}...", nl=False)
+
+        try:
+            # Quick socket check (2 second timeout)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((host, port))
+            sock.close()
+
+            if result == 0:
+                click.echo(click.style(" ✓ reachable", fg="green"))
+                return url
+            else:
+                click.echo(click.style(" ✗ unreachable", fg="red"))
+        except socket.gaierror:
+            click.echo(click.style(" ✗ hostname not found", fg="red"))
+        except TimeoutError:
+            click.echo(click.style(" ✗ timeout", fg="yellow"))
+        except Exception as e:
+            click.echo(click.style(f" ✗ error: {e}", fg="red"))
+
+        # URL not reachable - ask user what to do
+        click.echo()
+        choice = click.prompt(
+            f"  {service_name} at {url} is not reachable. What would you like to do?",
+            type=click.Choice(["save", "retry", "edit"]),
+            default="save",
+        )
+
+        if choice == "save":
+            click.echo("  Saving URL anyway (you can update it later)")
+            return url
+        elif choice == "retry":
+            return self._verify_url_connectivity(url, service_name)
+        else:  # edit
+            new_url = click.prompt("  Enter new URL", default=url)
+            return self._normalize_url(new_url, service_name)
 
     def _detect_existing_gitea_token(self) -> tuple[str | None, str | None]:
         """Check for existing Gitea token in keyring or environment.
@@ -348,15 +535,20 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
-        if self.provider_type == "gitlab":
-            self._collect_gitlab_token_interactively()
+        # Only collect git provider token if updating git provider or credentials
+        if self.update_git_provider or self.update_credentials:
+            if self.provider_type == "gitlab":
+                self._collect_gitlab_token_interactively()
+            else:
+                self._collect_gitea_token_interactively()
+            click.echo()
+
+        # AI Agent configuration (only if updating agent provider)
+        if self.update_agent_provider:
+            self._configure_ai_agent()
         else:
-            self._collect_gitea_token_interactively()
-
-        click.echo()
-
-        # AI Agent configuration
-        self._configure_ai_agent()
+            # Load agent settings from existing config
+            self._load_agent_type_from_config()
 
     def _collect_gitea_token_interactively(self) -> None:
         """Collect Gitea token interactively."""
@@ -970,7 +1162,14 @@ class RepoInitializer:
 
     def _generate_config(self) -> None:
         """Generate configuration file."""
-        click.echo(click.style("📝 Creating configuration file...", bold=True))
+        click.echo(
+            click.style(
+                "📝 Updating configuration file..."
+                if self.existing_config
+                else "📝 Creating configuration file...",
+                bold=True,
+            )
+        )
 
         # Determine credential references based on backend and provider
         if self.backend == "keyring":
@@ -1078,16 +1277,46 @@ class RepoInitializer:
         else:
             mcp_server_line = "  mcp_server: null"
 
+        # Build git_provider section (use existing if not updating)
+        if not self.update_git_provider and self.existing_config:
+            existing_git = self.existing_config.get("git_provider", {})
+            git_provider_section = "git_provider:\n"
+            for key, value in existing_git.items():
+                if isinstance(value, str) and (value.startswith("@") or value.startswith("$")):
+                    git_provider_section += f'  {key}: "{value}"\n'
+                else:
+                    git_provider_section += f"  {key}: {value}\n"
+            git_provider_section = git_provider_section.rstrip("\n")
+        else:
+            git_provider_section = f"""git_provider:
+  provider_type: {self.provider_type}
+{mcp_server_line}
+  base_url: {self.repo_info.base_url}
+  api_token: "{git_token_ref}\""""
+
+        # Build agent_provider section (use existing if not updating)
+        if not self.update_agent_provider and self.existing_config:
+            existing_agent = self.existing_config.get("agent_provider", {})
+            agent_config = "agent_provider:\n"
+            for key, value in existing_agent.items():
+                if isinstance(value, dict):
+                    agent_config += f"  {key}:\n"
+                    for subkey, subval in value.items():
+                        agent_config += f"    {subkey}: {subval}\n"
+                elif isinstance(value, str) and (value.startswith("@") or value.startswith("$")):
+                    agent_config += f'  {key}: "{value}"\n'
+                elif value is None:
+                    agent_config += f"  {key}: null\n"
+                else:
+                    agent_config += f"  {key}: {value}\n"
+            agent_config = agent_config.rstrip("\n")
+
         # Generate configuration content
         config_content = f"""# Automation System Configuration
 # Generated by: sapiens init
 # Repository: {self.repo_info.owner}/{self.repo_info.repo}
 
-git_provider:
-  provider_type: {self.provider_type}
-{mcp_server_line}
-  base_url: {self.repo_info.base_url}
-  api_token: "{git_token_ref}"
+{git_provider_section}
 
 repository:
   owner: {self.repo_info.owner}

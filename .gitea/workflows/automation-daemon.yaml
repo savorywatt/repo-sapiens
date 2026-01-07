@@ -2,16 +2,17 @@
 # @version: 1.1.0
 # @name: automation-daemon
 #
-# Sapiens Automation Daemon for GitHub Actions
+# Sapiens Automation Daemon for Gitea Actions
 #
 # This workflow runs repo-sapiens periodically to process issues automatically.
 #
 # Setup:
-# 1. Copy this file to .github/workflows/automation-daemon.yaml
+# 1. Copy this file to .gitea/workflows/automation-daemon.yaml
 # 2. Set required secrets in your repo settings:
-#    - GITHUB_TOKEN is automatic, but you may need a PAT for some operations
+#    - SAPIENS_GITEA_TOKEN: Your Gitea API token
+#      (Note: Gitea reserves GITEA_* prefix for internal use)
 #    - OPENAI_API_KEY: (if using Goose with OpenAI)
-#    - ANTHROPIC_API_KEY: (if using Claude)
+#    - ANTHROPIC_API_KEY or CLAUDE_API_KEY: (if using Claude)
 # 3. Update CONFIG_FILE to match your config
 
 name: Sapiens Daemon
@@ -21,22 +22,13 @@ on:
     - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:  # Manual trigger
 
-permissions:
-  contents: read
-  issues: read
-
 env:
+  # Change this to your config file (use sapiens_config.ci.yaml for CI/CD specific config)
   CONFIG_FILE: sapiens_config.yaml
-
-# Prevent concurrent runs to avoid race conditions
-concurrency:
-  group: sapiens-daemon
-  cancel-in-progress: false
 
 jobs:
   process-pending:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -55,8 +47,9 @@ jobs:
 
       - name: Process all pending issues
         env:
-          # GitHub token (use PAT if needed for more permissions)
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Git provider credentials
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          GITEA_API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 
           # AI provider credentials (uncomment the one you use)
           # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -69,6 +62,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: workflow-state-${{ github.run_number }}
+          name: workflow-state-${{ gitea.run_number }}
           path: .automation/state/
           retention-days: 7
