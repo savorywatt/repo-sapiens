@@ -10,5 +10,6 @@ Key Commands:
 
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.init import init_command
+from repo_sapiens.cli.update import update_command
 
-__all__ = ["credentials_group", "init_command"]
+__all__ = ["credentials_group", "init_command", "update_command"]

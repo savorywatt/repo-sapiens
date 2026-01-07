@@ -8,7 +8,9 @@ import click
 import structlog
 
 from repo_sapiens.cli.credentials import credentials_group
+from repo_sapiens.cli.health import health_check
 from repo_sapiens.cli.init import init_command
+from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
@@ -25,7 +27,7 @@ log = structlog.get_logger(__name__)
 @click.group()
 @click.option(
     "--config",
-    default="repo_sapiens/config/automation_config.yaml",
+    default=".sapiens/config.yaml",
     help="Path to configuration file",
 )
 @click.option("--log-level", default="INFO", help="Logging level")
@@ -36,9 +38,23 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
     configure_logging(log_level)
 
     # Skip config loading for commands that don't need it
-    # (init creates the config, credentials manages credentials, react is standalone)
-    commands_without_config = ["init", "credentials", "react"]
+    # (init creates the config, credentials manages credentials, update checks templates,
+    # health-check handles its own config loading)
+    commands_without_config = ["init", "credentials", "update", "health-check"]
     if ctx.invoked_subcommand in commands_without_config:
+        ctx.obj = {"settings": None}
+        return
+
+    # React can optionally use config but doesn't require it
+    if ctx.invoked_subcommand == "react":
+        config_path = Path(config)
+        if config_path.exists():
+            try:
+                settings = AutomationSettings.from_yaml(str(config_path))
+                ctx.obj = {"settings": settings}
+                return
+            except Exception:
+                pass  # Fall through to use defaults
         ctx.obj = {"settings": None}
         return
 
@@ -160,25 +176,29 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 
 @cli.command()
 @click.argument("task", required=False)
-@click.option("--model", default="qwen3:latest", help="Ollama model to use")
-@click.option("--ollama-url", default="http://localhost:11434", help="Ollama server URL")
+@click.option("--model", default=None, help="Model to use (default: from config or qwen3:8b)")
+@click.option("--ollama-url", default=None, help="Ollama server URL (default: from config)")
 @click.option("--max-iterations", default=10, type=int, help="Max ReAct iterations")
 @click.option("--working-dir", default=".", help="Working directory for file operations")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed trajectory")
 @click.option("--repl", is_flag=True, help="Start interactive REPL mode")
+@click.pass_context
 def react(
+    ctx: click.Context,
     task: str | None,
-    model: str,
-    ollama_url: str,
+    model: str | None,
+    ollama_url: str | None,
     max_iterations: int,
     working_dir: str,
     verbose: bool,
     repl: bool,
 ) -> None:
-    """Run a task using the ReAct agent with Ollama.
+    """Run a task using the ReAct agent with Ollama/vLLM.
 
     The ReAct agent reasons step-by-step and uses tools (read/write files,
     run commands) to complete the task.
+
+    Settings are read from the config file (--config). CLI options override config.
 
     Examples:
         sapiens react "Create a hello.py file that prints Hello World"
@@ -190,6 +210,22 @@ def react(
     if not task and not repl:
         click.echo("Error: Either provide a TASK or use --repl for interactive mode", err=True)
         sys.exit(1)
+
+    # Get settings from config (may be None if config doesn't exist)
+    settings = ctx.obj.get("settings") if ctx.obj else None
+
+    # Resolve model and URL from config or defaults
+    if model is None:
+        if settings and settings.agent_provider:
+            model = settings.agent_provider.model or "qwen3:8b"
+        else:
+            model = "qwen3:8b"
+
+    if ollama_url is None:
+        if settings and settings.agent_provider and settings.agent_provider.base_url:
+            ollama_url = settings.agent_provider.base_url
+        else:
+            ollama_url = "http://localhost:11434"
 
     async def execute_single_task(agent: ReActAgentProvider, task_text: str) -> bool:
         """Execute a single task and display results. Returns success status."""
@@ -274,7 +310,9 @@ def react(
                         click.echo("Goodbye!")
                         break
                     elif cmd == "/help":
-                        click.echo("\nCommands: /help, /models, /model <name>, /pwd, /verbose, /clear, /quit")
+                        click.echo(
+                            "\nCommands: /help, /models, /model <name>, /pwd, /verbose, /clear, /quit"
+                        )
                         click.echo("Or type any task for the agent to execute.\n")
                     elif cmd == "/models":
                         models = await agent.list_models()
@@ -352,11 +390,253 @@ def react(
         sys.exit(1)
 
 
+@cli.command()
+@click.argument("task", required=False)
+@click.option("--timeout", default=300, type=int, help="Max execution time in seconds")
+@click.option("--working-dir", default=".", help="Working directory for execution")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+@click.pass_context
+def run(
+    ctx: click.Context,
+    task: str | None,
+    timeout: int,
+    working_dir: str,
+    verbose: bool,
+) -> None:
+    """Run a task using the configured AI agent.
+
+    Dispatches to the agent configured in .sapiens/config.yaml:
+    - claude-local: Uses Claude CLI (claude -p "task")
+    - goose-local: Uses Goose CLI (goose session start)
+    - ollama/openai-compatible: Uses builtin ReAct agent with local model
+    - openai/anthropic: Uses builtin ReAct agent with API
+
+    Task can be provided as argument or via stdin for long prompts.
+
+    Examples:
+        sapiens run "Summarize the codebase structure"
+        sapiens run "Fix the bug in auth.py" --timeout 600
+        echo "Long task prompt..." | sapiens run
+        cat task.txt | sapiens run
+    """
+    # Support stdin for long prompts
+    if not task:
+        if not sys.stdin.isatty():
+            task = sys.stdin.read().strip()
+        if not task:
+            click.echo("Error: No task provided. Pass as argument or via stdin.", err=True)
+            sys.exit(1)
+
+    settings = ctx.obj.get("settings") if ctx.obj else None
+
+    if not settings:
+        click.echo(
+            "Error: Configuration required. Run 'sapiens init' first or check your config file.",
+            err=True,
+        )
+        sys.exit(1)
+
+    provider_type = settings.agent_provider.provider_type
+
+    try:
+        asyncio.run(_run_task(settings, task, timeout, working_dir, verbose))
+    except KeyboardInterrupt:
+        click.echo("\nInterrupted by user", err=True)
+        sys.exit(130)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        log.error("run_task_error", provider=provider_type, exc_info=True)
+        sys.exit(1)
+
+
+async def _run_task(
+    settings: AutomationSettings,
+    task: str,
+    timeout: int,
+    working_dir: str,
+    verbose: bool,
+) -> None:
+    """Execute task using the configured agent provider.
+
+    Args:
+        settings: Automation settings with agent configuration
+        task: Task prompt to execute
+        timeout: Maximum execution time in seconds
+        working_dir: Working directory for file operations
+        verbose: Whether to show detailed output
+    """
+    provider_type = settings.agent_provider.provider_type
+
+    if provider_type == "claude-local":
+        await _run_claude_cli(task, timeout, working_dir)
+    elif provider_type == "goose-local":
+        await _run_goose_cli(task, timeout, working_dir, settings)
+    elif provider_type in ("ollama", "openai-compatible"):
+        await _run_react_agent(task, timeout, working_dir, verbose, settings)
+    else:
+        # API-based providers (openai, anthropic, claude-api, goose-api)
+        await _run_react_agent(task, timeout, working_dir, verbose, settings)
+
+
+async def _run_claude_cli(task: str, timeout: int, working_dir: str) -> None:
+    """Run task using Claude CLI."""
+    import shutil
+
+    claude_path = shutil.which("claude")
+    if not claude_path:
+        raise RuntimeError("Claude CLI not found. Install it or choose a different agent provider.")
+
+    click.echo("Running task with Claude CLI...")
+    click.echo(f"Working directory: {Path(working_dir).resolve()}")
+    click.echo("-" * 40)
+
+    # Stream output directly to terminal
+    process = await asyncio.create_subprocess_exec(
+        claude_path,
+        "-p",
+        task,
+        cwd=working_dir,
+        stdout=None,  # Inherit stdout for streaming
+        stderr=None,  # Inherit stderr for streaming
+    )
+
+    try:
+        await asyncio.wait_for(process.wait(), timeout=timeout)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+        raise RuntimeError(f"Task timed out after {timeout} seconds")
+
+    if process.returncode != 0:
+        raise RuntimeError(f"Claude CLI exited with code {process.returncode}")
+
+
+async def _run_goose_cli(
+    task: str,
+    timeout: int,
+    working_dir: str,
+    settings: AutomationSettings,
+) -> None:
+    """Run task using Goose CLI."""
+    import shutil
+
+    goose_path = shutil.which("goose")
+    if not goose_path:
+        raise RuntimeError("Goose CLI not found. Install it or choose a different agent provider.")
+
+    click.echo("Running task with Goose CLI...")
+    click.echo(f"Working directory: {Path(working_dir).resolve()}")
+    click.echo("-" * 40)
+
+    # Build command with optional config
+    cmd = [goose_path, "session", "start", "--prompt", task]
+
+    # Add provider if configured
+    if settings.agent_provider.goose_config:
+        if settings.agent_provider.goose_config.llm_provider:
+            cmd.extend(["--provider", settings.agent_provider.goose_config.llm_provider])
+
+    # Stream output directly to terminal
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=working_dir,
+        stdout=None,
+        stderr=None,
+    )
+
+    try:
+        await asyncio.wait_for(process.wait(), timeout=timeout)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+        raise RuntimeError(f"Task timed out after {timeout} seconds")
+
+    if process.returncode != 0:
+        raise RuntimeError(f"Goose CLI exited with code {process.returncode}")
+
+
+async def _run_react_agent(
+    task: str,
+    timeout: int,
+    working_dir: str,
+    verbose: bool,
+    settings: AutomationSettings,
+) -> None:
+    """Run task using builtin ReAct agent."""
+    from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
+    from repo_sapiens.models.domain import Task as DomainTask
+
+    # Get model and URL from settings
+    model = settings.agent_provider.model or "qwen3:8b"
+    base_url = settings.agent_provider.base_url or "http://localhost:11434"
+
+    click.echo("Running task with ReAct agent...")
+    click.echo(f"Model: {model}")
+    click.echo(f"Backend: {base_url}")
+    click.echo(f"Working directory: {Path(working_dir).resolve()}")
+    click.echo("-" * 40)
+
+    # Calculate max iterations from timeout (rough estimate: 30s per iteration)
+    max_iterations = max(3, timeout // 30)
+
+    config = ReActConfig(
+        model=model,
+        max_iterations=max_iterations,
+        ollama_url=base_url,
+    )
+    agent = ReActAgentProvider(working_dir=working_dir, config=config)
+
+    async with agent:
+        try:
+            await agent.connect()
+        except RuntimeError as e:
+            raise RuntimeError(f"Failed to connect to LLM backend: {e}")
+
+        domain_task = DomainTask(
+            id="run-task",
+            prompt_issue_id=0,
+            title=task,
+            description=task,
+        )
+
+        result = await agent.execute_task(domain_task, {})
+
+        if verbose:
+            click.echo("\n--- Trajectory ---")
+            for step in agent.get_trajectory():
+                click.echo(f"\nStep {step.iteration}:")
+                click.echo(f"  THOUGHT: {step.thought[:200]}...")
+                click.echo(f"  ACTION: {step.action}")
+                click.echo(f"  INPUT: {step.action_input}")
+                obs_preview = step.observation[:150].replace("\n", " ")
+                click.echo(f"  OBSERVATION: {obs_preview}...")
+
+        click.echo("\n--- Result ---")
+        if result.success:
+            click.echo("Status: SUCCESS")
+            if result.output:
+                click.echo(f"\n{result.output}")
+        else:
+            click.echo(f"Status: FAILED - {result.error}")
+
+        if result.files_changed:
+            click.echo(f"\nFiles changed: {', '.join(result.files_changed)}")
+
+        if not result.success:
+            raise RuntimeError(result.error or "Task failed")
+
+
 # Add credentials management command group
 cli.add_command(credentials_group)
 
+# Add health-check command
+cli.add_command(health_check)
+
 # Add init command
 cli.add_command(init_command)
+
+# Add update command
+cli.add_command(update_command)
 
 
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:

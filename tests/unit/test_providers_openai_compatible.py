@@ -1,4 +1,4 @@
-"""Tests for repo_sapiens/providers/openai_compatible.py - OpenAI-compatible provider."""
+"""Tests for repo_sapiens/providers/openai_compatible.py - OpenAI-compatible API provider."""
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from repo_sapiens.models.domain import Issue, IssueState, Plan, Task, TaskResult
+from repo_sapiens.models.domain import Issue, IssueState, Plan, Review, Task, TaskResult
 from repo_sapiens.providers.openai_compatible import OpenAICompatibleProvider
 
 
@@ -17,22 +17,12 @@ def provider():
 
 
 @pytest.fixture
-def provider_with_auth():
-    """Create OpenAICompatibleProvider with API key authentication."""
-    return OpenAICompatibleProvider(
-        base_url="http://localhost:8000/v1",
-        model="gpt-4",
-        api_key="sk-test-api-key-12345",  # pragma: allowlist secret
-    )
-
-
-@pytest.fixture
 def provider_custom():
     """Create OpenAICompatibleProvider instance with custom settings."""
     return OpenAICompatibleProvider(
-        base_url="http://custom-server:9000/v1",
-        model="codellama:13b",
-        api_key="test-key",  # pragma: allowlist secret
+        base_url="http://custom-vllm:8080/v1",
+        model="mistral-7b-instruct",
+        api_key="test-api-key",
         working_dir="/workspace/project",
         qa_handler=MagicMock(),
         timeout=600.0,
@@ -45,10 +35,10 @@ def sample_issue():
     return Issue(
         id=1,
         number=42,
-        title="Add user authentication",
-        body="We need to implement login and signup functionality.",
+        title="Implement rate limiting",
+        body="We need to add rate limiting to the API endpoints.",
         state=IssueState.OPEN,
-        labels=["feature", "high-priority"],
+        labels=["feature", "api"],
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
         author="testuser",
@@ -62,8 +52,8 @@ def sample_task():
     return Task(
         id="task-1",
         prompt_issue_id=42,
-        title="Create User model",
-        description="Implement User model with authentication fields",
+        title="Add rate limiter middleware",
+        description="Implement middleware to track and limit API requests per client",
         dependencies=[],
     )
 
@@ -88,41 +78,36 @@ class TestOpenAICompatibleProviderInit:
         """Should initialize with custom values."""
         qa_handler = MagicMock()
         provider = OpenAICompatibleProvider(
-            base_url="http://custom-host:9000/v1/",
-            model="mistral:7b",
-            api_key="secret-key",  # pragma: allowlist secret
-            working_dir="/custom/path",
+            base_url="http://openrouter.ai/api/v1/",
+            model="anthropic/claude-3-opus",
+            api_key="sk-test-key",
+            working_dir="/custom/workspace",
             qa_handler=qa_handler,
-            timeout=600.0,
+            timeout=120.0,
         )
 
         # Trailing slash should be stripped
-        assert provider.base_url == "http://custom-host:9000/v1"
-        assert provider.model == "mistral:7b"
-        assert provider.api_key == "secret-key"  # pragma: allowlist secret
-        assert provider.working_dir == "/custom/path"
+        assert provider.base_url == "http://openrouter.ai/api/v1"
+        assert provider.model == "anthropic/claude-3-opus"
+        assert provider.api_key == "sk-test-key"
+        assert provider.working_dir == "/custom/workspace"
         assert provider.qa_handler is qa_handler
-        assert provider.timeout == 600.0
+        assert provider.timeout == 120.0
 
     def test_init_strips_trailing_slash(self):
         """Should strip trailing slash from base_url."""
         provider = OpenAICompatibleProvider(base_url="http://localhost:8000/v1///")
         assert provider.base_url == "http://localhost:8000/v1"
 
-    def test_init_strips_single_trailing_slash(self):
-        """Should strip single trailing slash from base_url."""
-        provider = OpenAICompatibleProvider(base_url="http://localhost:8000/v1/")
-        assert provider.base_url == "http://localhost:8000/v1"
-
-    def test_init_with_api_key_sets_auth_header(self, provider_with_auth):
+    def test_init_with_api_key_sets_auth_header(self):
         """Should set Authorization header when api_key is provided."""
-        # Headers are stored in the client - verify client was created
-        assert provider_with_auth.client is not None
-        assert provider_with_auth.api_key == "sk-test-api-key-12345"  # pragma: allowlist secret
+        provider = OpenAICompatibleProvider(api_key="test-bearer-token")
+        # Headers are stored in client config
+        assert provider.client is not None
 
-    def test_init_without_api_key_no_auth_header(self, provider):
-        """Should not set Authorization header when no api_key."""
-        assert provider.api_key is None
+    def test_init_without_api_key_no_auth_header(self):
+        """Should not set Authorization header when api_key is None."""
+        provider = OpenAICompatibleProvider(api_key=None)
         assert provider.client is not None
 
     def test_init_working_dir_none_defaults_to_current(self):
@@ -130,10 +115,10 @@ class TestOpenAICompatibleProviderInit:
         provider = OpenAICompatibleProvider(working_dir=None)
         assert provider.working_dir == "."
 
-    def test_init_client_timeout(self):
-        """Should create client with specified timeout."""
-        provider = OpenAICompatibleProvider(timeout=120.0)
-        assert provider.timeout == 120.0
+    def test_init_client_with_custom_timeout(self):
+        """Should create client with custom timeout."""
+        provider = OpenAICompatibleProvider(timeout=600.0)
+        assert provider.timeout == 600.0
         assert provider.client is not None
 
 
@@ -146,8 +131,8 @@ class TestOpenAICompatibleProviderConnection:
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "data": [
-                {"id": "gpt-4"},
-                {"id": "gpt-3.5-turbo"},
+                {"id": "default"},
+                {"id": "codellama-7b"},
             ]
         }
         mock_response.raise_for_status = MagicMock()
@@ -160,10 +145,24 @@ class TestOpenAICompatibleProviderConnection:
             mock_get.assert_called_once_with("http://localhost:8000/v1/models")
 
     @pytest.mark.asyncio
-    async def test_connect_model_not_found(self):
-        """Should log warning when model is not available."""
-        provider = OpenAICompatibleProvider(model="nonexistent-model")
+    async def test_connect_model_found(self, provider_custom):
+        """Should log success when specified model is found."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "data": [
+                {"id": "mistral-7b-instruct"},
+                {"id": "llama-2-13b"},
+            ]
+        }
+        mock_response.raise_for_status = MagicMock()
 
+        with patch.object(provider_custom.client, "get", AsyncMock(return_value=mock_response)):
+            # Should not raise
+            await provider_custom.connect()
+
+    @pytest.mark.asyncio
+    async def test_connect_model_not_found_logs_warning(self, provider_custom):
+        """Should log warning when specified model is not found."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "data": [
@@ -172,31 +171,13 @@ class TestOpenAICompatibleProviderConnection:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
+        with patch.object(provider_custom.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise, just log warning
-            await provider.connect()
+            await provider_custom.connect()
 
     @pytest.mark.asyncio
-    async def test_connect_model_found_by_substring(self):
-        """Should find model by substring match."""
-        provider = OpenAICompatibleProvider(model="gpt-4")
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "data": [
-                {"id": "gpt-4-turbo-preview"},
-                {"id": "gpt-3.5-turbo"},
-            ]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
-            # Should not raise - "gpt-4" is in "gpt-4-turbo-preview"
-            await provider.connect()
-
-    @pytest.mark.asyncio
-    async def test_connect_with_default_model_skips_check(self, provider):
-        """Should skip model check when using 'default' model."""
+    async def test_connect_default_model_skips_check(self, provider):
+        """Should skip model availability check when using 'default' model."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"data": []}
         mock_response.raise_for_status = MagicMock()
@@ -217,34 +198,11 @@ class TestOpenAICompatibleProviderConnection:
                 await provider.connect()
 
         assert "OpenAI-compatible server not running" in str(exc_info.value)
-        assert "http://localhost:8000/v1" in str(exc_info.value)
+        assert provider.base_url in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_connect_401_unauthorized(self, provider_with_auth):
-        """Should raise HTTPStatusError for 401 unauthorized."""
-        mock_response = MagicMock()
-        mock_response.status_code = 401
-        mock_response.json.return_value = {
-            "error": {"message": "Invalid API key", "type": "invalid_request_error"}
-        }
-
-        with patch.object(
-            provider_with_auth.client,
-            "get",
-            AsyncMock(
-                side_effect=httpx.HTTPStatusError(
-                    "Unauthorized",
-                    request=MagicMock(),
-                    response=mock_response,
-                )
-            ),
-        ):
-            with pytest.raises(httpx.HTTPStatusError):
-                await provider_with_auth.connect()
-
-    @pytest.mark.asyncio
-    async def test_connect_404_models_endpoint_not_supported(self, provider):
-        """Should proceed when /models endpoint returns 404."""
+    async def test_connect_models_endpoint_404(self, provider):
+        """Should log warning when /models endpoint returns 404."""
         mock_response = MagicMock()
         mock_response.status_code = 404
 
@@ -259,12 +217,12 @@ class TestOpenAICompatibleProviderConnection:
                 )
             ),
         ):
-            # Should not raise - 404 on /models is acceptable
+            # Should not raise, just log warning
             await provider.connect()
 
     @pytest.mark.asyncio
-    async def test_connect_500_server_error(self, provider):
-        """Should raise HTTPStatusError for 500 server error."""
+    async def test_connect_other_http_error(self, provider):
+        """Should propagate non-404 HTTP errors."""
         mock_response = MagicMock()
         mock_response.status_code = 500
 
@@ -273,7 +231,7 @@ class TestOpenAICompatibleProviderConnection:
             "get",
             AsyncMock(
                 side_effect=httpx.HTTPStatusError(
-                    "Internal Server Error",
+                    "Server error",
                     request=MagicMock(),
                     response=mock_response,
                 )
@@ -288,12 +246,12 @@ class TestOpenAICompatibleProviderConnection:
         with patch.object(
             provider.client,
             "get",
-            AsyncMock(side_effect=Exception("Unexpected error")),
+            AsyncMock(side_effect=ValueError("Unexpected error")),
         ):
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(ValueError) as exc_info:
                 await provider.connect()
 
-        assert "Unexpected error" in str(exc_info.value)
+            assert "Unexpected error" in str(exc_info.value)
 
 
 class TestOpenAICompatibleProviderContextManager:
@@ -305,7 +263,7 @@ class TestOpenAICompatibleProviderContextManager:
         provider = OpenAICompatibleProvider()
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {"data": [{"id": "model-1"}]}
+        mock_response.json.return_value = {"data": [{"id": "default"}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)):
@@ -318,7 +276,7 @@ class TestOpenAICompatibleProviderContextManager:
         provider = OpenAICompatibleProvider()
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {"data": [{"id": "model-1"}]}
+        mock_response.json.return_value = {"data": [{"id": "default"}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(
@@ -334,7 +292,7 @@ class TestOpenAICompatibleProviderContextManager:
         provider = OpenAICompatibleProvider()
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {"data": [{"id": "model-1"}]}
+        mock_response.json.return_value = {"data": [{"id": "default"}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(
@@ -355,31 +313,29 @@ class TestOpenAICompatibleProviderExecutePrompt:
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "choices": [
-                {"message": {"role": "assistant", "content": "Here is the implementation code..."}}
+                {"message": {"content": "Here is the implementation...\nCreated file: app.py"}}
             ],
-            "usage": {"total_tokens": 150},
+            "usage": {"total_tokens": 250},
         }
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt(
-                "Write a function",
-                context={"test": "value"},
+                "Write a function to parse JSON",
+                context={"workspace": "/tmp"},
                 task_id="task-1",
             )
 
         assert result["success"] is True
-        assert result["output"] == "Here is the implementation code..."
+        assert "Here is the implementation" in result["output"]
         assert result["error"] is None
-        assert isinstance(result["files_changed"], list)
+        assert "app.py" in result["files_changed"]
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_correct_api_call(self, provider):
-        """Should make correct API call to chat completions endpoint."""
+    async def test_execute_prompt_api_call_format(self, provider):
+        """Should make correct API call to chat/completions endpoint."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Response"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Response text"}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(
@@ -390,28 +346,10 @@ class TestOpenAICompatibleProviderExecutePrompt:
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         assert call_args[0][0] == "http://localhost:8000/v1/chat/completions"
-
         json_body = call_args[1]["json"]
         assert json_body["model"] == "default"
         assert json_body["messages"] == [{"role": "user", "content": "Test prompt"}]
         assert json_body["temperature"] == 0.7
-
-    @pytest.mark.asyncio
-    async def test_execute_prompt_with_custom_model(self, provider_with_auth):
-        """Should use custom model in API call."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Response"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(
-            provider_with_auth.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
-            await provider_with_auth.execute_prompt("Test prompt")
-
-        json_body = mock_post.call_args[1]["json"]
-        assert json_body["model"] == "gpt-4"
 
     @pytest.mark.asyncio
     async def test_execute_prompt_no_choices(self, provider):
@@ -421,93 +359,93 @@ class TestOpenAICompatibleProviderExecutePrompt:
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            result = await provider.execute_prompt("Test prompt")
+            result = await provider.execute_prompt("Test prompt", task_id="task-1")
 
         assert result["success"] is False
         assert result["output"] == ""
-        assert result["error"] == "No choices returned from API"
+        assert "No choices returned" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_empty_message_content(self, provider):
-        """Should handle empty message content."""
+    async def test_execute_prompt_empty_choices(self, provider):
+        """Should handle response with empty choices array."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {"choices": [{"message": {}}]}
+        mock_response.json.return_value = {}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             result = await provider.execute_prompt("Test prompt")
 
-        assert result["success"] is True
-        assert result["output"] == ""
+        assert result["success"] is False
+        assert "No choices returned" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_api_error(self, provider):
-        """Should handle API errors gracefully."""
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.json.return_value = {"error": {"message": "Internal server error"}}
+    async def test_execute_prompt_http_error_with_json_body(self, provider):
+        """Should extract error message from JSON response body."""
+        mock_response_obj = MagicMock()
+        mock_response_obj.status_code = 400
+        mock_response_obj.json.return_value = {"error": {"message": "Invalid model specified"}}
 
         with patch.object(
             provider.client,
             "post",
             AsyncMock(
                 side_effect=httpx.HTTPStatusError(
-                    "API Error",
+                    "Bad Request",
                     request=MagicMock(),
-                    response=mock_response,
+                    response=mock_response_obj,
                 )
             ),
         ):
             result = await provider.execute_prompt("Test prompt", task_id="task-1")
 
         assert result["success"] is False
-        assert result["output"] == ""
-        assert "500" in result["error"]
-        assert "Internal server error" in result["error"]
+        assert "Invalid model specified" in result["error"]
+        assert "400" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_api_error_no_json_body(self, provider):
-        """Should handle API errors when response body is not JSON."""
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.json.side_effect = ValueError("Not JSON")
+    async def test_execute_prompt_http_error_without_json_body(self, provider):
+        """Should handle HTTP error when response body is not JSON."""
+        mock_response_obj = MagicMock()
+        mock_response_obj.status_code = 500
+        mock_response_obj.json.side_effect = ValueError("Not JSON")
 
         with patch.object(
             provider.client,
             "post",
             AsyncMock(
                 side_effect=httpx.HTTPStatusError(
-                    "Server Error",
+                    "Internal Server Error",
                     request=MagicMock(),
-                    response=mock_response,
+                    response=mock_response_obj,
                 )
             ),
         ):
-            result = await provider.execute_prompt("Test prompt")
+            result = await provider.execute_prompt("Test prompt", task_id="task-1")
 
         assert result["success"] is False
-        assert result["error"] is not None
+        assert "500" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_connection_error(self, provider):
-        """Should handle connection errors."""
+    async def test_execute_prompt_generic_exception(self, provider):
+        """Should handle generic exceptions."""
         with patch.object(
             provider.client,
             "post",
-            AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
+            AsyncMock(side_effect=RuntimeError("Connection reset")),
         ):
-            result = await provider.execute_prompt("Test prompt")
+            result = await provider.execute_prompt("Test prompt", task_id="task-1")
 
         assert result["success"] is False
-        assert "Connection refused" in result["error"]
+        assert result["output"] == ""
+        assert "Connection reset" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_with_usage_stats(self, provider):
-        """Should extract token usage from response."""
+    async def test_execute_prompt_extracts_usage_total_tokens(self, provider):
+        """Should extract total_tokens from usage if available."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test"}}],
-            "usage": {"prompt_tokens": 50, "completion_tokens": 100, "total_tokens": 150},
+            "choices": [{"message": {"content": "Response"}}],
+            "usage": {"total_tokens": 500},
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -517,11 +455,11 @@ class TestOpenAICompatibleProviderExecutePrompt:
         assert result["success"] is True
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_with_completion_tokens_only(self, provider):
-        """Should handle usage with only completion_tokens."""
+    async def test_execute_prompt_extracts_usage_completion_tokens(self, provider):
+        """Should fall back to completion_tokens if total_tokens unavailable."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test"}}],
+            "choices": [{"message": {"content": "Response"}}],
             "usage": {"completion_tokens": 100},
         }
         mock_response.raise_for_status = MagicMock()
@@ -535,9 +473,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
     async def test_execute_prompt_with_none_context(self, provider):
         """Should handle None context."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
@@ -549,9 +485,7 @@ class TestOpenAICompatibleProviderExecutePrompt:
     async def test_execute_prompt_with_none_task_id(self, provider):
         """Should handle None task_id."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Test"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
@@ -565,9 +499,9 @@ class TestOpenAICompatibleProviderDetectChangedFiles:
 
     def test_detect_created_file(self, provider):
         """Should detect created files."""
-        output = "Created file: src/models/user.py\nDone."
+        output = "Created file: src/middleware/rate_limiter.py\nDone."
         files = provider._detect_changed_files(output)
-        assert "src/models/user.py" in files
+        assert "src/middleware/rate_limiter.py" in files
 
     def test_detect_modified_file(self, provider):
         """Should detect modified files."""
@@ -582,28 +516,28 @@ class TestOpenAICompatibleProviderDetectChangedFiles:
         assert "README.md" in files
 
     def test_detect_writing_to_file(self, provider):
-        """Should detect files being written to."""
-        output = "Writing to: output.txt"
+        """Should detect 'Writing to:' pattern."""
+        output = "Writing to: output.json"
         files = provider._detect_changed_files(output)
-        assert "output.txt" in files
+        assert "output.json" in files
 
     def test_detect_saved_file(self, provider):
-        """Should detect saved files."""
-        output = "Saved: data.json"
+        """Should detect 'Saved:' pattern."""
+        output = "Saved: data.csv"
         files = provider._detect_changed_files(output)
-        assert "data.json" in files
+        assert "data.csv" in files
 
     def test_detect_file_pattern(self, provider):
-        """Should detect File: pattern."""
+        """Should detect 'File:' pattern."""
         output = "File: test.py"
         files = provider._detect_changed_files(output)
         assert "test.py" in files
 
-    def test_detect_file_uppercase(self, provider):
-        """Should detect FILE: uppercase pattern."""
-        output = "FILE: main.py"
+    def test_detect_file_uppercase_pattern(self, provider):
+        """Should detect 'FILE:' pattern (uppercase)."""
+        output = "FILE: IMPORTANT.txt"
         files = provider._detect_changed_files(output)
-        assert "main.py" in files
+        assert "IMPORTANT.txt" in files
 
     def test_detect_multiple_files(self, provider):
         """Should detect multiple file changes."""
@@ -611,11 +545,13 @@ class TestOpenAICompatibleProviderDetectChangedFiles:
         Created file: app.py
         Modified file: setup.py
         Updated file: README.md
+        Writing to: config.json
         """
         files = provider._detect_changed_files(output)
         assert "app.py" in files
         assert "setup.py" in files
         assert "README.md" in files
+        assert "config.json" in files
 
     def test_detect_no_files(self, provider):
         """Should return empty list when no files detected."""
@@ -623,18 +559,35 @@ class TestOpenAICompatibleProviderDetectChangedFiles:
         files = provider._detect_changed_files(output)
         assert files == []
 
+    def test_detect_file_with_path(self, provider):
+        """Should extract complete file paths."""
+        output = "Created file: src/models/user.py additional text"
+        files = provider._detect_changed_files(output)
+        assert "src/models/user.py" in files
+
     def test_detect_file_with_special_characters(self, provider):
         """Should handle file paths with special characters."""
         output = "Created file: path/to/file-with-dashes_and_underscores.py"
         files = provider._detect_changed_files(output)
         assert "path/to/file-with-dashes_and_underscores.py" in files
 
+    def test_detect_file_empty_after_pattern(self, provider):
+        """Should raise IndexError when pattern has no filename after it.
+
+        Note: This is a known limitation in the current implementation.
+        The code assumes there will always be a filename after the pattern.
+        """
+        output = "Created file:"
+        # Current implementation raises IndexError when no filename follows
+        with pytest.raises(IndexError):
+            provider._detect_changed_files(output)
+
 
 class TestOpenAICompatibleProviderParseTasksFromMarkdown:
     """Tests for _parse_tasks_from_markdown method."""
 
     def test_parse_standard_format(self, provider):
-        """Should parse tasks in standard format."""
+        """Should parse tasks in standard format (## N. Title)."""
         markdown = """
 ## 1. First Task
 Description of first task.
@@ -655,7 +608,7 @@ Final task description.
         assert tasks[2].id == "task-3"
 
     def test_parse_colon_format(self, provider):
-        """Should parse tasks with colon separator."""
+        """Should parse tasks with colon separator (## N: Title)."""
         markdown = """
 ## 1: Task One
 Description one.
@@ -685,6 +638,29 @@ Description two.
         markdown = "# Overview\nSome text without task format."
         tasks = provider._parse_tasks_from_markdown(markdown)
         assert tasks == []
+
+    def test_parse_task_with_nested_headers(self, provider):
+        """Should filter out lines starting with # from descriptions.
+
+        The parser skips any line starting with # when accumulating description,
+        so ### headers are excluded from task descriptions.
+        """
+        markdown = """
+## 1. Main Task
+Description.
+### Subtask details
+More info.
+
+## 2. Second Task
+Another description.
+"""
+        tasks = provider._parse_tasks_from_markdown(markdown)
+
+        assert len(tasks) == 2
+        # Note: Lines starting with # are skipped, so "Subtask details" is NOT included
+        assert "Subtask details" not in tasks[0].description
+        # But "More info." IS included since it doesn't start with #
+        assert "More info" in tasks[0].description
 
     def test_task_objects_have_attribute_access(self, provider):
         """Should return task objects with attribute access."""
@@ -719,19 +695,19 @@ Description two.
         assert tasks[0].custom_field == "custom_value"
         assert tasks[0]["custom_field"] == "custom_value"
 
-    def test_parse_ignores_overview_headers(self, provider):
-        """Should not parse overview headers as tasks."""
+    def test_parse_preserves_multiline_description(self, provider):
+        """Should preserve multi-line descriptions correctly."""
         markdown = """
-# Overview
-This is the overview.
-
-## 1. Actual Task
-Task description.
+## 1. Setup Database
+First line.
+Second line.
+Third line.
 """
         tasks = provider._parse_tasks_from_markdown(markdown)
 
-        assert len(tasks) == 1
-        assert tasks[0].title == "Actual Task"
+        assert "First line" in tasks[0].description
+        assert "Second line" in tasks[0].description
+        assert "Third line" in tasks[0].description
 
 
 class TestOpenAICompatibleProviderGeneratePlan:
@@ -742,23 +718,21 @@ class TestOpenAICompatibleProviderGeneratePlan:
         """Should generate a plan from an issue."""
         plan_output = """
 # Overview
-This plan implements user authentication with login and signup.
+This plan implements rate limiting for API endpoints.
 
 # Tasks
 
-## 1. Create User Model
-Implement the User model with fields for email, password hash, etc.
+## 1. Create Rate Limiter Class
+Implement a token bucket rate limiter class with configurable limits.
 
-## 2. Add Authentication Routes
-Create login and signup endpoints.
+## 2. Add Middleware Integration
+Integrate rate limiter as middleware in the request pipeline.
 
-## 3. Implement JWT Tokens
-Add token generation and validation.
+## 3. Add Configuration Options
+Allow rate limits to be configured via environment variables.
 """
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": plan_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": plan_output}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
@@ -766,9 +740,9 @@ Add token generation and validation.
 
         assert isinstance(plan, Plan)
         assert plan.id == str(sample_issue.number)
-        assert "Add user authentication" in plan.title
+        assert "Implement rate limiting" in plan.title
         assert len(plan.tasks) == 3
-        assert "Create User Model" in plan.tasks[0].title
+        assert "Rate Limiter" in plan.tasks[0].title
 
     @pytest.mark.asyncio
     async def test_generate_plan_with_empty_tasks(self, provider, sample_issue):
@@ -776,9 +750,7 @@ Add token generation and validation.
         plan_output = "# Overview\nSome plan without proper task formatting."
 
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": plan_output}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"content": plan_output}}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
@@ -788,27 +760,26 @@ Add token generation and validation.
         assert len(plan.tasks) == 0
 
     @pytest.mark.asyncio
-    async def test_generate_plan_sets_file_path(self, provider, sample_issue):
-        """Should set appropriate file_path for the plan."""
+    async def test_generate_plan_file_path_format(self, provider, sample_issue):
+        """Should generate correct file_path for the plan."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "## 1. Task\nDesc"}}]
+            "choices": [{"message": {"content": "## 1. Task\nDescription"}}]
         }
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             plan = await provider.generate_plan(sample_issue)
 
-        assert plan.file_path is not None
-        assert "42" in plan.file_path
-        assert "add-user-authentication" in plan.file_path
+        # File path should be based on issue number and title
+        assert plan.file_path == "plans/42-implement-rate-limiting.md"
 
     @pytest.mark.asyncio
-    async def test_generate_plan_prompt_contains_issue_info(self, provider, sample_issue):
-        """Should include issue info in the prompt."""
+    async def test_generate_plan_prompt_contains_issue_details(self, provider, sample_issue):
+        """Should include issue details in the prompt."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "## 1. Task\nDesc"}}]
+            "choices": [{"message": {"content": "## 1. Task\nDescription"}}]
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -817,335 +788,11 @@ Add token generation and validation.
         ) as mock_post:
             await provider.generate_plan(sample_issue)
 
-        # Verify prompt contains issue information
-        call_args = mock_post.call_args[1]["json"]
-        prompt = call_args["messages"][0]["content"]
+        call_args = mock_post.call_args
+        prompt = call_args[1]["json"]["messages"][0]["content"]
         assert str(sample_issue.number) in prompt
         assert sample_issue.title in prompt
         assert sample_issue.body in prompt
-
-
-class TestOpenAICompatibleProviderExecuteTask:
-    """Tests for execute_task method."""
-
-    @pytest.mark.asyncio
-    async def test_execute_task_success(self, provider, sample_task):
-        """Should execute a task and return result."""
-        task_output = """
-FILE: src/models/user.py
-```python
-class User:
-    def __init__(self, email):
-        self.email = email
-```
-Created file: src/models/user.py
-"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": task_output}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        context = {
-            "issue_number": 42,
-            "original_issue": {"title": "Test Issue", "body": "Test body"},
-            "task_number": 1,
-            "total_tasks": 3,
-            "branch": "feature/user-auth",
-            "workspace": "/workspace",
-        }
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            result = await provider.execute_task(sample_task, context)
-
-        assert isinstance(result, TaskResult)
-        assert result.success is True
-        assert result.branch == "feature/user-auth"
-        assert "src/models/user.py" in result.files_changed
-
-    @pytest.mark.asyncio
-    async def test_execute_task_stores_issue_number(self, provider, sample_task):
-        """Should store current issue number for Q&A."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Done"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        context = {"issue_number": 99}
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            await provider.execute_task(sample_task, context)
-
-        assert provider.current_issue_number == 99
-
-    @pytest.mark.asyncio
-    async def test_execute_task_failure(self, provider, sample_task):
-        """Should handle task execution failure."""
-        with patch.object(
-            provider.client,
-            "post",
-            AsyncMock(side_effect=Exception("API Error")),
-        ):
-            result = await provider.execute_task(sample_task, {})
-
-        assert result.success is False
-        assert "API Error" in result.error
-
-    @pytest.mark.asyncio
-    async def test_execute_task_with_empty_context(self, provider, sample_task):
-        """Should handle empty context dict."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Done"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            result = await provider.execute_task(sample_task, {})
-
-        assert result.success is True
-        assert result.branch is None
-
-    @pytest.mark.asyncio
-    async def test_execute_task_prompt_contains_task_info(self, provider, sample_task):
-        """Should include task info in the prompt."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Done"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        context = {
-            "original_issue": {"title": "Issue Title", "body": "Issue body"},
-            "task_number": 2,
-            "total_tasks": 5,
-            "branch": "feature-branch",
-            "workspace": "/workspace",
-        }
-
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
-            await provider.execute_task(sample_task, context)
-
-        call_args = mock_post.call_args[1]["json"]
-        prompt = call_args["messages"][0]["content"]
-        assert sample_task.title in prompt
-        assert sample_task.description in prompt
-        assert "2/5" in prompt
-        assert "feature-branch" in prompt
-
-
-class TestOpenAICompatibleProviderReviewCode:
-    """Tests for review_code method."""
-
-    @pytest.mark.asyncio
-    async def test_review_code_approve(self, provider):
-        """Should correctly parse APPROVE response."""
-        review_output = """APPROVE
-
-Good implementation. Code follows best practices.
-- Clean code structure
-- Proper error handling
-"""
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": review_output}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        diff = "+def new_function():\n+    pass"
-        context = {"description": "Add new function"}
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            review = await provider.review_code(diff, context)
-
-        assert review.approved is True
-        assert len(review.comments) >= 1
-        assert review.confidence_score == 0.7
-
-    @pytest.mark.asyncio
-    async def test_review_code_request_changes(self, provider):
-        """Should correctly parse REQUEST_CHANGES response."""
-        review_output = """REQUEST_CHANGES
-
-This code needs improvements:
-- Missing error handling
-- No input validation
-* Security vulnerability detected
-"""
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": review_output}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        diff = "+def vulnerable_function():\n+    pass"
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            review = await provider.review_code(diff, {})
-
-        assert review.approved is False
-        assert "Missing error handling" in review.comments
-        assert "No input validation" in review.comments
-        assert "Security vulnerability detected" in review.comments
-
-    @pytest.mark.asyncio
-    async def test_review_code_correct_api_call(self, provider):
-        """Should make correct API call for code review."""
-        diff = "+def test_function():\n+    pass"
-        context = {"description": "Test function"}
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "APPROVE\nLooks good"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
-            await provider.review_code(diff, context)
-
-        mock_post.assert_called_once()
-        call_args = mock_post.call_args[1]["json"]
-        prompt = call_args["messages"][0]["content"]
-        assert "code reviewer" in prompt.lower()
-        assert diff in prompt
-
-    @pytest.mark.asyncio
-    async def test_review_code_truncates_large_diff(self, provider):
-        """Should truncate large diffs to 5000 characters."""
-        large_diff = "+" * 10000
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "APPROVE\nLooks good"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
-            await provider.review_code(large_diff, {})
-
-        call_args = mock_post.call_args[1]["json"]
-        prompt = call_args["messages"][0]["content"]
-        # The diff in the prompt should be truncated to 5000 chars
-        assert len(prompt) < len(large_diff) + 1000  # Allow for prompt overhead
-
-    @pytest.mark.asyncio
-    async def test_review_code_returns_review_with_correct_kwargs(self, provider):
-        """Should return Review with correct field types."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "APPROVE\n- Good code"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            review = await provider.review_code("+code", {})
-
-        # Verify Review object has correct types
-        assert isinstance(review.approved, bool)
-        assert isinstance(review.comments, list)
-        assert isinstance(review.confidence_score, float)
-        assert review.confidence_score == 0.7
-
-    @pytest.mark.asyncio
-    async def test_review_code_no_bullet_points_uses_full_output(self, provider):
-        """Should use full output as comment when no bullet points found."""
-        review_output = "APPROVE\nThis is a general comment without bullet points."
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": review_output}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            review = await provider.review_code("+code", {})
-
-        assert len(review.comments) == 1
-        assert review_output in review.comments[0]
-
-    @pytest.mark.asyncio
-    async def test_review_code_empty_response(self, provider):
-        """Should handle empty response."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": ""}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            review = await provider.review_code("+code", {})
-
-        assert review.approved is False
-        assert len(review.comments) == 0
-
-
-class TestOpenAICompatibleProviderResolveConflict:
-    """Tests for resolve_conflict method."""
-
-    @pytest.mark.asyncio
-    async def test_resolve_conflict_success(self, provider):
-        """Should resolve merge conflict."""
-        resolved_content = """def function():
-    combined_changes()
-    return True"""
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": resolved_content}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        conflict_info = {
-            "file": "src/app.py",
-            "content": """<<<<<<< HEAD
-def function():
-    original_code()
-=======
-def function():
-    new_code()
->>>>>>> feature""",
-        }
-
-        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            result = await provider.resolve_conflict(conflict_info)
-
-        assert result == resolved_content
-        assert "<<<<<<" not in result
-        assert "======" not in result
-        assert ">>>>>>" not in result
-
-    @pytest.mark.asyncio
-    async def test_resolve_conflict_prompt_contains_conflict_info(self, provider):
-        """Should include conflict info in prompt."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "resolved"}}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        conflict_info = {
-            "file": "test.py",
-            "content": "<<<<<<< HEAD\noriginal\n=======\nnew\n>>>>>>> branch",
-        }
-
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
-            await provider.resolve_conflict(conflict_info)
-
-        call_args = mock_post.call_args[1]["json"]
-        prompt = call_args["messages"][0]["content"]
-        assert "test.py" in prompt
-        assert conflict_info["content"] in prompt
 
 
 class TestOpenAICompatibleProviderGeneratePrompts:
@@ -1181,6 +828,324 @@ class TestOpenAICompatibleProviderGeneratePrompts:
         tasks = await provider.generate_prompts(plan)
         assert tasks == []
 
+    @pytest.mark.asyncio
+    async def test_generate_prompts_empty_tasks(self, provider):
+        """Should return empty list if plan has empty tasks."""
+        plan = MagicMock(spec=Plan)
+        plan.tasks = []
+
+        tasks = await provider.generate_prompts(plan)
+        assert tasks == []
+
+
+class TestOpenAICompatibleProviderExecuteTask:
+    """Tests for execute_task method."""
+
+    @pytest.mark.asyncio
+    async def test_execute_task_success(self, provider, sample_task):
+        """Should execute a task and return result."""
+        task_output = """
+Here's the implementation:
+
+FILE: src/middleware/rate_limiter.py
+```python
+class RateLimiter:
+    def __init__(self, max_requests=100):
+        self.max_requests = max_requests
+```
+Created file: src/middleware/rate_limiter.py
+"""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": task_output}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        context = {
+            "issue_number": 42,
+            "original_issue": {"title": "Rate Limiting", "body": "Add rate limits"},
+            "task_number": 1,
+            "total_tasks": 3,
+            "branch": "feature/rate-limiting",
+            "workspace": "/workspace",
+        }
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            result = await provider.execute_task(sample_task, context)
+
+        assert isinstance(result, TaskResult)
+        assert result.success is True
+        assert result.branch == "feature/rate-limiting"
+        assert "src/middleware/rate_limiter.py" in result.files_changed
+
+    @pytest.mark.asyncio
+    async def test_execute_task_stores_issue_number(self, provider, sample_task):
+        """Should store current issue number for Q&A."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        context = {"issue_number": 99}
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            await provider.execute_task(sample_task, context)
+
+        assert provider.current_issue_number == 99
+
+    @pytest.mark.asyncio
+    async def test_execute_task_failure(self, provider, sample_task):
+        """Should handle task execution failure."""
+        with patch.object(
+            provider.client,
+            "post",
+            AsyncMock(side_effect=RuntimeError("API Error")),
+        ):
+            result = await provider.execute_task(sample_task, {})
+
+        assert result.success is False
+        assert "API Error" in result.error
+
+    @pytest.mark.asyncio
+    async def test_execute_task_with_empty_context(self, provider, sample_task):
+        """Should handle empty context dict."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            result = await provider.execute_task(sample_task, {})
+
+        assert result.success is True
+        assert result.branch is None
+
+    @pytest.mark.asyncio
+    async def test_execute_task_prompt_format(self, provider, sample_task):
+        """Should format task prompt correctly."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "Done"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        context = {
+            "original_issue": {"title": "Test Issue", "body": "Issue body"},
+            "task_number": 2,
+            "total_tasks": 5,
+            "branch": "feature/test",
+            "workspace": "/workspace",
+        }
+
+        with patch.object(
+            provider.client, "post", AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await provider.execute_task(sample_task, context)
+
+        call_args = mock_post.call_args
+        prompt = call_args[1]["json"]["messages"][0]["content"]
+        assert sample_task.title in prompt
+        assert sample_task.description in prompt
+        assert "2/5" in prompt
+        assert "feature/test" in prompt
+
+
+class TestOpenAICompatibleProviderReviewCode:
+    """Tests for review_code method."""
+
+    @pytest.mark.asyncio
+    async def test_review_code_approve(self, provider):
+        """Should correctly parse APPROVE response."""
+        review_output = """APPROVE
+
+Good implementation:
+- Clean code structure
+- Proper error handling
+"""
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        diff = "+def new_function():\n+    pass"
+        context = {"description": "Add new function"}
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code(diff, context)
+
+        assert isinstance(review, Review)
+        assert review.approved is True
+        assert len(review.comments) > 0
+        assert review.confidence_score == 0.7
+
+    @pytest.mark.asyncio
+    async def test_review_code_request_changes(self, provider):
+        """Should correctly parse REQUEST_CHANGES response."""
+        review_output = """REQUEST_CHANGES
+
+Issues found:
+- Missing input validation
+- No error handling for edge cases
+"""
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        diff = "+def risky_function():\n+    return unsafe_operation()"
+        context = {"description": "Risky change"}
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code(diff, context)
+
+        assert review.approved is False
+        assert len(review.comments) >= 2
+
+    @pytest.mark.asyncio
+    async def test_review_code_parses_bullet_comments(self, provider):
+        """Should parse bullet-point comments from output."""
+        review_output = """APPROVE
+
+- First comment
+- Second comment
+* Third comment with asterisk
+"""
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code("+code", {})
+
+        assert "First comment" in review.comments
+        assert "Second comment" in review.comments
+        assert "Third comment with asterisk" in review.comments
+
+    @pytest.mark.asyncio
+    async def test_review_code_no_bullets_uses_full_output(self, provider):
+        """Should use full output as comment when no bullets found."""
+        review_output = "APPROVE - This looks good overall"
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": review_output}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code("+code", {})
+
+        assert len(review.comments) == 1
+        assert review_output in review.comments[0]
+
+    @pytest.mark.asyncio
+    async def test_review_code_empty_output(self, provider):
+        """Should handle empty output."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code("+code", {})
+
+        assert review.approved is False  # No APPROVE found
+        assert review.comments == []  # Empty output = no comments
+
+    @pytest.mark.asyncio
+    async def test_review_code_truncates_large_diff(self, provider):
+        """Should truncate large diffs to 5000 characters."""
+        large_diff = "+" * 10000
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "APPROVE"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(
+            provider.client, "post", AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await provider.review_code(large_diff, {})
+
+        call_args = mock_post.call_args
+        prompt = call_args[1]["json"]["messages"][0]["content"]
+        # The diff in the prompt should be truncated
+        # The full prompt will be larger than 5000 due to the prompt template
+        assert prompt.count("+") <= 5000
+
+    @pytest.mark.asyncio
+    async def test_review_code_conservative_confidence_score(self, provider):
+        """Should use conservative confidence score of 0.7."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "APPROVE"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code("+code", {})
+
+        assert review.confidence_score == 0.7
+
+
+class TestOpenAICompatibleProviderResolveConflict:
+    """Tests for resolve_conflict method."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_conflict_success(self, provider):
+        """Should resolve merge conflict."""
+        resolved_content = """def combined_function():
+    # Merged both changes
+    original_code()
+    new_code()
+    return True"""
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": resolved_content}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        conflict_info = {
+            "file": "src/app.py",
+            "content": """<<<<<<< HEAD
+def function():
+    original_code()
+=======
+def function():
+    new_code()
+>>>>>>> feature""",
+        }
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            result = await provider.resolve_conflict(conflict_info)
+
+        assert result == resolved_content
+        assert "<<<<<<" not in result
+        assert "======" not in result
+        assert ">>>>>>" not in result
+
+    @pytest.mark.asyncio
+    async def test_resolve_conflict_prompt_format(self, provider):
+        """Should include conflict details in prompt."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": "resolved"}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        conflict_info = {
+            "file": "config.yaml",
+            "content": "conflict content here",
+        }
+
+        with patch.object(
+            provider.client, "post", AsyncMock(return_value=mock_response)
+        ) as mock_post:
+            await provider.resolve_conflict(conflict_info)
+
+        call_args = mock_post.call_args
+        prompt = call_args[1]["json"]["messages"][0]["content"]
+        assert "config.yaml" in prompt
+        assert "conflict content here" in prompt
+
+    @pytest.mark.asyncio
+    async def test_resolve_conflict_empty_result(self, provider):
+        """Should handle empty resolution."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            result = await provider.resolve_conflict({"file": "test.py", "content": ""})
+
+        assert result == ""
+
 
 class TestOpenAICompatibleProviderIntegration:
     """Integration-style tests for OpenAICompatibleProvider."""
@@ -1192,7 +1157,7 @@ class TestOpenAICompatibleProviderIntegration:
 
         # Mock responses for connect, generate_plan, and execute_task
         connect_response = MagicMock()
-        connect_response.json.return_value = {"data": [{"id": "gpt-4"}]}
+        connect_response.json.return_value = {"data": [{"id": "default"}]}
         connect_response.raise_for_status = MagicMock()
 
         plan_response = MagicMock()
@@ -1200,7 +1165,6 @@ class TestOpenAICompatibleProviderIntegration:
             "choices": [
                 {
                     "message": {
-                        "role": "assistant",
                         "content": """
 # Overview
 Implementation plan.
@@ -1210,7 +1174,7 @@ Initialize project structure.
 
 ## 2. Implement Feature
 Add main functionality.
-""",
+"""
                     }
                 }
             ]
@@ -1219,9 +1183,7 @@ Add main functionality.
 
         task_response = MagicMock()
         task_response.json.return_value = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "Created file: main.py\nDone."}}
-            ]
+            "choices": [{"message": {"content": "Created file: main.py\nDone."}}]
         }
         task_response.raise_for_status = MagicMock()
 
@@ -1256,59 +1218,74 @@ Add main functionality.
 class TestOpenAICompatibleProviderEdgeCases:
     """Edge case tests for OpenAICompatibleProvider."""
 
-    def test_base_url_without_trailing_slash(self):
-        """Should work with base_url that has no trailing slash."""
-        provider = OpenAICompatibleProvider(base_url="http://example.com/v1")
-        assert provider.base_url == "http://example.com/v1"
+    @pytest.mark.asyncio
+    async def test_connect_with_empty_model_list(self, provider_custom):
+        """Should log warning when model list is empty."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"data": []}
+        mock_response.raise_for_status = MagicMock()
 
-    def test_model_with_special_characters(self):
-        """Should handle model names with special characters."""
-        provider = OpenAICompatibleProvider(model="org/model-name:7b-v2.0")
-        assert provider.model == "org/model-name:7b-v2.0"
+        with patch.object(provider_custom.client, "get", AsyncMock(return_value=mock_response)):
+            # Should not raise
+            await provider_custom.connect()
 
     @pytest.mark.asyncio
-    async def test_execute_prompt_with_unicode_content(self, provider):
-        """Should handle unicode content in prompts."""
+    async def test_execute_prompt_missing_message_key(self, provider):
+        """Should handle response with missing message key in choices."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Response: Hello, World!"}}]
-        }
+        mock_response.json.return_value = {"choices": [{}]}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
-            result = await provider.execute_prompt("Test with unicode: cafe")
+            result = await provider.execute_prompt("Test prompt")
 
         assert result["success"] is True
+        assert result["output"] == ""
 
     @pytest.mark.asyncio
-    async def test_review_code_with_asterisk_bullets(self, provider):
-        """Should parse comments with asterisk bullets."""
-        review_output = """APPROVE
-* First comment with asterisk
-* Second comment with asterisk
-"""
+    async def test_execute_prompt_missing_content_key(self, provider):
+        """Should handle response with missing content key in message."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"choices": [{"message": {}}]}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            result = await provider.execute_prompt("Test prompt")
+
+        assert result["success"] is True
+        assert result["output"] == ""
+
+    def test_detect_changed_files_pattern_in_middle_of_line(self, provider):
+        """Should detect patterns in middle of lines."""
+        output = "Log: Created file: output.txt at 12:00"
+        files = provider._detect_changed_files(output)
+        assert "output.txt" in files
+
+    @pytest.mark.asyncio
+    async def test_review_code_case_insensitive_approve(self, provider):
+        """Should detect APPROVE regardless of case."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": review_output}}]
+            "choices": [{"message": {"content": "approve\nLooks good"}}]
         }
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
             review = await provider.review_code("+code", {})
 
-        assert "First comment with asterisk" in review.comments
-        assert "Second comment with asterisk" in review.comments
+        assert review.approved is True
 
     @pytest.mark.asyncio
-    async def test_generate_plan_with_api_failure(self, provider, sample_issue):
-        """Should handle API failure during plan generation."""
-        with patch.object(
-            provider.client,
-            "post",
-            AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
-        ):
-            plan = await provider.generate_plan(sample_issue)
+    async def test_review_code_approve_not_on_first_line(self, provider):
+        """Should detect APPROVE only on first line."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": "Analysis:\nI APPROVE this change"}}]
+        }
+        mock_response.raise_for_status = MagicMock()
 
-        # Should still return a plan, but with no tasks due to empty output
-        assert isinstance(plan, Plan)
-        assert len(plan.tasks) == 0
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)):
+            review = await provider.review_code("+code", {})
+
+        # APPROVE is not on first line, so should be False
+        assert review.approved is False

@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-01-05
+
+### Added
+- **`sapiens run` Command**: New universal command that dispatches to configured agent
+  - Reads `agent_provider.provider_type` from config and dispatches appropriately
+  - `claude-local`: Runs `claude -p "task"` via Claude CLI
+  - `goose-local`: Runs `goose session start --prompt "task"` via Goose CLI
+  - `ollama`/`openai-compatible`: Uses builtin ReAct agent with local model
+  - `openai`/`anthropic`: Uses builtin ReAct agent with cloud API
+  - Supports stdin for long prompts: `cat task.txt | sapiens run`
+  - Options: `--timeout`, `--working-dir`, `--verbose`
+- **Reusable Composite Actions**: Deployed during `sapiens init`
+  - `.github/actions/sapiens-task/action.yaml` for GitHub Actions
+  - `.gitea/actions/sapiens-task/action.yaml` for Gitea Actions
+  - Direct secret handling (anthropic-api-key, openai-api-key, gitea-token)
+  - Use in workflows: `uses: ./.github/actions/sapiens-task`
+- **Builtin ReAct Agent**: New "builtin" option in `sapiens init` with full LLM provider selection
+  - Supports Ollama, vLLM, OpenAI, Anthropic, OpenRouter, and Groq
+  - Shows provider comparison table and recommendations
+  - Auto-detects running local servers (Ollama/vLLM)
+  - Default: qwen3:8b (qwen3:14b requires 24GB VRAM)
+- **vLLM Provider**: Added vLLM to LLM provider options
+  - OpenAI-compatible API with better tool support than Ollama
+  - Excellent GPU utilization with continuous batching
+- **Agent Selection UI**: Enhanced agent listing with provider hints
+  - Shows supported providers for each agent (e.g., "Ollama, vLLM, OpenAI, etc.")
+  - Builtin agent always shown as "always available" option
+- **Setup Test**: Optional test at end of `sapiens init`
+  - Offers to summarize README.md with configured agent
+  - Shows exact command that will be run for the selected agent
+- **React Config Integration**: `sapiens react` now reads settings from config
+  - Model and base URL automatically loaded from `agent_provider` config
+  - CLI options override config when specified
+  - Simple usage: `sapiens react "task"` or `sapiens react --repl`
+
+### Changed
+- **Init Command**: Now deploys reusable composite action by default
+  - `--deploy-actions/--no-deploy-actions` flag controls action deployment
+  - Action enables simplified workflow: `uses: ./.github/actions/sapiens-task`
+- **Keyring Namespace**: Migrated from `builder/` to `sapiens/` prefix
+  - Credentials now stored under `sapiens/gitea/api_token`, `sapiens/claude/api_key`, etc.
+- **Config Location**: Default config path changed from `repo_sapiens/config/automation_config.yaml` to `.sapiens/config.yaml`
+- **State Directory**: Changed from `.automation/state` to `.sapiens/state`
+- **Encrypted Credentials**: File path changed from `.builder/credentials.enc` to `.sapiens/credentials.enc`
+- **CLI Commands**: All documentation and suggestions now use `sapiens credentials` (was `builder credentials`)
+
+### Removed
+- **Orphan "api" option**: Removed confusing standalone API mode from agent selection
+  - Use "builtin" agent with cloud provider (OpenAI, Anthropic, etc.) instead
+
+### Fixed
+- Credential suggestion messages now show correct CLI syntax: `sapiens credentials set service/key --backend keyring`
+
 ## [0.3.0] - 2026-01-02
 
 ### Changed

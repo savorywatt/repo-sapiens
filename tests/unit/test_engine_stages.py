@@ -16,8 +16,7 @@ Each stage is tested for:
 """
 
 from datetime import UTC, datetime
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -39,7 +38,6 @@ from repo_sapiens.models.domain import (
     Task,
     TaskResult,
 )
-
 
 # ==============================================================================
 # Fixtures
@@ -161,9 +159,7 @@ def mock_agent_provider():
         output="Task completed successfully",
     )
 
-    mock.execute_prompt = AsyncMock(
-        return_value={"success": True, "output": "Tests created"}
-    )
+    mock.execute_prompt = AsyncMock(return_value={"success": True, "output": "Tests created"})
 
     # Add working_dir attribute for execution stage
     mock.working_dir = "/tmp/workspace"
@@ -307,7 +303,7 @@ class TestApprovalStageInitialization:
         )
 
         expected_keywords = ["ok", "approve", "approved", "lgtm", "looks good"]
-        assert stage.APPROVAL_KEYWORDS == expected_keywords
+        assert expected_keywords == stage.APPROVAL_KEYWORDS
 
 
 class TestApprovalStageExecute:
@@ -1887,7 +1883,9 @@ class TestStageIntegration:
 
         # Verify review issue was created with correct label
         create_call = mock_git_provider.create_issue.call_args
-        assert "Plan Review" in create_call.kwargs.get("title", create_call.args[0] if create_call.args else "")
+        assert "Plan Review" in create_call.kwargs.get(
+            "title", create_call.args[0] if create_call.args else ""
+        )
 
         # Verify original issue labels were updated
         update_call = mock_git_provider.update_issue.call_args

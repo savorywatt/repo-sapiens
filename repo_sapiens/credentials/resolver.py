@@ -64,7 +64,7 @@ class CredentialResolver:
     def encrypted_backend(self) -> EncryptedFileBackend:
         """Lazy initialization of encrypted file backend."""
         if self._encrypted_backend is None:
-            file_path = self._encrypted_file_path or Path(".builder/credentials.enc")
+            file_path = self._encrypted_file_path or Path(".sapiens/credentials.enc")
             self._encrypted_backend = EncryptedFileBackend(
                 file_path=file_path,
                 master_password=self._encrypted_master_password,
@@ -178,7 +178,7 @@ class CredentialResolver:
                     reference=reference,
                     suggestion=(
                         f"Store the credential with:\n"
-                        f"  builder credentials set --keyring {service}/{key}"
+                        f"  sapiens credentials set {service}/{key} --backend keyring"
                     ),
                 )
 
@@ -251,7 +251,7 @@ class CredentialResolver:
                     reference=reference,
                     suggestion=(
                         f"Store the credential with:\n"
-                        f"  builder credentials set --encrypted {service}/{key}"
+                        f"  sapiens credentials set {service}/{key} --backend encrypted"
                     ),
                 )
 

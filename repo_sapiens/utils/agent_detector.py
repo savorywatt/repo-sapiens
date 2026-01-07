@@ -38,6 +38,16 @@ AGENT_INFO = {
         "supports_local": True,
         "supports_api": False,
     },
+    "builtin": {
+        "name": "Builtin ReAct Agent",
+        "binary": None,  # Always available - no external CLI needed
+        "description": "Lightweight ReAct agent with tool-calling. Uses Ollama, vLLM, or cloud APIs.",
+        "provider": "repo-sapiens",
+        "models": ["qwen3:8b", "qwen3:14b", "llama3.1:8b", "gpt-4o", "claude-sonnet-4.5"],
+        "llm_providers": ["ollama", "vllm", "openai", "anthropic", "openrouter", "groq"],
+        "supports_local": True,
+        "supports_api": True,
+    },
 }
 
 
@@ -193,18 +203,16 @@ def format_agent_list() -> str:
     """Format list of detected agents for display.
 
     Returns:
-        Formatted string listing available agents
+        Formatted string listing available agents with provider hints
 
     Example:
         >>> print(format_agent_list())
         Available AI Agents:
-          - Claude Code (Anthropic)
-          - Goose AI (Block)
+          - Claude Code (Anthropic) - Claude models via CLI or API
+          - Goose AI (Block) - OpenAI, Anthropic, Ollama, OpenRouter, Groq
+          - Builtin ReAct Agent - Ollama, vLLM, or cloud APIs (always available)
     """
     available = detect_available_agents()
-
-    if not available:
-        return "No AI agents detected."
 
     lines = ["Available AI Agents:"]
 
@@ -218,7 +226,26 @@ def format_agent_list() -> str:
             provider = info["provider"]
 
             install_note = " (via uvx)" if agent_key == "goose-uvx" else ""
-            lines.append(f"  - {name} ({provider}){install_note}")
+
+            # Add provider hints
+            if base_agent == "claude":
+                hint = "Claude models via CLI or API"
+            elif base_agent == "goose":
+                providers = info.get("llm_providers", [])
+                hint = ", ".join(p.title() for p in providers[:5])
+            else:
+                hint = ""
+
+            if hint:
+                lines.append(f"  - {name} ({provider}){install_note} - {hint}")
+            else:
+                lines.append(f"  - {name} ({provider}){install_note}")
+
+    # Always show builtin option (no CLI required)
+    builtin_info = AGENT_INFO["builtin"]
+    builtin_providers = builtin_info.get("llm_providers", [])
+    builtin_hint = ", ".join(p.title() for p in builtin_providers[:4]) + ", etc."
+    lines.append(f"  - {builtin_info['name']} - {builtin_hint} (always available)")
 
     return "\n".join(lines)
 
@@ -346,6 +373,30 @@ LLM_PROVIDER_INFO = {
         ],
         "recommended_for": "Privacy-sensitive work, experimentation, learning, offline use",
         "note": "For tool usage, consider vLLM instead of Ollama",
+    },
+    "vllm": {
+        "name": "vLLM (Local)",
+        "description": "High-performance local serving with OpenAI-compatible API",
+        "models": ["qwen3:8b", "qwen3:14b", "llama3.1:8b", "mistral:7b"],
+        "default_model": "qwen3:8b",
+        "tool_support": "good",
+        "cost": "free",
+        "speed": "fast",
+        "api_key_env": None,
+        "requires_install": "pip install vllm",
+        "pros": [
+            "100% free (no API costs)",
+            "Complete data privacy (runs locally)",
+            "OpenAI-compatible API (better tool support than Ollama)",
+            "Excellent GPU utilization",
+            "Continuous batching for high throughput",
+        ],
+        "cons": [
+            "Requires powerful GPU (NVIDIA recommended)",
+            "More complex setup than Ollama",
+            "Linux-only (or WSL2 on Windows)",
+        ],
+        "recommended_for": "Local tool-calling tasks, privacy-sensitive work with good hardware",
     },
     "openrouter": {
         "name": "OpenRouter",
@@ -500,7 +551,7 @@ def format_provider_comparison() -> str:
         "--------------|--------------|-------------|------------|---------------------------",
     ]
 
-    providers = ["openai", "anthropic", "ollama", "openrouter", "groq"]
+    providers = ["openai", "anthropic", "ollama", "vllm", "openrouter", "groq"]
 
     for provider in providers:
         if provider not in LLM_PROVIDER_INFO:

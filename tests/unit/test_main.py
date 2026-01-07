@@ -37,7 +37,7 @@ class TestCLIBasics:
         """Test CLI help command."""
         result = cli_runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "Gitea automation system CLI" in result.output
+        assert "repo-sapiens" in result.output
 
     def test_cli_missing_config(self, cli_runner):
         """Test CLI handles missing config file."""

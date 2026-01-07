@@ -1,5 +1,5 @@
 # @repo-sapiens-template
-# @version: 1.0.0
+# @version: 1.1.0
 # @name: weekly-test-coverage
 #
 # Weekly Test Coverage Improvement for Gitea Actions
@@ -75,7 +75,7 @@ jobs:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          TARGET=${{ github.event.inputs.target_coverage || '60' }}
+          TARGET=${{ gitea.event.inputs.target_coverage || '60' }}
 
           sapiens react "Improve test coverage for this Python project.
 

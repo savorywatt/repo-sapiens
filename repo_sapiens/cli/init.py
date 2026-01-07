@@ -24,7 +24,7 @@ log = structlog.get_logger(__name__)
 @click.option(
     "--config-path",
     type=click.Path(path_type=Path),
-    default="repo_sapiens/config/automation_config.yaml",
+    default=".sapiens/config.yaml",
     help="Path for configuration file",
 )
 @click.option(
@@ -42,12 +42,18 @@ log = structlog.get_logger(__name__)
     default=True,
     help="Set up Gitea Actions secrets (default: true)",
 )
+@click.option(
+    "--deploy-actions/--no-deploy-actions",
+    default=True,
+    help="Deploy reusable composite action for AI tasks (default: true)",
+)
 def init_command(
     repo_path: Path,
     config_path: Path,
     backend: str | None,
     non_interactive: bool,
     setup_secrets: bool,
+    deploy_actions: bool,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -55,8 +61,9 @@ def init_command(
     1. Discover Git repository configuration
     2. Prompt for credentials (or use environment variables)
     3. Store credentials securely
-    4. Set up Gitea Actions secrets (if requested)
+    4. Set up Actions secrets (if requested)
     5. Generate configuration file
+    6. Deploy reusable composite action (if requested)
 
     Examples:
 
@@ -68,8 +75,11 @@ def init_command(
         export CLAUDE_API_KEY="your-key"
         sapiens init --non-interactive
 
-        # Skip Gitea Actions secret setup
+        # Skip Actions secret setup
         sapiens init --no-setup-secrets
+
+        # Skip action deployment
+        sapiens init --no-deploy-actions
     """
     try:
         initializer = RepoInitializer(
@@ -78,6 +88,7 @@ def init_command(
             backend=backend,
             non_interactive=non_interactive,
             setup_secrets=setup_secrets,
+            deploy_actions=deploy_actions,
         )
         initializer.run()
 
@@ -107,17 +118,19 @@ class RepoInitializer:
         backend: str | None,
         non_interactive: bool,
         setup_secrets: bool,
+        deploy_actions: bool = True,
     ):
         self.repo_path = repo_path
         self.config_path = config_path
         self.backend = backend or self._detect_backend()
         self.non_interactive = non_interactive
         self.setup_secrets = setup_secrets
+        self.deploy_actions = deploy_actions
 
         self.repo_info = None
         self.provider_type = None  # 'github' or 'gitea' (detected)
         self.gitea_token = None
-        self.agent_type = None  # 'claude' or 'goose'
+        self.agent_type = None  # 'claude', 'goose', or 'builtin'
         self.agent_mode: Literal["local", "api"] = "local"
         self.agent_api_key = None
 
@@ -126,6 +139,11 @@ class RepoInitializer:
         self.goose_model = None
         self.goose_toolkit = "default"
         self.goose_temperature = 0.7
+
+        # Builtin ReAct agent settings
+        self.builtin_provider = None  # 'ollama', 'vllm', 'openai', 'anthropic', etc.
+        self.builtin_model = None
+        self.builtin_base_url = None  # For ollama/vllm
 
     def run(self) -> None:
         """Run the initialization workflow."""
@@ -148,7 +166,11 @@ class RepoInitializer:
         # Step 5: Generate configuration file
         self._generate_config()
 
-        # Step 6: Validate setup
+        # Step 6: Deploy reusable composite action
+        if self.deploy_actions:
+            self._deploy_composite_action()
+
+        # Step 7: Validate setup
         self._validate_setup()
 
         # Done!
@@ -156,6 +178,10 @@ class RepoInitializer:
         click.echo(click.style("✅ Initialization complete!", bold=True, fg="green"))
         click.echo()
         self._print_next_steps()
+
+        # Step 8: Optional test
+        if not self.non_interactive:
+            self._offer_test_run()
 
     def _detect_backend(self) -> str:
         """Detect best credential backend for current environment."""
@@ -166,6 +192,35 @@ class RepoInitializer:
 
         # Fall back to environment
         return "environment"
+
+    def _detect_existing_gitea_token(self) -> tuple[str | None, str | None]:
+        """Check for existing Gitea token in keyring or environment.
+
+        Checks in order:
+        1. Keyring (gitea/api_token)
+        2. Environment (GITEA_TOKEN, SAPIENS_GITEA_TOKEN)
+
+        Returns (token, source) tuple where source describes where it was found.
+        """
+        import os
+
+        # Check keyring first
+        try:
+            keyring_backend = KeyringBackend()
+            if keyring_backend.available:
+                token = keyring_backend.get("gitea", "api_token")
+                if token:
+                    return token, "keyring (gitea/api_token)"
+        except Exception:
+            pass  # Keyring not available or error
+
+        # Check environment variables
+        for env_var in ("GITEA_TOKEN", "SAPIENS_GITEA_TOKEN"):
+            token = os.getenv(env_var)
+            if token:
+                return token, f"environment (${env_var})"
+
+        return None, None
 
     def _discover_repository(self) -> None:
         """Discover Git repository configuration."""
@@ -215,14 +270,29 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
-        # Gitea token
-        click.echo(
-            "Gitea API Token is required. Get it from:\n"
-            f"   {self.repo_info.base_url}/user/settings/applications"
-        )
-        click.echo()
+        # Check for existing Gitea token in keyring or environment
+        existing_token, source = self._detect_existing_gitea_token()
 
-        self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
+        if existing_token:
+            use_existing = click.confirm(
+                click.style(f"✓ Gitea token found in {source}. Use it?", fg="green"),
+                default=True,
+            )
+            if use_existing:
+                self.gitea_token = existing_token
+                click.echo(f"   ✓ Using Gitea token from {source}")
+            else:
+                self.gitea_token = click.prompt(
+                    "Enter your Gitea API token", hide_input=True, type=str
+                )
+        else:
+            # No existing token - prompt for it
+            click.echo(
+                "Gitea API Token is required. Get it from:\n"
+                f"   {self.repo_info.base_url}/user/settings/applications"
+            )
+            click.echo()
+            self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
 
         click.echo()
 
@@ -250,38 +320,32 @@ class RepoInitializer:
                 if base_agent not in agent_choices:
                     agent_choices.append(base_agent)
 
-            agent_choices.append("api")  # Always allow API mode
+            agent_choices.append("builtin")  # Builtin ReAct agent (Ollama, vLLM, or API)
 
             self.agent_type = click.prompt(
                 "Which agent do you want to use?",
                 type=click.Choice(agent_choices),
-                default=agent_choices[0] if agent_choices else "api",
+                default=agent_choices[0] if agent_choices else "builtin",
             )
         else:
             click.echo(click.style("⚠ No AI agent CLIs detected", fg="yellow"))
             click.echo()
             click.echo("You can:")
-            click.echo("  1. Install Claude Code: https://claude.com/install.sh")
-            click.echo("  2. Install Goose: pip install goose-ai")
-            click.echo("  3. Use API mode (requires API key)")
+            click.echo("  1. Use builtin ReAct agent (local or cloud LLM)")
+            click.echo("  2. Install Claude Code: https://claude.com/install.sh")
+            click.echo("  3. Install Goose: pip install goose-ai")
             click.echo()
 
-            use_api = click.confirm("Use API mode?", default=True)
-            if use_api:
-                self.agent_type = click.prompt(
-                    "Which API provider?", type=click.Choice(["claude", "openai"]), default="claude"
-                )
-                self.agent_mode = "api"
-            else:
-                raise click.ClickException(
-                    "No agents available. Please install an agent CLI or use API mode."
-                )
+            self.agent_type = "builtin"
+            click.echo("Using builtin ReAct agent...")
 
         # Configure based on agent type
         if self.agent_type == "claude":
             self._configure_claude()
         elif self.agent_type == "goose":
             self._configure_goose()
+        elif self.agent_type == "builtin":
+            self._configure_builtin()
 
     def _configure_claude(self) -> None:
         """Configure Claude agent."""
@@ -394,6 +458,215 @@ class RepoInitializer:
 
         self.agent_mode = "local"  # Goose runs locally
 
+    def _configure_builtin(self) -> None:
+        """Configure builtin ReAct agent with LLM provider selection."""
+        from repo_sapiens.utils.agent_detector import (
+            format_provider_comparison,
+            get_provider_info,
+            get_provider_recommendation,
+            get_vllm_vs_ollama_note,
+        )
+
+        click.echo()
+        click.echo(click.style("🧠 Builtin ReAct Agent Configuration", bold=True, fg="cyan"))
+        click.echo()
+        click.echo("The builtin agent uses an LLM for reasoning and executes tools locally.")
+        click.echo()
+
+        # Show provider comparison
+        click.echo(format_provider_comparison())
+        click.echo()
+
+        # Show vLLM vs Ollama note for local providers
+        click.echo(get_vllm_vs_ollama_note())
+        click.echo()
+
+        # Show recommendation
+        click.echo(click.style("💡 Recommendation:", bold=True, fg="green"))
+        click.echo(get_provider_recommendation("tool-usage"))
+        click.echo()
+
+        # Prompt for LLM provider
+        self.builtin_provider = click.prompt(
+            "Which LLM provider?",
+            type=click.Choice(["ollama", "vllm", "openai", "anthropic", "openrouter", "groq"]),
+            default="ollama",
+        )
+
+        provider_info = get_provider_info(self.builtin_provider)
+
+        # For local providers, check availability and configure URL
+        if self.builtin_provider == "ollama":
+            self._configure_builtin_ollama(provider_info)
+        elif self.builtin_provider == "vllm":
+            self._configure_builtin_vllm(provider_info)
+        else:
+            # Cloud provider - needs API key
+            self._configure_builtin_cloud(provider_info)
+
+        self.agent_mode = "local"
+
+    def _configure_builtin_ollama(self, provider_info: dict) -> None:
+        """Configure Ollama for builtin agent."""
+        import httpx
+
+        click.echo()
+        default_url = "http://localhost:11434"
+
+        # Check Ollama availability
+        try:
+            response = httpx.get(f"{default_url}/api/tags", timeout=5.0)
+            if response.status_code == 200:
+                models_data = response.json()
+                available_models = [m["name"] for m in models_data.get("models", [])]
+                click.echo(click.style("✓ Ollama is running", fg="green"))
+                if available_models:
+                    click.echo(f"  Available models: {', '.join(available_models[:5])}")
+                    if len(available_models) > 5:
+                        click.echo(f"  ... and {len(available_models) - 5} more")
+            else:
+                available_models = []
+                click.echo(click.style("⚠ Ollama responded but no models found", fg="yellow"))
+        except Exception:
+            available_models = []
+            click.echo(click.style("⚠ Ollama not detected at localhost:11434", fg="yellow"))
+            click.echo("  Install Ollama: https://ollama.ai")
+            click.echo("  Then run: ollama pull qwen3:8b")
+
+        click.echo()
+
+        # Model selection
+        recommended_models = ["qwen3:8b", "qwen3:14b", "llama3.1:8b", "mistral:7b"]
+        if available_models:
+            model_choices = [m for m in recommended_models if m in available_models]
+            model_choices.extend([m for m in available_models if m not in model_choices][:3])
+            default_model = model_choices[0] if model_choices else "qwen3:8b"
+        else:
+            default_model = "qwen3:8b"
+
+        click.echo("Recommended models for tool-calling:")
+        for model in recommended_models[:4]:
+            marker = (
+                " (recommended)"
+                if model == "qwen3:8b"
+                else " (requires 24GB VRAM)"
+                if model == "qwen3:14b"
+                else ""
+            )
+            available = " ✓" if model in available_models else ""
+            click.echo(f"  • {model}{marker}{available}")
+        click.echo()
+
+        self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
+
+        # URL configuration
+        if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
+            self.builtin_base_url = default_url
+        else:
+            self.builtin_base_url = click.prompt("Ollama URL", default=default_url)
+
+    def _configure_builtin_vllm(self, provider_info: dict) -> None:
+        """Configure vLLM for builtin agent."""
+        import httpx
+
+        click.echo()
+        default_url = "http://localhost:8000"
+
+        # Check vLLM availability
+        try:
+            response = httpx.get(f"{default_url}/v1/models", timeout=5.0)
+            if response.status_code == 200:
+                models_data = response.json()
+                available_models = [m["id"] for m in models_data.get("data", [])]
+                click.echo(click.style("✓ vLLM is running", fg="green"))
+                if available_models:
+                    click.echo(f"  Available models: {', '.join(available_models)}")
+            else:
+                available_models = []
+                click.echo(click.style("⚠ vLLM responded but no models found", fg="yellow"))
+        except Exception:
+            available_models = []
+            click.echo(click.style("⚠ vLLM not detected at localhost:8000", fg="yellow"))
+            click.echo("  Start vLLM: vllm serve qwen3:8b --port 8000")
+
+        click.echo()
+
+        # Model selection
+        recommended_models = provider_info.get("models", ["qwen3:8b", "qwen3:14b", "llama3.1:8b"])
+        default_model = (
+            available_models[0]
+            if available_models
+            else provider_info.get("default_model", "qwen3:8b")
+        )
+
+        click.echo("Recommended models for tool-calling:")
+        for model in recommended_models[:4]:
+            marker = (
+                " (recommended)"
+                if model == "qwen3:8b"
+                else " (requires 24GB VRAM)"
+                if "14b" in model
+                else ""
+            )
+            available = " ✓" if model in available_models else ""
+            click.echo(f"  • {model}{marker}{available}")
+        click.echo()
+
+        self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
+
+        # URL configuration
+        if click.confirm("Use default vLLM URL (localhost:8000)?", default=True):
+            self.builtin_base_url = default_url
+        else:
+            self.builtin_base_url = click.prompt("vLLM URL", default=default_url)
+
+    def _configure_builtin_cloud(self, provider_info: dict) -> None:
+        """Configure cloud LLM provider for builtin agent."""
+        import os
+
+        click.echo()
+
+        # Model selection
+        available_models = provider_info.get("models", [])
+        default_model = provider_info.get(
+            "default_model", available_models[0] if available_models else "gpt-4o"
+        )
+
+        click.echo(f"Available models for {provider_info['name']}:")
+        for i, model in enumerate(available_models[:5], 1):
+            marker = " (recommended)" if model == default_model else ""
+            click.echo(f"  {i}. {model}{marker}")
+        click.echo()
+
+        self.builtin_model = click.prompt(
+            "Which model?",
+            type=click.Choice(available_models) if available_models else str,
+            default=default_model,
+        )
+
+        # API key
+        api_key_env = provider_info.get("api_key_env")
+        if api_key_env:
+            existing_key = os.getenv(api_key_env)
+
+            if existing_key:
+                use_existing = click.confirm(
+                    f"{api_key_env} found in environment. Use it?", default=True
+                )
+                if use_existing:
+                    self.agent_api_key = existing_key
+                else:
+                    self.agent_api_key = click.prompt(
+                        f"Enter your {provider_info['name']} API key", hide_input=True, type=str
+                    )
+            else:
+                website = provider_info.get("website", "provider website")
+                click.echo(f"API key required. Get it from: {website}")
+                click.echo()
+                self.agent_api_key = click.prompt(
+                    f"Enter your {provider_info['name']} API key", hide_input=True, type=str
+                )
+
     def _store_credentials(self) -> None:
         """Store credentials in selected backend."""
         click.echo()
@@ -425,6 +698,10 @@ class RepoInitializer:
                 # Store under provider-specific key
                 backend.set(self.goose_llm_provider, "api_key", self.agent_api_key)
                 click.echo(f"   ✓ Stored: {self.goose_llm_provider}/api_key")
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                # Store under provider-specific key
+                backend.set(self.builtin_provider, "api_key", self.agent_api_key)
+                click.echo(f"   ✓ Stored: {self.builtin_provider}/api_key")
             elif self.agent_type == "claude":
                 backend.set("claude", "api_key", self.agent_api_key)
                 click.echo("   ✓ Stored: claude/api_key")
@@ -442,6 +719,11 @@ class RepoInitializer:
             if self.agent_type == "goose" and self.goose_llm_provider:
                 # Store under provider-specific environment variable
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
+                backend.set(env_var, self.agent_api_key)
+                click.echo(f"   ✓ Set: {env_var}")
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                # Store under provider-specific environment variable
+                env_var = f"{self.builtin_provider.upper()}_API_KEY"
                 backend.set(env_var, self.agent_api_key)
                 click.echo(f"   ✓ Set: {env_var}")
             elif self.agent_type == "claude":
@@ -571,10 +853,14 @@ class RepoInitializer:
         if self.backend == "keyring":
             gitea_token_ref = "@keyring:gitea/api_token"  # nosec B105 # Template placeholder for keyring reference
 
-            # For Goose, use provider-specific keyring path
+            # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
                 agent_api_key_ref = (
                     f"@keyring:{self.goose_llm_provider}/api_key" if self.agent_api_key else "null"
+                )
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                agent_api_key_ref = (
+                    f"@keyring:{self.builtin_provider}/api_key" if self.agent_api_key else "null"
                 )
             elif self.agent_type == "claude":
                 agent_api_key_ref = "@keyring:claude/api_key" if self.agent_api_key else "null"
@@ -585,9 +871,12 @@ class RepoInitializer:
             gitea_token_ref = "${GITEA_TOKEN}"  # nosec B105 # Template placeholder for environment variable
             # fmt: on
 
-            # For Goose, use provider-specific environment variable
+            # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
+                agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
+            elif self.agent_type == "builtin" and self.builtin_provider:
+                env_var = f"{self.builtin_provider.upper()}_API_KEY"
                 agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
             elif self.agent_type == "claude":
                 agent_api_key_ref = "${CLAUDE_API_KEY}" if self.agent_api_key else "null"
@@ -614,6 +903,36 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}
 {goose_config_section}"""
+        elif self.agent_type == "builtin":
+            # Builtin ReAct agent with selected provider
+            model = self.builtin_model or "qwen3:8b"
+
+            if self.builtin_provider == "ollama":
+                provider_type = "ollama"
+                base_url = self.builtin_base_url or "http://localhost:11434"
+                agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: null
+  local_mode: true
+  base_url: {base_url}"""
+            elif self.builtin_provider == "vllm":
+                provider_type = "openai-compatible"
+                base_url = self.builtin_base_url or "http://localhost:8000"
+                agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: null
+  local_mode: true
+  base_url: {base_url}/v1"""
+            else:
+                # Cloud provider (openai, anthropic, openrouter, groq)
+                provider_type = self.builtin_provider
+                agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: {agent_api_key_ref}
+  local_mode: false"""
         else:
             # Claude configuration
             provider_type = f"claude-{self.agent_mode}"
@@ -650,7 +969,7 @@ repository:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
   review_approval_threshold: 0.8
@@ -672,6 +991,59 @@ tags:
         # Write configuration file
         self.config_path.write_text(config_content)
         click.echo(f"   ✓ Created: {self.config_path}")
+        click.echo()
+
+    def _deploy_composite_action(self) -> None:
+        """Deploy reusable composite action for AI tasks."""
+        import importlib.resources
+
+        click.echo(click.style("📦 Deploying reusable composite action...", bold=True))
+
+        # Determine target directory based on provider type
+        if self.provider_type == "github":
+            action_dir = self.repo_path / ".github" / "actions" / "sapiens-task"
+            template_subpath = "actions/github/sapiens-task/action.yaml"
+        else:
+            action_dir = self.repo_path / ".gitea" / "actions" / "sapiens-task"
+            template_subpath = "actions/gitea/sapiens-task/action.yaml"
+
+        # Create the action directory
+        action_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get the template from package resources
+        try:
+            # Try importlib.resources (Python 3.9+)
+            template_files = (
+                importlib.resources.files("repo_sapiens") / "templates" / template_subpath
+            )
+            if hasattr(template_files, "read_text"):
+                action_content = template_files.read_text()
+            else:
+                # Fallback: read from file system
+                package_dir = Path(__file__).parent.parent
+                template_path = package_dir / "templates" / template_subpath
+                if template_path.exists():
+                    action_content = template_path.read_text()
+                else:
+                    # Try relative to repo root (development mode)
+                    repo_root = Path(__file__).parent.parent.parent
+                    template_path = repo_root / "templates" / template_subpath
+                    action_content = template_path.read_text()
+
+            # Write the action file
+            action_file = action_dir / "action.yaml"
+            action_file.write_text(action_content)
+            click.echo(f"   ✓ Created: {action_file.relative_to(self.repo_path)}")
+
+        except Exception as e:
+            click.echo(click.style(f"   ⚠ Warning: Could not deploy action: {e}", fg="yellow"))
+            click.echo(
+                click.style(
+                    "   You can manually copy the action from the repo-sapiens templates.",
+                    fg="yellow",
+                )
+            )
+
         click.echo()
 
     def _validate_setup(self) -> None:
@@ -744,3 +1116,83 @@ tags:
         click.echo("  - README.md")
         click.echo("  - QUICK_START.md")
         click.echo("  - docs/CREDENTIAL_QUICK_START.md")
+
+    def _offer_test_run(self) -> None:
+        """Offer to test the setup by summarizing the README."""
+        import subprocess
+
+        # Check if README exists
+        readme_path = self.repo_path / "README.md"
+        if not readme_path.exists():
+            return
+
+        click.echo()
+        click.echo(click.style("🧪 Test Your Setup", bold=True, fg="cyan"))
+        click.echo()
+
+        # Build the test command based on agent type
+        test_prompt = "Summarize this project's README in 2-3 sentences."
+
+        # Only include --config if non-default path
+        config_flag = (
+            ""
+            if str(self.config_path) == ".sapiens/config.yaml"
+            else f"--config {self.config_path} "
+        )
+
+        if self.agent_type == "claude":
+            test_cmd = f'claude -p "{test_prompt}"'
+        elif self.agent_type == "goose":
+            test_cmd = f'goose session start --prompt "{test_prompt}"'
+        elif self.agent_type == "builtin":
+            # react command reads model from config, so no --model needed
+            test_cmd = f'sapiens {config_flag}react "{test_prompt}"'.replace("  ", " ")
+        else:
+            return
+
+        click.echo("Would you like to test your setup by having the agent summarize README.md?")
+        click.echo()
+        click.echo(click.style("Command:", fg="yellow"))
+        click.echo(f"  {test_cmd}")
+        click.echo()
+
+        if click.confirm("Run this test now?", default=False):
+            click.echo()
+            click.echo(click.style("Running test...", bold=True))
+            click.echo()
+
+            try:
+                # Run the command directly (output streams to terminal)
+                result = subprocess.run(
+                    test_cmd,
+                    shell=True,
+                    cwd=self.repo_path,
+                    timeout=120,
+                )
+                if result.returncode == 0:
+                    click.echo()
+                    click.echo(click.style("✅ Test completed successfully!", fg="green"))
+                else:
+                    click.echo(click.style("⚠ Test returned non-zero exit code", fg="yellow"))
+            except subprocess.TimeoutExpired:
+                click.echo(click.style("⚠ Test timed out after 120 seconds", fg="yellow"))
+            except Exception as e:
+                click.echo(click.style(f"⚠ Test failed: {e}", fg="yellow"))
+        else:
+            click.echo()
+            click.echo("You can run this test later with the command above.")
+
+        # Suggest REPL for further exploration
+        click.echo()
+        if self.agent_type == "builtin":
+            repl_cmd = f"sapiens {config_flag}react --repl".replace("  ", " ")
+        elif self.agent_type == "claude":
+            repl_cmd = "claude"
+        elif self.agent_type == "goose":
+            repl_cmd = "goose session start"
+        else:
+            repl_cmd = None
+
+        if repl_cmd:
+            click.echo(click.style("💡 Try the interactive REPL:", fg="cyan"))
+            click.echo(f"  {repl_cmd}")

@@ -13,6 +13,7 @@ from repo_sapiens.agents.backends import (
     OpenAIBackend,
     create_backend,
 )
+from repo_sapiens.exceptions import AgentError, ProviderConnectionError
 
 # =============================================================================
 # Fixtures
@@ -271,16 +272,16 @@ class TestOllamaBackend:
     async def test_connect_raises_runtime_error_when_server_not_running(
         self, ollama_backend: OllamaBackend
     ) -> None:
-        """Test connect raises RuntimeError with helpful message when server not running."""
+        """Test connect raises ProviderConnectionError when server not running."""
         with patch.object(
             ollama_backend.client,
             "get",
             AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
         ):
-            with pytest.raises(RuntimeError) as exc_info:
+            with pytest.raises(ProviderConnectionError) as exc_info:
                 await ollama_backend.connect()
 
-        assert "Ollama not running at http://localhost:11434" in str(exc_info.value)
+        assert "Ollama not running" in str(exc_info.value)
         assert "ollama serve" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -443,7 +444,7 @@ class TestOpenAIBackend:
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(openai_backend.client, "get", AsyncMock(return_value=mock_response)):
-            with pytest.raises(RuntimeError, match="Invalid API key"):
+            with pytest.raises(AgentError, match="Invalid API key"):
                 await openai_backend.list_models(raise_on_error=True)
 
     @pytest.mark.asyncio
@@ -578,7 +579,7 @@ class TestOpenAIBackend:
 
     @pytest.mark.asyncio
     async def test_chat_handles_api_error_response(self, openai_backend: OpenAIBackend) -> None:
-        """Test chat raises RuntimeError on OpenAI-style API error."""
+        """Test chat raises AgentError on OpenAI-style API error."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}
@@ -586,7 +587,7 @@ class TestOpenAIBackend:
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(openai_backend.client, "post", AsyncMock(return_value=mock_response)):
-            with pytest.raises(RuntimeError, match="Rate limit exceeded"):
+            with pytest.raises(AgentError, match="Rate limit exceeded"):
                 await openai_backend.chat(
                     messages=[{"role": "user", "content": "Test"}],
                     model="gpt-4",
@@ -625,18 +626,16 @@ class TestOpenAIBackend:
     async def test_connect_raises_runtime_error_when_server_not_running(
         self, openai_backend: OpenAIBackend
     ) -> None:
-        """Test connect raises RuntimeError with helpful message when server not running."""
+        """Test connect raises ProviderConnectionError when server not running."""
         with patch.object(
             openai_backend.client,
             "get",
             AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
         ):
-            with pytest.raises(RuntimeError) as exc_info:
+            with pytest.raises(ProviderConnectionError) as exc_info:
                 await openai_backend.connect()
 
-        assert "OpenAI-compatible server not running at http://localhost:8000/v1" in str(
-            exc_info.value
-        )
+        assert "OpenAI-compatible server not running" in str(exc_info.value)
         assert "Ensure your server is started" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -835,7 +834,7 @@ class TestBackendEdgeCases:
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(backend.client, "post", AsyncMock(return_value=mock_response)):
-            with pytest.raises(RuntimeError, match="Unknown error"):
+            with pytest.raises(AgentError, match="Unknown error"):
                 await backend.chat(
                     messages=[{"role": "user", "content": "Test"}],
                     model="gpt-4",

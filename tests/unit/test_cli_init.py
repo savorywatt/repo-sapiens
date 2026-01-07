@@ -1,12 +1,12 @@
 """Unit tests for repo_sapiens/cli/init.py - Repository initialization CLI."""
 
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import os
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from click.testing import CliRunner
 from click import ClickException
+from click.testing import CliRunner
 
 from repo_sapiens.cli.init import RepoInitializer, init_command
 from repo_sapiens.git.exceptions import GitDiscoveryError
@@ -302,10 +302,14 @@ class TestRepoInitializerCollectCredentials:
 
         assert "GITEA_TOKEN environment variable required" in str(exc_info.value)
 
+    @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.cli.init.click.prompt")
-    def test_collect_interactively_gitea_token(self, mock_prompt, tmp_path, mock_repo_info):
+    def test_collect_interactively_gitea_token(
+        self, mock_prompt, mock_confirm, tmp_path, mock_repo_info
+    ):
         """Should prompt for Gitea token interactively."""
         mock_prompt.return_value = "interactive-token-456"
+        mock_confirm.return_value = False  # Don't use existing keyring token
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
             initializer = RepoInitializer(
@@ -425,7 +429,7 @@ class TestRepoInitializerConfigureAIAgent:
         """Should offer API mode when no agents detected."""
         mock_detect.return_value = []
         mock_confirm.return_value = True  # Use API mode
-        mock_prompt.return_value = "claude"  # API provider choice
+        mock_prompt.return_value = "openai"  # Valid provider choice for builtin
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
             initializer = RepoInitializer(
@@ -438,21 +442,22 @@ class TestRepoInitializerConfigureAIAgent:
 
         initializer.repo_info = mock_repo_info
 
-        with patch.object(initializer, "_configure_claude"):
+        with patch.object(initializer, "_configure_builtin_cloud"):
             initializer._configure_ai_agent()
 
-        assert initializer.agent_type == "claude"
-        assert initializer.agent_mode == "api"
+        # When no external agents detected, builtin is used
+        assert initializer.agent_type == "builtin"
+        assert initializer.builtin_provider == "openai"
 
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.utils.agent_detector.detect_available_agents")
-    def test_configure_agent_no_agents_decline_api(
+    def test_configure_agent_no_agents_uses_builtin(
         self, mock_detect, mock_confirm, mock_prompt, tmp_path, mock_repo_info
     ):
-        """Should raise exception when no agents and API declined."""
+        """Should use builtin agent when no external agents detected."""
         mock_detect.return_value = []
-        mock_confirm.return_value = False  # Decline API mode
+        mock_prompt.return_value = "ollama"  # Choose local provider
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
             initializer = RepoInitializer(
@@ -465,10 +470,11 @@ class TestRepoInitializerConfigureAIAgent:
 
         initializer.repo_info = mock_repo_info
 
-        with pytest.raises(ClickException) as exc_info:
+        # Builtin agent should be configured
+        with patch.object(initializer, "_configure_builtin_ollama"):
             initializer._configure_ai_agent()
 
-        assert "No agents available" in str(exc_info.value)
+        assert initializer.agent_type == "builtin"
 
 
 class TestConfigureClaude:
@@ -725,9 +731,7 @@ class TestRepoInitializerStoreCredentials:
         mock_keyring.set.assert_any_call("openai", "api_key", "sk-openai-key")
 
     @patch("repo_sapiens.cli.init.EnvironmentBackend")
-    def test_store_in_environment_gitea_only(
-        self, mock_env_class, tmp_path, mock_repo_info
-    ):
+    def test_store_in_environment_gitea_only(self, mock_env_class, tmp_path, mock_repo_info):
         """Should store Gitea token in environment."""
         mock_env = Mock()
         mock_env_class.return_value = mock_env
@@ -1028,7 +1032,11 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         with patch.dict(
             "sys.modules",
-            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))}
+            {
+                "repo_sapiens.providers.github_rest": MagicMock(
+                    GitHubRestProvider=Mock(return_value=mock_github)
+                )
+            },
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1059,7 +1067,11 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         with patch.dict(
             "sys.modules",
-            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))}
+            {
+                "repo_sapiens.providers.github_rest": MagicMock(
+                    GitHubRestProvider=Mock(return_value=mock_github)
+                )
+            },
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1077,9 +1089,7 @@ class TestRepoInitializerValidateSetup:
     """Tests for setup validation."""
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
-    def test_validate_setup_keyring_success(
-        self, mock_resolver_class, tmp_path, mock_repo_info
-    ):
+    def test_validate_setup_keyring_success(self, mock_resolver_class, tmp_path, mock_repo_info):
         """Should validate keyring credentials successfully."""
         mock_resolver = Mock()
         mock_resolver.resolve.return_value = "resolved-token"
@@ -1496,9 +1506,7 @@ class TestRepoInitializerEdgeCases:
         initializer.agent_type = "claude"
         initializer.agent_mode = "local"
 
-        with patch.object(
-            initializer, "_setup_github_secrets", side_effect=Exception("API error")
-        ):
+        with patch.object(initializer, "_setup_github_secrets", side_effect=Exception("API error")):
             # Should not raise, just warn
             initializer._setup_gitea_secrets()
 

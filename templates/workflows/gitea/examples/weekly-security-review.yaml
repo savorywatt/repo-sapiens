@@ -1,5 +1,5 @@
 # @repo-sapiens-template
-# @version: 1.0.0
+# @version: 1.1.0
 # @name: weekly-security-review
 #
 # Weekly Security Review for Gitea Actions
@@ -715,7 +715,7 @@ jobs:
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
 
       - name: Auto-fix security issues
-        if: env.TOTAL_ISSUES != '0' && (github.event.inputs.auto_fix != 'false')
+        if: env.TOTAL_ISSUES != '0' && (gitea.event.inputs.auto_fix != 'false')
         env:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |

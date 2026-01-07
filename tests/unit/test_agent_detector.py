@@ -30,7 +30,9 @@ class TestDetectAvailableAgents:
     def test_detect_both_agents_available(self):
         """Should detect both Claude and Goose when both are installed."""
         with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
-            mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
+            mock_which.side_effect = (
+                lambda x: f"/usr/local/bin/{x}" if x in ["claude", "goose"] else None
+            )
 
             agents = detect_available_agents()
 
@@ -70,7 +72,9 @@ class TestDetectAvailableAgents:
         """Should not add goose-uvx if goose is already detected."""
         with patch("repo_sapiens.utils.agent_detector.shutil.which") as mock_which:
             # Both goose and uvx are available
-            mock_which.side_effect = lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
+            mock_which.side_effect = (
+                lambda x: f"/usr/local/bin/{x}" if x in ["goose", "uvx"] else None
+            )
 
             agents = detect_available_agents()
 
@@ -309,13 +313,16 @@ class TestFormatAgentList:
             assert "(via uvx)" in result
 
     def test_format_with_no_agents(self):
-        """Should return message when no agents detected."""
+        """Should still show builtin agent when no CLI agents detected."""
         with patch("repo_sapiens.utils.agent_detector.detect_available_agents") as mock_detect:
             mock_detect.return_value = []
 
             result = format_agent_list()
 
-            assert result == "No AI agents detected."
+            # Builtin is always available, even when no CLI agents detected
+            assert "Available AI Agents:" in result
+            assert "Builtin ReAct Agent" in result
+            assert "always available" in result
 
     def test_format_with_single_agent(self):
         """Should format list with single agent."""
@@ -570,12 +577,19 @@ class TestAgentInfoRegistry:
     """Tests for AGENT_INFO constant registry."""
 
     def test_all_agents_have_required_fields(self):
-        """Should ensure all agents have required fields."""
-        required_fields = ["name", "binary", "install_cmd", "docs_url", "provider", "models"]
+        """Should ensure all CLI agents have required fields."""
+        # CLI agents (claude, goose) require these fields
+        cli_required_fields = ["name", "binary", "install_cmd", "docs_url", "provider", "models"]
+        # Builtin agent has different required fields (no CLI needed)
+        builtin_required_fields = ["name", "description", "provider", "models", "llm_providers"]
 
         for agent_key, info in AGENT_INFO.items():
-            for field in required_fields:
-                assert field in info, f"Agent '{agent_key}' missing required field '{field}'"
+            if agent_key == "builtin":
+                for field in builtin_required_fields:
+                    assert field in info, f"Agent '{agent_key}' missing required field '{field}'"
+            else:
+                for field in cli_required_fields:
+                    assert field in info, f"Agent '{agent_key}' missing required field '{field}'"
 
     def test_all_agents_have_boolean_flags(self):
         """Should ensure all agents have support flags."""

@@ -8,6 +8,7 @@ import structlog
 
 from repo_sapiens.models.domain import Branch, Comment, Issue, IssueState, PullRequest
 from repo_sapiens.providers.base import GitProvider
+from repo_sapiens.utils.connection_pool import HTTPConnectionPool, get_pool
 from repo_sapiens.utils.retry import async_retry
 
 log = structlog.get_logger(__name__)
@@ -36,24 +37,36 @@ class GiteaRestProvider(GitProvider):
         self.token = token
         self.owner = owner
         self.repo = repo
-        self.client: httpx.AsyncClient | None = None
+        self._pool: HTTPConnectionPool | None = None
 
     async def connect(self) -> None:
-        """Initialize HTTP client."""
-        self.client = httpx.AsyncClient(
+        """Initialize connection pool and verify connectivity."""
+        self._pool = await get_pool(
+            name=f"gitea-{self.base_url}",
+            base_url=self.api_base,
             headers={
                 "Authorization": f"token {self.token}",
                 "Content-Type": "application/json",
             },
-            timeout=30.0,
         )
+        # Verify connection works
+        response = await self._pool.get("/version")
+        if response.status_code != 200:
+            raise ConnectionError(f"Failed to connect to Gitea: {response.status_code}")
         log.info("gitea_connected", base_url=self.base_url, owner=self.owner, repo=self.repo)
 
     async def disconnect(self) -> None:
-        """Close HTTP client."""
-        if self.client:
-            await self.client.aclose()
-            self.client = None
+        """Clear pool reference (pool manager handles actual cleanup)."""
+        self._pool = None
+
+    async def __aenter__(self) -> "GiteaRestProvider":
+        """Async context manager entry."""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        """Async context manager exit."""
+        await self.disconnect()
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_issues(
@@ -64,12 +77,11 @@ class GiteaRestProvider(GitProvider):
         """Retrieve issues via REST API."""
         log.info("get_issues", labels=labels, state=state)
 
-        params = {"state": state}
+        params: dict[str, str] = {"state": state}
         if labels:
             params["labels"] = ",".join(labels)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues"
-        response = await self.client.get(url, params=params)
+        response = await self._pool.get(f"/repos/{self.owner}/{self.repo}/issues", params=params)
         response.raise_for_status()
 
         issues_data = response.json()
@@ -80,8 +92,7 @@ class GiteaRestProvider(GitProvider):
         """Get single issue by number."""
         log.info("get_issue", issue_number=issue_number)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}"
-        response = await self.client.get(url)
+        response = await self._pool.get(f"/repos/{self.owner}/{self.repo}/issues/{issue_number}")
         response.raise_for_status()
 
         return self._parse_issue(response.json())
@@ -96,8 +107,7 @@ class GiteaRestProvider(GitProvider):
         """Create issue via REST API."""
         log.info("create_issue", title=title)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues"
-        data = {
+        data: dict[str, Any] = {
             "title": title,
             "body": body,
         }
@@ -107,7 +117,7 @@ class GiteaRestProvider(GitProvider):
             label_ids = await self._get_or_create_label_ids(labels)
             data["labels"] = label_ids
 
-        response = await self.client.post(url, json=data)
+        response = await self._pool.post(f"/repos/{self.owner}/{self.repo}/issues", json=data)
         response.raise_for_status()
 
         return self._parse_issue(response.json())
@@ -127,16 +137,15 @@ class GiteaRestProvider(GitProvider):
         # Update labels separately if provided (Gitea requires PUT to labels endpoint)
         if labels is not None:
             label_ids = await self._get_or_create_label_ids(labels)
-            labels_url = (
-                f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}/labels"
+            labels_response = await self._pool.put(
+                f"/repos/{self.owner}/{self.repo}/issues/{issue_number}/labels",
+                json={"labels": label_ids},
             )
-            labels_response = await self.client.put(labels_url, json={"labels": label_ids})
             labels_response.raise_for_status()
 
         # Update other fields if provided
         if title is not None or body is not None or state is not None:
-            url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}"
-            data = {}
+            data: dict[str, str] = {}
 
             if title is not None:
                 data["title"] = title
@@ -145,7 +154,10 @@ class GiteaRestProvider(GitProvider):
             if state is not None:
                 data["state"] = state
 
-            response = await self.client.patch(url, json=data)
+            response = await self._pool.patch(
+                f"/repos/{self.owner}/{self.repo}/issues/{issue_number}",
+                json=data,
+            )
             response.raise_for_status()
 
         # Fetch and return updated issue
@@ -156,10 +168,10 @@ class GiteaRestProvider(GitProvider):
         """Add comment to issue."""
         log.info("add_comment", issue_number=issue_number)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments"
-        data = {"body": body}
-
-        response = await self.client.post(url, json=data)
+        response = await self._pool.post(
+            f"/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments",
+            json={"body": body},
+        )
         response.raise_for_status()
 
         comment_data = response.json()
@@ -170,10 +182,10 @@ class GiteaRestProvider(GitProvider):
         """Get file content from repository."""
         log.info("get_file", path=path, ref=ref)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/contents/{path}"
-        params = {"ref": ref}
-
-        response = await self.client.get(url, params=params)
+        response = await self._pool.get(
+            f"/repos/{self.owner}/{self.repo}/contents/{path}",
+            params={"ref": ref},
+        )
         response.raise_for_status()
 
         import base64
@@ -186,8 +198,9 @@ class GiteaRestProvider(GitProvider):
         """Get all comments for an issue."""
         log.info("get_comments", issue_number=issue_number)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments"
-        response = await self.client.get(url)
+        response = await self._pool.get(
+            f"/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments"
+        )
         response.raise_for_status()
 
         comments_data = response.json()
@@ -198,10 +211,10 @@ class GiteaRestProvider(GitProvider):
         """Get branch information."""
         log.info("get_branch", branch=branch_name)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/branches/{branch_name}"
-
         try:
-            response = await self.client.get(url)
+            response = await self._pool.get(
+                f"/repos/{self.owner}/{self.repo}/branches/{branch_name}"
+            )
             response.raise_for_status()
 
             branch_data = response.json()
@@ -227,14 +240,15 @@ class GiteaRestProvider(GitProvider):
 
         if pr_number:
             # Get diff directly from PR endpoint (more reliable)
-            url = f"{self.api_base}/repos/{self.owner}/{self.repo}/pulls/{pr_number}.diff"
-            response = await self.client.get(url, headers={"Accept": "text/plain"})
+            response = await self._pool.get(
+                f"/repos/{self.owner}/{self.repo}/pulls/{pr_number}.diff",
+                headers={"Accept": "text/plain"},
+            )
             response.raise_for_status()
             return response.text
 
         # Fallback to compare API (note: may not include patches in all Gitea versions)
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/compare/{base}...{head}"
-        response = await self.client.get(url)
+        response = await self._pool.get(f"/repos/{self.owner}/{self.repo}/compare/{base}...{head}")
         response.raise_for_status()
 
         compare_data = response.json()
@@ -252,10 +266,10 @@ class GiteaRestProvider(GitProvider):
         """Merge source branch into target."""
         log.info("merge_branches", source=source, target=target)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/branches/{target}/merge"
-        data = {"head": source, "base": target, "message": message}
-
-        response = await self.client.post(url, json=data)
+        response = await self._pool.post(
+            f"/repos/{self.owner}/{self.repo}/branches/{target}/merge",
+            json={"head": source, "base": target, "message": message},
+        )
         response.raise_for_status()
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
@@ -271,20 +285,19 @@ class GiteaRestProvider(GitProvider):
 
         import base64
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/contents/{path}"
+        contents_path = f"/repos/{self.owner}/{self.repo}/contents/{path}"
 
         # Try to get existing file SHA
         sha = None
         try:
-            existing = await self.client.get(url, params={"ref": branch})
+            existing = await self._pool.get(contents_path, params={"ref": branch})
             if existing.status_code == 200:
                 sha = existing.json().get("sha")
         except (httpx.HTTPError, ValueError) as e:
             # File doesn't exist yet or response parsing failed, which is fine
-            log.debug("file_not_exists", url=url, error=str(e))
-            pass
+            log.debug("file_not_exists", path=contents_path, error=str(e))
 
-        data = {
+        data: dict[str, str] = {
             "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
             "message": message,
             "branch": branch,
@@ -293,7 +306,7 @@ class GiteaRestProvider(GitProvider):
         if sha:
             data["sha"] = sha
 
-        response = await self.client.post(url, json=data)
+        response = await self._pool.post(contents_path, json=data)
         response.raise_for_status()
 
         result = response.json()
@@ -310,13 +323,13 @@ class GiteaRestProvider(GitProvider):
             return existing
 
         # Create new branch using Gitea's branches endpoint
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/branches"
-        data = {
-            "new_branch_name": branch_name,
-            "old_branch_name": from_branch,
-        }
-
-        response = await self.client.post(url, json=data)
+        response = await self._pool.post(
+            f"/repos/{self.owner}/{self.repo}/branches",
+            json={
+                "new_branch_name": branch_name,
+                "old_branch_name": from_branch,
+            },
+        )
         response.raise_for_status()
 
         branch_data = response.json()
@@ -334,9 +347,10 @@ class GiteaRestProvider(GitProvider):
         """Create a pull request."""
         log.info("create_pull_request", title=title, head=head, base=base)
 
+        pulls_path = f"/repos/{self.owner}/{self.repo}/pulls"
+
         # Check if PR already exists for this branch
-        list_url = f"{self.api_base}/repos/{self.owner}/{self.repo}/pulls"
-        list_response = await self.client.get(list_url, params={"state": "open"})
+        list_response = await self._pool.get(pulls_path, params={"state": "open"})
         list_response.raise_for_status()
 
         existing_prs = list_response.json()
@@ -345,18 +359,15 @@ class GiteaRestProvider(GitProvider):
                 log.info("pull_request_exists", pr=pr["number"], head=head)
                 # Update the existing PR with new title and body
                 pr_number = pr["number"]
-                update_url = f"{self.api_base}/repos/{self.owner}/{self.repo}/pulls/{pr_number}"
-                update_data = {
-                    "title": title,
-                    "body": body,
-                }
-                update_response = await self.client.patch(update_url, json=update_data)
+                update_response = await self._pool.patch(
+                    f"{pulls_path}/{pr_number}",
+                    json={"title": title, "body": body},
+                )
                 update_response.raise_for_status()
                 log.info("pull_request_updated", pr=pr_number)
                 return self._parse_pull_request(update_response.json())
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/pulls"
-        data = {
+        data: dict[str, Any] = {
             "title": title,
             "body": body,
             "head": head,
@@ -368,7 +379,7 @@ class GiteaRestProvider(GitProvider):
             label_ids = await self._get_or_create_label_ids(labels)
             data["labels"] = label_ids
 
-        response = await self.client.post(url, json=data)
+        response = await self._pool.post(pulls_path, json=data)
         response.raise_for_status()
 
         pr_data = response.json()
@@ -386,10 +397,8 @@ class GiteaRestProvider(GitProvider):
         """
         log.info("get_pull_request", pr=pr_number)
 
-        url = f"{self.api_base}/repos/{self.owner}/{self.repo}/pulls/{pr_number}"
-
         try:
-            response = await self.client.get(url)
+            response = await self._pool.get(f"/repos/{self.owner}/{self.repo}/pulls/{pr_number}")
             response.raise_for_status()
             pr_data = response.json()
             return self._parse_pull_request(pr_data)
@@ -406,9 +415,10 @@ class GiteaRestProvider(GitProvider):
         Returns:
             List of label IDs
         """
+        labels_path = f"/repos/{self.owner}/{self.repo}/labels"
+
         # Get existing labels
-        labels_url = f"{self.api_base}/repos/{self.owner}/{self.repo}/labels"
-        response = await self.client.get(labels_url)
+        response = await self._pool.get(labels_path)
         response.raise_for_status()
 
         existing_labels = response.json()
@@ -422,13 +432,14 @@ class GiteaRestProvider(GitProvider):
             else:
                 # Create new label
                 log.info("creating_label", name=name)
-                create_url = f"{self.api_base}/repos/{self.owner}/{self.repo}/labels"
-                create_data = {
-                    "name": name,
-                    "color": "ededed",  # Default gray color
-                    "description": f"Auto-created label: {name}",
-                }
-                create_response = await self.client.post(create_url, json=create_data)
+                create_response = await self._pool.post(
+                    labels_path,
+                    json={
+                        "name": name,
+                        "color": "ededed",  # Default gray color
+                        "description": f"Auto-created label: {name}",
+                    },
+                )
                 create_response.raise_for_status()
                 new_label = create_response.json()
                 label_ids.append(new_label["id"])

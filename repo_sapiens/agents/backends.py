@@ -12,6 +12,8 @@ from abc import ABC, abstractmethod
 import httpx
 import structlog
 
+from repo_sapiens.exceptions import AgentError, ProviderConnectionError
+
 log = structlog.get_logger()
 
 
@@ -34,7 +36,7 @@ class LLMBackend(ABC):
         """Verify connection to the backend server.
 
         Raises:
-            RuntimeError: If the server is not reachable or not properly configured.
+            ProviderConnectionError: If the server is not reachable or not properly configured.
         """
 
     @abstractmethod
@@ -68,7 +70,7 @@ class LLMBackend(ABC):
 
         Raises:
             httpx.HTTPError: On HTTP request failures.
-            RuntimeError: On backend-specific errors.
+            AgentError: On backend-specific errors.
         """
 
 
@@ -117,14 +119,17 @@ class OllamaBackend(LLMBackend):
         """Verify Ollama is running and accessible.
 
         Raises:
-            RuntimeError: If Ollama server is not reachable.
+            ProviderConnectionError: If Ollama server is not reachable.
         """
         try:
             models = await self.list_models(raise_on_error=True)
             log.info("ollama_connected", available_models=len(models))
         except httpx.ConnectError as e:
-            raise RuntimeError(
-                f"Ollama not running at {self.base_url}. Start it with: ollama serve"
+            raise ProviderConnectionError(
+                "Ollama not running",
+                provider_url=self.base_url,
+                suggestion="Start it with: ollama serve",
+                agent_type="ollama",
             ) from e
 
     async def list_models(self, raise_on_error: bool = False) -> list[str]:
@@ -268,15 +273,17 @@ class OpenAIBackend(LLMBackend):
         """Verify the OpenAI-compatible server is accessible.
 
         Raises:
-            RuntimeError: If the server is not reachable.
+            ProviderConnectionError: If the server is not reachable.
         """
         try:
             models = await self.list_models(raise_on_error=True)
             log.info("openai_backend_connected", available_models=len(models))
         except httpx.ConnectError as e:
-            raise RuntimeError(
-                f"OpenAI-compatible server not running at {self.base_url}. "
-                "Ensure your server is started and accessible."
+            raise ProviderConnectionError(
+                "OpenAI-compatible server not running",
+                provider_url=self.base_url,
+                suggestion="Ensure your server is started and accessible.",
+                agent_type="openai",
             ) from e
 
     async def list_models(self, raise_on_error: bool = False) -> list[str]:
@@ -301,7 +308,7 @@ class OpenAIBackend(LLMBackend):
                 error_msg = data["error"].get("message", "Unknown error")
                 log.error("openai_api_error", error=error_msg)
                 if raise_on_error:
-                    raise RuntimeError(f"OpenAI API error: {error_msg}")
+                    raise AgentError(f"OpenAI API error: {error_msg}", agent_type="openai")
                 return []
 
             return [m["id"] for m in data.get("data", [])]
@@ -334,7 +341,7 @@ class OpenAIBackend(LLMBackend):
 
         Raises:
             httpx.HTTPError: On HTTP request failures.
-            RuntimeError: On OpenAI API errors.
+            AgentError: On OpenAI API errors.
         """
         try:
             response = await self.client.post(
@@ -353,11 +360,11 @@ class OpenAIBackend(LLMBackend):
             if "error" in result:
                 error_msg = result["error"].get("message", "Unknown error")
                 log.error("openai_chat_error", error=error_msg, model=model)
-                raise RuntimeError(f"OpenAI API error: {error_msg}")
+                raise AgentError(f"OpenAI API error: {error_msg}", agent_type="openai")
 
             return result["choices"][0]["message"]["content"]
-        except RuntimeError:
-            # Re-raise RuntimeError (API errors)
+        except AgentError:
+            # Re-raise AgentError (API errors)
             raise
         except Exception as e:
             log.error("openai_chat_failed", error=str(e), model=model)

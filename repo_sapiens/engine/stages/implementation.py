@@ -89,7 +89,7 @@ class ImplementationStage(WorkflowStage):
 
         except Exception as e:
             log.error("implementation_stage_failed", error=str(e))
-            await self._handle_stage_error(issue, "implementation", e)
+            await self._handle_stage_error(issue, e)
             raise
 
     def _extract_task_from_issue(self, issue: Issue) -> Task:

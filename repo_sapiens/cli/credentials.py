@@ -26,19 +26,19 @@ def credentials_group():
     Examples:
 
         # Store a credential in OS keyring
-        builder credentials set gitea/api_token --backend keyring
+        sapiens credentials set gitea/api_token --backend keyring
 
         # Store in environment variable
-        builder credentials set GITEA_API_TOKEN --backend environment
+        sapiens credentials set GITEA_API_TOKEN --backend environment
 
         # Store in encrypted file
-        builder credentials set gitea/api_token --backend encrypted
+        sapiens credentials set gitea/api_token --backend encrypted
 
         # Test credential resolution
-        builder credentials get @keyring:gitea/api_token
+        sapiens credentials get @keyring:gitea/api_token
 
         # Delete credential
-        builder credentials delete gitea/api_token --backend keyring
+        sapiens credentials delete gitea/api_token --backend keyring
     """
     pass
 
@@ -72,11 +72,11 @@ def set_credential(reference: str, backend: str, value: str, master_password: st
 
     Examples:
 
-        builder credentials set gitea/api_token --backend keyring
+        sapiens credentials set gitea/api_token --backend keyring
 
-        builder credentials set GITEA_TOKEN --backend environment
+        sapiens credentials set GITEA_TOKEN --backend environment
 
-        builder credentials set claude/api_key --backend encrypted
+        sapiens credentials set claude/api_key --backend encrypted
     """
     try:
         if backend == "keyring":
@@ -117,17 +117,17 @@ def get_credential(reference: str, show_value: bool, master_password: str | None
 
     Examples:
 
-        builder credentials get @keyring:gitea/api_token
+        sapiens credentials get @keyring:gitea/api_token
 
-        builder credentials get ${GITEA_TOKEN}
+        sapiens credentials get ${GITEA_TOKEN}
 
-        builder credentials get @encrypted:claude/api_key
+        sapiens credentials get @encrypted:claude/api_key
     """
     try:
         # Create resolver with encrypted backend password if provided
         if master_password:
             resolver = CredentialResolver(
-                encrypted_file_path=Path(".builder/credentials.enc"),
+                encrypted_file_path=Path(".sapiens/credentials.enc"),
                 encrypted_master_password=master_password,
             )
         else:
@@ -181,11 +181,11 @@ def delete_credential(reference: str, backend: str, master_password: str | None)
 
     Examples:
 
-        builder credentials delete gitea/api_token --backend keyring
+        sapiens credentials delete gitea/api_token --backend keyring
 
-        builder credentials delete GITEA_TOKEN --backend environment
+        sapiens credentials delete GITEA_TOKEN --backend environment
 
-        builder credentials delete claude/api_key --backend encrypted
+        sapiens credentials delete claude/api_key --backend encrypted
     """
     try:
         if backend == "keyring":
@@ -237,7 +237,7 @@ def test_credentials(master_password: str | None):
 
     # Test encrypted backend
     encrypted_backend = EncryptedFileBackend(
-        Path(".builder/credentials.enc"), master_password or "test"
+        Path(".sapiens/credentials.enc"), master_password or "test"
     )
     click.echo("Encrypted file backend: ", nl=False)
     if encrypted_backend.available:
@@ -306,7 +306,7 @@ def _set_encrypted(reference: str, value: str, master_password: str | None) -> N
         master_password = click.prompt("Master password", hide_input=True, confirmation_prompt=True)
 
     backend = EncryptedFileBackend(
-        file_path=Path(".builder/credentials.enc"), master_password=master_password
+        file_path=Path(".sapiens/credentials.enc"), master_password=master_password
     )
     backend.set(service, key, value)
 
@@ -336,6 +336,6 @@ def _delete_encrypted(reference: str, master_password: str | None) -> bool:
         master_password = click.prompt("Master password", hide_input=True)
 
     backend = EncryptedFileBackend(
-        file_path=Path(".builder/credentials.enc"), master_password=master_password
+        file_path=Path(".sapiens/credentials.enc"), master_password=master_password
     )
     return backend.delete(service, key)

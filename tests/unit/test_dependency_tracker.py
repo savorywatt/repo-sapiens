@@ -6,6 +6,17 @@ from repo_sapiens.models.domain import Task
 from repo_sapiens.processors.dependency_tracker import DependencyTracker
 
 
+def _make_task(id: str, title: str, dependencies: list[str] | None = None) -> Task:
+    """Helper to create Task with required fields."""
+    return Task(
+        id=id,
+        prompt_issue_id=1,
+        title=title,
+        description=f"Description for {title}",
+        dependencies=dependencies or [],
+    )
+
+
 def test_dependency_tracker_initialization():
     """Test dependency tracker initialization."""
     tracker = DependencyTracker()
@@ -16,7 +27,7 @@ def test_dependency_tracker_initialization():
 def test_add_task():
     """Test adding tasks to tracker."""
     tracker = DependencyTracker()
-    task = Task(id="task-1", title="Test Task")
+    task = _make_task(id="task-1", title="Test Task")
 
     tracker.add_task(task)
 
@@ -27,7 +38,7 @@ def test_add_task():
 def test_is_ready_no_dependencies():
     """Test task with no dependencies is ready."""
     tracker = DependencyTracker()
-    task = Task(id="task-1", title="Test")
+    task = _make_task(id="task-1", title="Test")
 
     tracker.add_task(task)
 
@@ -38,8 +49,8 @@ def test_is_ready_with_dependencies():
     """Test task with dependencies."""
     tracker = DependencyTracker()
 
-    task1 = Task(id="task-1", title="Task 1")
-    task2 = Task(id="task-2", title="Task 2", dependencies=["task-1"])
+    task1 = _make_task(id="task-1", title="Task 1")
+    task2 = _make_task(id="task-2", title="Task 2", dependencies=["task-1"])
 
     tracker.add_task(task1)
     tracker.add_task(task2)
@@ -58,9 +69,9 @@ def test_get_ready_tasks():
     """Test getting ready tasks."""
     tracker = DependencyTracker()
 
-    task1 = Task(id="task-1", title="Task 1")
-    task2 = Task(id="task-2", title="Task 2", dependencies=["task-1"])
-    task3 = Task(id="task-3", title="Task 3")
+    task1 = _make_task(id="task-1", title="Task 1")
+    task2 = _make_task(id="task-2", title="Task 2", dependencies=["task-1"])
+    task3 = _make_task(id="task-3", title="Task 3")
 
     tracker.add_task(task1)
     tracker.add_task(task2)
@@ -85,8 +96,8 @@ def test_validate_dependencies_circular():
     """Test circular dependency detection."""
     tracker = DependencyTracker()
 
-    task1 = Task(id="task-1", title="Task 1", dependencies=["task-2"])
-    task2 = Task(id="task-2", title="Task 2", dependencies=["task-1"])
+    task1 = _make_task(id="task-1", title="Task 1", dependencies=["task-2"])
+    task2 = _make_task(id="task-2", title="Task 2", dependencies=["task-1"])
 
     tracker.add_task(task1)
     tracker.add_task(task2)
@@ -99,7 +110,7 @@ def test_validate_dependencies_invalid_reference():
     """Test invalid dependency reference."""
     tracker = DependencyTracker()
 
-    task1 = Task(id="task-1", title="Task 1", dependencies=["task-999"])
+    task1 = _make_task(id="task-1", title="Task 1", dependencies=["task-999"])
 
     tracker.add_task(task1)
 
@@ -111,10 +122,10 @@ def test_get_execution_order():
     """Test getting execution order."""
     tracker = DependencyTracker()
 
-    task1 = Task(id="task-1", title="Task 1")
-    task2 = Task(id="task-2", title="Task 2", dependencies=["task-1"])
-    task3 = Task(id="task-3", title="Task 3", dependencies=["task-1"])
-    task4 = Task(id="task-4", title="Task 4", dependencies=["task-2", "task-3"])
+    task1 = _make_task(id="task-1", title="Task 1")
+    task2 = _make_task(id="task-2", title="Task 2", dependencies=["task-1"])
+    task3 = _make_task(id="task-3", title="Task 3", dependencies=["task-1"])
+    task4 = _make_task(id="task-4", title="Task 4", dependencies=["task-2", "task-3"])
 
     tracker.add_task(task1)
     tracker.add_task(task2)
@@ -138,8 +149,8 @@ def test_get_blocked_tasks():
     """Test getting blocked tasks."""
     tracker = DependencyTracker()
 
-    task1 = Task(id="task-1", title="Task 1")
-    task2 = Task(id="task-2", title="Task 2", dependencies=["task-1"])
+    task1 = _make_task(id="task-1", title="Task 1")
+    task2 = _make_task(id="task-2", title="Task 2", dependencies=["task-1"])
 
     tracker.add_task(task1)
     tracker.add_task(task2)

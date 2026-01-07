@@ -1,13 +1,13 @@
 """Fix execution stage - implements fixes from approved proposals."""
 
 import re
-import subprocess  # nosec B404 # Required for git operations with controlled input
 from pathlib import Path
 
 import structlog
 
 from repo_sapiens.engine.stages.base import WorkflowStage
 from repo_sapiens.models.domain import Issue
+from repo_sapiens.utils.async_subprocess import run_command
 
 log = structlog.get_logger(__name__)
 
@@ -85,9 +85,13 @@ class FixExecutionStage(WorkflowStage):
             log.info("checking_out_branch", branch=branch_name, path=str(playground_dir))
 
             # Fetch and checkout
-            subprocess.run(["git", "fetch", "origin"], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
-            subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                ["git", "checkout", "-B", branch_name, f"origin/{branch_name}"],
+            await run_command("git", "fetch", "origin", cwd=playground_dir, check=True)
+            await run_command(
+                "git",
+                "checkout",
+                "-B",
+                branch_name,
+                f"origin/{branch_name}",
                 cwd=playground_dir,
                 check=True,
             )
@@ -149,31 +153,41 @@ Focus on addressing the feedback completely and correctly.
                 log.info("committing_fixes", branch=branch_name)
 
                 # Git add all changes
-                subprocess.run(["git", "add", "."], cwd=playground_dir, check=True)  # nosec B603 B607 # Git command with controlled input
+                await run_command("git", "add", ".", cwd=playground_dir, check=True)
 
                 # Check if there are changes to commit
-                status_result = subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                    ["git", "status", "--porcelain"],
+                status_stdout, _, _ = await run_command(
+                    "git",
+                    "status",
+                    "--porcelain",
                     cwd=playground_dir,
-                    capture_output=True,
-                    text=True,
                     check=True,
                 )
 
-                if status_result.stdout.strip():
+                if status_stdout.strip():
                     # Commit changes
                     commit_message = (
                         f"fix: Address review feedback [FIX-{issue.number}]\n\n"
                         f"Fixes from code review on PR #{pr_number}\n"
                         f"Fix proposal: #{issue.number}"
                     )
-                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                        ["git", "commit", "-m", commit_message], cwd=playground_dir, check=True
+                    await run_command(
+                        "git",
+                        "commit",
+                        "-m",
+                        commit_message,
+                        cwd=playground_dir,
+                        check=True,
                     )
 
                     # Push to remote
-                    subprocess.run(  # nosec B603 B607 # Git command with controlled input
-                        ["git", "push", "origin", branch_name], cwd=playground_dir, check=True
+                    await run_command(
+                        "git",
+                        "push",
+                        "origin",
+                        branch_name,
+                        cwd=playground_dir,
+                        check=True,
                     )
 
                     log.info("fixes_committed_and_pushed", branch=branch_name)

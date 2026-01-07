@@ -45,37 +45,33 @@ jobs:
 
       - name: Create plan proposal
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_GITEA_URL }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.repository }}
+          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "🔍 Processing issue #${{ gitea.event.issue.number }} for planning"
           sapiens process-issue --issue ${{ gitea.event.issue.number }}
 
-      - name: Comment on success
+      - name: Post success comment
         if: success()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '✅ **Plan proposal created!**\n\nThe development plan has been generated. Review the plan and add the `approved` label to proceed with task creation.\n\n🤖 Posted by Builder Automation'
-            })
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "✅ **Plan proposal created!**\n\nThe development plan has been generated. Review the plan and add the `approved` label to proceed with task creation.\n\n🤖 Posted by Sapiens Automation"}' \
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
 
-      - name: Comment on failure
+      - name: Post failure comment
         if: failure()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '❌ **Plan creation failed**\n\nThere was an error creating the development plan. Check the workflow logs for details.\n\n🤖 Posted by Builder Automation'
-            })
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "❌ **Plan creation failed**\n\nThere was an error creating the development plan. Check the workflow logs for details.\n\n🤖 Posted by Sapiens Automation"}' \
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"

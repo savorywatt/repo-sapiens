@@ -1,4 +1,4 @@
-"""Secure credential management for the builder CLI.
+"""Secure credential management for the sapiens CLI.
 
 This package provides:
 - Multiple storage backends (keyring, environment, encrypted file)

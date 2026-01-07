@@ -46,6 +46,7 @@ class PlanReviewStage(WorkflowStage):
                 id=plan_id,
                 title=issue.title.replace("[Plan Review] ", ""),
                 description="",
+                tasks=[],
                 file_path=plan_path,
             )
 
@@ -62,7 +63,7 @@ class PlanReviewStage(WorkflowStage):
                 task_issue = await self.git.create_issue(
                     title=issue_title,
                     body=issue_body,
-                    labels=[self.settings.tags.needs_implementation],
+                    labels=[self.settings.tags.ready_to_implement],
                 )
 
                 # Store task issue ID in task
@@ -97,7 +98,7 @@ class PlanReviewStage(WorkflowStage):
 
         except Exception as e:
             log.error("plan_review_stage_failed", error=str(e))
-            await self._handle_stage_error(issue, "plan_review", e)
+            await self._handle_stage_error(issue, e)
             raise
 
     def _extract_plan_id(self, issue_body: str) -> str:

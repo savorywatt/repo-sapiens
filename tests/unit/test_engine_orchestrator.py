@@ -10,7 +10,7 @@ Tests cover:
 """
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -19,7 +19,6 @@ from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
 from repo_sapiens.models.domain import Issue, IssueState, Task
 from repo_sapiens.providers.base import AgentProvider, GitProvider
-
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -238,9 +237,7 @@ class TestStageRouting:
         stage = orchestrator._determine_stage(issue)
         assert stage == "pr_fix"
 
-    def test_route_approved_fix_proposal_to_fix_execution(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    def test_route_approved_fix_proposal_to_fix_execution(self, orchestrator: WorkflowOrchestrator):
         """Test that approved + fix-proposal labels route to fix_execution stage."""
         issue = create_test_issue(labels=["approved", "fix-proposal"])
         stage = orchestrator._determine_stage(issue)
@@ -282,9 +279,7 @@ class TestStageRouting:
         stage = orchestrator._determine_stage(issue)
         assert stage is None
 
-    def test_label_priority_proposed_over_needs_planning(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    def test_label_priority_proposed_over_needs_planning(self, orchestrator: WorkflowOrchestrator):
         """Test that 'proposed' takes precedence when both labels present."""
         issue = create_test_issue(labels=["proposed", "needs-planning"])
         stage = orchestrator._determine_stage(issue)
@@ -307,9 +302,7 @@ class TestIssueProcessing:
     """Tests for process_issue and process_all_issues methods."""
 
     @pytest.mark.asyncio
-    async def test_process_issue_executes_correct_stage(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_process_issue_executes_correct_stage(self, orchestrator: WorkflowOrchestrator):
         """Test that process_issue executes the correct stage based on labels."""
         issue = create_test_issue(labels=["needs-planning"])
 
@@ -339,9 +332,7 @@ class TestIssueProcessing:
             mock_stage.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_process_issue_stage_error_propagates(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_process_issue_stage_error_propagates(self, orchestrator: WorkflowOrchestrator):
         """Test that stage execution errors are propagated."""
         issue = create_test_issue(labels=["needs-planning"])
 
@@ -763,9 +754,7 @@ class TestSingleTaskExecution:
     """Tests for _execute_single_task method."""
 
     @pytest.mark.asyncio
-    async def test_execute_single_task_requires_issue_id(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_execute_single_task_requires_issue_id(self, orchestrator: WorkflowOrchestrator):
         """Test that task without issue ID raises ValueError."""
         task = Task(
             id="task-1",
@@ -973,9 +962,7 @@ class TestStateManagement:
         assert plan_id in load_calls
 
     @pytest.mark.asyncio
-    async def test_stages_have_access_to_state_manager(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_stages_have_access_to_state_manager(self, orchestrator: WorkflowOrchestrator):
         """Test that all stages have access to the state manager."""
         for stage_name, stage in orchestrator.stages.items():
             assert hasattr(stage, "state"), f"Stage {stage_name} missing state attribute"

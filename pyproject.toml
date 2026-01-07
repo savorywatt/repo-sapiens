@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Intelligent repository automation and management tool"
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT"
+license = {text = "MIT"}
 authors = [
     {name = "savorywatt", email = "maintainer@savorywatt.com"}
 ]
@@ -31,8 +31,7 @@ dependencies = [
     "cryptography>=41.0.0",
     "gitpython>=3.1.40",
     "jinja2>=3.1.3",
-    "pygithub>=2.1.1",  # GitHub API client
-    "PyNaCl>=1.5.0",    # GitHub secret encryption
+    "pygithub>=2.1.1",  # GitHub API client (includes PyNaCl for secret encryption)
 ]
 
 [project.optional-dependencies]
@@ -41,7 +40,7 @@ monitoring = [
     "fastapi>=0.109.0",
     "uvicorn>=0.27.0",
 ]
-analytics = ["plotly>=5.18.0"]
+# analytics = ["plotly>=5.18.0"]  # Unused: dashboard uses CDN
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
@@ -53,8 +52,10 @@ dev = [
     "mypy>=1.7.0",
     "pre-commit>=3.6.0",
     "bandit[toml]>=1.7.6",
+    "types-PyYAML>=6.0",
+    "types-aiofiles>=23.2",
 ]
-all = ["repo-sapiens[monitoring,analytics]"]
+all = ["repo-sapiens[monitoring]"]
 
 [project.scripts]
 repo-sapiens = "repo_sapiens.main:cli"
@@ -80,6 +81,7 @@ repo_sapiens = [
     "py.typed",
     "templates/**/*.j2",
     "templates/**/*.json",
+    "templates/**/*.yaml",
 ]
 
 [tool.black]

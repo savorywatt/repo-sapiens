@@ -53,7 +53,7 @@ class TestKeyringBackend:
         result = backend.get("gitea", "api_token")
 
         assert result == "test-token"
-        mock_keyring.get_password.assert_called_once_with("builder/gitea", "api_token")
+        mock_keyring.get_password.assert_called_once_with("sapiens/gitea", "api_token")
 
     @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
     @patch("repo_sapiens.credentials.keyring_backend.keyring")
@@ -100,7 +100,7 @@ class TestKeyringBackend:
 
         backend.set("gitea", "api_token", "new-token")
 
-        mock_keyring.set_password.assert_called_once_with("builder/gitea", "api_token", "new-token")
+        mock_keyring.set_password.assert_called_once_with("sapiens/gitea", "api_token", "new-token")
 
     def test_set_empty_value_raises_error(self, backend):
         """Test that empty values are rejected."""
@@ -138,7 +138,7 @@ class TestKeyringBackend:
         result = backend.delete("gitea", "api_token")
 
         assert result is True
-        mock_keyring.delete_password.assert_called_once_with("builder/gitea", "api_token")
+        mock_keyring.delete_password.assert_called_once_with("sapiens/gitea", "api_token")
 
     @patch("repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE", True)
     @patch("repo_sapiens.credentials.keyring_backend.keyring")
