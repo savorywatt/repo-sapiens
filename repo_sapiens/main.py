@@ -354,7 +354,7 @@ def task_command(
                 await execute_single_task(agent, user_input)
                 click.echo()
 
-            except (EOFError, KeyboardInterrupt):
+            except (EOFError, KeyboardInterrupt, click.Abort):
                 click.echo("\nGoodbye!")
                 break
 

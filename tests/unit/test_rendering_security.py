@@ -81,7 +81,7 @@ class TestSanitizeLogOutput:
         result = sanitize_log_output(text)
         assert "\x00" not in result
         assert "\x1f" not in result
-        assert "HelloWorldTest" == result
+        assert result == "HelloWorldTest"
 
     def test_newline_and_tab_preserved(self):
         """Newlines and tabs should be preserved."""

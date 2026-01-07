@@ -27,6 +27,7 @@ permissions:
 jobs:
   update-docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Skip if commit message contains [skip docs] or [no docs]
     if: |
       !contains(github.event.head_commit.message, '[skip docs]') &&

@@ -64,7 +64,9 @@ class TestMetricsCollector:
 
     def test_record_token_usage(self):
         """Should record token usage metric."""
-        MetricsCollector.record_token_usage(model="claude-sonnet", operation="planning", tokens=1000)
+        MetricsCollector.record_token_usage(
+            model="claude-sonnet", operation="planning", tokens=1000
+        )
         MetricsCollector.record_token_usage(model="claude-haiku", operation="review", tokens=500)
 
     def test_set_system_info(self):
