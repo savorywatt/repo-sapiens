@@ -49,7 +49,7 @@ jobs:
         run: |
           echo "Using config: $CONFIG_FILE"
           echo "Server URL: $GITEA_URL"
-          uv run sapiens --config "$CONFIG_FILE" process-all --log-level DEBUG
+          uv run sapiens --config "$CONFIG_FILE" --log-level DEBUG process-all
 
       - name: Upload state artifacts
         if: always()
