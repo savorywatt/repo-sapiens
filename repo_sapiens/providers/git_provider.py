@@ -34,7 +34,7 @@ class GiteaProvider(GitProvider):
         """
         self.mcp = MCPClient(mcp_server)
         self.base_url = base_url
-        self.token = token
+        self.token = token.strip() if token else token
         self.owner = owner
         self.repo = repo
 

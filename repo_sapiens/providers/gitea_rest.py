@@ -34,7 +34,7 @@ class GiteaRestProvider(GitProvider):
         """
         self.base_url = base_url.rstrip("/")
         self.api_base = f"{self.base_url}/api/v1"
-        self.token = token
+        self.token = token.strip() if token else token
         self.owner = owner
         self.repo = repo
         self._pool: HTTPConnectionPool | None = None

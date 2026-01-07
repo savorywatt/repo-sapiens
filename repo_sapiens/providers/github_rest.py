@@ -47,7 +47,7 @@ class GitHubRestProvider(GitProvider):
             repo: Repository name
             base_url: GitHub API base URL (for GitHub Enterprise)
         """
-        self.token = token
+        self.token = token.strip() if token else token
         self.owner = owner
         self.repo = repo
         # Normalize base_url by removing trailing slash (Pydantic HttpUrl adds it)
