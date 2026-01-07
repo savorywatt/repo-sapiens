@@ -38,7 +38,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install repo-sapiens
-        run: pip install repo-sapiens
+        run: |
+          pip install repo-sapiens
+          # Ensure pip scripts are in PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Process issue
         env:
@@ -49,7 +52,7 @@ jobs:
           # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
           echo "Processing issue #${{ gitea.event.issue.number }}"
-          sapiens --config $CONFIG_FILE process-issue --issue ${{ gitea.event.issue.number }}
+          python -m repo_sapiens.cli --config $CONFIG_FILE process-issue --issue ${{ gitea.event.issue.number }}
 
       - name: Post success comment
         if: success()

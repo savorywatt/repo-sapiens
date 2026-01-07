@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload state artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: workflow-state-${{ gitea.run_number }}
           path: .sapiens/state/

@@ -379,7 +379,7 @@ jobs:
 
           pip install repo-sapiens || pip3 install repo-sapiens
 
-          sapiens task "Analyze this SBOM and security report for a software project.
+          python -m repo_sapiens.cli task "Analyze this SBOM and security report for a software project.
 
           $(cat sbom-report.md)
 
@@ -443,7 +443,7 @@ jobs:
             }" || echo "Issue creation failed"
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: sbom-${{ gitea.run_number }}
           path: |

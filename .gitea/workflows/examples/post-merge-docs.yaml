@@ -42,7 +42,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install repo-sapiens
-        run: pip install repo-sapiens
+        run: |
+          pip install repo-sapiens
+          # Ensure pip scripts are in PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Get recent changes
         id: changes
@@ -57,7 +60,7 @@ jobs:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          sapiens task "Review the recent commits and update documentation if needed.
+          python -m repo_sapiens.cli task "Review the recent commits and update documentation if needed.
 
           Recent commits:
           ${{ steps.changes.outputs.commits }}

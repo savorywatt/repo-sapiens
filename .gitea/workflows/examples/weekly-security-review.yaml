@@ -721,7 +721,7 @@ jobs:
         run: |
           pip install repo-sapiens || pip3 install repo-sapiens
 
-          sapiens task "Review the security report and fix identified vulnerabilities.
+          python -m repo_sapiens.cli task "Review the security report and fix identified vulnerabilities.
 
           $(cat security-report.md)
 
@@ -788,7 +788,7 @@ jobs:
             }" || echo "PR creation failed - may need manual creation"
 
       - name: Upload security report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: security-report
           path: |

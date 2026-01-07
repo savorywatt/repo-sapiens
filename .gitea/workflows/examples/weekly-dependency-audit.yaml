@@ -38,6 +38,8 @@ jobs:
       - name: Install tools
         run: |
           pip install repo-sapiens pip-audit safety
+          # Ensure pip scripts are in PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Check for outdated packages
         id: outdated
@@ -95,7 +97,7 @@ jobs:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          sapiens task "Review the dependency audit report and update safe dependencies.
+          python -m repo_sapiens.cli task "Review the dependency audit report and update safe dependencies.
 
           $(cat dependency-report.md)
 

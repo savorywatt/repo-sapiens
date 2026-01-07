@@ -44,6 +44,8 @@ jobs:
         run: |
           pip install repo-sapiens
           pip install -e ".[dev]" 2>/dev/null || pip install -e . pytest pytest-cov
+          # Ensure pip scripts are in PATH
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Run coverage analysis
         id: coverage
@@ -77,7 +79,7 @@ jobs:
         run: |
           TARGET=${{ gitea.event.inputs.target_coverage || '60' }}
 
-          sapiens task "Improve test coverage for this Python project.
+          python -m repo_sapiens.cli task "Improve test coverage for this Python project.
 
           Current total coverage: ${{ steps.coverage.outputs.total_coverage }}%
           Target coverage: ${TARGET}%
