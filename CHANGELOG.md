@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Model and base URL automatically loaded from `agent_provider` config
   - CLI options override config when specified
   - Simple usage: `sapiens react "task"` or `sapiens react --repl`
+- **GitLab Support**: Full GitLab REST API v4 integration
+  - New `GitLabRestProvider` class for issues, merge requests, branches, and files
+  - `sapiens init` now detects and configures GitLab repositories
+  - GitLab CI/CD workflow templates (`.gitlab-ci.yml`)
+  - GitLab composite action template for reusable AI tasks
+  - Supports gitlab.com and self-hosted GitLab instances
+  - Uses `PRIVATE-TOKEN` authentication with `api`, `read_repository`, `write_repository` scopes
 
 ### Changed
 - **Init Command**: Now deploys reusable composite action by default

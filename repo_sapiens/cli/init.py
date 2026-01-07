@@ -128,7 +128,7 @@ class RepoInitializer:
         self.deploy_actions = deploy_actions
 
         self.repo_info = None
-        self.provider_type = None  # 'github' or 'gitea' (detected)
+        self.provider_type = None  # 'github', 'gitea', or 'gitlab' (detected)
         self.gitea_token = None
         self.agent_type = None  # 'claude', 'goose', or 'builtin'
         self.agent_mode: Literal["local", "api"] = "local"
@@ -222,6 +222,35 @@ class RepoInitializer:
 
         return None, None
 
+    def _detect_existing_gitlab_token(self) -> tuple[str | None, str | None]:
+        """Check for existing GitLab token in keyring or environment.
+
+        Checks in order:
+        1. Keyring (gitlab/api_token)
+        2. Environment (GITLAB_TOKEN, SAPIENS_GITLAB_TOKEN, CI_JOB_TOKEN)
+
+        Returns (token, source) tuple where source describes where it was found.
+        """
+        import os
+
+        # Check keyring first
+        try:
+            keyring_backend = KeyringBackend()
+            if keyring_backend.available:
+                token = keyring_backend.get("gitlab", "api_token")
+                if token:
+                    return token, "keyring (gitlab/api_token)"
+        except Exception:
+            pass  # Keyring not available or error
+
+        # Check environment variables
+        for env_var in ("GITLAB_TOKEN", "SAPIENS_GITLAB_TOKEN", "CI_JOB_TOKEN"):
+            token = os.getenv(env_var)
+            if token:
+                return token, f"environment (${env_var})"
+
+        return None, None
+
     def _discover_repository(self) -> None:
         """Discover Git repository configuration."""
         click.echo(click.style("🔍 Discovering repository configuration...", bold=True))
@@ -270,6 +299,18 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
+        if self.provider_type == "gitlab":
+            self._collect_gitlab_token_interactively()
+        else:
+            self._collect_gitea_token_interactively()
+
+        click.echo()
+
+        # AI Agent configuration
+        self._configure_ai_agent()
+
+    def _collect_gitea_token_interactively(self) -> None:
+        """Collect Gitea token interactively."""
         # Check for existing Gitea token in keyring or environment
         existing_token, source = self._detect_existing_gitea_token()
 
@@ -294,10 +335,33 @@ class RepoInitializer:
             click.echo()
             self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
 
-        click.echo()
+    def _collect_gitlab_token_interactively(self) -> None:
+        """Collect GitLab token interactively."""
+        # Check for existing GitLab token in keyring or environment
+        existing_token, source = self._detect_existing_gitlab_token()
 
-        # AI Agent configuration
-        self._configure_ai_agent()
+        if existing_token:
+            use_existing = click.confirm(
+                click.style(f"✓ GitLab token found in {source}. Use it?", fg="green"),
+                default=True,
+            )
+            if use_existing:
+                self.gitea_token = existing_token  # Reuse gitea_token field
+                click.echo(f"   ✓ Using GitLab token from {source}")
+            else:
+                self.gitea_token = click.prompt(
+                    "Enter your GitLab Personal Access Token", hide_input=True, type=str
+                )
+        else:
+            # No existing token - prompt for it
+            pat_url = f"{self.repo_info.base_url}/-/user_settings/personal_access_tokens"
+            click.echo("GitLab Personal Access Token is required. Get it from:\n" f"   {pat_url}")
+            click.echo()
+            click.echo("Required scopes: api, read_repository, write_repository")
+            click.echo()
+            self.gitea_token = click.prompt(
+                "Enter your GitLab Personal Access Token", hide_input=True, type=str
+            )
 
     def _configure_ai_agent(self) -> None:
         """Configure AI agent (Claude or Goose) interactively."""
@@ -688,9 +752,13 @@ class RepoInitializer:
         """Store credentials in OS keyring."""
         backend = KeyringBackend()
 
-        # Store Gitea token
-        backend.set("gitea", "api_token", self.gitea_token)
-        click.echo("   ✓ Stored: gitea/api_token")
+        # Store git provider token (Gitea, GitLab, or GitHub)
+        if self.provider_type == "gitlab":
+            backend.set("gitlab", "api_token", self.gitea_token)
+            click.echo("   ✓ Stored: gitlab/api_token")
+        else:
+            backend.set("gitea", "api_token", self.gitea_token)
+            click.echo("   ✓ Stored: gitea/api_token")
 
         # Store agent API key if provided
         if self.agent_api_key:
@@ -710,9 +778,13 @@ class RepoInitializer:
         """Store credentials in environment (for current session)."""
         backend = EnvironmentBackend()
 
-        # Store Gitea token
-        backend.set("GITEA_TOKEN", self.gitea_token)
-        click.echo("   ✓ Set: GITEA_TOKEN")
+        # Store git provider token (Gitea, GitLab, or GitHub)
+        if self.provider_type == "gitlab":
+            backend.set("GITLAB_TOKEN", self.gitea_token)
+            click.echo("   ✓ Set: GITLAB_TOKEN")
+        else:
+            backend.set("GITEA_TOKEN", self.gitea_token)
+            click.echo("   ✓ Set: GITEA_TOKEN")
 
         # Store agent API key if provided
         if self.agent_api_key:
@@ -849,9 +921,12 @@ class RepoInitializer:
         """Generate configuration file."""
         click.echo(click.style("📝 Creating configuration file...", bold=True))
 
-        # Determine credential references based on backend
+        # Determine credential references based on backend and provider
         if self.backend == "keyring":
-            gitea_token_ref = "@keyring:gitea/api_token"  # nosec B105 # Template placeholder for keyring reference
+            if self.provider_type == "gitlab":
+                git_token_ref = "@keyring:gitlab/api_token"  # nosec B105
+            else:
+                git_token_ref = "@keyring:gitea/api_token"  # nosec B105
 
             # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
@@ -868,7 +943,10 @@ class RepoInitializer:
                 agent_api_key_ref = "null"
         else:
             # fmt: off
-            gitea_token_ref = "${GITEA_TOKEN}"  # nosec B105 # Template placeholder for environment variable
+            if self.provider_type == "gitlab":
+                git_token_ref = "${GITLAB_TOKEN}"  # nosec B105
+            else:
+                git_token_ref = "${GITEA_TOKEN}"  # nosec B105
             # fmt: on
 
             # Determine agent API key reference
@@ -943,11 +1021,11 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}"""
 
-        # Determine MCP server (only Gitea uses MCP)
-        if self.provider_type == "github":
-            mcp_server_line = "  mcp_server: null"
-        else:
+        # Determine MCP server (only Gitea uses MCP; GitHub and GitLab do not)
+        if self.provider_type == "gitea":
             mcp_server_line = "  mcp_server: gitea-mcp"
+        else:
+            mcp_server_line = "  mcp_server: null"
 
         # Generate configuration content
         config_content = f"""# Automation System Configuration
@@ -958,7 +1036,7 @@ git_provider:
   provider_type: {self.provider_type}
 {mcp_server_line}
   base_url: {self.repo_info.base_url}
-  api_token: {gitea_token_ref}
+  api_token: "{git_token_ref}"
 
 repository:
   owner: {self.repo_info.owner}
@@ -1055,13 +1133,19 @@ tags:
             resolver = CredentialResolver()
 
             if self.backend == "keyring":
-                gitea_ref = "@keyring:gitea/api_token"
+                if self.provider_type == "gitlab":
+                    token_ref = "@keyring:gitlab/api_token"
+                else:
+                    token_ref = "@keyring:gitea/api_token"
             else:
-                gitea_ref = "${GITEA_TOKEN}"
+                if self.provider_type == "gitlab":
+                    token_ref = "${GITLAB_TOKEN}"
+                else:
+                    token_ref = "${GITEA_TOKEN}"
 
-            resolved = resolver.resolve(gitea_ref, cache=False)
+            resolved = resolver.resolve(token_ref, cache=False)
             if not resolved:
-                raise ValueError("Failed to resolve Gitea token")
+                raise ValueError(f"Failed to resolve {self.provider_type} token")
 
             click.echo("   ✓ Credentials validated")
             click.echo("   ✓ Configuration file created")
@@ -1073,12 +1157,21 @@ tags:
 
     def _print_next_steps(self) -> None:
         """Print next steps for the user."""
+        provider_name = self.provider_type.title()
+
         click.echo(click.style("📋 Next Steps:", bold=True))
         click.echo()
-        click.echo("1. Label an issue with 'needs-planning' in Gitea:")
-        issues_url = (
-            f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
-        )
+        click.echo(f"1. Label an issue with 'needs-planning' in {provider_name}:")
+
+        # Build issues URL based on provider
+        if self.provider_type == "gitlab":
+            issues_url = (
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/-/issues"
+            )
+        else:
+            issues_url = (
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
+            )
         click.echo(f"   {issues_url}")
         click.echo()
         click.echo("2. Run the automation daemon:")
@@ -1087,11 +1180,13 @@ tags:
         click.echo("3. Watch the automation work!")
         click.echo()
 
-        # Print manual secret setup if needed
-        if self.setup_secrets:
+        # Print manual secret setup if needed (not for GitLab - uses CI/CD variables)
+        if self.setup_secrets and self.provider_type != "gitlab":
             click.echo(
                 click.style(
-                    "⚠ Important: Set Gitea Actions Secrets Manually", bold=True, fg="yellow"
+                    f"⚠ Important: Set {provider_name} Actions Secrets Manually",
+                    bold=True,
+                    fg="yellow",
                 )
             )
             click.echo()
@@ -1102,7 +1197,33 @@ tags:
             click.echo(f"Navigate to: {secrets_url}")
             click.echo()
             click.echo("Add the following secrets:")
-            click.echo("  - GITEA_TOKEN (your Gitea API token)")
+            if self.provider_type == "gitea":
+                click.echo("  - GITEA_TOKEN (your Gitea API token)")
+            if self.agent_mode == "api":
+                if self.agent_type == "goose" and self.goose_llm_provider:
+                    secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
+                    provider_title = self.goose_llm_provider.title()
+                    click.echo(f"  - {secret_name} (your {provider_title} API key for Goose)")
+                elif self.agent_type == "claude":
+                    click.echo("  - CLAUDE_API_KEY (your Claude API key)")
+            click.echo()
+
+        # GitLab uses CI/CD variables instead of Actions secrets
+        if self.setup_secrets and self.provider_type == "gitlab":
+            click.echo(
+                click.style(
+                    "⚠ Important: Set GitLab CI/CD Variables Manually", bold=True, fg="yellow"
+                )
+            )
+            click.echo()
+            variables_url = (
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/"
+                f"{self.repo_info.repo}/-/settings/ci_cd"
+            )
+            click.echo(f"Navigate to: {variables_url}")
+            click.echo("Expand 'Variables' section and add:")
+            click.echo()
+            click.echo("  - GITLAB_TOKEN (your GitLab Personal Access Token)")
             if self.agent_mode == "api":
                 if self.agent_type == "goose" and self.goose_llm_provider:
                     secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"

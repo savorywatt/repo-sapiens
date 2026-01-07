@@ -8,7 +8,6 @@ import pytest
 from repo_sapiens.models.domain import IssueState
 from repo_sapiens.providers.github_rest import GitHubRestProvider
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================

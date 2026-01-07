@@ -29,7 +29,7 @@ Only these values are valid for `agent_provider.provider_type`:
 Do NOT use `react` as a provider type.
 
 ### Valid Git Provider Types
-- `github`, `gitea`
+- `github`, `gitea`, `gitlab`
 
 ## Testing
 

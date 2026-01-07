@@ -19,7 +19,7 @@ from repo_sapiens.exceptions import ConfigurationError
 
 
 class GitProviderConfig(BaseModel):
-    """Git provider configuration (Gitea or GitHub).
+    """Git provider configuration (Gitea, GitHub, or GitLab).
 
     Supports credential references:
     - api_token: "@keyring:gitea/api_token"
@@ -27,7 +27,7 @@ class GitProviderConfig(BaseModel):
     - api_token: "@encrypted:gitea/api_token"
     """
 
-    provider_type: Literal["gitea", "github"] = Field(
+    provider_type: Literal["gitea", "github", "gitlab"] = Field(
         default="gitea", description="Type of Git provider"
     )
     mcp_server: str | None = Field(

@@ -15,7 +15,6 @@ from repo_sapiens.models.domain import IssueState
 from repo_sapiens.providers.gitea_rest import GiteaRestProvider
 from repo_sapiens.utils.connection_pool import HTTPConnectionPool
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -286,9 +285,7 @@ class TestGiteaRestProviderIssues:
         mock_pool.post = AsyncMock(return_value=mock_response)
         provider._pool = mock_pool
 
-        issue = await provider.create_issue(
-            title="New bug report", body="Description of the bug"
-        )
+        issue = await provider.create_issue(title="New bug report", body="Description of the bug")
 
         assert issue.id == 1001
         call_args = mock_pool.post.call_args
@@ -505,9 +502,7 @@ class TestGiteaRestProviderFiles:
         assert call_args.kwargs["params"]["ref"] == "main"
 
     @pytest.mark.asyncio
-    async def test_commit_file_new(
-        self, provider: GiteaRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_commit_file_new(self, provider: GiteaRestProvider, mock_pool: AsyncMock) -> None:
         """Should create new file when it doesn't exist."""
         not_found_response = MagicMock()
         not_found_response.status_code = 404
@@ -670,9 +665,7 @@ class TestGiteaRestProviderBranches:
         mock_pool.post.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_merge_branches(
-        self, provider: GiteaRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_merge_branches(self, provider: GiteaRestProvider, mock_pool: AsyncMock) -> None:
         """Should merge source branch into target."""
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()

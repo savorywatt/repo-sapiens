@@ -1,13 +1,15 @@
 """Provider implementations for Git and AI agent integrations.
 
 This package provides pluggable implementations for interacting with Git
-platforms (Gitea, GitHub) and AI agents (Claude, OpenAI, Ollama).
+platforms (Gitea, GitHub, GitLab) and AI agents (Claude, OpenAI, Ollama).
 
 Key Components:
     - GitProvider: Abstract base for Git platform providers
     - AgentProvider: Abstract base for AI agent providers
     - GiteaRestProvider: Gitea REST API implementation
     - GiteaProvider: Gitea MCP-based implementation
+    - GitHubRestProvider: GitHub REST API implementation
+    - GitLabRestProvider: GitLab REST API v4 implementation
     - ClaudeLocalProvider: Local Claude Code CLI
     - ExternalAgentProvider: External Claude/Goose CLI
     - OllamaProvider: Ollama local inference

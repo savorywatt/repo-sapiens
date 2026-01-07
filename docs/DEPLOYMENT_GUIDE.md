@@ -74,10 +74,10 @@ git push -u origin main
 2. Go to **Settings** → **Secrets**
 3. Click **Add Secret**
 
-#### Required Secrets (All Setups)
+#### Required Secrets
 
-**Secret: AUTOMATION__GIT_PROVIDER__API_TOKEN**
-- Name: `AUTOMATION__GIT_PROVIDER__API_TOKEN`
+**Secret: SAPIENS_GITEA_TOKEN**
+- Name: `SAPIENS_GITEA_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
   1. User Settings → Applications → Generate New Token
@@ -86,24 +86,8 @@ git push -u origin main
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret: AUTOMATION__GIT_PROVIDER__BASE_URL**
-- Name: `AUTOMATION__GIT_PROVIDER__BASE_URL`
-- Value: Your Gitea instance URL (e.g., `https://gitea.example.com`)
-
-#### For Ollama Setup (Recommended for Testing)
-
-**Secret: AUTOMATION__OLLAMA__BASE_URL**
-- Name: `AUTOMATION__OLLAMA__BASE_URL`
-- Value: `http://localhost:11434` (or your Ollama server URL)
-
-**Secret: AUTOMATION__OLLAMA__MODEL**
-- Name: `AUTOMATION__OLLAMA__MODEL`
-- Value: `codellama:13b` (or your preferred model)
-
-#### For Claude API Setup (Production)
-
-**Secret: AUTOMATION__CLAUDE__API_KEY**
-- Name: `AUTOMATION__CLAUDE__API_KEY`
+**Secret: SAPIENS_CLAUDE_API_KEY**
+- Name: `SAPIENS_CLAUDE_API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
   1. Go to https://console.anthropic.com
@@ -138,12 +122,16 @@ Check that workflow files are present:
 
 ```bash
 ls -la .gitea/workflows/
-# Should show:
-# - automation-trigger.yaml
-# - plan-merged.yaml
-# - automation-daemon.yaml
-# - monitor.yaml
-# - test.yaml
+# Core workflows (installed by `sapiens init`):
+# - process-issue.yaml      # Issue event handler
+# - automation-daemon.yaml  # Scheduled processor
+#
+# Optional example workflows in templates/workflows/gitea/examples/:
+# - daily-issue-triage.yaml
+# - weekly-test-coverage.yaml
+# - weekly-security-review.yaml
+# - weekly-dependency-audit.yaml
+# - post-merge-docs.yaml
 ```
 
 ### 5. Test the System
@@ -182,7 +170,7 @@ export CLAUDE_API_KEY="your-key"
 sapiens health-check
 
 # List active plans
-sapiens list-active-plans
+sapiens list-plans
 ```
 
 **View in Gitea:**

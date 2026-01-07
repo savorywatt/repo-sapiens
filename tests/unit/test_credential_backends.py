@@ -27,7 +27,6 @@ from repo_sapiens.credentials.exceptions import (
 from repo_sapiens.credentials.keyring_backend import KeyringBackend
 from repo_sapiens.credentials.resolver import CredentialResolver
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -103,18 +102,14 @@ class TestBackendProperties:
             (True, Exception("No backend"), False),  # Fails to init
         ],
     )
-    def test_keyring_unavailable_scenarios(
-        self, keyring_available, get_keyring_effect, expected
-    ):
+    def test_keyring_unavailable_scenarios(self, keyring_available, get_keyring_effect, expected):
         """Should return False when keyring is unavailable."""
         with patch(
             "repo_sapiens.credentials.keyring_backend.KEYRING_AVAILABLE",
             keyring_available,
         ):
             if keyring_available:
-                with patch(
-                    "repo_sapiens.credentials.keyring_backend.keyring"
-                ) as mock_kr:
+                with patch("repo_sapiens.credentials.keyring_backend.keyring") as mock_kr:
                     mock_kr.get_keyring.side_effect = get_keyring_effect
                     backend = KeyringBackend()
                     assert backend.available is expected
@@ -141,7 +136,10 @@ class TestEnvironmentBackend:
             ("test_secret_value", "test_secret_value"),
             ("", ""),
             ("secret!@#$%^&*()_+-=[]{}|;':\",./<>?", "secret!@#$%^&*()_+-=[]{}|;':\",./<>?"),
-            ("secret_value_\u00e9\u00e8\u00ea\u4e2d\u6587", "secret_value_\u00e9\u00e8\u00ea\u4e2d\u6587"),
+            (
+                "secret_value_\u00e9\u00e8\u00ea\u4e2d\u6587",
+                "secret_value_\u00e9\u00e8\u00ea\u4e2d\u6587",
+            ),
         ],
         ids=["normal", "empty", "special_chars", "unicode"],
     )
@@ -222,9 +220,7 @@ class TestKeyringBackend:
         backend = KeyringBackend()
         result = backend.get("gitea", "api_token")
         assert result == "secret_token"
-        mock_keyring_available.get_password.assert_called_once_with(
-            "sapiens/gitea", "api_token"
-        )
+        mock_keyring_available.get_password.assert_called_once_with("sapiens/gitea", "api_token")
 
     def test_get_nonexistent_credential(self, mock_keyring_available):
         """Should return None for non-existent credential."""
@@ -286,17 +282,13 @@ class TestKeyringBackend:
         backend = KeyringBackend()
         result = backend.delete("gitea", "api_token")
         assert result is True
-        mock_keyring_available.delete_password.assert_called_once_with(
-            "sapiens/gitea", "api_token"
-        )
+        mock_keyring_available.delete_password.assert_called_once_with("sapiens/gitea", "api_token")
 
     def test_delete_nonexistent_credential(self, mock_keyring_available):
         """Should return False when credential doesn't exist."""
         from keyring.errors import PasswordDeleteError
 
-        mock_keyring_available.delete_password.side_effect = PasswordDeleteError(
-            "Not found"
-        )
+        mock_keyring_available.delete_password.side_effect = PasswordDeleteError("Not found")
         backend = KeyringBackend()
         assert backend.delete("unknown", "key") is False
 
@@ -311,9 +303,7 @@ class TestKeyringBackend:
         """Should wrap KeyringError in CredentialError."""
         from keyring.errors import KeyringError
 
-        mock_keyring_available.delete_password.side_effect = KeyringError(
-            "Delete failed"
-        )
+        mock_keyring_available.delete_password.side_effect = KeyringError("Delete failed")
         backend = KeyringBackend()
         with pytest.raises(CredentialError, match="Failed to delete credential"):
             backend.delete("service", "key")
@@ -554,9 +544,7 @@ class TestCredentialResolverPatterns:
             ("@encrypted:claude/api_key", "claude", "api_key"),
         ],
     )
-    def test_keyring_and_encrypted_patterns(
-        self, reference, expected_service, expected_key
-    ):
+    def test_keyring_and_encrypted_patterns(self, reference, expected_service, expected_key):
         """Should match @keyring: and @encrypted: formats."""
         if reference.startswith("@keyring:"):
             match = CredentialResolver.KEYRING_PATTERN.match(reference)
@@ -696,8 +684,17 @@ class TestCredentialResolverLooksLikeToken:
             ("this has spaces in it quite long", False),
         ],
         ids=[
-            "ghp", "gho", "ghu", "ghs", "ghr",
-            "long_21", "short_20", "short", "hyphenated", "empty", "spaces",
+            "ghp",
+            "gho",
+            "ghu",
+            "ghs",
+            "ghr",
+            "long_21",
+            "short_20",
+            "short",
+            "hyphenated",
+            "empty",
+            "spaces",
         ],
     )
     def test_token_detection(self, value, expected):

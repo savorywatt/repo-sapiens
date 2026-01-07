@@ -78,16 +78,27 @@ class TestGitProviderConfig:
 
         assert config.provider_type == "gitea"
 
+    def test_valid_gitlab_config(self):
+        """Test valid GitLab provider configuration."""
+        config = GitProviderConfig(
+            provider_type="gitlab",
+            base_url="https://gitlab.example.com",
+            api_token="glpat-abc123def456",
+        )
+
+        assert config.provider_type == "gitlab"
+        assert str(config.base_url) == "https://gitlab.example.com/"
+
     def test_invalid_provider_type_raises_error(self):
         """Test invalid provider type raises validation error."""
         with pytest.raises(ValidationError) as exc_info:
             GitProviderConfig(
-                provider_type="gitlab",  # Invalid
-                base_url="https://gitlab.example.com",
+                provider_type="bitbucket",  # Invalid - not supported
+                base_url="https://bitbucket.org",
                 api_token="token",
             )
 
-        assert "gitlab" in str(exc_info.value).lower()
+        assert "bitbucket" in str(exc_info.value).lower()
 
     def test_invalid_url_format_raises_error(self):
         """Test invalid URL format raises validation error."""

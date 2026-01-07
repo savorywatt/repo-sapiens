@@ -256,14 +256,21 @@ class GitDiscovery:
             https_url=parser.https_url,
         )
 
-    def detect_provider_type(self, remote_name: str | None = None) -> Literal["github", "gitea"]:
-        """Detect Git provider type (GitHub or Gitea) from remote URL.
+    def detect_provider_type(
+        self, remote_name: str | None = None
+    ) -> Literal["github", "gitlab", "gitea"]:
+        """Detect Git provider type (GitHub, GitLab, or Gitea) from remote URL.
+
+        Detection order:
+        1. GitHub (github.com, GitHub Enterprise patterns)
+        2. GitLab (gitlab.com, self-hosted with "gitlab" in hostname)
+        3. Gitea (fallback for other self-hosted instances)
 
         Args:
             remote_name: Specific remote name (optional)
 
         Returns:
-            Provider type: "github" or "gitea"
+            Provider type: "github", "gitlab", or "gitea"
 
         Raises:
             NotGitRepositoryError: If not a Git repository
@@ -286,6 +293,14 @@ class GitDiscovery:
         if "github" in url_lower and ("enterprise" in url_lower or "ghe" in url_lower):
             return "github"
 
+        # Check for GitLab
+        if "gitlab.com" in url_lower:
+            return "gitlab"
+
+        # Check for self-hosted GitLab (gitlab in hostname)
+        if "gitlab" in url_lower:
+            return "gitlab"
+
         # Default to Gitea (self-hosted)
         return "gitea"
 
@@ -294,14 +309,14 @@ class GitDiscovery:
 
         Detects repository configuration and returns a dictionary suitable
         for generating configuration files. Automatically detects if the
-        remote is GitHub or Gitea.
+        remote is GitHub, GitLab, or Gitea.
 
         Args:
             remote_name: Specific remote name (optional)
 
         Returns:
             Dictionary with config values:
-                - provider_type: "github" or "gitea"
+                - provider_type: "github", "gitlab", or "gitea"
                 - base_url: Provider instance URL
                 - owner: Repository owner
                 - repo: Repository name
@@ -326,10 +341,14 @@ class GitDiscovery:
         info = self.parse_repository(remote_name, allow_multiple=False)
         provider_type = self.detect_provider_type(remote_name)
 
-        # For GitHub, use api.github.com for API calls
+        # Determine API URL based on provider type
         base_url = str(info.base_url)
         if provider_type == "github" and base_url == "https://github.com":
+            # GitHub uses api.github.com for API calls
             api_url = "https://api.github.com"
+        elif provider_type == "gitlab":
+            # GitLab uses same base URL (API path /api/v4 is added by provider)
+            api_url = base_url
         else:
             api_url = base_url
 

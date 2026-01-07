@@ -2,7 +2,7 @@
 
 This test module provides additional coverage for the repo_sapiens.git.discovery
 module, focusing on:
-- detect_provider_type() - GitHub vs Gitea detection
+- detect_provider_type() - GitHub, GitLab, and Gitea detection
 - detect_git_config() - Full configuration detection with API URL mapping
 - URL parsing for various formats (HTTPS, SSH, enterprise, with ports)
 - Error handling for non-git directories
@@ -27,7 +27,7 @@ from repo_sapiens.git.models import GitRemote
 
 
 class TestDetectProviderType:
-    """Tests for detect_provider_type() method - GitHub vs Gitea detection."""
+    """Tests for detect_provider_type() method - GitHub, GitLab, and Gitea detection."""
 
     @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_github_from_https_url(self, mock_repo_class: Mock) -> None:
@@ -111,6 +111,54 @@ class TestDetectProviderType:
         # but the current implementation requires both "github" AND "enterprise"/"ghe"
         # So self-hosted GHE without "github" in URL will fall through to gitea
         assert provider == "gitea"
+
+    @patch("repo_sapiens.git.discovery.git.Repo")
+    def test_detect_provider_gitlab_com(self, mock_repo_class: Mock) -> None:
+        """Test detection of GitLab from gitlab.com HTTPS URL."""
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitlab.com/owner/repo.git"
+
+        mock_repo = Mock()
+        mock_repo.remotes = [mock_remote]
+        mock_repo_class.return_value = mock_repo
+
+        discovery = GitDiscovery()
+        provider = discovery.detect_provider_type()
+
+        assert provider == "gitlab"
+
+    @patch("repo_sapiens.git.discovery.git.Repo")
+    def test_detect_provider_gitlab_self_hosted(self, mock_repo_class: Mock) -> None:
+        """Test detection of GitLab from self-hosted URL with gitlab in hostname."""
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitlab.mycompany.com/owner/repo.git"
+
+        mock_repo = Mock()
+        mock_repo.remotes = [mock_remote]
+        mock_repo_class.return_value = mock_repo
+
+        discovery = GitDiscovery()
+        provider = discovery.detect_provider_type()
+
+        assert provider == "gitlab"
+
+    @patch("repo_sapiens.git.discovery.git.Repo")
+    def test_detect_provider_gitlab_ssh(self, mock_repo_class: Mock) -> None:
+        """Test detection of GitLab from SSH URL like git@gitlab.com:org/repo.git."""
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "git@gitlab.com:org/repo.git"
+
+        mock_repo = Mock()
+        mock_repo.remotes = [mock_remote]
+        mock_repo_class.return_value = mock_repo
+
+        discovery = GitDiscovery()
+        provider = discovery.detect_provider_type()
+
+        assert provider == "gitlab"
 
     @patch("repo_sapiens.git.discovery.git.Repo")
     def test_detect_gitea_self_hosted(self, mock_repo_class: Mock) -> None:

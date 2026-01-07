@@ -110,8 +110,7 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
         )
         click.echo()
         click.echo(
-            click.style("Suggestion:", fg="yellow")
-            + " Run 'sapiens init' to create configuration"
+            click.style("Suggestion:", fg="yellow") + " Run 'sapiens init' to create configuration"
         )
         sys.exit(EXIT_CONFIG_ERROR)
 

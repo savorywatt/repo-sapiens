@@ -1,0 +1,58 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: automation-daemon
+#
+# Sapiens Automation Daemon for GitLab CI/CD
+#
+# This pipeline runs repo-sapiens periodically to process issues automatically.
+#
+# Setup:
+# 1. Copy this file to .gitlab-ci.yml (or include it via `include:`)
+# 2. Set required CI/CD variables in your project settings:
+#    - GITLAB_TOKEN: Your GitLab API token (or use CI_JOB_TOKEN for limited access)
+#    - OPENAI_API_KEY: (if using Goose with OpenAI)
+#    - ANTHROPIC_API_KEY or CLAUDE_API_KEY: (if using Claude)
+# 3. Set up a pipeline schedule in CI/CD > Schedules (e.g., every 5 minutes)
+# 4. Update CONFIG_FILE to match your config
+#
+# Note: GitLab scheduled pipelines are configured via the UI, not cron in YAML.
+# Go to: Settings > CI/CD > Pipeline schedules > New schedule
+
+variables:
+  # Change this to your config file (use sapiens_config.ci.yaml for CI/CD specific config)
+  CONFIG_FILE: sapiens_config.yaml
+  PYTHON_VERSION: "3.11"
+
+stages:
+  - process
+
+# Process all pending issues
+process-pending:
+  stage: process
+  image: python:${PYTHON_VERSION}
+  rules:
+    # Run on schedule (configured via GitLab UI)
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    # Allow manual trigger from pipeline UI
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+    # Allow API trigger
+    - if: $CI_PIPELINE_SOURCE == "api"
+  variables:
+    # Git provider credentials
+    GITLAB_TOKEN: $GITLAB_TOKEN
+    # AI provider credentials (set in CI/CD variables)
+    # OPENAI_API_KEY: $OPENAI_API_KEY
+    # ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+    # CLAUDE_API_KEY: $CLAUDE_API_KEY
+  before_script:
+    - pip install --quiet repo-sapiens
+    # If using Goose, also install it:
+    # - pip install goose-ai
+  script:
+    - sapiens --config $CONFIG_FILE process-all --log-level INFO
+  artifacts:
+    paths:
+      - .automation/state/
+    expire_in: 7 days
+    when: always

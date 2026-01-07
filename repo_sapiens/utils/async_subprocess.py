@@ -54,7 +54,7 @@ async def run_command(
             process.communicate(),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         process.kill()
         await process.wait()
         raise
@@ -118,7 +118,7 @@ async def run_shell_command(
             process.communicate(),
             timeout=timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         process.kill()
         await process.wait()
         raise
