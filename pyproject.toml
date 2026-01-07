@@ -158,6 +158,8 @@ python_functions = "test_*"
 addopts = "-n auto --dist loadgroup -q"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests",
+    "needs_real_timing: tests that require actual wall-clock time (not patched asyncio.sleep)",
 ]
 
 [tool.coverage.run]

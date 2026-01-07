@@ -31,6 +31,7 @@ async def test_cache_miss():
 
 
 @pytest.mark.asyncio
+@pytest.mark.needs_real_timing
 async def test_cache_ttl_expiration():
     """Test that cache entries expire after TTL."""
     cache = AsyncCache(ttl_seconds=1)  # 1 second TTL

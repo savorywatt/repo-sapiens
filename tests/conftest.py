@@ -10,13 +10,25 @@ import pytest
 from repo_sapiens.config import credential_fields
 
 
+def pytest_configure(config):
+    """Disable benchmark plugin when running with xdist to avoid warnings."""
+    if config.pluginmanager.hasplugin("xdist"):
+        # pytest-benchmark emits warnings when xdist is active
+        config.pluginmanager.set_blocked("benchmark")
+
+
 @pytest.fixture(autouse=True)
-def fast_asyncio_sleep():
+def fast_asyncio_sleep(request):
     """Replace asyncio.sleep with instant return for faster tests.
 
     This eliminates delays from retry backoff, timeouts, etc.
-    Tests that specifically need real timing should use pytest.mark.slow.
+    Tests that specifically need real timing should use @pytest.mark.needs_real_timing.
     """
+    # Skip patching for tests that need actual wall-clock timing
+    if "needs_real_timing" in [m.name for m in request.node.iter_markers()]:
+        yield
+        return
+
     original_sleep = asyncio.sleep
 
     async def instant_sleep(delay):

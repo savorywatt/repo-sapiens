@@ -47,6 +47,11 @@ log = structlog.get_logger(__name__)
     default=True,
     help="Deploy reusable composite action for AI tasks (default: true)",
 )
+@click.option(
+    "--deploy-workflows/--no-deploy-workflows",
+    default=False,
+    help="Deploy CI/CD workflow templates (default: false, prompts in interactive mode)",
+)
 def init_command(
     repo_path: Path,
     config_path: Path,
@@ -54,6 +59,7 @@ def init_command(
     non_interactive: bool,
     setup_secrets: bool,
     deploy_actions: bool,
+    deploy_workflows: bool,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -64,6 +70,7 @@ def init_command(
     4. Set up Actions secrets (if requested)
     5. Generate configuration file
     6. Deploy reusable composite action (if requested)
+    7. Deploy CI/CD workflow templates (if requested)
 
     Examples:
 
@@ -80,6 +87,9 @@ def init_command(
 
         # Skip action deployment
         sapiens init --no-deploy-actions
+
+        # Deploy workflow templates
+        sapiens init --deploy-workflows
     """
     try:
         initializer = RepoInitializer(
@@ -89,6 +99,7 @@ def init_command(
             non_interactive=non_interactive,
             setup_secrets=setup_secrets,
             deploy_actions=deploy_actions,
+            deploy_workflows=deploy_workflows,
         )
         initializer.run()
 
@@ -119,6 +130,7 @@ class RepoInitializer:
         non_interactive: bool,
         setup_secrets: bool,
         deploy_actions: bool = True,
+        deploy_workflows: bool = False,
     ):
         self.repo_path = repo_path
         self.config_path = config_path
@@ -126,6 +138,7 @@ class RepoInitializer:
         self.non_interactive = non_interactive
         self.setup_secrets = setup_secrets
         self.deploy_actions = deploy_actions
+        self.deploy_workflows = deploy_workflows
 
         self.repo_info = None
         self.provider_type = None  # 'github', 'gitea', or 'gitlab' (detected)
@@ -170,7 +183,13 @@ class RepoInitializer:
         if self.deploy_actions:
             self._deploy_composite_action()
 
-        # Step 7: Validate setup
+        # Step 7: Deploy CI/CD workflows (optional)
+        # In interactive mode, always offer the choice
+        # In non-interactive mode, only deploy if explicitly requested
+        if self.deploy_workflows or (not self.non_interactive):
+            self._deploy_workflows()
+
+        # Step 8: Validate setup
         self._validate_setup()
 
         # Done!
@@ -179,7 +198,7 @@ class RepoInitializer:
         click.echo()
         self._print_next_steps()
 
-        # Step 8: Optional test
+        # Step 9: Optional test
         if not self.non_interactive:
             self._offer_test_run()
 
@@ -1113,6 +1132,9 @@ tags:
         if self.provider_type == "github":
             action_dir = self.repo_path / ".github" / "actions" / "sapiens-task"
             template_subpath = "actions/github/sapiens-task/action.yaml"
+        elif self.provider_type == "gitlab":
+            action_dir = self.repo_path / ".gitlab" / "actions" / "sapiens-task"
+            template_subpath = "actions/gitlab/sapiens-task/action.yaml"
         else:
             action_dir = self.repo_path / ".gitea" / "actions" / "sapiens-task"
             template_subpath = "actions/gitea/sapiens-task/action.yaml"
@@ -1153,6 +1175,110 @@ tags:
                     fg="yellow",
                 )
             )
+
+        click.echo()
+
+    def _deploy_workflows(self) -> None:
+        """Deploy CI/CD workflow templates."""
+        import importlib.resources
+
+        click.echo(click.style("📋 Deploying workflow templates...", bold=True))
+        click.echo()
+
+        # Determine paths based on provider type
+        if self.provider_type == "github":
+            workflows_dir = self.repo_path / ".github" / "workflows"
+            template_base = "workflows/github"
+        elif self.provider_type == "gitlab":
+            # GitLab uses single .gitlab-ci.yml at root
+            workflows_dir = self.repo_path
+            template_base = "workflows/gitlab"
+        else:
+            workflows_dir = self.repo_path / ".gitea" / "workflows"
+            template_base = "workflows/gitea"
+
+        workflows_dir.mkdir(parents=True, exist_ok=True)
+
+        # Core workflows
+        core_workflows = [
+            ("automation-daemon.yaml", "Automation daemon (scheduled processing)"),
+            ("process-issue.yaml", "Process issue (manual trigger)"),
+        ]
+
+        # Example workflows
+        example_workflows = [
+            ("examples/daily-issue-triage.yaml", "Daily issue triage"),
+            ("examples/weekly-test-coverage.yaml", "Weekly test coverage report"),
+            ("examples/weekly-dependency-audit.yaml", "Weekly dependency audit"),
+            ("examples/weekly-security-review.yaml", "Weekly security review"),
+            ("examples/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
+            ("examples/post-merge-docs.yaml", "Post-merge documentation update"),
+        ]
+
+        def deploy_template(template_name: str, target_dir: Path) -> bool:
+            """Deploy a single template file."""
+            template_subpath = f"{template_base}/{template_name}"
+            try:
+                # Try importlib.resources
+                template_files = (
+                    importlib.resources.files("repo_sapiens") / "templates" / template_subpath
+                )
+                if hasattr(template_files, "read_text"):
+                    content = template_files.read_text()
+                else:
+                    # Fallback: read from file system
+                    package_dir = Path(__file__).parent.parent
+                    template_path = package_dir / "templates" / template_subpath
+                    if template_path.exists():
+                        content = template_path.read_text()
+                    else:
+                        repo_root = Path(__file__).parent.parent.parent
+                        template_path = repo_root / "templates" / template_subpath
+                        content = template_path.read_text()
+
+                # For GitLab, core workflows go to .gitlab-ci.yml
+                if self.provider_type == "gitlab" and not template_name.startswith("examples/"):
+                    target_file = target_dir / ".gitlab-ci.yml"
+                else:
+                    # Create subdirectories if needed
+                    target_file = target_dir / template_name
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+                target_file.write_text(content)
+                return True
+            except Exception:
+                return False
+
+        # Ask about core workflows
+        if not self.non_interactive:
+            deploy_core = click.confirm(
+                "Deploy core workflows (automation-daemon, process-issue)?",
+                default=True,
+            )
+        else:
+            deploy_core = True
+
+        if deploy_core:
+            for template_name, description in core_workflows:
+                if deploy_template(template_name, workflows_dir):
+                    if self.provider_type == "gitlab" and not template_name.startswith("examples/"):
+                        click.echo(f"   ✓ {description} → .gitlab-ci.yml")
+                    else:
+                        click.echo(f"   ✓ {description}")
+                else:
+                    click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
+
+        click.echo()
+
+        # Ask about example workflows (one by one in interactive mode)
+        if not self.non_interactive:
+            click.echo("Example workflows available:")
+            for template_name, description in example_workflows:
+                if click.confirm(f"  Deploy '{description}'?", default=False):
+                    if deploy_template(template_name, workflows_dir):
+                        click.echo(click.style("     ✓ Deployed", fg="green"))
+                    else:
+                        click.echo(click.style("     ⚠ Could not deploy", fg="yellow"))
 
         click.echo()
 
