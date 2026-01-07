@@ -144,6 +144,7 @@ async def test_dependency_failure_blocks_dependents():
 
 
 @pytest.mark.asyncio
+@pytest.mark.needs_real_timing
 async def test_task_timeout():
     """Test task timeout handling."""
 

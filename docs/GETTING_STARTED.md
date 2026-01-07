@@ -21,7 +21,7 @@ Welcome to repo-sapiens, an intelligent repository automation and management sys
 
 repo-sapiens is an AI-driven automation system that transforms repository management from manual processes to intelligent, automated workflows. It helps you:
 
-- **Automate issue processing** - Convert GitHub/Gitea issues into complete, tested implementations
+- **Automate issue processing** - Convert GitHub/Gitea/GitLab issues into complete, tested implementations
 - **Manage complex workflows** - Coordinate multi-step processes across repositories
 - **Maintain code quality** - Automated planning, implementation, and code review
 - **Scale efficiently** - Handle multiple repositories and concurrent tasks
@@ -33,12 +33,11 @@ repo-sapiens is an AI-driven automation system that transforms repository manage
 - **AI Implementation**: Execute tasks using Claude or other AI agents
 - **Automated Code Review**: Review and test implementations before merge
 - **State Management**: Track workflow progress with atomic, reliable state updates
-- **Webhook Support**: Real-time event processing from your Git provider
 - **Health Monitoring**: Built-in health checks and failure detection
 - **Cost Optimization**: Intelligent AI model selection based on task complexity
 - **Multi-Repository Support**: Coordinate workflows across multiple repositories
 - **Parallel Execution**: Execute independent tasks concurrently
-- **CI/CD Integration**: Native support for GitHub Actions, Gitea Actions, and more
+- **CI/CD Integration**: Native support for GitHub Actions, Gitea Actions, GitLab CI/CD, and more
 
 ### Use Cases
 
@@ -83,8 +82,8 @@ For development or to use the latest features:
 git clone https://github.com/savorywatt/repo-sapiens.git
 cd repo-sapiens
 
-# Install in development mode
-pip install -e .
+# Install in development mode (using uv)
+uv pip install -e .
 
 # Verify installation
 sapiens --version
@@ -146,7 +145,7 @@ Copy the default configuration template:
 
 ```bash
 # From the source directory
-cp repo_sapiens/config/automation_config.yaml ./my_config.yaml
+cp .sapiens/config.yaml ./my_config.yaml
 
 # Or create a new one with this basic template:
 cat > my_config.yaml << 'EOF'
@@ -167,7 +166,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
 
@@ -186,7 +185,10 @@ You have three options for managing credentials. Choose the one that fits your e
 
 ```bash
 # For the current session (recommended for testing)
+# Choose the appropriate token for your Git provider:
 export GITEA_API_TOKEN="your-gitea-token-here"
+# or: export GITHUB_TOKEN="your-github-token-here"
+# or: export GITLAB_TOKEN="your-gitlab-token-here"
 export CLAUDE_API_KEY="your-claude-api-key-here"
 
 # Verify configuration loads correctly
@@ -303,12 +305,12 @@ The `automation_config.yaml` file controls all aspects of repo-sapiens behavior.
 
 ```yaml
 # Git Provider Configuration
-# Supports: gitea, github
+# Supports: gitea, github, gitlab
 git_provider:
-  provider_type: gitea
+  provider_type: gitea  # or github, gitlab
   mcp_server: null  # Optional: Name of MCP server for git ops
   base_url: https://your-gitea-instance.com
-  api_token: "${GITEA_API_TOKEN}"  # See credential options below
+  api_token: "${GITEA_API_TOKEN}"  # or GITHUB_TOKEN, GITLAB_TOKEN
 
 # Repository Configuration
 repository:
@@ -328,7 +330,7 @@ agent_provider:
 # Workflow Behavior
 workflow:
   plans_directory: plans  # Where to store generated plans
-  state_directory: .automation/state  # Where to track progress
+  state_directory: .sapiens/state  # Where to track progress
   branching_strategy: per-agent  # or: shared
   max_concurrent_tasks: 3  # 1-10 recommended
   review_approval_threshold: 0.8  # 0.0-1.0 confidence for auto-approval
@@ -457,6 +459,24 @@ jobs:
         run: sapiens --config my_config.yaml process-all
 ```
 
+**GitLab CI/CD Example** (`.gitlab-ci.yml`):
+
+```yaml
+automation:
+  image: python:3.11
+  stage: automation
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "issue"
+  script:
+    - pip install repo-sapiens
+    - sapiens --config my_config.yaml process-all
+  variables:
+    GITLAB_TOKEN: $GITLAB_TOKEN
+    CLAUDE_API_KEY: $CLAUDE_API_KEY
+```
+
+Note: GitLab uses merge requests instead of pull requests. The automation will create merge requests when appropriate.
+
 **Pros**:
 - Native CI/CD support
 - No additional setup
@@ -564,7 +584,7 @@ sapiens --config my_config.yaml show-plan --plan-id 42
 # In my_config.yaml
 workflow:
   plans_directory: plans  # Plans stored here
-  state_directory: .automation/state  # Progress tracked here
+  state_directory: .sapiens/state  # Progress tracked here
   branching_strategy: per-agent  # One branch per AI agent
   max_concurrent_tasks: 3  # How many tasks to run in parallel
 
@@ -628,38 +648,6 @@ WantedBy=multi-user.target
 sudo systemctl enable sapiens
 sudo systemctl start sapiens
 sudo systemctl status sapiens
-```
-
-### Workflow 3: Webhook Integration
-
-Real-time event processing when issues are created or updated:
-
-```bash
-# Start the webhook server (optional, for real-time processing)
-sapiens webhook-server --host 0.0.0.0 --port 8000
-
-# Output:
-# Uvicorn running on http://0.0.0.0:8000
-# Webhook endpoint: POST /webhook/gitea
-```
-
-**Configure Webhook in Gitea**:
-
-1. Go to Repository Settings → Webhooks
-2. Add Webhook:
-   - **URL**: `https://your-server.com:8000/webhook/gitea`
-   - **Content Type**: `application/json`
-   - **Events**: Issues, Pushes
-   - **Active**: Yes
-
-**Webhook Server Configuration**:
-
-```yaml
-# In my_config.yaml
-webhook:
-  host: 0.0.0.0
-  port: 8000
-  secret: "${WEBHOOK_SECRET}"  # Optional: validates webhook signature
 ```
 
 ---
@@ -810,7 +798,7 @@ ls -la my_config.yaml
 sapiens --config /full/path/to/my_config.yaml list-plans
 
 # Use default location
-cp my_config.yaml repo_sapiens/config/automation_config.yaml
+cp my_config.yaml .sapiens/config.yaml
 sapiens list-plans  # Uses default config
 ```
 
@@ -886,11 +874,11 @@ workflow:
 ps aux | grep sapiens
 
 # Or remove stale lock file
-rm -f .automation/state/*.lock
+rm -f .sapiens/state/*.lock
 
 # Check permissions on state directory
-ls -la .automation/state/
-chmod 755 .automation/state
+ls -la .sapiens/state/
+chmod 755 .sapiens/state
 ```
 
 ### Debug Logging
@@ -961,10 +949,16 @@ See: [Advanced Configuration Guide](advanced-config.md)
 
 Set up automated workflows:
 
-- **GitHub Actions**: Trigger automation on issue events
-- **Gitea Actions**: Native integration with Gitea workflows
-- **GitLab CI**: Schedule automation jobs
+- **GitHub Actions**: Trigger automation on issue events (`.github/workflows/`)
+- **Gitea Actions**: Native integration with Gitea workflows (`.gitea/workflows/`)
+- **GitLab CI/CD**: Single `.gitlab-ci.yml` file for all automation
 - **Jenkins**: Integrate with Jenkins pipelines
+
+**GitLab-specific notes**:
+- GitLab uses merge requests (MRs) instead of pull requests
+- CI/CD configuration lives in a single `.gitlab-ci.yml` file at the repository root
+- Use `PRIVATE-TOKEN` header for API authentication (handled automatically)
+- Required token scopes: `api`, `read_repository`, `write_repository`
 
 See: [CI/CD Integration Guide](ci-cd-usage.md)
 
@@ -1039,9 +1033,9 @@ sapiens daemon --interval 60                 # Run continuous automation
 sapiens health-check                         # Check system health
 
 # ReAct agent (local execution with Ollama, default model: qwen3:latest)
-sapiens react --repl                         # Interactive REPL mode
-sapiens react "task description"             # Run single task
-sapiens react --repl --model qwen3:latest    # Use specific model
+sapiens task --repl                         # Interactive REPL mode
+sapiens task "task description"             # Run single task
+sapiens task --repl --model qwen3:latest    # Use specific model
 
 # Credentials management
 sapiens credentials test                     # Verify credentials work

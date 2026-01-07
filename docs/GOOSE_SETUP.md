@@ -7,7 +7,7 @@ This guide shows you how to use [Goose AI](https://github.com/block/goose) as th
 Goose is an open-source AI developer agent created by Block (Square). Unlike Claude Code which is tied to Anthropic's models, Goose supports **multiple LLM backends**:
 
 - **OpenAI** (GPT-4, GPT-4 Turbo, GPT-4o)
-- **Anthropic** (Claude 3.5 Sonnet, Claude Opus 4.5)
+- **Anthropic** (Claude Sonnet 4, Claude Opus 4 - models use format like `claude-sonnet-4-20250514`)
 - **Ollama** (Local models: Llama 3.1, Qwen 2.5 Coder, DeepSeek Coder)
 - **OpenRouter** (100+ models through one API)
 - **Groq** (Ultra-fast inference)

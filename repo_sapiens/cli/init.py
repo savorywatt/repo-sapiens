@@ -47,6 +47,11 @@ log = structlog.get_logger(__name__)
     default=True,
     help="Deploy reusable composite action for AI tasks (default: true)",
 )
+@click.option(
+    "--deploy-workflows/--no-deploy-workflows",
+    default=False,
+    help="Deploy CI/CD workflow templates (default: false, prompts in interactive mode)",
+)
 def init_command(
     repo_path: Path,
     config_path: Path,
@@ -54,6 +59,7 @@ def init_command(
     non_interactive: bool,
     setup_secrets: bool,
     deploy_actions: bool,
+    deploy_workflows: bool,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -64,6 +70,7 @@ def init_command(
     4. Set up Actions secrets (if requested)
     5. Generate configuration file
     6. Deploy reusable composite action (if requested)
+    7. Deploy CI/CD workflow templates (if requested)
 
     Examples:
 
@@ -80,6 +87,9 @@ def init_command(
 
         # Skip action deployment
         sapiens init --no-deploy-actions
+
+        # Deploy workflow templates
+        sapiens init --deploy-workflows
     """
     try:
         initializer = RepoInitializer(
@@ -89,6 +99,7 @@ def init_command(
             non_interactive=non_interactive,
             setup_secrets=setup_secrets,
             deploy_actions=deploy_actions,
+            deploy_workflows=deploy_workflows,
         )
         initializer.run()
 
@@ -119,6 +130,7 @@ class RepoInitializer:
         non_interactive: bool,
         setup_secrets: bool,
         deploy_actions: bool = True,
+        deploy_workflows: bool = False,
     ):
         self.repo_path = repo_path
         self.config_path = config_path
@@ -126,9 +138,10 @@ class RepoInitializer:
         self.non_interactive = non_interactive
         self.setup_secrets = setup_secrets
         self.deploy_actions = deploy_actions
+        self.deploy_workflows = deploy_workflows
 
         self.repo_info = None
-        self.provider_type = None  # 'github' or 'gitea' (detected)
+        self.provider_type = None  # 'github', 'gitea', or 'gitlab' (detected)
         self.gitea_token = None
         self.agent_type = None  # 'claude', 'goose', or 'builtin'
         self.agent_mode: Literal["local", "api"] = "local"
@@ -145,22 +158,149 @@ class RepoInitializer:
         self.builtin_model = None
         self.builtin_base_url = None  # For ollama/vllm
 
+        # Existing config tracking
+        self.existing_config: dict | None = None
+        self.update_git_provider = True
+        self.update_agent_provider = True
+        self.update_credentials = True
+
+    def _load_existing_config(self) -> bool:
+        """Load existing configuration if present.
+
+        Returns True if config exists and was loaded.
+        """
+        import yaml
+
+        config_file = self.repo_path / self.config_path
+        if not config_file.exists():
+            return False
+
+        try:
+            with open(config_file) as f:
+                self.existing_config = yaml.safe_load(f)
+            return True
+        except Exception:
+            return False
+
+    def _show_existing_config(self) -> None:
+        """Display current configuration summary."""
+        if not self.existing_config:
+            return
+
+        click.echo(click.style("📋 Existing configuration found:", bold=True, fg="yellow"))
+        click.echo()
+
+        # Git provider section
+        git = self.existing_config.get("git_provider", {})
+        if git:
+            click.echo(click.style("  Git Provider:", bold=True))
+            click.echo(f"    Type: {git.get('provider_type', 'unknown')}")
+            click.echo(f"    URL: {git.get('base_url', 'unknown')}")
+            click.echo()
+
+        # Repository section
+        repo = self.existing_config.get("repository", {})
+        if repo:
+            click.echo(click.style("  Repository:", bold=True))
+            click.echo(f"    {repo.get('owner', '?')}/{repo.get('name', '?')}")
+            click.echo()
+
+        # Agent provider section
+        agent = self.existing_config.get("agent_provider", {})
+        if agent:
+            click.echo(click.style("  Agent Provider:", bold=True))
+            click.echo(f"    Type: {agent.get('provider_type', 'unknown')}")
+            click.echo(f"    Model: {agent.get('model', 'unknown')}")
+            if agent.get("base_url"):
+                click.echo(f"    URL: {agent.get('base_url')}")
+            click.echo()
+
+    def _prompt_update_sections(self) -> None:
+        """Ask user which sections to update."""
+        if self.non_interactive:
+            # In non-interactive mode, update everything
+            return
+
+        click.echo(click.style("What would you like to update?", bold=True))
+        click.echo()
+
+        self.update_git_provider = click.confirm("  Update git provider settings?", default=False)
+        self.update_agent_provider = click.confirm(
+            "  Update agent provider settings?", default=False
+        )
+        self.update_credentials = click.confirm("  Update stored credentials?", default=False)
+
+        # If nothing selected, offer to start fresh
+        if not any([self.update_git_provider, self.update_agent_provider, self.update_credentials]):
+            click.echo()
+            if click.confirm(
+                "No updates selected. Start fresh with new configuration?", default=False
+            ):
+                self.update_git_provider = True
+                self.update_agent_provider = True
+                self.update_credentials = True
+                self.existing_config = None  # Treat as fresh install
+            else:
+                click.echo()
+                click.echo("No changes made. Exiting.")
+                raise SystemExit(0)
+
+        click.echo()
+
+    def _load_agent_type_from_config(self) -> None:
+        """Load agent type from existing config for downstream steps."""
+        if not self.existing_config:
+            return
+
+        agent = self.existing_config.get("agent_provider", {})
+        provider_type = agent.get("provider_type", "")
+
+        if provider_type.startswith("claude"):
+            self.agent_type = "claude"
+            self.agent_mode = "api" if provider_type == "claude-api" else "local"
+        elif provider_type.startswith("goose"):
+            self.agent_type = "goose"
+            self.agent_mode = "api" if provider_type == "goose-api" else "local"
+            goose_config = agent.get("goose_config", {})
+            self.goose_llm_provider = goose_config.get("llm_provider")
+            self.goose_model = agent.get("model")
+        elif provider_type in ("ollama", "openai-compatible"):
+            self.agent_type = "builtin"
+            self.builtin_provider = "ollama" if provider_type == "ollama" else "vllm"
+            self.builtin_model = agent.get("model")
+            self.builtin_base_url = agent.get("base_url")
+        else:
+            self.agent_type = "builtin"
+            self.builtin_provider = provider_type
+            self.builtin_model = agent.get("model")
+
     def run(self) -> None:
         """Run the initialization workflow."""
         click.echo(click.style("🚀 Initializing repo-sapiens", bold=True, fg="cyan"))
         click.echo()
 
-        # Step 1: Discover repository
+        # Check for existing configuration
+        has_existing = self._load_existing_config()
+        if has_existing and not self.non_interactive:
+            self._show_existing_config()
+            self._prompt_update_sections()
+
+        # Step 1: Discover repository (always needed for repo_info)
         self._discover_repository()
 
-        # Step 2: Collect credentials
-        self._collect_credentials()
+        # Step 2: Collect credentials (only if updating)
+        if self.update_git_provider or self.update_agent_provider or self.update_credentials:
+            self._collect_credentials()
+        else:
+            # Load agent type from existing config for downstream steps
+            self._load_agent_type_from_config()
 
-        # Step 3: Store credentials locally
-        self._store_credentials()
+        # Step 3: Store credentials locally (only if updating)
+        if self.update_credentials:
+            self._store_credentials()
 
-        # Step 4: Set up Gitea Actions secrets (optional)
-        if self.setup_secrets:
+        # Step 4: Set up Gitea Actions secrets (optional, only if updating credentials)
+        if self.setup_secrets and self.update_credentials:
             self._setup_gitea_secrets()
 
         # Step 5: Generate configuration file
@@ -170,7 +310,13 @@ class RepoInitializer:
         if self.deploy_actions:
             self._deploy_composite_action()
 
-        # Step 7: Validate setup
+        # Step 7: Deploy CI/CD workflows (optional)
+        # In interactive mode, always offer the choice
+        # In non-interactive mode, only deploy if explicitly requested
+        if self.deploy_workflows or (not self.non_interactive):
+            self._deploy_workflows()
+
+        # Step 8: Validate setup
         self._validate_setup()
 
         # Done!
@@ -179,7 +325,7 @@ class RepoInitializer:
         click.echo()
         self._print_next_steps()
 
-        # Step 8: Optional test
+        # Step 9: Optional test
         if not self.non_interactive:
             self._offer_test_run()
 
@@ -192,6 +338,96 @@ class RepoInitializer:
 
         # Fall back to environment
         return "environment"
+
+    def _normalize_url(self, url: str, service_name: str = "service") -> str:
+        """Normalize a URL by ensuring it has a protocol prefix and verify connectivity.
+
+        Args:
+            url: The URL to normalize (may or may not have http/https prefix)
+            service_name: Name of the service for user prompts (e.g., "Ollama", "vLLM")
+
+        Returns:
+            URL with proper http:// or https:// prefix
+        """
+        url = url.strip()
+
+        # Already has protocol - just verify
+        if url.startswith("http://") or url.startswith("https://"):
+            normalized = url.rstrip("/")
+            return self._verify_url_connectivity(normalized, service_name)
+
+        # No protocol - ask user which one to use
+        click.echo()
+        click.echo(f"The URL '{url}' doesn't specify a protocol.")
+        use_https = click.confirm(
+            f"Use HTTPS for {service_name}? (No = HTTP)",
+            default=False,  # Default to HTTP for local services
+        )
+
+        protocol = "https" if use_https else "http"
+        normalized = f"{protocol}://{url}".rstrip("/")
+        click.echo(f"  Using: {normalized}")
+
+        return self._verify_url_connectivity(normalized, service_name)
+
+    def _verify_url_connectivity(self, url: str, service_name: str) -> str:
+        """Verify URL is reachable, allow user to retry or save anyway.
+
+        Args:
+            url: Full URL with protocol
+            service_name: Name of the service for display
+
+        Returns:
+            The URL (possibly modified by user)
+        """
+        import socket
+        import urllib.parse
+
+        if self.non_interactive:
+            return url
+
+        # Parse the URL to get host and port
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        click.echo(f"  Checking connectivity to {host}:{port}...", nl=False)
+
+        try:
+            # Quick socket check (2 second timeout)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((host, port))
+            sock.close()
+
+            if result == 0:
+                click.echo(click.style(" ✓ reachable", fg="green"))
+                return url
+            else:
+                click.echo(click.style(" ✗ unreachable", fg="red"))
+        except socket.gaierror:
+            click.echo(click.style(" ✗ hostname not found", fg="red"))
+        except TimeoutError:
+            click.echo(click.style(" ✗ timeout", fg="yellow"))
+        except Exception as e:
+            click.echo(click.style(f" ✗ error: {e}", fg="red"))
+
+        # URL not reachable - ask user what to do
+        click.echo()
+        choice = click.prompt(
+            f"  {service_name} at {url} is not reachable. What would you like to do?",
+            type=click.Choice(["save", "retry", "edit"]),
+            default="save",
+        )
+
+        if choice == "save":
+            click.echo("  Saving URL anyway (you can update it later)")
+            return url
+        elif choice == "retry":
+            return self._verify_url_connectivity(url, service_name)
+        else:  # edit
+            new_url = click.prompt("  Enter new URL", default=url)
+            return self._normalize_url(new_url, service_name)
 
     def _detect_existing_gitea_token(self) -> tuple[str | None, str | None]:
         """Check for existing Gitea token in keyring or environment.
@@ -216,6 +452,35 @@ class RepoInitializer:
 
         # Check environment variables
         for env_var in ("GITEA_TOKEN", "SAPIENS_GITEA_TOKEN"):
+            token = os.getenv(env_var)
+            if token:
+                return token, f"environment (${env_var})"
+
+        return None, None
+
+    def _detect_existing_gitlab_token(self) -> tuple[str | None, str | None]:
+        """Check for existing GitLab token in keyring or environment.
+
+        Checks in order:
+        1. Keyring (gitlab/api_token)
+        2. Environment (GITLAB_TOKEN, SAPIENS_GITLAB_TOKEN, CI_JOB_TOKEN)
+
+        Returns (token, source) tuple where source describes where it was found.
+        """
+        import os
+
+        # Check keyring first
+        try:
+            keyring_backend = KeyringBackend()
+            if keyring_backend.available:
+                token = keyring_backend.get("gitlab", "api_token")
+                if token:
+                    return token, "keyring (gitlab/api_token)"
+        except Exception:
+            pass  # Keyring not available or error
+
+        # Check environment variables
+        for env_var in ("GITLAB_TOKEN", "SAPIENS_GITLAB_TOKEN", "CI_JOB_TOKEN"):
             token = os.getenv(env_var)
             if token:
                 return token, f"environment (${env_var})"
@@ -270,6 +535,23 @@ class RepoInitializer:
 
     def _collect_interactively(self) -> None:
         """Collect credentials interactively from user."""
+        # Only collect git provider token if updating git provider or credentials
+        if self.update_git_provider or self.update_credentials:
+            if self.provider_type == "gitlab":
+                self._collect_gitlab_token_interactively()
+            else:
+                self._collect_gitea_token_interactively()
+            click.echo()
+
+        # AI Agent configuration (only if updating agent provider)
+        if self.update_agent_provider:
+            self._configure_ai_agent()
+        else:
+            # Load agent settings from existing config
+            self._load_agent_type_from_config()
+
+    def _collect_gitea_token_interactively(self) -> None:
+        """Collect Gitea token interactively."""
         # Check for existing Gitea token in keyring or environment
         existing_token, source = self._detect_existing_gitea_token()
 
@@ -294,10 +576,33 @@ class RepoInitializer:
             click.echo()
             self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
 
-        click.echo()
+    def _collect_gitlab_token_interactively(self) -> None:
+        """Collect GitLab token interactively."""
+        # Check for existing GitLab token in keyring or environment
+        existing_token, source = self._detect_existing_gitlab_token()
 
-        # AI Agent configuration
-        self._configure_ai_agent()
+        if existing_token:
+            use_existing = click.confirm(
+                click.style(f"✓ GitLab token found in {source}. Use it?", fg="green"),
+                default=True,
+            )
+            if use_existing:
+                self.gitea_token = existing_token  # Reuse gitea_token field
+                click.echo(f"   ✓ Using GitLab token from {source}")
+            else:
+                self.gitea_token = click.prompt(
+                    "Enter your GitLab Personal Access Token", hide_input=True, type=str
+                )
+        else:
+            # No existing token - prompt for it
+            pat_url = f"{self.repo_info.base_url}/-/user_settings/personal_access_tokens"
+            click.echo("GitLab Personal Access Token is required. Get it from:\n" f"   {pat_url}")
+            click.echo()
+            click.echo("Required scopes: api, read_repository, write_repository")
+            click.echo()
+            self.gitea_token = click.prompt(
+                "Enter your GitLab Personal Access Token", hide_input=True, type=str
+            )
 
     def _configure_ai_agent(self) -> None:
         """Configure AI agent (Claude or Goose) interactively."""
@@ -563,7 +868,8 @@ class RepoInitializer:
         if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
             self.builtin_base_url = default_url
         else:
-            self.builtin_base_url = click.prompt("Ollama URL", default=default_url)
+            custom_url = click.prompt("Ollama URL (host:port)", default="localhost:11434")
+            self.builtin_base_url = self._normalize_url(custom_url, "Ollama")
 
     def _configure_builtin_vllm(self, provider_info: dict) -> None:
         """Configure vLLM for builtin agent."""
@@ -618,7 +924,8 @@ class RepoInitializer:
         if click.confirm("Use default vLLM URL (localhost:8000)?", default=True):
             self.builtin_base_url = default_url
         else:
-            self.builtin_base_url = click.prompt("vLLM URL", default=default_url)
+            custom_url = click.prompt("vLLM URL (host:port)", default="localhost:8000")
+            self.builtin_base_url = self._normalize_url(custom_url, "vLLM")
 
     def _configure_builtin_cloud(self, provider_info: dict) -> None:
         """Configure cloud LLM provider for builtin agent."""
@@ -688,9 +995,13 @@ class RepoInitializer:
         """Store credentials in OS keyring."""
         backend = KeyringBackend()
 
-        # Store Gitea token
-        backend.set("gitea", "api_token", self.gitea_token)
-        click.echo("   ✓ Stored: gitea/api_token")
+        # Store git provider token (Gitea, GitLab, or GitHub)
+        if self.provider_type == "gitlab":
+            backend.set("gitlab", "api_token", self.gitea_token)
+            click.echo("   ✓ Stored: gitlab/api_token")
+        else:
+            backend.set("gitea", "api_token", self.gitea_token)
+            click.echo("   ✓ Stored: gitea/api_token")
 
         # Store agent API key if provided
         if self.agent_api_key:
@@ -710,9 +1021,13 @@ class RepoInitializer:
         """Store credentials in environment (for current session)."""
         backend = EnvironmentBackend()
 
-        # Store Gitea token
-        backend.set("GITEA_TOKEN", self.gitea_token)
-        click.echo("   ✓ Set: GITEA_TOKEN")
+        # Store git provider token (Gitea, GitLab, or GitHub)
+        if self.provider_type == "gitlab":
+            backend.set("GITLAB_TOKEN", self.gitea_token)
+            click.echo("   ✓ Set: GITLAB_TOKEN")
+        else:
+            backend.set("GITEA_TOKEN", self.gitea_token)
+            click.echo("   ✓ Set: GITEA_TOKEN")
 
         # Store agent API key if provided
         if self.agent_api_key:
@@ -847,11 +1162,21 @@ class RepoInitializer:
 
     def _generate_config(self) -> None:
         """Generate configuration file."""
-        click.echo(click.style("📝 Creating configuration file...", bold=True))
+        click.echo(
+            click.style(
+                "📝 Updating configuration file..."
+                if self.existing_config
+                else "📝 Creating configuration file...",
+                bold=True,
+            )
+        )
 
-        # Determine credential references based on backend
+        # Determine credential references based on backend and provider
         if self.backend == "keyring":
-            gitea_token_ref = "@keyring:gitea/api_token"  # nosec B105 # Template placeholder for keyring reference
+            if self.provider_type == "gitlab":
+                git_token_ref = "@keyring:gitlab/api_token"  # nosec B105
+            else:
+                git_token_ref = "@keyring:gitea/api_token"  # nosec B105
 
             # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
@@ -868,7 +1193,10 @@ class RepoInitializer:
                 agent_api_key_ref = "null"
         else:
             # fmt: off
-            gitea_token_ref = "${GITEA_TOKEN}"  # nosec B105 # Template placeholder for environment variable
+            if self.provider_type == "gitlab":
+                git_token_ref = "${GITLAB_TOKEN}"  # nosec B105
+            else:
+                git_token_ref = "${GITEA_TOKEN}"  # nosec B105
             # fmt: on
 
             # Determine agent API key reference
@@ -943,22 +1271,52 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}"""
 
-        # Determine MCP server (only Gitea uses MCP)
-        if self.provider_type == "github":
-            mcp_server_line = "  mcp_server: null"
-        else:
+        # Determine MCP server (only Gitea uses MCP; GitHub and GitLab do not)
+        if self.provider_type == "gitea":
             mcp_server_line = "  mcp_server: gitea-mcp"
+        else:
+            mcp_server_line = "  mcp_server: null"
+
+        # Build git_provider section (use existing if not updating)
+        if not self.update_git_provider and self.existing_config:
+            existing_git = self.existing_config.get("git_provider", {})
+            git_provider_section = "git_provider:\n"
+            for key, value in existing_git.items():
+                if isinstance(value, str) and (value.startswith("@") or value.startswith("$")):
+                    git_provider_section += f'  {key}: "{value}"\n'
+                else:
+                    git_provider_section += f"  {key}: {value}\n"
+            git_provider_section = git_provider_section.rstrip("\n")
+        else:
+            git_provider_section = f"""git_provider:
+  provider_type: {self.provider_type}
+{mcp_server_line}
+  base_url: {self.repo_info.base_url}
+  api_token: "{git_token_ref}\""""
+
+        # Build agent_provider section (use existing if not updating)
+        if not self.update_agent_provider and self.existing_config:
+            existing_agent = self.existing_config.get("agent_provider", {})
+            agent_config = "agent_provider:\n"
+            for key, value in existing_agent.items():
+                if isinstance(value, dict):
+                    agent_config += f"  {key}:\n"
+                    for subkey, subval in value.items():
+                        agent_config += f"    {subkey}: {subval}\n"
+                elif isinstance(value, str) and (value.startswith("@") or value.startswith("$")):
+                    agent_config += f'  {key}: "{value}"\n'
+                elif value is None:
+                    agent_config += f"  {key}: null\n"
+                else:
+                    agent_config += f"  {key}: {value}\n"
+            agent_config = agent_config.rstrip("\n")
 
         # Generate configuration content
         config_content = f"""# Automation System Configuration
 # Generated by: sapiens init
 # Repository: {self.repo_info.owner}/{self.repo_info.repo}
 
-git_provider:
-  provider_type: {self.provider_type}
-{mcp_server_line}
-  base_url: {self.repo_info.base_url}
-  api_token: {gitea_token_ref}
+{git_provider_section}
 
 repository:
   owner: {self.repo_info.owner}
@@ -1003,6 +1361,9 @@ tags:
         if self.provider_type == "github":
             action_dir = self.repo_path / ".github" / "actions" / "sapiens-task"
             template_subpath = "actions/github/sapiens-task/action.yaml"
+        elif self.provider_type == "gitlab":
+            action_dir = self.repo_path / ".gitlab" / "actions" / "sapiens-task"
+            template_subpath = "actions/gitlab/sapiens-task/action.yaml"
         else:
             action_dir = self.repo_path / ".gitea" / "actions" / "sapiens-task"
             template_subpath = "actions/gitea/sapiens-task/action.yaml"
@@ -1046,6 +1407,119 @@ tags:
 
         click.echo()
 
+    def _deploy_workflows(self) -> None:
+        """Deploy CI/CD workflow templates."""
+        import importlib.resources
+
+        click.echo(click.style("📋 Deploying workflow templates...", bold=True))
+        click.echo()
+
+        # Determine paths based on provider type
+        if self.provider_type == "github":
+            workflows_dir = self.repo_path / ".github" / "workflows"
+            template_base = "workflows/github"
+        elif self.provider_type == "gitlab":
+            # GitLab uses single .gitlab-ci.yml at root
+            workflows_dir = self.repo_path
+            template_base = "workflows/gitlab"
+        else:
+            workflows_dir = self.repo_path / ".gitea" / "workflows"
+            template_base = "workflows/gitea"
+
+        workflows_dir.mkdir(parents=True, exist_ok=True)
+
+        # Core workflows
+        core_workflows = [
+            ("automation-daemon.yaml", "Automation daemon (scheduled processing)"),
+            ("process-issue.yaml", "Process issue (manual trigger)"),
+        ]
+
+        # Example workflows
+        example_workflows = [
+            ("examples/daily-issue-triage.yaml", "Daily issue triage"),
+            ("examples/weekly-test-coverage.yaml", "Weekly test coverage report"),
+            ("examples/weekly-dependency-audit.yaml", "Weekly dependency audit"),
+            ("examples/weekly-security-review.yaml", "Weekly security review"),
+            ("examples/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
+            ("examples/post-merge-docs.yaml", "Post-merge documentation update"),
+        ]
+
+        def deploy_template(template_name: str, target_dir: Path) -> bool:
+            """Deploy a single template file."""
+            template_subpath = f"{template_base}/{template_name}"
+            content = None
+
+            try:
+                # First try: repo root templates/ directory (development mode)
+                repo_root = Path(__file__).parent.parent.parent
+                template_path = repo_root / "templates" / template_subpath
+                if template_path.exists():
+                    content = template_path.read_text()
+
+                # Second try: package templates directory
+                if content is None:
+                    package_dir = Path(__file__).parent.parent
+                    template_path = package_dir / "templates" / template_subpath
+                    if template_path.exists():
+                        content = template_path.read_text()
+
+                # Third try: importlib.resources (installed package)
+                if content is None:
+                    template_files = (
+                        importlib.resources.files("repo_sapiens") / "templates" / template_subpath
+                    )
+                    if template_files.is_file():
+                        content = template_files.read_text()
+
+                if content is None:
+                    return False
+
+                # For GitLab, core workflows go to .gitlab-ci.yml
+                if self.provider_type == "gitlab" and not template_name.startswith("examples/"):
+                    target_file = target_dir / ".gitlab-ci.yml"
+                else:
+                    # Create subdirectories if needed
+                    target_file = target_dir / template_name
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+                target_file.write_text(content)
+                return True
+            except Exception:
+                return False
+
+        # Ask about core workflows
+        if not self.non_interactive:
+            deploy_core = click.confirm(
+                "Deploy core workflows (automation-daemon, process-issue)?",
+                default=True,
+            )
+        else:
+            deploy_core = True
+
+        if deploy_core:
+            for template_name, description in core_workflows:
+                if deploy_template(template_name, workflows_dir):
+                    if self.provider_type == "gitlab" and not template_name.startswith("examples/"):
+                        click.echo(f"   ✓ {description} → .gitlab-ci.yml")
+                    else:
+                        click.echo(f"   ✓ {description}")
+                else:
+                    click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
+
+        click.echo()
+
+        # Ask about example workflows (one by one in interactive mode)
+        if not self.non_interactive:
+            click.echo("Example workflows available:")
+            for template_name, description in example_workflows:
+                if click.confirm(f"  Deploy '{description}'?", default=False):
+                    if deploy_template(template_name, workflows_dir):
+                        click.echo(click.style("     ✓ Deployed", fg="green"))
+                    else:
+                        click.echo(click.style("     ⚠ Could not deploy", fg="yellow"))
+
+        click.echo()
+
     def _validate_setup(self) -> None:
         """Validate the setup."""
         click.echo(click.style("✓ Validating setup...", bold=True))
@@ -1055,13 +1529,19 @@ tags:
             resolver = CredentialResolver()
 
             if self.backend == "keyring":
-                gitea_ref = "@keyring:gitea/api_token"
+                if self.provider_type == "gitlab":
+                    token_ref = "@keyring:gitlab/api_token"
+                else:
+                    token_ref = "@keyring:gitea/api_token"
             else:
-                gitea_ref = "${GITEA_TOKEN}"
+                if self.provider_type == "gitlab":
+                    token_ref = "${GITLAB_TOKEN}"
+                else:
+                    token_ref = "${GITEA_TOKEN}"
 
-            resolved = resolver.resolve(gitea_ref, cache=False)
+            resolved = resolver.resolve(token_ref, cache=False)
             if not resolved:
-                raise ValueError("Failed to resolve Gitea token")
+                raise ValueError(f"Failed to resolve {self.provider_type} token")
 
             click.echo("   ✓ Credentials validated")
             click.echo("   ✓ Configuration file created")
@@ -1073,12 +1553,21 @@ tags:
 
     def _print_next_steps(self) -> None:
         """Print next steps for the user."""
+        provider_name = self.provider_type.title()
+
         click.echo(click.style("📋 Next Steps:", bold=True))
         click.echo()
-        click.echo("1. Label an issue with 'needs-planning' in Gitea:")
-        issues_url = (
-            f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
-        )
+        click.echo(f"1. Label an issue with 'needs-planning' in {provider_name}:")
+
+        # Build issues URL based on provider
+        if self.provider_type == "gitlab":
+            issues_url = (
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/-/issues"
+            )
+        else:
+            issues_url = (
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
+            )
         click.echo(f"   {issues_url}")
         click.echo()
         click.echo("2. Run the automation daemon:")
@@ -1087,11 +1576,13 @@ tags:
         click.echo("3. Watch the automation work!")
         click.echo()
 
-        # Print manual secret setup if needed
-        if self.setup_secrets:
+        # Print manual secret setup if needed (not for GitLab - uses CI/CD variables)
+        if self.setup_secrets and self.provider_type != "gitlab":
             click.echo(
                 click.style(
-                    "⚠ Important: Set Gitea Actions Secrets Manually", bold=True, fg="yellow"
+                    f"⚠ Important: Set {provider_name} Actions Secrets Manually",
+                    bold=True,
+                    fg="yellow",
                 )
             )
             click.echo()
@@ -1102,7 +1593,33 @@ tags:
             click.echo(f"Navigate to: {secrets_url}")
             click.echo()
             click.echo("Add the following secrets:")
-            click.echo("  - GITEA_TOKEN (your Gitea API token)")
+            if self.provider_type == "gitea":
+                click.echo("  - GITEA_TOKEN (your Gitea API token)")
+            if self.agent_mode == "api":
+                if self.agent_type == "goose" and self.goose_llm_provider:
+                    secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
+                    provider_title = self.goose_llm_provider.title()
+                    click.echo(f"  - {secret_name} (your {provider_title} API key for Goose)")
+                elif self.agent_type == "claude":
+                    click.echo("  - CLAUDE_API_KEY (your Claude API key)")
+            click.echo()
+
+        # GitLab uses CI/CD variables instead of Actions secrets
+        if self.setup_secrets and self.provider_type == "gitlab":
+            click.echo(
+                click.style(
+                    "⚠ Important: Set GitLab CI/CD Variables Manually", bold=True, fg="yellow"
+                )
+            )
+            click.echo()
+            variables_url = (
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/"
+                f"{self.repo_info.repo}/-/settings/ci_cd"
+            )
+            click.echo(f"Navigate to: {variables_url}")
+            click.echo("Expand 'Variables' section and add:")
+            click.echo()
+            click.echo("  - GITLAB_TOKEN (your GitLab Personal Access Token)")
             if self.agent_mode == "api":
                 if self.agent_type == "goose" and self.goose_llm_provider:
                     secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
@@ -1145,8 +1662,8 @@ tags:
         elif self.agent_type == "goose":
             test_cmd = f'goose session start --prompt "{test_prompt}"'
         elif self.agent_type == "builtin":
-            # react command reads model from config, so no --model needed
-            test_cmd = f'sapiens {config_flag}react "{test_prompt}"'.replace("  ", " ")
+            # task command reads model from config, so no --model needed
+            test_cmd = f'sapiens {config_flag}task "{test_prompt}"'.replace("  ", " ")
         else:
             return
 
@@ -1185,7 +1702,7 @@ tags:
         # Suggest REPL for further exploration
         click.echo()
         if self.agent_type == "builtin":
-            repl_cmd = f"sapiens {config_flag}react --repl".replace("  ", " ")
+            repl_cmd = f"sapiens {config_flag}task --repl".replace("  ", " ")
         elif self.agent_type == "claude":
             repl_cmd = "claude"
         elif self.agent_type == "goose":

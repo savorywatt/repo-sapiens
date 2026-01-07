@@ -52,6 +52,18 @@ def github_repo_info():
     return mock_info
 
 
+@pytest.fixture
+def gitlab_repo_info():
+    """Create a mock RepositoryInfo for GitLab."""
+    mock_info = Mock()
+    mock_info.remote_name = "origin"
+    mock_info.owner = "gitlab-owner"
+    mock_info.repo = "gitlab-repo"
+    mock_info.base_url = "https://gitlab.com"
+    mock_info.full_name = "gitlab-owner/gitlab-repo"
+    return mock_info
+
+
 # =============================================================================
 # RepoInitializer Initialization Tests
 # =============================================================================
@@ -233,6 +245,29 @@ class TestRepoInitializerDiscoverRepository:
         assert initializer.provider_type == "github"
 
     @patch("repo_sapiens.cli.init.GitDiscovery")
+    def test_init_detects_gitlab_repository(self, mock_discovery_class, tmp_path, gitlab_repo_info):
+        """Should detect GitLab provider type from gitlab.com URLs."""
+        mock_discovery = Mock()
+        mock_discovery.parse_repository.return_value = gitlab_repo_info
+        mock_discovery.detect_provider_type.return_value = "gitlab"
+        mock_discovery_class.return_value = mock_discovery
+
+        with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
+            initializer = RepoInitializer(
+                repo_path=tmp_path,
+                config_path=Path("config.yaml"),
+                backend=None,
+                non_interactive=False,
+                setup_secrets=True,
+            )
+
+        initializer._discover_repository()
+
+        assert initializer.repo_info == gitlab_repo_info
+        assert initializer.provider_type == "gitlab"
+        mock_discovery_class.assert_called_once_with(tmp_path)
+
+    @patch("repo_sapiens.cli.init.GitDiscovery")
     def test_discover_repository_git_discovery_error(self, mock_discovery_class, tmp_path):
         """Should raise ClickException on GitDiscoveryError."""
         mock_discovery = Mock()
@@ -328,6 +363,64 @@ class TestRepoInitializerCollectCredentials:
 
         assert initializer.gitea_token == "interactive-token-456"
         mock_prompt.assert_called()
+
+    @patch("repo_sapiens.cli.init.click.confirm")
+    @patch("repo_sapiens.cli.init.click.prompt")
+    def test_init_prompts_for_gitlab_token(
+        self, mock_prompt, mock_confirm, tmp_path, gitlab_repo_info
+    ):
+        """Should prompt for GitLab Personal Access Token interactively."""
+        mock_prompt.return_value = "glpat-interactive-token-789"
+        mock_confirm.return_value = False  # Don't use existing keyring token
+
+        with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
+            initializer = RepoInitializer(
+                repo_path=tmp_path,
+                config_path=Path("config.yaml"),
+                backend=None,
+                non_interactive=False,
+                setup_secrets=True,
+            )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+
+        # Mock the AI agent configuration
+        with patch.object(initializer, "_configure_ai_agent"):
+            initializer._collect_interactively()
+
+        assert initializer.gitea_token == "glpat-interactive-token-789"
+        mock_prompt.assert_called()
+
+    @patch("repo_sapiens.cli.init.click.confirm")
+    @patch("repo_sapiens.cli.init.click.prompt")
+    @patch.object(RepoInitializer, "_detect_existing_gitlab_token")
+    def test_init_uses_existing_gitlab_token(
+        self, mock_detect_token, mock_prompt, mock_confirm, tmp_path, gitlab_repo_info
+    ):
+        """Should offer to use existing GitLab token from keyring/environment."""
+        mock_detect_token.return_value = ("existing-gitlab-token", "keyring (gitlab/api_token)")
+        mock_confirm.return_value = True  # Use existing token
+
+        with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
+            initializer = RepoInitializer(
+                repo_path=tmp_path,
+                config_path=Path("config.yaml"),
+                backend=None,
+                non_interactive=False,
+                setup_secrets=True,
+            )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+
+        # Mock the AI agent configuration
+        with patch.object(initializer, "_configure_ai_agent"):
+            initializer._collect_interactively()
+
+        assert initializer.gitea_token == "existing-gitlab-token"
+        # Should not prompt for new token since user chose existing
+        mock_prompt.assert_not_called()
 
 
 # =============================================================================
@@ -781,6 +874,88 @@ class TestRepoInitializerStoreCredentials:
         mock_env.set.assert_any_call("GITEA_TOKEN", "test-gitea-token")
         mock_env.set.assert_any_call("ANTHROPIC_API_KEY", "sk-ant-key")
 
+    @patch("repo_sapiens.cli.init.KeyringBackend")
+    def test_init_stores_gitlab_credentials_keyring(
+        self, mock_keyring_class, tmp_path, gitlab_repo_info
+    ):
+        """Should store GitLab token in keyring under gitlab/api_token."""
+        mock_keyring = Mock()
+        mock_keyring.available = True
+        mock_keyring_class.return_value = mock_keyring
+
+        initializer = RepoInitializer(
+            repo_path=tmp_path,
+            config_path=Path("config.yaml"),
+            backend="keyring",
+            non_interactive=True,
+            setup_secrets=True,
+        )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+        initializer.gitea_token = "glpat-test-gitlab-token"
+        initializer.agent_type = "claude"
+        initializer.agent_api_key = None
+
+        initializer._store_in_keyring()
+
+        mock_keyring.set.assert_called_once_with("gitlab", "api_token", "glpat-test-gitlab-token")
+
+    @patch("repo_sapiens.cli.init.EnvironmentBackend")
+    def test_init_stores_gitlab_credentials_environment(
+        self, mock_env_class, tmp_path, gitlab_repo_info
+    ):
+        """Should store GitLab token in environment as GITLAB_TOKEN."""
+        mock_env = Mock()
+        mock_env_class.return_value = mock_env
+
+        initializer = RepoInitializer(
+            repo_path=tmp_path,
+            config_path=Path("config.yaml"),
+            backend="environment",
+            non_interactive=True,
+            setup_secrets=True,
+        )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+        initializer.gitea_token = "glpat-test-gitlab-token"
+        initializer.agent_type = "claude"
+        initializer.agent_api_key = None
+
+        initializer._store_in_environment()
+
+        mock_env.set.assert_called_once_with("GITLAB_TOKEN", "glpat-test-gitlab-token")
+
+    @patch("repo_sapiens.cli.init.KeyringBackend")
+    def test_init_stores_gitlab_credentials_with_agent_api_key(
+        self, mock_keyring_class, tmp_path, gitlab_repo_info
+    ):
+        """Should store both GitLab token and agent API key in keyring."""
+        mock_keyring = Mock()
+        mock_keyring.available = True
+        mock_keyring_class.return_value = mock_keyring
+
+        initializer = RepoInitializer(
+            repo_path=tmp_path,
+            config_path=Path("config.yaml"),
+            backend="keyring",
+            non_interactive=True,
+            setup_secrets=True,
+        )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+        initializer.gitea_token = "glpat-test-gitlab-token"
+        initializer.agent_type = "claude"
+        initializer.agent_api_key = "sk-ant-claude-key"
+
+        initializer._store_in_keyring()
+
+        assert mock_keyring.set.call_count == 2
+        mock_keyring.set.assert_any_call("gitlab", "api_token", "glpat-test-gitlab-token")
+        mock_keyring.set.assert_any_call("claude", "api_key", "sk-ant-claude-key")
+
 
 # =============================================================================
 # Config Generation Tests
@@ -907,6 +1082,64 @@ class TestRepoInitializerGenerateConfig:
         assert "provider_type: github" in content
         assert "mcp_server: null" in content
         assert "base_url: https://github.com" in content
+
+    def test_init_generates_gitlab_config(self, tmp_path, gitlab_repo_info):
+        """Should generate config for GitLab provider with mcp_server: null."""
+        config_path = tmp_path / "config.yaml"
+
+        initializer = RepoInitializer(
+            repo_path=tmp_path,
+            config_path=config_path,
+            backend="keyring",
+            non_interactive=True,
+            setup_secrets=False,
+        )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+        initializer.agent_type = "claude"
+        initializer.agent_mode = "local"
+        initializer.agent_api_key = None
+
+        initializer._generate_config()
+
+        assert config_path.exists()
+        content = config_path.read_text()
+
+        # GitLab-specific assertions
+        assert "provider_type: gitlab" in content
+        assert "mcp_server: null" in content
+        assert "base_url: https://gitlab.com" in content
+        assert "owner: gitlab-owner" in content
+        assert "name: gitlab-repo" in content
+        assert "@keyring:gitlab/api_token" in content
+
+    def test_init_generates_gitlab_config_environment_backend(self, tmp_path, gitlab_repo_info):
+        """Should generate GitLab config with environment variable references."""
+        config_path = tmp_path / "config.yaml"
+
+        initializer = RepoInitializer(
+            repo_path=tmp_path,
+            config_path=config_path,
+            backend="environment",
+            non_interactive=True,
+            setup_secrets=False,
+        )
+
+        initializer.repo_info = gitlab_repo_info
+        initializer.provider_type = "gitlab"
+        initializer.agent_type = "claude"
+        initializer.agent_mode = "local"
+        initializer.agent_api_key = None
+
+        initializer._generate_config()
+
+        content = config_path.read_text()
+
+        # GitLab-specific assertions for environment backend
+        assert "provider_type: gitlab" in content
+        assert "${GITLAB_TOKEN}" in content
+        assert "mcp_server: null" in content
 
     def test_generate_config_creates_parent_directories(self, tmp_path, mock_repo_info):
         """Should create parent directories for config file."""

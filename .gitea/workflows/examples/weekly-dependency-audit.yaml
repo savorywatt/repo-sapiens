@@ -1,0 +1,128 @@
+# @repo-sapiens-template
+# @version: 1.1.0
+# @name: weekly-dependency-audit
+#
+# Weekly Dependency Audit for Gitea Actions
+#
+# Checks for outdated dependencies, security vulnerabilities, and
+# creates PRs for safe updates.
+#
+# Setup:
+# 1. Copy to .gitea/workflows/weekly-dependency-audit.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo/PR write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key
+# 3. Adjust schedule as needed
+
+name: Dependency Audit
+
+on:
+  schedule:
+    # Every Wednesday at 10am UTC
+    - cron: '0 10 * * 3'
+  workflow_dispatch:
+
+jobs:
+  audit-dependencies:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install tools
+        run: |
+          pip install repo-sapiens pip-audit safety
+
+      - name: Check for outdated packages
+        id: outdated
+        continue-on-error: true
+        run: |
+          echo "## Outdated Packages" > dependency-report.md
+          pip list --outdated --format=json > outdated.json 2>/dev/null || echo "[]" > outdated.json
+          python -c "
+          import json
+          data = json.load(open('outdated.json'))
+          if data:
+              print('| Package | Current | Latest |')
+              print('|---------|---------|--------|')
+              for p in data[:20]:
+                  print(f\"| {p['name']} | {p['version']} | {p['latest_version']} |\")
+          else:
+              print('All packages are up to date!')
+          " >> dependency-report.md
+
+      - name: Security audit
+        id: security
+        continue-on-error: true
+        run: |
+          echo -e "\n## Security Vulnerabilities" >> dependency-report.md
+
+          # Try pip-audit first
+          pip-audit --format=json > audit.json 2>/dev/null || echo "[]" > audit.json
+
+          python -c "
+          import json
+          try:
+              data = json.load(open('audit.json'))
+              if data:
+                  print('| Package | Vulnerability | Fix Version |')
+                  print('|---------|---------------|-------------|')
+                  for v in data[:10]:
+                      print(f\"| {v.get('name', 'unknown')} | {v.get('id', 'N/A')} | {v.get('fix_versions', ['N/A'])[0] if v.get('fix_versions') else 'N/A'} |\")
+              else:
+                  print('No known vulnerabilities found!')
+          except:
+              print('Security audit completed - check logs for details')
+          " >> dependency-report.md
+
+      - name: Create update branch
+        run: |
+          git config user.name "repo-sapiens[bot]"
+          git config user.email "repo-sapiens[bot]@users.noreply.gitea.com"
+          BRANCH="auto/dependency-audit-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+
+      - name: Analyze and update dependencies
+        env:
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          sapiens task "Review the dependency audit report and update safe dependencies.
+
+          $(cat dependency-report.md)
+
+          Tasks:
+          1. Review outdated.json for packages that can be safely updated
+          2. Prioritize security fixes from audit.json
+          3. For PATCH and MINOR updates of well-known packages, update them
+          4. For MAJOR updates, only update if there are security issues
+          5. Update pyproject.toml or requirements.txt with new versions
+          6. Run tests to verify nothing breaks: python -m pytest tests/ -x
+
+          Guidelines:
+          - Be conservative - only update what's safe
+          - Skip updates that break tests
+          - Group related updates together
+          - Note any packages that need manual review
+
+          Commit changes with: 'chore(deps): Update dependencies [audit]'"
+
+      - name: Push changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No dependency changes made"
+            exit 0
+          fi
+
+          git commit -m "chore(deps): Weekly dependency updates" || true
+          git push -u origin "$BRANCH" || true
+          echo "Branch $BRANCH pushed with dependency updates"

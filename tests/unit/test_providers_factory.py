@@ -12,6 +12,7 @@ from repo_sapiens.config.settings import (
 from repo_sapiens.providers.factory import create_git_provider, detect_provider_from_url
 from repo_sapiens.providers.gitea_rest import GiteaRestProvider
 from repo_sapiens.providers.github_rest import GitHubRestProvider
+from repo_sapiens.providers.gitlab_rest import GitLabRestProvider
 
 
 class TestCreateGitProvider:
@@ -106,6 +107,36 @@ class TestCreateGitProvider:
         assert provider.owner == "enterprise-org"
         assert provider.repo == "private-repo"
 
+    def test_create_gitlab_provider(self, tmp_path):
+        """Should create GitLabRestProvider when provider_type is 'gitlab'."""
+        settings = AutomationSettings(
+            git_provider=GitProviderConfig(
+                provider_type="gitlab",
+                base_url="https://gitlab.com",
+                api_token=SecretStr("glpat_test123"),
+            ),
+            repository=RepositoryConfig(
+                owner="gitlab-user",
+                name="gitlab-repo",
+                default_branch="main",
+            ),
+            agent_provider=AgentProviderConfig(
+                provider_type="claude-local",
+                model="claude-sonnet-4.5",
+                api_key=SecretStr("test-key"),
+                local_mode=True,
+            ),
+            workflow={"state_directory": str(tmp_path / "state")},
+        )
+
+        provider = create_git_provider(settings)
+
+        assert isinstance(provider, GitLabRestProvider)
+        assert provider.base_url == "https://gitlab.com"
+        assert provider.token == "glpat_test123"
+        assert provider.owner == "gitlab-user"
+        assert provider.repo == "gitlab-repo"
+
     def test_unsupported_provider_type_raises_error(self, tmp_path):
         """Should raise ValueError for unsupported provider types."""
         # Use model_construct to bypass Pydantic validation and test factory logic
@@ -133,7 +164,7 @@ class TestCreateGitProvider:
             create_git_provider(settings)
 
         assert "Unsupported Git provider type: unsupported" in str(exc_info.value)
-        assert "Supported types: gitea, github" in str(exc_info.value)
+        assert "Supported: gitea, github, gitlab" in str(exc_info.value)
 
     def test_provider_uses_repository_config(self, tmp_path):
         """Should correctly pass repository owner and name to provider."""
@@ -250,6 +281,16 @@ class TestDetectProviderFromUrl:
         result = detect_provider_from_url("https://code.company.internal/team/app")
         assert result == "gitea"
 
+    def test_detect_gitlab_com_from_url(self):
+        """Should detect GitLab from gitlab.com URL."""
+        result = detect_provider_from_url("https://gitlab.com/org/repo")
+        assert result == "gitlab"
+
+    def test_detect_self_hosted_gitlab_from_url(self):
+        """Should detect GitLab from URL containing 'gitlab' keyword."""
+        result = detect_provider_from_url("https://git.company.com/gitlab/org/repo")
+        assert result == "gitlab"
+
     def test_detect_with_port_number(self):
         """Should handle URLs with port numbers."""
         result = detect_provider_from_url("https://git.local:8443/user/repo")
@@ -319,6 +360,34 @@ class TestProviderFactoryIntegration:
 
         provider = create_git_provider(settings)
         assert isinstance(provider, GiteaRestProvider)
+
+    def test_factory_and_detection_work_together_for_gitlab(self, tmp_path):
+        """Should create correct provider when detection suggests GitLab."""
+        url = "https://gitlab.com/mygroup/myproject.git"
+        provider_type = detect_provider_from_url(url)
+
+        settings = AutomationSettings(
+            git_provider=GitProviderConfig(
+                provider_type=provider_type,
+                base_url="https://gitlab.com",
+                api_token=SecretStr("glpat_test-token"),
+            ),
+            repository=RepositoryConfig(
+                owner="mygroup",
+                name="myproject",
+                default_branch="main",
+            ),
+            agent_provider=AgentProviderConfig(
+                provider_type="claude-local",
+                model="claude-sonnet-4.5",
+                api_key=SecretStr("test-key"),
+                local_mode=True,
+            ),
+            workflow={"state_directory": str(tmp_path / "state")},
+        )
+
+        provider = create_git_provider(settings)
+        assert isinstance(provider, GitLabRestProvider)
 
 
 class TestProviderFactoryEdgeCases:
@@ -424,6 +493,11 @@ class TestDetectProviderUrlPatterns:
             ("https://corp-ghe.internal/org/repo", "github"),
             ("https://git.corp.com/ghe/org/repo", "github"),
             ("https://enterprise.corp.com/org/repo", "github"),
+            # GitLab patterns
+            ("https://gitlab.com/user/repo", "gitlab"),
+            ("git@gitlab.com:user/repo.git", "gitlab"),
+            ("https://gitlab.company.com/org/repo", "gitlab"),
+            ("https://git.company.com/gitlab/org/repo", "gitlab"),
             # Gitea (default) patterns
             ("https://gitea.io/user/repo", "gitea"),
             ("https://code.company.com/team/project", "gitea"),

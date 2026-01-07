@@ -15,8 +15,6 @@ repo-sapiens Documentation
    :maxdepth: 2
    :caption: API Reference
 
-   api/modules
-
 .. toctree::
    :maxdepth: 1
    :caption: Development

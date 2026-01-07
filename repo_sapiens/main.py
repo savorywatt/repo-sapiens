@@ -45,8 +45,8 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
         ctx.obj = {"settings": None}
         return
 
-    # React can optionally use config but doesn't require it
-    if ctx.invoked_subcommand == "react":
+    # Task command can optionally use config but doesn't require it
+    if ctx.invoked_subcommand == "task":
         config_path = Path(config)
         if config_path.exists():
             try:
@@ -174,8 +174,8 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
     asyncio.run(_show_plan_status(settings, plan_id))
 
 
-@cli.command()
-@click.argument("task", required=False)
+@cli.command(name="task")
+@click.argument("prompt", required=False)
 @click.option("--model", default=None, help="Model to use (default: from config or qwen3:8b)")
 @click.option("--ollama-url", default=None, help="Ollama server URL (default: from config)")
 @click.option("--max-iterations", default=10, type=int, help="Max ReAct iterations")
@@ -183,9 +183,9 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed trajectory")
 @click.option("--repl", is_flag=True, help="Start interactive REPL mode")
 @click.pass_context
-def react(
+def task_command(
     ctx: click.Context,
-    task: str | None,
+    prompt: str | None,
     model: str | None,
     ollama_url: str | None,
     max_iterations: int,
@@ -201,14 +201,14 @@ def react(
     Settings are read from the config file (--config). CLI options override config.
 
     Examples:
-        sapiens react "Create a hello.py file that prints Hello World"
-        sapiens react --repl  # Start interactive mode
+        sapiens task "Create a hello.py file that prints Hello World"
+        sapiens task --repl  # Start interactive mode
     """
     from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
     from repo_sapiens.models.domain import Task as DomainTask
 
-    if not task and not repl:
-        click.echo("Error: Either provide a TASK or use --repl for interactive mode", err=True)
+    if not prompt and not repl:
+        click.echo("Error: Either provide a PROMPT or use --repl for interactive mode", err=True)
         sys.exit(1)
 
     # Get settings from config (may be None if config doesn't exist)
@@ -293,7 +293,7 @@ def react(
         while True:
             try:
                 user_input = click.prompt(
-                    click.style("react", fg="cyan") + click.style("> ", fg="white"),
+                    click.style("task", fg="cyan") + click.style("> ", fg="white"),
                     prompt_suffix="",
                 ).strip()
 
@@ -354,7 +354,7 @@ def react(
                 await execute_single_task(agent, user_input)
                 click.echo()
 
-            except (EOFError, KeyboardInterrupt):
+            except (EOFError, KeyboardInterrupt, click.Abort):
                 click.echo("\nGoodbye!")
                 break
 
@@ -376,8 +376,8 @@ def react(
             if repl:
                 await run_repl(agent)
             else:
-                click.echo(f"Task: {task}\n")
-                await execute_single_task(agent, task)  # type: ignore[arg-type]
+                click.echo(f"Task: {prompt}\n")
+                await execute_single_task(agent, prompt)  # type: ignore[arg-type]
 
     try:
         asyncio.run(run())

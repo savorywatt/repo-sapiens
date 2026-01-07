@@ -12,10 +12,10 @@ An AI-driven automation system for Git workflows with support for multiple AI ag
 
 ### Implemented
 
-- **Multi-Platform Git Support**: Works with both **GitHub** and **Gitea**
+- **Multi-Platform Git Support**: Works with **GitHub**, **Gitea**, and **GitLab**
   - Auto-detects provider from repository remote URL
-  - GitHub Actions or Gitea Actions workflow templates
-  - Platform-specific API integration
+  - GitHub Actions, Gitea Actions, or GitLab CI/CD workflow templates
+  - Platform-specific API integration (including GitLab merge requests)
 
 - **Multiple AI Agent Support**
   - **Claude Code**: Anthropic's coding assistant
@@ -33,8 +33,8 @@ An AI-driven automation system for Git workflows with support for multiple AI ag
   - PR creation and management
 
 - **CLI Commands**
-  - `sapiens init` - Interactive repository setup with agent selection
-  - `sapiens react --repl` - Interactive ReAct agent REPL
+  - `sapiens init` - Interactive repository setup with agent selection (GitHub/Gitea/GitLab)
+  - `sapiens task --repl` - Interactive ReAct agent REPL
   - `sapiens daemon` - Run automation daemon
   - `sapiens credentials` - Manage credentials securely
   - `sapiens process-issue` - Process a specific issue
@@ -68,7 +68,7 @@ sapiens init
 ```
 
 This will:
-- Auto-discover your Git repository configuration (GitHub or Gitea)
+- Auto-discover your Git repository configuration (GitHub, Gitea, or GitLab)
 - Detect and select AI agent (Claude Code, Goose AI, or ReAct)
 - Configure LLM provider settings
 - Store credentials securely
@@ -81,13 +81,13 @@ Try the local AI agent with Ollama:
 
 ```bash
 # Start interactive REPL (uses qwen3:latest by default)
-sapiens react --repl
+sapiens task --repl
 
 # Use a remote Ollama server
-sapiens react --repl --ollama-url http://192.168.1.100:11434
+sapiens task --repl --ollama-url http://192.168.1.100:11434
 
 # Use a specific model
-sapiens react --repl --model codellama:13b
+sapiens task --repl --model codellama:13b
 ```
 
 REPL commands:
@@ -125,9 +125,9 @@ Located at `repo_sapiens/config/automation_config.yaml`:
 
 ```yaml
 git_provider:
-  type: gitea  # or 'github'
+  type: gitea  # or 'github', 'gitlab'
   base_url: ${GITEA_BASE_URL:-https://gitea.example.com}
-  api_token: ${GITEA_TOKEN}
+  api_token: ${GITEA_TOKEN}  # or GITHUB_TOKEN, GITLAB_TOKEN
 
 agent_provider:
   type: claude  # or 'goose', 'ollama'
@@ -175,6 +175,8 @@ Configure in your repository settings:
 |--------|-------------|
 | `SAPIENS_GITEA_TOKEN` | Gitea API token with repo access |
 | `SAPIENS_GITEA_URL` | Gitea instance URL |
+| `SAPIENS_GITHUB_TOKEN` | GitHub personal access token (for GitHub) |
+| `SAPIENS_GITLAB_TOKEN` | GitLab personal access token (for GitLab) |
 | `SAPIENS_CLAUDE_API_KEY` | Anthropic Claude API key |
 
 ## Architecture
@@ -198,6 +200,7 @@ repo_sapiens/
 ├── providers/        # Git and AI providers
 │   ├── gitea_rest.py
 │   ├── github_rest.py
+│   ├── gitlab_rest.py
 │   ├── ollama.py
 │   └── external_agent.py
 ├── rendering/        # Template rendering

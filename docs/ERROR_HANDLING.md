@@ -14,7 +14,7 @@ All repo-sapiens exceptions inherit from a base `RepoSapiensError` class, enabli
 RepoSapiensError (base)
 ├── ConfigurationError
 │   └── Configuration file issues (missing, invalid YAML, validation failures)
-├── CredentialError (see repo_sapiens.credentials.exceptions)
+├── CredentialError (in repo_sapiens/exceptions.py)
 │   ├── CredentialNotFoundError
 │   ├── CredentialFormatError
 │   ├── BackendNotAvailableError
@@ -179,7 +179,7 @@ The `from_yaml()` method automatically:
 Credential errors include helpful suggestions for resolution:
 
 ```python
-from repo_sapiens.credentials.exceptions import (
+from repo_sapiens.exceptions import (
     CredentialNotFoundError,
     BackendNotAvailableError,
 )
@@ -276,23 +276,6 @@ except Exception as e:
 ## Audit Findings
 
 The following patterns were found and fixed:
-
-### Bare Except Clauses
-
-**Found in:** `repo_sapiens/providers/gitea_rest.py:285`
-
-**Problem:** Silently catches all exceptions including KeyboardInterrupt and SystemExit.
-
-**Fix:**
-```python
-# Before
-except:
-    pass
-
-# After
-except (httpx.HTTPError, ValueError) as e:
-    log.debug("file_not_exists", url=url, error=str(e))
-```
 
 ### Broad Exception Catches
 

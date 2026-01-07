@@ -1,0 +1,78 @@
+# @repo-sapiens-template
+# @version: 1.1.0
+# @name: daily-issue-triage
+#
+# Daily Issue Triage for Gitea Actions
+#
+# Automatically reviews and labels new issues, adds initial assessments,
+# and identifies issues that need immediate attention.
+#
+# Setup:
+# 1. Copy to .gitea/workflows/daily-issue-triage.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with issue write access
+#    - SAPIENS_CLAUDE_API_KEY: Claude API key
+# 3. Create labels: bug, enhancement, question, needs-triage, priority-high
+
+name: Daily Issue Triage
+
+on:
+  schedule:
+    # Every day at 8am UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+jobs:
+  triage-issues:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Triage issues
+        env:
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          sapiens task "Triage open issues in this repository.
+
+          Repository: ${{ gitea.repository }}
+
+          Tasks:
+          1. Use the Gitea API to list open issues without labels (needs-triage or unlabeled)
+          2. For each untriaged issue:
+             a. Read the issue title and body
+             b. Categorize: bug, enhancement, question, or documentation
+             c. Assess priority: low, medium, high (based on impact and urgency)
+             d. Add appropriate labels via API
+             e. If high priority, add a comment noting it needs attention
+          3. For issues older than 7 days without response, add 'stale' label
+
+          Label mapping:
+          - Bug reports → 'bug' label
+          - Feature requests → 'enhancement' label
+          - Questions → 'question' label
+          - Security issues → 'priority-high' + 'security' labels
+
+          Guidelines:
+          - Be helpful and welcoming in any comments
+          - Don't close issues automatically
+          - Flag unclear issues for human review
+          - Note if issue is a duplicate (but don't close)
+
+          Gitea API base: ${{ gitea.server_url }}/api/v1
+          Use token from AUTOMATION__GIT_PROVIDER__API_TOKEN for auth."

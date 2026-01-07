@@ -74,10 +74,10 @@ git push -u origin main
 2. Go to **Settings** → **Secrets**
 3. Click **Add Secret**
 
-#### Required Secrets (All Setups)
+#### Required Secrets
 
-**Secret: AUTOMATION__GIT_PROVIDER__API_TOKEN**
-- Name: `AUTOMATION__GIT_PROVIDER__API_TOKEN`
+**Secret: SAPIENS_GITEA_TOKEN**
+- Name: `SAPIENS_GITEA_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
   1. User Settings → Applications → Generate New Token
@@ -86,24 +86,8 @@ git push -u origin main
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret: AUTOMATION__GIT_PROVIDER__BASE_URL**
-- Name: `AUTOMATION__GIT_PROVIDER__BASE_URL`
-- Value: Your Gitea instance URL (e.g., `https://gitea.example.com`)
-
-#### For Ollama Setup (Recommended for Testing)
-
-**Secret: AUTOMATION__OLLAMA__BASE_URL**
-- Name: `AUTOMATION__OLLAMA__BASE_URL`
-- Value: `http://localhost:11434` (or your Ollama server URL)
-
-**Secret: AUTOMATION__OLLAMA__MODEL**
-- Name: `AUTOMATION__OLLAMA__MODEL`
-- Value: `codellama:13b` (or your preferred model)
-
-#### For Claude API Setup (Production)
-
-**Secret: AUTOMATION__CLAUDE__API_KEY**
-- Name: `AUTOMATION__CLAUDE__API_KEY`
+**Secret: SAPIENS_CLAUDE_API_KEY**
+- Name: `SAPIENS_CLAUDE_API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
   1. Go to https://console.anthropic.com
@@ -138,12 +122,16 @@ Check that workflow files are present:
 
 ```bash
 ls -la .gitea/workflows/
-# Should show:
-# - automation-trigger.yaml
-# - plan-merged.yaml
-# - automation-daemon.yaml
-# - monitor.yaml
-# - test.yaml
+# Core workflows (installed by `sapiens init`):
+# - process-issue.yaml      # Issue event handler
+# - automation-daemon.yaml  # Scheduled processor
+#
+# Optional example workflows in templates/workflows/gitea/examples/:
+# - daily-issue-triage.yaml
+# - weekly-test-coverage.yaml
+# - weekly-security-review.yaml
+# - weekly-dependency-audit.yaml
+# - post-merge-docs.yaml
 ```
 
 ### 5. Test the System
@@ -182,7 +170,7 @@ export CLAUDE_API_KEY="your-key"
 sapiens health-check
 
 # List active plans
-sapiens list-active-plans
+sapiens list-plans
 ```
 
 **View in Gitea:**
@@ -191,50 +179,17 @@ sapiens list-active-plans
 2. Click on any run to view logs
 3. Download artifacts for debugging
 
-### 7. Configure Webhook (Optional)
-
-For real-time processing instead of cron-based:
-
-1. Deploy webhook server:
-   ```bash
-   # On server
-   uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
-
-   # Or with systemd service
-   sudo systemctl enable automation-webhook
-   sudo systemctl start automation-webhook
-   ```
-
-2. Configure in Gitea:
-   - Repository Settings → Webhooks
-   - Click "Add Webhook" → Gitea
-   - Payload URL: `https://your-server.com/webhook/gitea`
-   - Content Type: `application/json`
-   - Secret: (optional)
-   - Events: Select "Issues" and "Push"
-   - Active: Checked
-   - Click "Add Webhook"
-
-3. Test webhook:
-   - Webhook Settings → "Test Delivery"
-   - Check webhook server logs
-
 ## Verification Checklist
 
 - [ ] Code pushed to Gitea
-- [ ] Core secrets configured (AUTOMATION__GIT_PROVIDER__API_TOKEN, AUTOMATION__GIT_PROVIDER__BASE_URL)
-- [ ] AI provider secrets configured:
-  - [ ] **Ollama**: AUTOMATION__OLLAMA__BASE_URL, AUTOMATION__OLLAMA__MODEL
-  - [ ] **Claude**: AUTOMATION__CLAUDE__API_KEY
+- [ ] Core secrets configured (`SAPIENS_GITEA_TOKEN`, `SAPIENS_CLAUDE_API_KEY`)
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
 - [ ] Workflow files present in `.gitea/workflows/`
-- [ ] (Ollama only) Ollama server running and model pulled
 - [ ] Test issue created with label
 - [ ] Workflow triggered successfully
 - [ ] Workflow logs show no errors
 - [ ] Health check passes
-- [ ] (Optional) Webhook configured and tested
 
 ## Troubleshooting
 
@@ -254,47 +209,10 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" in workflow logs
 
 **Solutions:**
-1. Verify AUTOMATION__GIT_PROVIDER__API_TOKEN secret is set
+1. Verify `SAPIENS_GITEA_TOKEN` secret is set
 2. Check token has correct scopes
 3. Regenerate token if expired
 4. Ensure secret name matches exactly (case-sensitive)
-
-### Ollama Connection Issues
-
-**Problem:** "Ollama not running" or "Connection refused" errors
-
-**Solutions:**
-1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
-2. Check AUTOMATION__OLLAMA__BASE_URL is correct
-3. Ensure runner can reach Ollama server (network/firewall)
-4. Verify model is pulled: `ollama list`
-
-```bash
-# Debug Ollama connectivity from runner
-curl http://localhost:11434/api/tags
-
-# If using remote Ollama, test connectivity
-curl http://ollama-server:11434/api/tags
-```
-
-### Ollama Model Not Found
-
-**Problem:** "Model not found" errors
-
-**Solutions:**
-1. Pull the model: `ollama pull codellama:13b`
-2. Check model name matches AUTOMATION__OLLAMA__MODEL exactly
-3. List available models: `ollama list`
-
-### Ollama Out of Memory
-
-**Problem:** Model fails to load or runs very slowly
-
-**Solutions:**
-1. Use smaller model: `codellama:7b` instead of `codellama:34b`
-2. Ensure sufficient RAM (model size + 2GB overhead)
-3. Check GPU memory if using GPU acceleration
-4. Close other applications using GPU memory
 
 ### Permission Errors
 
@@ -412,11 +330,7 @@ Create a simple dashboard to monitor automation:
 
 ```bash
 # View recent activity
-sapiens list-active-plans
-
-# Check for issues
-sapiens check-stale --max-age-hours 12
-sapiens check-failures --since-hours 24
+sapiens list-plans
 
 # Generate report
 sapiens health-check > /tmp/health.txt

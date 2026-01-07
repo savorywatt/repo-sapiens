@@ -10,9 +10,10 @@ help:
 	@echo ""
 	@echo "  make install        Install production dependencies"
 	@echo "  make dev            Install development dependencies"
-	@echo "  make test           Run all tests"
-	@echo "  make test-unit      Run unit tests only"
-	@echo "  make test-cov       Run tests with coverage report"
+	@echo "  make test           Run all tests (parallel)"
+	@echo "  make test-unit      Run unit tests (parallel)"
+	@echo "  make test-cov       Run tests with coverage (sequential)"
+	@echo "  make test-verbose   Run tests with verbose output"
 	@echo "  make lint           Run linters (ruff)"
 	@echo "  make format         Format code (ruff)"
 	@echo "  make type-check     Run type checker (mypy)"
@@ -33,21 +34,23 @@ install:
 dev:
 	uv sync
 
-# Testing
+# Testing (parallel by default via pyproject.toml: -n auto)
 test:
-	uv run pytest tests/ -v
+	uv run pytest tests/
 
 test-unit:
-	uv run pytest tests/unit/ -v
+	uv run pytest tests/unit/
 
 test-integration:
-	uv run pytest tests/integration/ -v
+	uv run pytest tests/integration/ -n 0
 
+# Coverage with parallel execution (pytest-cov handles xdist automatically)
 test-cov:
-	uv run pytest tests/ --cov=repo_sapiens --cov-report=html --cov-report=term
+	uv run pytest tests/ -n 4 --cov=repo_sapiens --cov-report=html --cov-report=term-missing --cov-fail-under=10
 
-test-fast:
-	uv run pytest tests/unit/ -q --tb=short
+# Verbose output for debugging
+test-verbose:
+	uv run pytest tests/unit/ -n 0 -v --tb=short
 
 # Code quality
 lint:
@@ -84,7 +87,7 @@ docker-run:
 
 # Development shortcuts
 repl:
-	uv run sapiens react --repl
+	uv run sapiens task --repl
 
 run:
 	uv run sapiens --help

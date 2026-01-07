@@ -284,6 +284,7 @@ class TestParallelExecutor:
         assert execution_order[0] == "critical"
 
     @pytest.mark.asyncio
+    @pytest.mark.needs_real_timing
     async def test_task_timeout(self):
         """Test task timeout handling."""
 

@@ -157,18 +157,20 @@ flowchart TD
 
 ```bash
 # Option A: Install from PyPI (recommended)
-pip install repo-sapiens
+uv tool install repo-sapiens
 
 # Option B: Install from source (for development)
 git clone https://github.com/savorywatt/repo-sapiens.git
 cd repo-sapiens
-pip install -e .
+uv sync --group dev
 ```
 
 Verify the installation:
 
 ```bash
 sapiens --help
+# Or if installed from source:
+uv run sapiens --help
 ```
 
 ### Step 3.2: Initialize in Your Repository
@@ -187,7 +189,7 @@ The init wizard will:
 3. **Ask** which AI provider you want to use
 4. **Collect** provider-specific credentials
 5. **Store** credentials securely
-6. **Generate** `repo_sapiens/config/automation_config.yaml`
+6. **Generate** `.sapiens/config.yaml`
 
 #### Example: Claude API Setup
 
@@ -222,7 +224,7 @@ Enter your Claude API key: ●●●●●●●●●●●●
    ✓ Credentials stored securely
 
 📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+   ✓ Created: .sapiens/config.yaml
 
 ✅ Initialization complete!
 ```
@@ -260,7 +262,7 @@ Enter model name [qwen3:latest]: qwen3:latest
    ✓ Ollama configured (no API key needed)
 
 📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+   ✓ Created: .sapiens/config.yaml
 
 ✅ Initialization complete!
 
@@ -377,12 +379,14 @@ You can either copy from the repo-sapiens source or create them manually.
 
 **Option A: Copy from repo-sapiens installation**
 
-If you cloned repo-sapiens:
+If you cloned repo-sapiens, copy the workflow templates:
 
 ```bash
 # From your project directory
-cp -r /path/to/repo-sapiens/.gitea/workflows/*.yaml .gitea/workflows/
+cp -r /path/to/repo-sapiens/templates/workflows/gitea/*.yaml .gitea/workflows/
 ```
+
+> **Note:** The workflow templates are located in `templates/workflows/gitea/` within the repo-sapiens source, not in `.gitea/workflows/`.
 
 **Option B: Create minimal workflow set**
 
@@ -416,8 +420,8 @@ jobs:
 
       - name: Install repo-sapiens
         run: |
-          pip install --upgrade pip
-          pip install repo-sapiens
+          pip install --upgrade pip uv
+          uv tool install repo-sapiens
 
       - name: Create plan proposal
         env:
@@ -577,10 +581,10 @@ If no runners are available, you'll need to:
 **Via CLI:**
 ```bash
 # Check workflow status
-sapiens --config repo_sapiens/config/automation_config.yaml list-plans
+sapiens --config .sapiens/config.yaml list-plans
 
 # View specific plan
-sapiens --config repo_sapiens/config/automation_config.yaml show-plan --plan-id 1
+sapiens --config .sapiens/config.yaml show-plan --plan-id 1
 ```
 
 ### Step 7.4: Expected Flow
@@ -607,9 +611,8 @@ After running `sapiens init`, your config is at:
 
 ```
 my-project/
-└── automation/
-    └── config/
-        └── automation_config.yaml
+└── .sapiens/
+    └── config.yaml
 ```
 
 ### Configuration by Provider
@@ -617,7 +620,7 @@ my-project/
 #### Claude API Configuration
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 
 git_provider:
   provider_type: gitea
@@ -637,7 +640,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
 
@@ -650,7 +653,7 @@ tags:
 #### Claude Code (Local CLI) Configuration
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 
 git_provider:
   provider_type: gitea
@@ -670,7 +673,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 1  # Local mode typically single-threaded
 
@@ -683,7 +686,7 @@ tags:
 #### Ollama Configuration
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 
 git_provider:
   provider_type: gitea
@@ -704,7 +707,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 1  # Adjust based on GPU memory
   review_approval_threshold: 0.7  # Lower threshold for local models
@@ -793,7 +796,7 @@ curl -H "Authorization: token YOUR_TOKEN" \
 **Debug:**
 ```bash
 # Test Claude API locally
-sapiens --config repo_sapiens/config/automation_config.yaml \
+sapiens --config .sapiens/config.yaml \
   process-issue --issue 1 --log-level DEBUG
 ```
 
@@ -806,8 +809,8 @@ sapiens --config repo_sapiens/config/automation_config.yaml \
 ```yaml
 - name: Install repo-sapiens
   run: |
-    pip install --upgrade pip
-    pip install repo-sapiens
+    pip install --upgrade pip uv
+    uv tool install repo-sapiens
 ```
 
 ### Ollama Connection Failed
@@ -875,8 +878,8 @@ ollama pull codellama:7b-instruct-q4_0
 Copy all workflow files for the complete automation experience:
 
 ```bash
-# From repo-sapiens source
-cp /path/to/repo-sapiens/.gitea/workflows/*.yaml .gitea/workflows/
+# From repo-sapiens source (templates are in templates/workflows/gitea/)
+cp /path/to/repo-sapiens/templates/workflows/gitea/*.yaml .gitea/workflows/
 git add .gitea/workflows/
 git commit -m "Add complete automation workflow set"
 git push

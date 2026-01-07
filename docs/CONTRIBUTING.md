@@ -61,7 +61,7 @@ If you have questions, open an issue or contact the maintainers.
 
 - Python 3.11 or 3.12
 - Git
-- Virtual environment tool (venv, poetry, or similar)
+- uv package manager (https://docs.astral.sh/uv/)
 
 ### Fork and Clone
 
@@ -76,35 +76,27 @@ If you have questions, open an issue or contact the maintainers.
    git remote add upstream https://github.com/savorywatt/repo-sapiens.git
    ```
 
-### Virtual Environment Setup
-
-Create and activate a virtual environment:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
-
 ### Install Development Dependencies
 
-Install the package in development mode with all dependencies:
+Install all dependencies using uv:
 
 ```bash
-pip install -e ".[dev]"
+uv sync --group dev
 ```
 
 This installs:
 - Core dependencies (pydantic, click, httpx, jinja2, etc.)
-- Development tools (pytest, black, ruff, mypy)
+- Development tools (pytest, ruff, mypy)
 - Testing utilities (pytest-asyncio, pytest-cov, pytest-mock)
+- Pre-commit hooks
 
 ### Run Tests
 
 Verify your setup by running the test suite:
 
 ```bash
-pytest tests/ -v
-pytest tests/ --cov=repo_sapiens --cov-report=term-missing  # With coverage
+uv run pytest tests/ -v
+uv run pytest tests/ --cov=repo_sapiens --cov-report=term-missing  # With coverage
 ```
 
 ## Code Style
@@ -114,7 +106,7 @@ pytest tests/ --cov=repo_sapiens --cov-report=term-missing  # With coverage
 All code must follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guidelines. Key points:
 
 - Use 4 spaces for indentation
-- Line length: 100 characters (enforced by Black)
+- Line length: 100 characters (enforced by Ruff)
 - Two blank lines between top-level definitions
 - One blank line between method definitions
 - Imports should be grouped and sorted (enforced by Ruff)
@@ -199,26 +191,24 @@ class MyClass:
         ...
 ```
 
-### Code Formatting with Black
+### Code Formatting and Linting with Ruff
 
-Format code automatically using Black:
+Format and lint code using Ruff:
 
 ```bash
-black repo_sapiens/ tests/
+# Format code
+uv run ruff format repo_sapiens/ tests/
+
+# Check code quality
+uv run ruff check repo_sapiens/ tests/
+
+# Auto-fix fixable issues
+uv run ruff check --fix repo_sapiens/ tests/
 ```
 
 The project is configured with:
 - Line length: 100 characters
 - Target Python version: 3.11+
-
-### Linting with Ruff
-
-Check code quality with Ruff:
-
-```bash
-ruff check repo_sapiens/ tests/
-ruff check --fix repo_sapiens/ tests/  # Auto-fix fixable issues
-```
 
 The project is configured to check:
 - Error codes (E, F)
@@ -239,18 +229,14 @@ We use **pre-commit** to automatically run code quality checks before each commi
 Install pre-commit hooks (one-time setup):
 
 ```bash
-# Install pre-commit package
-pip install pre-commit
-
-# Install the git hooks
-pre-commit install
+# Install the git hooks (pre-commit is included in dev dependencies)
+uv run pre-commit install
 ```
 
 #### What Gets Checked Automatically
 
 When you commit, pre-commit automatically runs:
-- **Black**: Code formatting (auto-fixes)
-- **Ruff**: Fast linting and import sorting (auto-fixes when possible)
+- **Ruff**: Code formatting, linting, and import sorting (auto-fixes when possible)
 - **MyPy**: Type checking on changed files
 - **Bandit**: Security vulnerability scanning
 - **pyupgrade**: Automatic syntax upgrades for Python 3.11+
@@ -263,15 +249,15 @@ Run hooks manually on all files:
 
 ```bash
 # Run all hooks on all files
-pre-commit run --all-files
+uv run pre-commit run --all-files
 
 # Run all hooks on staged files only
-pre-commit run
+uv run pre-commit run
 
 # Run a specific hook
-pre-commit run black --all-files
-pre-commit run ruff --all-files
-pre-commit run mypy --all-files
+uv run pre-commit run ruff --all-files
+uv run pre-commit run ruff-format --all-files
+uv run pre-commit run mypy --all-files
 ```
 
 #### Bypassing Hooks (Emergency Only)
@@ -291,19 +277,19 @@ If you prefer to run tools manually instead of using pre-commit:
 
 ```bash
 # Format code
-black repo_sapiens/ tests/
+uv run ruff format repo_sapiens/ tests/
 
 # Fix linting issues
-ruff check --fix repo_sapiens/ tests/
+uv run ruff check --fix repo_sapiens/ tests/
 
 # Type checking
-mypy repo_sapiens/
+uv run mypy repo_sapiens/
 
 # Security scanning
-bandit -c pyproject.toml -r repo_sapiens/
+uv run bandit -c pyproject.toml -r repo_sapiens/
 
 # Run tests
-pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 #### Updating Pre-commit Hooks
@@ -312,10 +298,10 @@ Update hooks to latest versions:
 
 ```bash
 # Update all hooks to latest versions
-pre-commit autoupdate
+uv run pre-commit autoupdate
 
 # Update a specific hook
-pre-commit autoupdate --repo https://github.com/psf/black
+uv run pre-commit autoupdate --repo https://github.com/astral-sh/ruff-pre-commit
 ```
 
 ## Testing Requirements
@@ -370,7 +356,7 @@ async def test_resolve_keyring_credential(resolver):
 
 ### Maintain 75%+ Code Coverage
 
-- Run coverage reports: `pytest --cov=repo_sapiens --cov-report=html`
+- Run coverage reports: `uv run pytest --cov=repo_sapiens --cov-report=html`
 - Coverage reports are generated in `htmlcov/index.html`
 - Aim for 75%+ line coverage; critical paths should have higher coverage
 - Use `# pragma: no cover` sparingly for untestable code (e.g., CLI entry points)
@@ -381,17 +367,17 @@ Before submitting a pull request, ensure:
 
 ```bash
 # Run all tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Check coverage
-pytest tests/ --cov=repo_sapiens --cov-report=term-missing
+uv run pytest tests/ --cov=repo_sapiens --cov-report=term-missing
 
 # Type checking
-mypy repo_sapiens/
+uv run mypy repo_sapiens/
 
 # Formatting and linting
-black --check repo_sapiens/ tests/
-ruff check repo_sapiens/ tests/
+uv run ruff format --check repo_sapiens/ tests/
+uv run ruff check repo_sapiens/ tests/
 ```
 
 ## Pull Request Process
@@ -655,18 +641,18 @@ git push upstream --tags
 
 ### Release Checklist
 
-- [ ] All pre-commit hooks pass: `pre-commit run --all-files`
-- [ ] All tests pass: `pytest tests/ -v`
-- [ ] Coverage is acceptable: `pytest --cov=repo_sapiens`
-- [ ] Code is formatted: `black repo_sapiens/ tests/`
-- [ ] Linting passes: `ruff check repo_sapiens/`
-- [ ] Type checking passes: `mypy repo_sapiens/`
-- [ ] Security scan passes: `bandit -c pyproject.toml -r repo_sapiens/`
+- [ ] All pre-commit hooks pass: `uv run pre-commit run --all-files`
+- [ ] All tests pass: `uv run pytest tests/ -v`
+- [ ] Coverage is acceptable: `uv run pytest --cov=repo_sapiens`
+- [ ] Code is formatted: `uv run ruff format repo_sapiens/ tests/`
+- [ ] Linting passes: `uv run ruff check repo_sapiens/`
+- [ ] Type checking passes: `uv run mypy repo_sapiens/`
+- [ ] Security scan passes: `uv run bandit -c pyproject.toml -r repo_sapiens/`
 - [ ] Version updated in `repo_sapiens/__version__.py`
 - [ ] `CHANGELOG.md` is updated
 - [ ] Git tag is created and pushed
 - [ ] Release notes are published
-- [ ] Package is built and tested: `pip install .`
+- [ ] Package is built and tested: `uv build`
 
 ## Getting Help
 
@@ -687,19 +673,19 @@ git push upstream --tags
 **ImportError when running tests:**
 ```bash
 # Ensure package is installed in development mode
-pip install -e .
+uv sync --group dev
 ```
 
-**Black/Ruff conflicts:**
+**Ruff formatting conflicts:**
 ```bash
-# Ruff should not conflict with Black when using standard settings
+# Ruff handles both formatting and linting
 # If issues occur, check pyproject.toml matches project standards
 ```
 
 **Async test failures:**
 ```bash
 # Ensure pytest-asyncio is installed and configured
-pytest --asyncio-mode=auto tests/
+uv run pytest --asyncio-mode=auto tests/
 ```
 
 ---

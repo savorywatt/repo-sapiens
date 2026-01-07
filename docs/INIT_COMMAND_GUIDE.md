@@ -6,10 +6,10 @@ Complete guide to using the `sapiens init` command for automated repository setu
 
 The `init` command provides a streamlined, interactive way to set up repo-sapiens in your Git repository. It handles:
 
-1. **Repository Discovery**: Auto-detects Git configuration
+1. **Repository Discovery**: Auto-detects Git configuration (GitHub, Gitea, or GitLab)
 2. **Credential Management**: Securely stores API tokens
 3. **Configuration Generation**: Creates automation_config.yaml
-4. **Gitea Actions Setup**: Guides you through setting up repository secrets
+4. **CI/CD Setup**: Guides you through setting up repository secrets (GitHub Actions, Gitea Actions, or GitLab CI/CD)
 
 ## Quick Start
 
@@ -27,17 +27,29 @@ sapiens init
 
 The command automatically detects:
 - Git remote URL (origin, upstream, or first available)
-- Repository owner and name
-- Gitea base URL
+- Repository owner and name (supports GitLab nested groups like `group/subgroup`)
+- Provider base URL (GitHub, Gitea, or GitLab)
 - Remote type (SSH or HTTPS)
+- Provider type based on URL patterns
 
-Example output:
+Example output (Gitea):
 ```
 🔍 Discovering repository configuration...
    ✓ Found Git repository: /home/user/my-project
    ✓ Detected remote: origin
    ✓ Parsed: owner=myuser, repo=my-project
    ✓ Base URL: https://gitea.example.com
+   ✓ Provider: gitea
+```
+
+Example output (GitLab):
+```
+🔍 Discovering repository configuration...
+   ✓ Found Git repository: /home/user/my-project
+   ✓ Detected remote: origin
+   ✓ Parsed: owner=mygroup/subgroup, repo=my-project
+   ✓ Base URL: https://gitlab.com
+   ✓ Provider: gitlab
 ```
 
 ### 2. Credential Collection
@@ -54,9 +66,28 @@ Enter your Gitea API token: ●●●●●●●●
 Do you want to use Claude API or local Claude Code? [local/api]: local
 ```
 
+**For GitLab** (interactive mode):
+```
+🔑 Setting up credentials...
+
+GitLab Personal Access Token is required. Get it from:
+   https://gitlab.com/-/user_settings/personal_access_tokens
+
+Required scopes: api, read_repository, write_repository
+
+Enter your GitLab token: ●●●●●●●●
+
+Do you want to use Claude API or local Claude Code? [local/api]: local
+```
+
 **Non-Interactive Mode** (CI/CD):
 ```bash
+# For Gitea
 export GITEA_TOKEN="your-token-here"
+# For GitHub
+export GITHUB_TOKEN="your-token-here"
+# For GitLab
+export GITLAB_TOKEN="your-token-here"
 export CLAUDE_API_KEY="your-key-here"  # optional
 sapiens init --non-interactive
 ```
@@ -83,51 +114,66 @@ export SAPIENS_MASTER_PASSWORD="secure-password"  # Legacy: SAPIENS_MASTER_PASSW
 sapiens init --backend encrypted
 ```
 
-### 4. Gitea Actions Secrets
+### 4. CI/CD Secrets
 
-The command guides you through setting up repository secrets for Gitea Actions:
+The command guides you through setting up repository secrets for your CI/CD platform:
 
+**For Gitea Actions**:
 ```
 🔐 Setting up Gitea Actions secrets...
    ℹ Please set GITEA_TOKEN manually in Gitea UI for now
    Navigate to: https://gitea.example.com/myuser/my-project/settings/secrets
 ```
 
+**For GitLab CI/CD**:
+```
+🔐 Setting up GitLab CI/CD variables...
+   ℹ Please set GITLAB_TOKEN manually in GitLab UI
+   Navigate to: https://gitlab.com/mygroup/my-project/-/settings/ci_cd
+   Expand "Variables" section and add your tokens
+```
+
 **What secrets to set**:
-- `GITEA_TOKEN`: Your Gitea API token (required)
-- `CLAUDE_API_KEY`: Your Claude API key (only if using API mode)
+
+| Provider | Secret Name | Description |
+|----------|-------------|-------------|
+| Gitea | `GITEA_TOKEN` | Gitea API token (required) |
+| GitHub | `GITHUB_TOKEN` | GitHub personal access token (often auto-provided) |
+| GitLab | `GITLAB_TOKEN` | GitLab personal access token with `api`, `read_repository`, `write_repository` scopes |
+| All | `CLAUDE_API_KEY` | Claude API key (only if using API mode)
 
 **How to set them**:
 
-1. Navigate to your repository settings:
-   ```
-   https://gitea.example.com/<owner>/<repo>/settings/secrets
-   ```
-
+**Gitea**:
+1. Navigate to: `https://gitea.example.com/<owner>/<repo>/settings/secrets`
 2. Click "Add Secret"
+3. Add `GITEA_TOKEN` and `CLAUDE_API_KEY`
 
-3. Add `GITEA_TOKEN`:
-   - Name: `GITEA_TOKEN`
-   - Value: (paste your Gitea API token)
-   - Click "Add Secret"
+**GitHub**:
+1. Navigate to: `https://github.com/<owner>/<repo>/settings/secrets/actions`
+2. Click "New repository secret"
+3. Add `GITHUB_TOKEN` (if not using the default) and `CLAUDE_API_KEY`
 
-4. Add `CLAUDE_API_KEY` (if using API mode):
-   - Name: `CLAUDE_API_KEY`
-   - Value: (paste your Claude API key)
-   - Click "Add Secret"
+**GitLab**:
+1. Navigate to: `https://gitlab.com/<namespace>/<project>/-/settings/ci_cd`
+2. Expand "Variables" section
+3. Click "Add variable"
+4. Add `GITLAB_TOKEN` and `CLAUDE_API_KEY`
+5. Recommended: Check "Mask variable" to hide values in job logs
 
 **Why these secrets are needed**:
 
-Gitea Actions workflows need these secrets to:
-- Access the Gitea API to read issues, create PRs, etc. (`GITEA_TOKEN`)
-- Call the Claude API for AI-powered code generation (`CLAUDE_API_KEY`)
+CI/CD workflows need these secrets to:
+- Access the Git provider API to read issues, create PRs/MRs, etc.
+- Call the Claude API for AI-powered code generation
 
-The secrets are stored securely in Gitea and are only accessible to workflow runs.
+The secrets are stored securely and are only accessible to workflow runs.
 
 ### 5. Configuration File Generation
 
-A `automation_config.yaml` file is created:
+A `automation_config.yaml` file is created based on the detected provider:
 
+**Gitea Example**:
 ```yaml
 # Automation System Configuration
 # Generated by: sapiens init
@@ -137,7 +183,7 @@ git_provider:
   provider_type: gitea
   mcp_server: gitea-mcp
   base_url: https://gitea.example.com
-  api_token: @keyring:gitea/api_token  # Secure reference
+  api_token: "@keyring:gitea/api_token"  # Secure reference
 
 repository:
   owner: myuser
@@ -152,7 +198,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
   review_approval_threshold: 0.8
@@ -166,6 +212,39 @@ tags:
   merge_ready: merge-ready
   completed: completed
   needs_attention: needs-attention
+```
+
+**GitLab Example**:
+```yaml
+# Automation System Configuration
+# Generated by: sapiens init
+# Repository: mygroup/subgroup/my-project
+
+git_provider:
+  provider_type: gitlab
+  base_url: https://gitlab.com
+  api_token: "@keyring:gitlab/api_token"  # Uses PRIVATE-TOKEN header
+
+repository:
+  owner: mygroup/subgroup  # GitLab supports nested namespaces
+  name: my-project
+  default_branch: main
+
+agent_provider:
+  provider_type: claude-local
+  model: claude-sonnet-4.5
+  api_key: null
+  local_mode: true
+
+workflow:
+  plans_directory: plans
+  state_directory: .sapiens/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 3
+  review_approval_threshold: 0.8
+
+# Note: GitLab uses merge requests (MRs) instead of pull requests
+# The automation handles this terminology difference automatically
 ```
 
 ### 6. Validation
@@ -195,7 +274,7 @@ sapiens init [OPTIONS]
 
 **`--config-path PATH`**
 - Where to save configuration file
-- Default: `repo_sapiens/config/automation_config.yaml`
+- Default: `.sapiens/config.yaml`
 - Example: `sapiens init --config-path config/my_config.yaml`
 
 **`--backend [keyring|environment|encrypted]`**
@@ -250,7 +329,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    Navigate to: https://gitea.example.com/myuser/my-repo/settings/secrets
 
 📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+   ✓ Created: .sapiens/config.yaml
 
 ✓ Validating setup...
    ✓ Credentials validated
@@ -264,7 +343,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    https://gitea.example.com/myuser/my-repo/issues
 
 2. Run the sapiens daemon:
-   sapiens --config repo_sapiens/config/automation_config.yaml daemon --interval 60
+   sapiens --config .sapiens/config.yaml daemon --interval 60
 
 3. Watch the automation work!
 ```
@@ -299,22 +378,89 @@ sapiens init --no-setup-secrets
 sapiens init --backend keyring
 ```
 
-## Gitea Actions Secrets Setup (Detailed)
+### Example 6: GitLab Repository Setup
+
+```bash
+cd my-gitlab-project
+sapiens init
+```
+
+Output:
+```
+🚀 Initializing repo-sapiens
+
+🔍 Discovering repository configuration...
+   ✓ Found Git repository: /home/user/my-gitlab-project
+   ✓ Detected remote: origin
+   ✓ Parsed: owner=mygroup/subgroup, repo=my-project
+   ✓ Base URL: https://gitlab.com
+   ✓ Provider: gitlab
+
+🔑 Setting up credentials...
+
+GitLab Personal Access Token is required. Get it from:
+   https://gitlab.com/-/user_settings/personal_access_tokens
+
+Required scopes: api, read_repository, write_repository
+
+Enter your GitLab token: ●●●●●●●●●●●●
+
+Do you want to use Claude API or local Claude Code? [local/api]: local
+
+📦 Storing credentials in keyring backend...
+   ✓ Stored: gitlab/api_token
+   ✓ Credentials stored securely
+
+🔐 Setting up GitLab CI/CD variables...
+   ℹ Please set GITLAB_TOKEN manually in GitLab UI
+   Navigate to: https://gitlab.com/mygroup/subgroup/my-project/-/settings/ci_cd
+
+📝 Creating configuration file...
+   ✓ Created: .sapiens/config.yaml
+
+✓ Validating setup...
+   ✓ Credentials validated
+   ✓ Configuration file created
+
+✅ Initialization complete!
+
+📋 Next Steps:
+
+1. Label an issue with 'needs-planning' in GitLab:
+   https://gitlab.com/mygroup/subgroup/my-project/-/issues
+
+2. Run the sapiens daemon:
+   sapiens --config .sapiens/config.yaml daemon --interval 60
+
+3. Watch the automation create merge requests!
+```
+
+### Example 7: GitLab CI/CD Non-Interactive Setup
+
+```bash
+# In your .gitlab-ci.yml pipeline
+export GITLAB_TOKEN="${GITLAB_TOKEN}"
+export CLAUDE_API_KEY="${CLAUDE_API_KEY}"
+
+sapiens init --non-interactive --backend environment
+```
+
+## CI/CD Secrets Setup (Detailed)
 
 ### Why Secrets Are Needed
 
-Gitea Actions workflows run in isolated environments and need credentials to:
+CI/CD workflows run in isolated environments and need credentials to:
 
-1. **Access Gitea API** (`GITEA_TOKEN`):
+1. **Access Git Provider API** (`GITEA_TOKEN` / `GITHUB_TOKEN` / `GITLAB_TOKEN`):
    - Read issues and comments
-   - Create branches and pull requests
+   - Create branches and pull/merge requests
    - Update issue labels and status
    - Post automation results
 
 2. **Access Claude API** (`CLAUDE_API_KEY`):
    - Generate development plans
    - Implement code changes
-   - Review pull requests
+   - Review pull/merge requests
    - Only needed if using `claude-api` mode
 
 ### Local vs CI/CD Credentials
@@ -324,36 +470,38 @@ Gitea Actions workflows run in isolated environments and need credentials to:
 - Used when you run `sapiens` commands locally
 - Never committed to Git
 
-**CI/CD (Gitea Actions)**:
-- Credentials stored as Gitea repository secrets
+**CI/CD**:
+- Credentials stored as repository secrets/variables
 - Injected as environment variables during workflow runs
 - Accessible only to workflow runs, not to code
 
-### Setting Secrets in Gitea
+### Setting Secrets by Provider
 
-**Step-by-step**:
+#### Gitea
 
-1. **Navigate to Repository Settings**:
-   ```
-   https://gitea.example.com/<your-org>/<your-repo>/settings/secrets
-   ```
+1. Navigate to: `https://gitea.example.com/<org>/<repo>/settings/secrets`
+2. Click "Add Secret"
+3. Add `GITEA_TOKEN` with your API token
+4. Add `CLAUDE_API_KEY` if using API mode
 
-2. **Add GITEA_TOKEN Secret**:
-   - Click "Add Secret"
-   - Name: `GITEA_TOKEN`
-   - Value: Your Gitea API token from https://gitea.example.com/user/settings/applications
-   - Click "Add Secret"
+#### GitHub
 
-3. **Add CLAUDE_API_KEY Secret** (if using API mode):
-   - Click "Add Secret"
-   - Name: `CLAUDE_API_KEY`
-   - Value: Your Claude API key from https://console.anthropic.com/
-   - Click "Add Secret"
+1. Navigate to: `https://github.com/<org>/<repo>/settings/secrets/actions`
+2. Click "New repository secret"
+3. Add `GITHUB_TOKEN` (if not using the default)
+4. Add `CLAUDE_API_KEY` if using API mode
 
-4. **Verify Secrets**:
-   - You should see both secrets listed
-   - Values are hidden (only show `*****`)
-   - Secrets are available to all workflows in the repository
+#### GitLab
+
+1. Navigate to: `https://gitlab.com/<namespace>/<project>/-/settings/ci_cd`
+2. Expand "Variables" section
+3. Click "Add variable"
+4. Add `GITLAB_TOKEN`:
+   - Key: `GITLAB_TOKEN`
+   - Value: Your personal access token
+   - Check "Mask variable" to hide in logs
+   - Required scopes: `api`, `read_repository`, `write_repository`
+5. Add `CLAUDE_API_KEY` if using API mode
 
 ### Using Secrets in Workflows
 
@@ -381,13 +529,13 @@ jobs:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          sapiens --config repo_sapiens/config/automation_config.yaml process-all
+          sapiens --config .sapiens/config.yaml process-all
 ```
 
 The workflow uses environment variable references in the config:
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 git_provider:
   api_token: ${GITEA_TOKEN}  # Resolved from env var
 

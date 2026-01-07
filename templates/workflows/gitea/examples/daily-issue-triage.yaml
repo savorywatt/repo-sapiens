@@ -27,6 +27,7 @@ on:
 jobs:
   triage-issues:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -48,7 +49,7 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          sapiens react "Triage open issues in this repository.
+          sapiens task "Triage open issues in this repository.
 
           Repository: ${{ gitea.repository }}
 

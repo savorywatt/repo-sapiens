@@ -25,6 +25,7 @@ on:
 jobs:
   update-docs:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Skip if commit message contains [skip docs] or [no docs]
     if: |
       !contains(gitea.event.head_commit.message, '[skip docs]') &&
@@ -57,7 +58,7 @@ jobs:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          sapiens react "Review the recent commits and update documentation if needed.
+          sapiens task "Review the recent commits and update documentation if needed.
 
           Recent commits:
           ${{ steps.changes.outputs.commits }}

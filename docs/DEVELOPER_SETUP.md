@@ -16,7 +16,7 @@ python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install package with dev dependencies
-pip install -e ".[dev]"
+uv sync --group dev
 ```
 
 ### 2. Set Up Ollama (Recommended for Testing)
@@ -56,7 +56,7 @@ curl http://localhost:11434/api/tags
 Create a local configuration file:
 
 ```bash
-cat > repo_sapiens/config/local_config.yaml << 'EOF'
+cat > .sapiens/config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
   base_url: ${SAPIENS_GITEA_URL:-http://localhost:3000}
@@ -75,7 +75,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 1
   review_approval_threshold: 0.7
@@ -108,10 +108,10 @@ curl http://localhost:11434/api/generate -d '{
 }' | jq .response
 
 # Run the sapiens health check
-sapiens --config repo_sapiens/config/local_config.yaml health-check
+sapiens --config .sapiens/config.yaml health-check
 
 # Process a test issue (if you have a Gitea instance)
-sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 1 --log-level DEBUG
+sapiens --config .sapiens/config.yaml process-issue --issue 1 --log-level DEBUG
 ```
 
 ---
@@ -342,17 +342,12 @@ chmod +x .git/hooks/pre-commit
 
 ## Documentation
 
-- **Quick Reference**: See `.pre-commit-quick-reference.md`
-- **Detailed Guide**: See `.pre-commit-hooks-guide.md`
 - **Contributing Guide**: See `CONTRIBUTING.md`
-- **Setup Summary**: See `PRE_COMMIT_SETUP_SUMMARY.md`
 
 ## Getting Help
 
-1. Check `.pre-commit-quick-reference.md` for common commands
-2. Check `.pre-commit-hooks-guide.md` for detailed info
-3. Ask in pull request comments
-4. Open an issue
+1. Ask in pull request comments
+2. Open an issue
 
 ## Pre-commit Cheat Sheet
 

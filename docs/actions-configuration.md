@@ -4,113 +4,21 @@ This document explains the Gitea Actions workflows and how to configure them for
 
 ## Workflow Files Overview
 
-The system includes five workflow files in `.gitea/workflows/`:
+The system includes workflow files in `.gitea/workflows/`:
 
-### 1. automation-trigger.yaml
+### Label-Triggered Workflows
 
-**Purpose:** Responds to issue events in real-time
+| Workflow | Label Trigger | Purpose |
+|----------|---------------|---------|
+| `needs-planning.yaml` | `needs-planning` | Generate development plan |
+| `approved.yaml` | `approved` | Execute approved plan |
+| `execute-task.yaml` | `execute-task` | Run task execution |
+| `needs-review.yaml` | `needs-review` | Code review workflow |
+| `needs-fix.yaml` | `needs-fix` | Handle fix requests |
+| `requires-qa.yaml` | `requires-qa` | QA workflow |
+| `build-artifacts.yaml` | `build-artifacts` | Build artifacts |
 
-**Triggers:**
-- Issues: opened, labeled, unlabeled, edited, closed
-- Issue comments: created
-
-**Process:**
-1. Checks issue labels
-2. Determines which stage to execute
-3. Calls `sapiens process-issue` with appropriate stage
-4. Reports success/failure
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Timeout: Default (uses cicd.timeout_minutes from config)
-
-**Customization:**
-```yaml
-# Add custom stage
-elif 'custom-label' in labels:
-    stage = 'custom-stage'
-```
-
-### 2. plan-merged.yaml
-
-**Purpose:** Generates prompts when plan files are merged to main
-
-**Triggers:**
-- Push to main branch
-- Modified files in `plans/` directory
-
-**Process:**
-1. Detects changed plan files
-2. Extracts plan ID from filename
-3. Calls `sapiens generate-prompts` for each plan
-4. Lists active plans for visibility
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Python: 3.11
-- Fetch depth: 2 (to compare with previous commit)
-
-**Customization:**
-```yaml
-# Change branch
-branches:
-  - main
-  - develop  # Add additional branches
-```
-
-### 3. automation-daemon.yaml
-
-**Purpose:** Periodically processes all pending issues
-
-**Triggers:**
-- Schedule: Every 5 minutes (cron)
-- Manual: workflow_dispatch
-
-**Process:**
-1. Processes all pending issues
-2. Checks for stale workflows
-3. Uploads state artifacts
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Schedule: `*/5 * * * *` (every 5 minutes)
-- Artifact retention: 7 days
-
-**Customization:**
-```yaml
-# Change schedule
-schedule:
-  - cron: '*/15 * * * *'  # Every 15 minutes
-  - cron: '0 * * * *'     # Every hour
-  - cron: '0 0 * * *'     # Daily at midnight
-```
-
-### 4. monitor.yaml
-
-**Purpose:** System health monitoring and failure detection
-
-**Triggers:**
-- Schedule: Every 6 hours
-- Manual: workflow_dispatch
-
-**Process:**
-1. Generates health report
-2. Checks for failures in last 24 hours
-3. Uploads report as artifact
-
-**Configuration:**
-- Runs on: `ubuntu-latest`
-- Schedule: `0 */6 * * *` (every 6 hours)
-
-**Customization:**
-```yaml
-# Check different time window
-- name: Check for failures
-  run: sapiens check-failures --since-hours 48
-```
-
-### 5. test.yaml
+### test.yaml
 
 **Purpose:** Run tests on pull requests and pushes
 
@@ -145,24 +53,17 @@ All workflows use these environment variables:
 ### Secrets (Required)
 ```yaml
 env:
-  GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
-  CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+  SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+  SAPIENS_CLAUDE_API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
 ```
 
-### Automation Config Mapping
+### Gitea Actions Context Variables
 ```yaml
-env:
-  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
-  AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-```
-
-### GitHub Actions Variables
-```yaml
-# Automatically available:
-# - GITHUB_REPOSITORY_OWNER
-# - GITHUB_REPOSITORY
-# - GITHUB_REF_NAME
-# - GITHUB_SERVER_URL
+# Automatically available in Gitea Actions:
+# - gitea.event.issue.number
+# - gitea.event.repository.owner.login
+# - gitea.event.repository.name
+# - gitea.server_url
 ```
 
 ## Workflow Dependencies
@@ -186,7 +87,7 @@ For development workflows (test.yaml):
 Workflows use pip caching for faster runs:
 ```yaml
 - name: Setup Python
-  uses: actions/setup-python@v4
+  uses: actions/setup-python@v5
   with:
     python-version: '3.11'
     cache: 'pip'  # Cache pip dependencies
@@ -195,13 +96,6 @@ Workflows use pip caching for faster runs:
 ## Workflow Outputs
 
 ### Artifacts
-
-**automation-daemon.yaml:**
-- `workflow-state`: State files from `.automation/state/`
-- Retention: 7 days
-
-**monitor.yaml:**
-- `health-report`: Health check report (markdown)
 
 **test.yaml:**
 - `coverage-report`: HTML coverage report from `htmlcov/`
@@ -215,7 +109,7 @@ Via Gitea UI:
 
 Via API:
 ```bash
-curl -H "Authorization: token $GITEA_TOKEN" \
+curl -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
   "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts"
 ```
 
@@ -242,7 +136,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -252,7 +146,7 @@ jobs:
 
       - name: Run custom command
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           sapiens custom-command --option value
 ```
@@ -336,11 +230,11 @@ Cache more than just pip:
 ```yaml
 - name: Use secret
   run: |
-    # DON'T: echo ${{ secrets.GITEA_TOKEN }}
+    # DON'T: echo ${{ secrets.SAPIENS_GITEA_TOKEN }}
     # DO: Use secret without logging
-    sapiens process-issue --issue 42
+    sapiens health-check
   env:
-    GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+    SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 ```
 
 2. **Limit secret scope:**
@@ -386,8 +280,8 @@ jobs:
 ```yaml
 - name: Debug info
   run: |
-    echo "GitHub ref: ${{ github.ref }}"
-    echo "Event name: ${{ github.event_name }}"
+    echo "Gitea ref: ${{ gitea.ref }}"
+    echo "Event name: ${{ gitea.event_name }}"
     echo "Working directory:"
     pwd
     ls -la
@@ -409,8 +303,8 @@ on:
 Then:
 ```yaml
 - name: Run with debug
-  if: ${{ github.event.inputs.debug == 'true' }}
-  run: sapiens --log-level DEBUG process-all
+  if: ${{ gitea.event.inputs.debug == 'true' }}
+  run: sapiens --log-level DEBUG health-check
 ```
 
 ## Monitoring

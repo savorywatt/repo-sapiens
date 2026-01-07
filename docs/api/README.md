@@ -1,27 +1,9 @@
 # API Reference
 
-This directory contains comprehensive API documentation for the repo-sapiens project.
+This directory contains API documentation for the repo-sapiens project.
 
-## Core Modules
-
-### Configuration & Credentials
-- [Configuration Management](./configuration.md) - Settings, config loading, and validation
-- [Credential Management](./credentials.md) - Secure credential storage and resolution
-
-### Git & Provider Integration
-- [Git Discovery](./git-discovery.md) - Repository detection and parsing
-- [Git Providers](./git-providers.md) - GitHub and Gitea provider interfaces
-- [Agent Providers](./agent-providers.md) - AI agent integrations
-
-### Template & Rendering
-- [Template Engine](./template-engine.md) - Secure Jinja2 template rendering
-- [Template Filters](./template-filters.md) - Custom filters and validators
-- [Security](./security.md) - Security utilities and validation
-
-### Automation Engine
-- [Orchestrator](./orchestrator.md) - Workflow orchestration
-- [Workflow Stages](./workflow-stages.md) - Individual workflow stages
-- [State Management](./state-management.md) - Persistence and recovery
+> **Note:** Full API documentation is auto-generated via Sphinx autodoc from source code docstrings.
+> To build the HTML documentation, run `cd docs && make html`.
 
 ## Quick Links
 
@@ -31,7 +13,7 @@ This directory contains comprehensive API documentation for the repo-sapiens pro
 ```python
 from repo_sapiens.config.settings import AutomationSettings
 
-settings = AutomationSettings.from_yaml("repo_sapiens/config/automation_config.yaml")
+settings = AutomationSettings.from_yaml(".sapiens/config.yaml")
 ```
 
 #### Resolving Credentials
@@ -49,7 +31,11 @@ from repo_sapiens.git.discovery import GitDiscovery
 
 discovery = GitDiscovery()
 info = discovery.parse_repository()
-provider_type = discovery.detect_provider_type()  # "github" or "gitea"
+provider_type = discovery.detect_provider_type()  # "github", "gitea", or "gitlab"
+
+# Optional parameters:
+# - remote_name: specify which remote to use (default: "origin")
+# - allow_multiple: enable parsing repos with multiple remotes
 ```
 
 #### Creating Git Providers
@@ -94,19 +80,12 @@ rendered = engine.render("workflows/ci/build.yaml.j2", context={
 - [Architecture Overview](../ARCHITECTURE.md)
 - [Contributing Guide](../CONTRIBUTING.md)
 
-## Generating Documentation
+## Building Documentation
 
-To generate HTML documentation from docstrings:
+Sphinx is already configured in `docs/source/conf.py`. To build HTML documentation:
 
 ```bash
-# Install Sphinx
-pip install sphinx sphinx-rtd-theme
-
-# Generate documentation
-cd docs/
-sphinx-quickstart
-sphinx-apidoc -o api/ ../repo_sapiens/
-make html
+cd docs && make html
 ```
 
-The generated documentation will be in `docs/_build/html/`.
+The generated documentation will be in `docs/build/html/`.

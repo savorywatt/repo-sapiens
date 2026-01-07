@@ -6,6 +6,7 @@ from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.providers.base import GitProvider
 from repo_sapiens.providers.gitea_rest import GiteaRestProvider
 from repo_sapiens.providers.github_rest import GitHubRestProvider
+from repo_sapiens.providers.gitlab_rest import GitLabRestProvider
 
 log = structlog.get_logger(__name__)
 
@@ -17,7 +18,7 @@ def create_git_provider(settings: AutomationSettings) -> GitProvider:
         settings: Automation settings containing provider configuration
 
     Returns:
-        GitProvider instance (Gitea or GitHub)
+        GitProvider instance (Gitea, GitHub, or GitLab)
 
     Raises:
         ValueError: If provider type is not supported
@@ -48,10 +49,18 @@ def create_git_provider(settings: AutomationSettings) -> GitProvider:
             base_url=str(settings.git_provider.base_url),
         )
 
-    else:
-        raise ValueError(
-            f"Unsupported Git provider type: {provider_type}. Supported types: gitea, github"
+    elif provider_type == "gitlab":
+        log.info("creating_gitlab_provider", base_url=str(settings.git_provider.base_url))
+        return GitLabRestProvider(
+            base_url=str(settings.git_provider.base_url),
+            token=settings.git_provider.api_token.get_secret_value(),
+            owner=settings.repository.owner,
+            repo=settings.repository.name,
         )
+
+    else:
+        supported = "gitea, github, gitlab"
+        raise ValueError(f"Unsupported Git provider type: {provider_type}. Supported: {supported}")
 
 
 def detect_provider_from_url(url: str) -> str:
@@ -61,13 +70,15 @@ def detect_provider_from_url(url: str) -> str:
         url: Git remote URL (HTTP/HTTPS or SSH)
 
     Returns:
-        Provider type: "github" or "gitea"
+        Provider type: "github", "gitlab", or "gitea"
 
     Example:
         >>> detect_provider_from_url("https://github.com/user/repo.git")
         'github'
         >>> detect_provider_from_url("git@github.com:user/repo.git")
         'github'
+        >>> detect_provider_from_url("https://gitlab.com/user/repo.git")
+        'gitlab'
         >>> detect_provider_from_url("https://gitea.example.com/user/repo.git")
         'gitea'
     """
@@ -87,6 +98,14 @@ def detect_provider_from_url(url: str) -> str:
 
     if "enterprise" in url_lower:
         return "github"
+
+    # Check for GitLab
+    if "gitlab.com" in url_lower:
+        return "gitlab"
+
+    # Check for self-hosted GitLab (common patterns)
+    if "gitlab" in url_lower:
+        return "gitlab"
 
     # Default to Gitea (could be self-hosted)
     return "gitea"

@@ -1,12 +1,49 @@
 """Pytest configuration and shared fixtures."""
 
+import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from repo_sapiens.config import credential_fields
+
+
+def pytest_configure(config):
+    """Disable benchmark plugin when running with xdist to avoid warnings."""
+    if config.pluginmanager.hasplugin("xdist"):
+        # pytest-benchmark emits warnings when xdist is active
+        config.pluginmanager.set_blocked("benchmark")
+
+
+@pytest.fixture(autouse=True)
+def fast_asyncio_sleep(request):
+    """Replace asyncio.sleep with instant return for faster tests.
+
+    This eliminates delays from retry backoff, timeouts, etc.
+    Tests that specifically need real timing should use @pytest.mark.needs_real_timing.
+    """
+    # Skip patching for tests that need actual wall-clock timing
+    if "needs_real_timing" in [m.name for m in request.node.iter_markers()]:
+        yield
+        return
+
+    original_sleep = asyncio.sleep
+
+    async def instant_sleep(delay):
+        """Instant sleep - just yield control without waiting."""
+        if delay > 0:
+            await original_sleep(0)  # Yield control but don't wait
+
+    with patch("asyncio.sleep", instant_sleep):
+        yield
+
+
 from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.models.domain import Issue, IssueState, Plan, Task
+from repo_sapiens.utils.mcp_client import MockMCPClient
 
 
 @pytest.fixture(autouse=True)
@@ -15,11 +52,6 @@ def reset_credential_resolver():
     yield
     # Reset to None so next test creates a fresh resolver
     credential_fields._resolver = None
-
-
-from repo_sapiens.engine.state_manager import StateManager
-from repo_sapiens.models.domain import Issue, IssueState, Plan, Task
-from repo_sapiens.utils.mcp_client import MockMCPClient
 
 
 @pytest.fixture

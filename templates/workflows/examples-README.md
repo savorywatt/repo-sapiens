@@ -58,12 +58,12 @@ Common patterns:
 
 ### Customizing Task Prompts
 
-Each workflow includes a `sapiens react` command with a task prompt. Modify the prompt to fit your project's needs:
+Each workflow includes a `sapiens task` command with a task prompt. Modify the prompt to fit your project's needs:
 
 ```yaml
 - name: Update documentation
   run: |
-    sapiens react "YOUR CUSTOM PROMPT HERE
+    sapiens task "YOUR CUSTOM PROMPT HERE
 
     Be specific about:
     - What files to check
@@ -78,7 +78,7 @@ The examples use Claude by default. For Ollama:
 ```yaml
 - name: Run task with Ollama
   run: |
-    sapiens react --backend ollama --base-url http://localhost:11434 "Your task"
+    sapiens task --backend ollama --base-url http://localhost:11434 "Your task"
 ```
 
 ## Required Secrets

@@ -62,6 +62,9 @@ def find_installed_templates(repo_path: Path, provider_type: str | None) -> list
     """Find all installed repo-sapiens templates in the repository."""
     if provider_type == "github":
         workflows_dir = repo_path / ".github" / "workflows"
+    elif provider_type == "gitlab":
+        # GitLab uses .gitlab-ci.yml at root, check for it and any includes
+        workflows_dir = repo_path
     else:
         workflows_dir = repo_path / ".gitea" / "workflows"
 
@@ -69,15 +72,35 @@ def find_installed_templates(repo_path: Path, provider_type: str | None) -> list
         return []
 
     templates = []
-    for yaml_file in workflows_dir.glob("*.yaml"):
-        info = extract_template_info(yaml_file)
-        if info:
-            templates.append(info)
 
-    for yml_file in workflows_dir.glob("*.yml"):
-        info = extract_template_info(yml_file)
-        if info:
-            templates.append(info)
+    if provider_type == "gitlab":
+        # Check root .gitlab-ci.yml
+        gitlab_ci = repo_path / ".gitlab-ci.yml"
+        if gitlab_ci.exists():
+            info = extract_template_info(gitlab_ci)
+            if info:
+                templates.append(info)
+        # Also check .gitlab directory for includes
+        gitlab_dir = repo_path / ".gitlab"
+        if gitlab_dir.exists():
+            for yaml_file in gitlab_dir.glob("**/*.yaml"):
+                info = extract_template_info(yaml_file)
+                if info:
+                    templates.append(info)
+            for yml_file in gitlab_dir.glob("**/*.yml"):
+                info = extract_template_info(yml_file)
+                if info:
+                    templates.append(info)
+    else:
+        for yaml_file in workflows_dir.glob("*.yaml"):
+            info = extract_template_info(yaml_file)
+            if info:
+                templates.append(info)
+
+        for yml_file in workflows_dir.glob("*.yml"):
+            info = extract_template_info(yml_file)
+            if info:
+                templates.append(info)
 
     return templates
 
@@ -88,6 +111,8 @@ def find_available_templates(
     """Find all available templates in the package."""
     if provider_type == "github":
         provider_dir = templates_dir / "github"
+    elif provider_type == "gitlab":
+        provider_dir = templates_dir / "gitlab"
     else:
         provider_dir = templates_dir / "gitea"
 
@@ -280,9 +305,11 @@ class TemplateUpdater:
             click.echo(f"   Provider: {self.provider_type.upper()}")
             click.echo()
         except GitDiscoveryError:
-            # Default to checking both if we can't detect
+            # Default to checking workflow directories if we can't detect
             if (self.repo_path / ".github" / "workflows").exists():
                 self.provider_type = "github"
+            elif (self.repo_path / ".gitlab-ci.yml").exists():
+                self.provider_type = "gitlab"
             elif (self.repo_path / ".gitea" / "workflows").exists():
                 self.provider_type = "gitea"
             else:
@@ -366,7 +393,12 @@ class TemplateUpdater:
             click.echo(click.style(f"✓ Updated {updated_count} template(s)", bold=True, fg="green"))
             click.echo()
             click.echo("Remember to commit the updated workflow files:")
-            click.echo("   git add .github/workflows/ .gitea/workflows/")
+            if self.provider_type == "gitlab":
+                click.echo("   git add .gitlab-ci.yml .gitlab/")
+            elif self.provider_type == "github":
+                click.echo("   git add .github/workflows/")
+            else:
+                click.echo("   git add .gitea/workflows/")
             click.echo("   git commit -m 'chore: Update repo-sapiens workflow templates'")
         else:
             click.echo("No templates were updated.")

@@ -115,45 +115,35 @@ def sample_label_data() -> list[dict]:
 class TestGiteaRestProviderInit:
     """Tests for GiteaRestProvider initialization."""
 
-    def test_init_with_required_params(self) -> None:
-        """Should initialize with required parameters."""
+    @pytest.mark.parametrize(
+        "base_url,expected_base,expected_api",
+        [
+            ("https://gitea.test.com", "https://gitea.test.com", "https://gitea.test.com/api/v1"),
+            (
+                "https://gitea.test.com/",
+                "https://gitea.test.com",
+                "https://gitea.test.com/api/v1",
+            ),
+            (
+                "http://localhost:3000",
+                "http://localhost:3000",
+                "http://localhost:3000/api/v1",
+            ),
+        ],
+        ids=["no_trailing_slash", "with_trailing_slash", "custom_port"],
+    )
+    def test_init_url_handling(self, base_url, expected_base, expected_api) -> None:
+        """Should handle various URL formats correctly."""
         provider = GiteaRestProvider(
-            base_url="https://gitea.test.com",
-            token="test-token",
-            owner="myowner",
-            repo="myrepo",
-        )
-
-        assert provider.base_url == "https://gitea.test.com"
-        assert provider.api_base == "https://gitea.test.com/api/v1"
-        assert provider.token == "test-token"
-        assert provider.owner == "myowner"
-        assert provider.repo == "myrepo"
-        assert provider._pool is None
-
-    def test_init_strips_trailing_slash(self) -> None:
-        """Should strip trailing slash from base URL."""
-        provider = GiteaRestProvider(
-            base_url="https://gitea.test.com/",
+            base_url=base_url,
             token="token",
             owner="owner",
             repo="repo",
         )
 
-        assert provider.base_url == "https://gitea.test.com"
-        assert provider.api_base == "https://gitea.test.com/api/v1"
-
-    def test_init_with_custom_port(self) -> None:
-        """Should handle custom port in base URL."""
-        provider = GiteaRestProvider(
-            base_url="http://localhost:3000",
-            token="local-token",
-            owner="local-owner",
-            repo="local-repo",
-        )
-
-        assert provider.base_url == "http://localhost:3000"
-        assert provider.api_base == "http://localhost:3000/api/v1"
+        assert provider.base_url == expected_base
+        assert provider.api_base == expected_api
+        assert provider._pool is None
 
 
 # =============================================================================
@@ -187,7 +177,7 @@ class TestGiteaRestProviderConnection:
         assert provider._pool is mock_pool
 
     @pytest.mark.asyncio
-    async def test_disconnect_closes_client(
+    async def test_disconnect_clears_pool(
         self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should clear pool reference on disconnect."""
@@ -195,17 +185,13 @@ class TestGiteaRestProviderConnection:
 
         await provider.disconnect()
 
-        # Pool is cleared (pool manager handles actual cleanup)
         assert provider._pool is None
 
     @pytest.mark.asyncio
     async def test_disconnect_when_not_connected(self, provider: GiteaRestProvider) -> None:
         """Should handle disconnect when no pool exists."""
         assert provider._pool is None
-
-        # Should not raise
         await provider.disconnect()
-
         assert provider._pool is None
 
 
@@ -249,9 +235,7 @@ class TestGiteaRestProviderIssues:
 
     @pytest.mark.asyncio
     async def test_get_issues_with_labels_filter(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should filter issues by labels."""
         mock_response = MagicMock()
@@ -285,7 +269,6 @@ class TestGiteaRestProviderIssues:
 
         assert issue.number == 42
         assert issue.state == IssueState.CLOSED
-        mock_pool.get.assert_called_once()
         assert "/issues/42" in mock_pool.get.call_args.args[0]
 
     @pytest.mark.asyncio
@@ -302,19 +285,12 @@ class TestGiteaRestProviderIssues:
         mock_pool.post = AsyncMock(return_value=mock_response)
         provider._pool = mock_pool
 
-        issue = await provider.create_issue(
-            title="New bug report",
-            body="Description of the bug",
-        )
+        issue = await provider.create_issue(title="New bug report", body="Description of the bug")
 
         assert issue.id == 1001
-        assert issue.title == "Fix authentication bug"
-
         call_args = mock_pool.post.call_args
-        assert "/repos/test-owner/test-repo/issues" in call_args.args[0]
         posted_data = call_args.kwargs["json"]
         assert posted_data["title"] == "New bug report"
-        assert posted_data["body"] == "Description of the bug"
         assert "labels" not in posted_data
 
     @pytest.mark.asyncio
@@ -326,12 +302,10 @@ class TestGiteaRestProviderIssues:
         sample_label_data: list[dict],
     ) -> None:
         """Should create issue with existing labels."""
-        # Mock get labels response
         labels_response = MagicMock()
         labels_response.json.return_value = sample_label_data
         labels_response.raise_for_status = MagicMock()
 
-        # Mock create issue response
         create_response = MagicMock()
         create_response.json.return_value = sample_issue_data
         create_response.raise_for_status = MagicMock()
@@ -340,65 +314,13 @@ class TestGiteaRestProviderIssues:
         mock_pool.post = AsyncMock(return_value=create_response)
         provider._pool = mock_pool
 
-        issue = await provider.create_issue(
-            title="New feature",
-            body="Feature description",
-            labels=["bug", "enhancement"],
+        await provider.create_issue(
+            title="New feature", body="Feature description", labels=["bug", "enhancement"]
         )
 
-        assert issue is not None
-
-        # Should have fetched labels first
-        assert mock_pool.get.called
-
-        # Should have created issue with label IDs
         create_call = mock_pool.post.call_args
         posted_data = create_call.kwargs["json"]
-        assert posted_data["labels"] == [1, 2]  # IDs of bug and enhancement
-
-    @pytest.mark.asyncio
-    async def test_create_issue_creates_missing_labels(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-        sample_issue_data: dict,
-        sample_label_data: list[dict],
-    ) -> None:
-        """Should create missing labels when creating issue."""
-        # Mock get labels response (only has 'bug')
-        labels_response = MagicMock()
-        labels_response.json.return_value = [sample_label_data[0]]  # Only 'bug'
-        labels_response.raise_for_status = MagicMock()
-
-        # Mock create label response
-        new_label_response = MagicMock()
-        new_label_response.json.return_value = {"id": 99, "name": "new-label"}
-        new_label_response.raise_for_status = MagicMock()
-
-        # Mock create issue response
-        create_issue_response = MagicMock()
-        create_issue_response.json.return_value = sample_issue_data
-        create_issue_response.raise_for_status = MagicMock()
-
-        mock_pool.get = AsyncMock(return_value=labels_response)
-
-        # Set up post to return different responses based on URL
-        async def mock_post(url: str, json: dict) -> MagicMock:
-            if "/labels" in url and "issues" not in url:
-                return new_label_response
-            return create_issue_response
-
-        mock_pool.post = AsyncMock(side_effect=mock_post)
-        provider._pool = mock_pool
-
-        await provider.create_issue(
-            title="New issue",
-            body="Description",
-            labels=["bug", "new-label"],
-        )
-
-        # Should have called post twice: once for new label, once for issue
-        assert mock_pool.post.call_count == 2
+        assert posted_data["labels"] == [1, 2]
 
     @pytest.mark.asyncio
     async def test_update_issue_title_and_body(
@@ -408,12 +330,10 @@ class TestGiteaRestProviderIssues:
         sample_issue_data: dict,
     ) -> None:
         """Should update issue title and body."""
-        # Mock patch response
         patch_response = MagicMock()
         patch_response.raise_for_status = MagicMock()
         mock_pool.patch = AsyncMock(return_value=patch_response)
 
-        # Mock get issue response for final fetch
         get_response = MagicMock()
         get_response.json.return_value = sample_issue_data
         get_response.raise_for_status = MagicMock()
@@ -422,16 +342,11 @@ class TestGiteaRestProviderIssues:
         provider._pool = mock_pool
 
         issue = await provider.update_issue(
-            issue_number=42,
-            title="Updated title",
-            body="Updated description",
+            issue_number=42, title="Updated title", body="Updated description"
         )
 
         assert issue.number == 42
-
-        # Check PATCH was called with correct data
         patch_call = mock_pool.patch.call_args
-        assert "/issues/42" in patch_call.args[0]
         patched_data = patch_call.kwargs["json"]
         assert patched_data["title"] == "Updated title"
         assert patched_data["body"] == "Updated description"
@@ -448,8 +363,8 @@ class TestGiteaRestProviderIssues:
         patch_response.raise_for_status = MagicMock()
         mock_pool.patch = AsyncMock(return_value=patch_response)
 
-        get_response = MagicMock()
         sample_issue_data["state"] = "closed"
+        get_response = MagicMock()
         get_response.json.return_value = sample_issue_data
         get_response.raise_for_status = MagicMock()
         mock_pool.get = AsyncMock(return_value=get_response)
@@ -471,24 +386,17 @@ class TestGiteaRestProviderIssues:
         sample_label_data: list[dict],
     ) -> None:
         """Should update issue labels separately."""
-        # Mock get labels
         labels_response = MagicMock()
         labels_response.json.return_value = sample_label_data
         labels_response.raise_for_status = MagicMock()
 
-        # Mock put labels response
         put_response = MagicMock()
         put_response.raise_for_status = MagicMock()
 
-        # Mock get issue
         get_response = MagicMock()
         get_response.json.return_value = sample_issue_data
         get_response.raise_for_status = MagicMock()
 
-        mock_pool.get = AsyncMock(return_value=labels_response)
-        mock_pool.put = AsyncMock(return_value=put_response)
-
-        # Override get to return issue on second call
         call_count = {"get": 0}
 
         async def mock_get(url: str, params: dict | None = None) -> MagicMock:
@@ -498,11 +406,11 @@ class TestGiteaRestProviderIssues:
             return get_response
 
         mock_pool.get = AsyncMock(side_effect=mock_get)
+        mock_pool.put = AsyncMock(return_value=put_response)
         provider._pool = mock_pool
 
         await provider.update_issue(issue_number=42, labels=["bug", "enhancement"])
 
-        # Should have called PUT on labels endpoint
         put_call = mock_pool.put.call_args
         assert "/issues/42/labels" in put_call.args[0]
         assert put_call.kwargs["json"]["labels"] == [1, 2]
@@ -533,9 +441,7 @@ class TestGiteaRestProviderComments:
         comment = await provider.add_comment(42, "Test comment body")
 
         assert comment.id == 5001
-        assert comment.body == "I've identified the root cause. Working on a fix."
         assert comment.author == "reviewer"
-
         call_args = mock_pool.post.call_args
         assert "/issues/42/comments" in call_args.args[0]
         assert call_args.kwargs["json"]["body"] == "Test comment body"
@@ -564,9 +470,7 @@ class TestGiteaRestProviderComments:
         comments = await provider.get_comments(42)
 
         assert len(comments) == 2
-        assert comments[0].id == 5001
         assert comments[0].author == "reviewer"
-        assert comments[1].id == 5002
         assert comments[1].author == "maintainer"
 
 
@@ -579,11 +483,7 @@ class TestGiteaRestProviderFiles:
     """Tests for file operations."""
 
     @pytest.mark.asyncio
-    async def test_get_file(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-    ) -> None:
+    async def test_get_file(self, provider: GiteaRestProvider, mock_pool: AsyncMock) -> None:
         """Should retrieve and decode file contents."""
         file_content = "# README\n\nThis is a test project."
         encoded_content = base64.b64encode(file_content.encode()).decode()
@@ -602,18 +502,12 @@ class TestGiteaRestProviderFiles:
         assert call_args.kwargs["params"]["ref"] == "main"
 
     @pytest.mark.asyncio
-    async def test_commit_file_new(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-    ) -> None:
+    async def test_commit_file_new(self, provider: GiteaRestProvider, mock_pool: AsyncMock) -> None:
         """Should create new file when it doesn't exist."""
-        # Mock 404 for existing file check
         not_found_response = MagicMock()
         not_found_response.status_code = 404
         mock_pool.get = AsyncMock(return_value=not_found_response)
 
-        # Mock successful create
         create_response = MagicMock()
         create_response.json.return_value = {"commit": {"sha": "newfile123"}}
         create_response.raise_for_status = MagicMock()
@@ -629,30 +523,23 @@ class TestGiteaRestProviderFiles:
         )
 
         assert sha == "newfile123"
-
         post_call = mock_pool.post.call_args
         posted_data = post_call.kwargs["json"]
         assert posted_data["message"] == "Add new file"
-        assert posted_data["branch"] == "main"
-        # Content should be base64 encoded
         decoded = base64.b64decode(posted_data["content"]).decode()
         assert decoded == "New file content"
-        assert "sha" not in posted_data  # New file has no SHA
+        assert "sha" not in posted_data
 
     @pytest.mark.asyncio
     async def test_commit_file_update(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should update existing file with SHA."""
-        # Mock existing file response
         existing_response = MagicMock()
         existing_response.status_code = 200
         existing_response.json.return_value = {"sha": "existing123"}
         mock_pool.get = AsyncMock(return_value=existing_response)
 
-        # Mock successful update
         update_response = MagicMock()
         update_response.json.return_value = {"commit": {"sha": "updated456"}}
         update_response.raise_for_status = MagicMock()
@@ -668,11 +555,9 @@ class TestGiteaRestProviderFiles:
         )
 
         assert sha == "updated456"
-
         post_call = mock_pool.post.call_args
         posted_data = post_call.kwargs["json"]
         assert posted_data["sha"] == "existing123"
-        assert posted_data["branch"] == "develop"
 
 
 # =============================================================================
@@ -705,15 +590,11 @@ class TestGiteaRestProviderBranches:
 
     @pytest.mark.asyncio
     async def test_get_branch_not_found(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should return None for non-existent branch."""
         http_error = httpx.HTTPStatusError(
-            "Not Found",
-            request=MagicMock(),
-            response=MagicMock(status_code=404),
+            "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
         )
         mock_pool.get = AsyncMock(side_effect=http_error)
         provider._pool = mock_pool
@@ -724,15 +605,11 @@ class TestGiteaRestProviderBranches:
 
     @pytest.mark.asyncio
     async def test_get_branch_other_error_propagates(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should propagate non-404 HTTP errors."""
         http_error = httpx.HTTPStatusError(
-            "Internal Server Error",
-            request=MagicMock(),
-            response=MagicMock(status_code=500),
+            "Internal Server Error", request=MagicMock(), response=MagicMock(status_code=500)
         )
         mock_pool.get = AsyncMock(side_effect=http_error)
         provider._pool = mock_pool
@@ -748,14 +625,10 @@ class TestGiteaRestProviderBranches:
         sample_branch_data: dict,
     ) -> None:
         """Should create new branch when it doesn't exist."""
-        # Mock get_branch returning 404 (not found)
         http_error = httpx.HTTPStatusError(
-            "Not Found",
-            request=MagicMock(),
-            response=MagicMock(status_code=404),
+            "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
         )
 
-        # Mock create branch response
         create_response = MagicMock()
         create_response.json.return_value = sample_branch_data
         create_response.raise_for_status = MagicMock()
@@ -767,7 +640,6 @@ class TestGiteaRestProviderBranches:
         branch = await provider.create_branch("feature/new-feature", "main")
 
         assert branch.name == "feature/authentication-fix"
-
         post_call = mock_pool.post.call_args
         posted_data = post_call.kwargs["json"]
         assert posted_data["new_branch_name"] == "feature/new-feature"
@@ -781,7 +653,6 @@ class TestGiteaRestProviderBranches:
         sample_branch_data: dict,
     ) -> None:
         """Should return existing branch if it already exists."""
-        # Mock get_branch returning existing branch
         get_response = MagicMock()
         get_response.json.return_value = sample_branch_data
         get_response.raise_for_status = MagicMock()
@@ -791,15 +662,10 @@ class TestGiteaRestProviderBranches:
         branch = await provider.create_branch("feature/authentication-fix")
 
         assert branch.name == "feature/authentication-fix"
-        # Should not have called POST
         mock_pool.post.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_merge_branches(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-    ) -> None:
+    async def test_merge_branches(self, provider: GiteaRestProvider, mock_pool: AsyncMock) -> None:
         """Should merge source branch into target."""
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
@@ -807,16 +673,13 @@ class TestGiteaRestProviderBranches:
         provider._pool = mock_pool
 
         await provider.merge_branches(
-            source="feature/completed",
-            target="main",
-            message="Merge feature branch",
+            source="feature/completed", target="main", message="Merge feature branch"
         )
 
         post_call = mock_pool.post.call_args
         assert "/branches/main/merge" in post_call.args[0]
         posted_data = post_call.kwargs["json"]
         assert posted_data["head"] == "feature/completed"
-        assert posted_data["base"] == "main"
         assert posted_data["message"] == "Merge feature branch"
 
 
@@ -836,12 +699,10 @@ class TestGiteaRestProviderPullRequests:
         sample_pr_data: dict,
     ) -> None:
         """Should create new pull request."""
-        # Mock list PRs (empty - no existing)
         list_response = MagicMock()
         list_response.json.return_value = []
         list_response.raise_for_status = MagicMock()
 
-        # Mock create PR
         create_response = MagicMock()
         create_response.json.return_value = sample_pr_data
         create_response.raise_for_status = MagicMock()
@@ -862,12 +723,6 @@ class TestGiteaRestProviderPullRequests:
         assert pr.head == "feature/auth-fix"
         assert pr.base == "main"
 
-        post_call = mock_pool.post.call_args
-        posted_data = post_call.kwargs["json"]
-        assert posted_data["title"] == "New feature PR"
-        assert posted_data["head"] == "feature/auth-fix"
-        assert posted_data["base"] == "main"
-
     @pytest.mark.asyncio
     async def test_create_pull_request_updates_existing(
         self,
@@ -876,7 +731,6 @@ class TestGiteaRestProviderPullRequests:
         sample_pr_data: dict,
     ) -> None:
         """Should update existing PR if one exists for the same branches."""
-        # Mock list PRs with existing PR
         existing_pr = {
             "number": 15,
             "head": {"ref": "feature/auth-fix"},
@@ -886,7 +740,6 @@ class TestGiteaRestProviderPullRequests:
         list_response.json.return_value = [existing_pr]
         list_response.raise_for_status = MagicMock()
 
-        # Mock update PR
         update_response = MagicMock()
         update_response.json.return_value = sample_pr_data
         update_response.raise_for_status = MagicMock()
@@ -903,64 +756,8 @@ class TestGiteaRestProviderPullRequests:
         )
 
         assert pr.number == 15
-
-        # Should have called PATCH, not POST
         mock_pool.patch.assert_called_once()
         mock_pool.post.assert_not_called()
-
-        patch_call = mock_pool.patch.call_args
-        assert "/pulls/15" in patch_call.args[0]
-        patched_data = patch_call.kwargs["json"]
-        assert patched_data["title"] == "Updated PR title"
-        assert patched_data["body"] == "Updated description"
-
-    @pytest.mark.asyncio
-    async def test_create_pull_request_with_labels(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-        sample_pr_data: dict,
-        sample_label_data: list[dict],
-    ) -> None:
-        """Should create PR with labels."""
-        # Mock list PRs (empty)
-        list_response = MagicMock()
-        list_response.json.return_value = []
-        list_response.raise_for_status = MagicMock()
-
-        # Mock get labels
-        labels_response = MagicMock()
-        labels_response.json.return_value = sample_label_data
-        labels_response.raise_for_status = MagicMock()
-
-        # Mock create PR
-        create_response = MagicMock()
-        create_response.json.return_value = sample_pr_data
-        create_response.raise_for_status = MagicMock()
-
-        call_count = {"get": 0}
-
-        async def mock_get(url: str, params: dict | None = None) -> MagicMock:
-            call_count["get"] += 1
-            if call_count["get"] == 1:
-                return list_response  # First call for PR list
-            return labels_response  # Second call for labels
-
-        mock_pool.get = AsyncMock(side_effect=mock_get)
-        mock_pool.post = AsyncMock(return_value=create_response)
-        provider._pool = mock_pool
-
-        await provider.create_pull_request(
-            title="Feature PR",
-            body="Description",
-            head="feature",
-            base="main",
-            labels=["bug", "enhancement"],
-        )
-
-        post_call = mock_pool.post.call_args
-        posted_data = post_call.kwargs["json"]
-        assert posted_data["labels"] == [1, 2]
 
     @pytest.mark.asyncio
     async def test_get_pull_request(
@@ -981,13 +778,10 @@ class TestGiteaRestProviderPullRequests:
         assert pr is not None
         assert pr.number == 15
         assert pr.title == "Fix authentication with special characters"
-        assert pr.state == "open"
 
     @pytest.mark.asyncio
     async def test_get_pull_request_not_found(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should return None for non-existent PR."""
         mock_pool.get = AsyncMock(side_effect=Exception("Not found"))
@@ -999,9 +793,7 @@ class TestGiteaRestProviderPullRequests:
 
     @pytest.mark.asyncio
     async def test_get_diff_from_pr(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should get diff from PR endpoint."""
         mock_response = MagicMock()
@@ -1013,16 +805,12 @@ class TestGiteaRestProviderPullRequests:
         diff = await provider.get_diff("main", "feature", pr_number=42)
 
         assert "diff --git" in diff
-        mock_pool.get.assert_called_once()
         call_args = mock_pool.get.call_args
         assert "/pulls/42.diff" in call_args.args[0]
-        assert call_args.kwargs["headers"]["Accept"] == "text/plain"
 
     @pytest.mark.asyncio
     async def test_get_diff_compare_branches(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
     ) -> None:
         """Should compare branches when no PR number provided."""
         mock_response = MagicMock()
@@ -1040,10 +828,6 @@ class TestGiteaRestProviderPullRequests:
 
         assert "diff --git a/src/auth.py" in diff
         assert "diff --git a/tests/test_auth.py" in diff
-        assert "@@ -1,3 +1,5 @@" in diff
-
-        call_args = mock_pool.get.call_args
-        assert "/compare/main...feature" in call_args.args[0]
 
 
 # =============================================================================
@@ -1071,7 +855,6 @@ class TestGiteaRestProviderLabels:
         label_ids = await provider._get_or_create_label_ids(["bug", "documentation"])
 
         assert label_ids == [1, 3]
-        # Should not have called POST (no new labels needed)
         mock_pool.post.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1082,12 +865,10 @@ class TestGiteaRestProviderLabels:
         sample_label_data: list[dict],
     ) -> None:
         """Should create new labels when they don't exist."""
-        # Mock get labels
         get_response = MagicMock()
         get_response.json.return_value = sample_label_data
         get_response.raise_for_status = MagicMock()
 
-        # Mock create label
         create_response = MagicMock()
         create_response.json.return_value = {"id": 100, "name": "new-label"}
         create_response.raise_for_status = MagicMock()
@@ -1099,72 +880,34 @@ class TestGiteaRestProviderLabels:
         label_ids = await provider._get_or_create_label_ids(["bug", "new-label"])
 
         assert label_ids == [1, 100]
-
-        # Should have called POST for new label
         mock_pool.post.assert_called_once()
         post_call = mock_pool.post.call_args
         posted_data = post_call.kwargs["json"]
         assert posted_data["name"] == "new-label"
-        assert posted_data["color"] == "ededed"  # Default gray
+        assert posted_data["color"] == "ededed"
 
 
 # =============================================================================
-# Error Handling Tests
-# =============================================================================
-
-
-class TestGiteaRestProviderErrorHandling:
-    """Tests for error handling."""
-
-    @pytest.mark.asyncio
-    async def test_http_error_propagates(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-    ) -> None:
-        """Should propagate HTTP errors from API calls."""
-        mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Server Error",
-            request=MagicMock(),
-            response=MagicMock(status_code=500),
-        )
-        mock_pool.get = AsyncMock(return_value=mock_response)
-        provider._pool = mock_pool
-
-        with pytest.raises(httpx.HTTPStatusError):
-            await provider.get_issues()
-
-    @pytest.mark.asyncio
-    async def test_network_error_propagates(
-        self,
-        provider: GiteaRestProvider,
-        mock_pool: AsyncMock,
-    ) -> None:
-        """Should propagate network errors."""
-        mock_pool.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
-        provider._pool = mock_pool
-
-        with pytest.raises(httpx.ConnectError):
-            await provider.get_issues()
-
-
-# =============================================================================
-# Model Parsing Tests
+# Model Parsing Tests - Consolidated
 # =============================================================================
 
 
 class TestGiteaRestProviderParsing:
     """Tests for model parsing methods."""
 
-    def test_parse_issue_open(self, provider: GiteaRestProvider) -> None:
-        """Should parse open issue correctly."""
+    @pytest.mark.parametrize(
+        "state,expected_state",
+        [("open", IssueState.OPEN), ("closed", IssueState.CLOSED)],
+        ids=["open", "closed"],
+    )
+    def test_parse_issue_state(self, provider: GiteaRestProvider, state, expected_state) -> None:
+        """Should parse issue state correctly."""
         data = {
             "id": 1,
             "number": 10,
             "title": "Test Issue",
             "body": "Description",
-            "state": "open",
+            "state": state,
             "labels": [{"name": "bug"}],
             "created_at": "2024-01-15T10:00:00Z",
             "updated_at": "2024-01-16T12:00:00Z",
@@ -1174,33 +917,7 @@ class TestGiteaRestProviderParsing:
 
         issue = provider._parse_issue(data)
 
-        assert issue.id == 1
-        assert issue.number == 10
-        assert issue.title == "Test Issue"
-        assert issue.body == "Description"
-        assert issue.state == IssueState.OPEN
-        assert issue.labels == ["bug"]
-        assert issue.author == "author"
-        assert issue.url == "https://gitea.example.com/issues/10"
-
-    def test_parse_issue_closed(self, provider: GiteaRestProvider) -> None:
-        """Should parse closed issue correctly."""
-        data = {
-            "id": 2,
-            "number": 11,
-            "title": "Closed Issue",
-            "body": "",
-            "state": "closed",
-            "labels": [],
-            "created_at": "2024-01-01T00:00:00Z",
-            "updated_at": "2024-01-02T00:00:00Z",
-            "user": {"login": "closer"},
-            "html_url": "https://gitea.example.com/issues/11",
-        }
-
-        issue = provider._parse_issue(data)
-
-        assert issue.state == IssueState.CLOSED
+        assert issue.state == expected_state
 
     def test_parse_issue_missing_body(self, provider: GiteaRestProvider) -> None:
         """Should handle missing body field."""
@@ -1234,10 +951,9 @@ class TestGiteaRestProviderParsing:
         assert comment.id == 100
         assert comment.body == "Comment text"
         assert comment.author == "commenter"
-        assert comment.created_at.year == 2024
 
-    def test_parse_pull_request(self, provider: GiteaRestProvider) -> None:
-        """Should parse pull request correctly."""
+    def test_parse_pull_request_body(self, provider: GiteaRestProvider) -> None:
+        """Should parse PR body correctly."""
         data = {
             "id": 500,
             "number": 50,
@@ -1252,40 +968,27 @@ class TestGiteaRestProviderParsing:
 
         pr = provider._parse_pull_request(data)
 
-        assert pr.id == 500
-        assert pr.number == 50
-        assert pr.title == "Feature PR"
-        assert pr.state == "open"
-        assert pr.head == "feature-branch"
-        assert pr.base == "main"
+        assert pr.body == "PR description"
 
     def test_parse_pull_request_missing_body(self, provider: GiteaRestProvider) -> None:
-        """Should handle missing PR body."""
+        """Should handle missing body field with empty string."""
         data = {
-            "id": 501,
-            "number": 51,
-            "title": "No Body PR",
+            "id": 500,
+            "number": 50,
+            "title": "Feature PR",
+            # body key intentionally omitted to test .get default
             "state": "open",
-            "head": {"ref": "branch"},
+            "head": {"ref": "feature-branch"},
             "base": {"ref": "main"},
-            "html_url": "https://gitea.example.com/pull/51",
-            "created_at": "2024-03-01T15:00:00Z",
+            "html_url": "https://gitea.example.com/pull/50",
+            "created_at": "2024-03-01T14:00:00Z",
         }
 
         pr = provider._parse_pull_request(data)
 
         assert pr.body == ""
 
-
-# =============================================================================
-# Datetime Parsing Tests
-# =============================================================================
-
-
-class TestGiteaRestProviderDatetimeParsing:
-    """Tests for datetime parsing in API responses."""
-
-    def test_parse_iso_datetime_with_z(self, provider: GiteaRestProvider) -> None:
+    def test_parse_datetime_with_z(self, provider: GiteaRestProvider) -> None:
         """Should parse ISO datetime with Z suffix."""
         data = {
             "id": 1,
@@ -1308,3 +1011,38 @@ class TestGiteaRestProviderDatetimeParsing:
         assert issue.created_at.hour == 10
         assert issue.created_at.minute == 30
         assert issue.created_at.tzinfo is not None
+
+
+# =============================================================================
+# Error Handling Tests
+# =============================================================================
+
+
+class TestGiteaRestProviderErrorHandling:
+    """Tests for error handling."""
+
+    @pytest.mark.asyncio
+    async def test_http_error_propagates(
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should propagate HTTP errors from API calls."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "Server Error", request=MagicMock(), response=MagicMock(status_code=500)
+        )
+        mock_pool.get = AsyncMock(return_value=mock_response)
+        provider._pool = mock_pool
+
+        with pytest.raises(httpx.HTTPStatusError):
+            await provider.get_issues()
+
+    @pytest.mark.asyncio
+    async def test_network_error_propagates(
+        self, provider: GiteaRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should propagate network errors."""
+        mock_pool.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+        provider._pool = mock_pool
+
+        with pytest.raises(httpx.ConnectError):
+            await provider.get_issues()

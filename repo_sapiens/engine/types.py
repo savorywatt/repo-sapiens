@@ -56,23 +56,25 @@ StagesDict = dict[str, StageState]
 
 
 # Known stage names (for documentation and validation purposes)
-KNOWN_STAGE_NAMES = frozenset({
-    # New granular workflow stages
-    "proposal",
-    "approval",
-    "task_execution",
-    "pr_review",
-    "pr_fix",
-    "fix_execution",
-    "qa",
-    # Legacy stages (kept for compatibility)
-    "planning",
-    "plan_review",
-    "prompts",
-    "implementation",
-    "code_review",
-    "merge",
-})
+KNOWN_STAGE_NAMES = frozenset(
+    {
+        # New granular workflow stages
+        "proposal",
+        "approval",
+        "task_execution",
+        "pr_review",
+        "pr_fix",
+        "fix_execution",
+        "qa",
+        # Legacy stages (kept for compatibility)
+        "planning",
+        "plan_review",
+        "prompts",
+        "implementation",
+        "code_review",
+        "merge",
+    }
+)
 
 
 class WorkflowState(TypedDict):

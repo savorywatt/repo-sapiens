@@ -132,7 +132,7 @@ if backend.available:
 
 **Platform Support:**
 - macOS: Uses Keychain
-- Windows: Uses Credential Manager
+- Windows: Uses Windows Credential Locker
 - Linux: Uses Secret Service API (requires `gnome-keyring` or `kwallet`)
 
 ### EnvironmentBackend
@@ -172,7 +172,7 @@ from repo_sapiens.credentials import EncryptedFileBackend
 from pathlib import Path
 
 backend = EncryptedFileBackend(
-    file_path=Path(".repo-sapiens/credentials.enc"),
+    file_path=Path(".sapiens/credentials.enc"),
     master_password="secure-master-password"
 )
 
@@ -212,7 +212,7 @@ def __init__(
 - `available: bool`: Property indicating if cryptography library is installed
 
 **Security:**
-- Uses AES-256-GCM encryption
+- Uses Fernet symmetric encryption (AES-128-CBC + HMAC)
 - Master password is hashed with PBKDF2
 - Each credential is individually encrypted
 - Requires `cryptography` library

@@ -8,7 +8,7 @@ repo-sapiens supports four agent options:
 
 | Agent | Type | LLM Providers | Best For |
 |-------|------|---------------|----------|
-| [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama, vLLM, OpenAI-compatible | Simple tasks, experimentation, local inference |
+| [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama, vLLM | Simple tasks, experimentation, local inference |
 | [Goose](#goose-ai) | External CLI | OpenAI, Anthropic, Ollama, OpenRouter, Groq | Flexibility, cloud providers |
 | [Claude Code](#claude-code) | External CLI | Anthropic only | Best coding performance, simplicity |
 | [Ollama Provider](#ollama-provider) | Built-in | Ollama (local) | Automation workflows, local inference |
@@ -31,11 +31,11 @@ Do you need cloud LLM providers (OpenAI, Anthropic API)?
 
 ## Built-in ReAct Agent
 
-The ReAct (Reasoning + Acting) agent is built directly into repo-sapiens. It supports both Ollama and OpenAI-compatible backends (vLLM, LMStudio, etc.) and includes a curated set of tools for file operations and shell commands.
+The ReAct (Reasoning + Acting) agent is built directly into repo-sapiens. It supports Ollama and can also connect to OpenAI-compatible backends (vLLM, LMStudio, etc.) via the `--ollama-url` option. It includes a curated set of tools for file operations and shell commands.
 
 ### Pros
 - **Zero installation**: No external CLI needed
-- **Multiple backends**: Ollama, vLLM, and any OpenAI-compatible server
+- **Multiple backends**: Ollama, vLLM, and other OpenAI-compatible servers via `--ollama-url`
 - **Transparent reasoning**: See step-by-step thinking with `--verbose`
 - **Interactive REPL**: Experiment with tasks interactively
 - **Privacy**: Local execution with Ollama or vLLM
@@ -57,24 +57,22 @@ The ReAct (Reasoning + Acting) agent is built directly into repo-sapiens. It sup
 **With Ollama:**
 ```bash
 ollama serve
-ollama pull qwen3:latest
-sapiens react "Create a Python script that sorts a list"
+ollama pull qwen3:8b
+sapiens task "Create a Python script that sorts a list"
 ```
 
-**With vLLM:**
+**With vLLM (OpenAI-compatible):**
 ```bash
 vllm serve Qwen/Qwen2.5-Coder-32B-Instruct --port 8000
-sapiens react --backend openai --base-url http://localhost:8000/v1 "Create hello.py"
+sapiens task --ollama-url http://localhost:8000/v1 "Create hello.py"
 ```
 
 ### Configuration
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--model` | `qwen3:latest` | Model to use |
-| `--backend` | `ollama` | Backend: `ollama` or `openai` |
-| `--base-url` | auto | Server URL (auto-detected per backend) |
-| `--api-key` | none | API key for OpenAI-compatible backends |
+| `--model` | `qwen3:8b` | Model to use |
+| `--ollama-url` | `http://localhost:11434` | Ollama or OpenAI-compatible server URL |
 | `--max-iterations` | `10` | Maximum reasoning steps |
 | `--working-dir` | `.` | Working directory |
 | `-v, --verbose` | `false` | Show reasoning trajectory |
@@ -184,9 +182,7 @@ agent_provider:
 
 ```bash
 # Install Claude Code
-npm install -g @anthropic/claude-code
-# or
-pip install claude-code
+npm install -g @anthropic-ai/claude-code
 
 # Initialize with Claude
 sapiens init
@@ -277,8 +273,8 @@ agent_provider:
 
 | Feature | ReAct Agent | Goose | Claude Code | Ollama Provider |
 |---------|-------------|-------|-------------|-----------------|
-| **Installation** | None | `pip install goose-ai` | `npm install -g @anthropic/claude-code` | None |
-| **Cloud Providers** | OpenAI-compatible | OpenAI, Anthropic, OpenRouter, Groq | Anthropic | - |
+| **Installation** | None | `pip install goose-ai` | `npm install -g @anthropic-ai/claude-code` | None |
+| **Cloud Providers** | - | OpenAI, Anthropic, OpenRouter, Groq | Anthropic | - |
 | **Local Models** | Ollama, vLLM | Ollama | - | Ollama |
 | **Tool Calling** | Custom | Native LLM | Native LLM | Prompt-based |
 | **REPL Mode** | Yes | Yes | Yes | - |
@@ -330,7 +326,7 @@ sapiens init --force
 If you want maximum coding quality:
 
 ```bash
-npm install -g @anthropic/claude-code
+npm install -g @anthropic-ai/claude-code
 sapiens init --force
 # Select: claude
 ```
