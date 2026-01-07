@@ -35,10 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Setup Test**: Optional test at end of `sapiens init`
   - Offers to summarize README.md with configured agent
   - Shows exact command that will be run for the selected agent
-- **React Config Integration**: `sapiens react` now reads settings from config
+- **React Config Integration**: `sapiens task` now reads settings from config
   - Model and base URL automatically loaded from `agent_provider` config
   - CLI options override config when specified
-  - Simple usage: `sapiens react "task"` or `sapiens react --repl`
+  - Simple usage: `sapiens task "task"` or `sapiens task --repl`
 - **GitLab Support**: Full GitLab REST API v4 integration
   - New `GitLabRestProvider` class for issues, merge requests, branches, and files
   - `sapiens init` now detects and configures GitLab repositories
@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All 457+ internal imports updated
 - **CLI Commands Renamed**: `automation` → `sapiens` (with `repo-sapiens` alias)
   - `sapiens init` - Initialize repository
-  - `sapiens react --repl` - Interactive ReAct agent REPL
+  - `sapiens task --repl` - Interactive ReAct agent REPL
   - `sapiens daemon` - Run automation daemon
   - `sapiens credentials` - Manage credentials
 - **Default Ollama Model**: Changed from `llama3.1:8b` to `qwen3:latest`
@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ReAct Agent**: Local AI agent using Ollama for autonomous coding tasks
   - ReAct (Reasoning + Acting) pattern with thought-action-observation loop
   - 9 built-in tools: read_file, write_file, list_directory, run_command, search_files, find_files, edit_file, tree, finish
-  - Interactive REPL mode (`sapiens react --repl`) with colored prompt
+  - Interactive REPL mode (`sapiens task --repl`) with colored prompt
   - Remote Ollama support via `--ollama-url` for running on separate GPU servers
   - Model discovery and switching (`/models`, `/model <name>` commands)
   - Path sandboxing for security - all file operations restricted to working directory

@@ -34,7 +34,7 @@ An AI-driven automation system for Git workflows with support for multiple AI ag
 
 - **CLI Commands**
   - `sapiens init` - Interactive repository setup with agent selection (GitHub/Gitea/GitLab)
-  - `sapiens react --repl` - Interactive ReAct agent REPL
+  - `sapiens task --repl` - Interactive ReAct agent REPL
   - `sapiens daemon` - Run automation daemon
   - `sapiens credentials` - Manage credentials securely
   - `sapiens process-issue` - Process a specific issue
@@ -81,13 +81,13 @@ Try the local AI agent with Ollama:
 
 ```bash
 # Start interactive REPL (uses qwen3:latest by default)
-sapiens react --repl
+sapiens task --repl
 
 # Use a remote Ollama server
-sapiens react --repl --ollama-url http://192.168.1.100:11434
+sapiens task --repl --ollama-url http://192.168.1.100:11434
 
 # Use a specific model
-sapiens react --repl --model codellama:13b
+sapiens task --repl --model codellama:13b
 ```
 
 REPL commands:

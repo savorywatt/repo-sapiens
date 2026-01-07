@@ -79,7 +79,7 @@ jobs:
         run: |
           TARGET=${{ github.event.inputs.target_coverage || '60' }}
 
-          sapiens react "Improve test coverage for this Python project.
+          sapiens task "Improve test coverage for this Python project.
 
           Current total coverage: ${{ steps.coverage.outputs.total_coverage }}%
           Target coverage: ${TARGET}%

@@ -1033,9 +1033,9 @@ sapiens daemon --interval 60                 # Run continuous automation
 sapiens health-check                         # Check system health
 
 # ReAct agent (local execution with Ollama, default model: qwen3:latest)
-sapiens react --repl                         # Interactive REPL mode
-sapiens react "task description"             # Run single task
-sapiens react --repl --model qwen3:latest    # Use specific model
+sapiens task --repl                         # Interactive REPL mode
+sapiens task "task description"             # Run single task
+sapiens task --repl --model qwen3:latest    # Use specific model
 
 # Credentials management
 sapiens credentials test                     # Verify credentials work

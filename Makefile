@@ -87,7 +87,7 @@ docker-run:
 
 # Development shortcuts
 repl:
-	uv run sapiens react --repl
+	uv run sapiens task --repl
 
 run:
 	uv run sapiens --help

@@ -59,7 +59,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          sapiens react "Review the recent commits and update documentation if needed.
+          sapiens task "Review the recent commits and update documentation if needed.
 
           Recent commits:
           ${{ steps.changes.outputs.commits }}

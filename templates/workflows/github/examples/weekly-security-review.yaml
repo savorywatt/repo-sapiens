@@ -727,7 +727,7 @@ jobs:
         run: |
           pip install repo-sapiens || pip3 install repo-sapiens
 
-          sapiens react "Review the security report and fix identified vulnerabilities.
+          sapiens task "Review the security report and fix identified vulnerabilities.
 
           $(cat security-report.md)
 

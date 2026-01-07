@@ -74,13 +74,13 @@ The easiest way to use the ReAct agent is through the interactive REPL:
 
 ```bash
 # Start interactive mode
-sapiens react --repl
+sapiens task --repl
 
 # With specific model
-sapiens react --repl --model qwen3:8b
+sapiens task --repl --model qwen3:8b
 
 # With custom working directory
-sapiens react --repl --working-dir /path/to/project
+sapiens task --repl --working-dir /path/to/project
 ```
 
 **REPL Commands:**
@@ -98,7 +98,7 @@ sapiens react --repl --working-dir /path/to/project
 **Example REPL Session:**
 
 ```
-$ sapiens react --repl --model qwen3:8b
+$ sapiens task --repl --model qwen3:8b
 
 ============================================================
 ReAct Agent REPL
@@ -161,13 +161,13 @@ Run a single task from the command line:
 
 ```bash
 # Execute a single task
-sapiens react "Create a hello.py file that prints Hello World"
+sapiens task "Create a hello.py file that prints Hello World"
 
 # With verbose output (shows reasoning steps)
-sapiens react "Refactor the utils.py module" --verbose
+sapiens task "Refactor the utils.py module" --verbose
 
 # With custom settings
-sapiens react "Add error handling to api.py" \
+sapiens task "Add error handling to api.py" \
   --model qwen3:latest \
   --max-iterations 15 \
   --working-dir /path/to/project
@@ -383,13 +383,13 @@ sapiens show-plan --plan-id <id>
 
 ```bash
 # Single task execution
-sapiens react "<task description>"
+sapiens task "<task description>"
 
 # Interactive REPL
-sapiens react --repl
+sapiens task --repl
 
 # With options
-sapiens react "<task>" \
+sapiens task "<task>" \
   --model <ollama-model> \
   --ollama-url <url> \
   --max-iterations <n> \
@@ -418,7 +418,7 @@ ollama serve &
 
 # 2. Start REPL in your project
 cd /path/to/my-project
-sapiens react --repl --model qwen3:8b
+sapiens task --repl --model qwen3:8b
 
 # 3. Interactively develop
 react> What's the structure of this project?
@@ -491,19 +491,19 @@ sapiens --config .sapiens/config.yaml daemon --interval 120
 
 ```bash
 # Create a file
-sapiens react "Create a Python script that downloads images from URLs"
+sapiens task "Create a Python script that downloads images from URLs"
 
 # Refactor existing code
-sapiens react "Refactor database.py to use async/await"
+sapiens task "Refactor database.py to use async/await"
 
 # Add documentation
-sapiens react "Add docstrings to all functions in utils/"
+sapiens task "Add docstrings to all functions in utils/"
 
 # Debug help
-sapiens react "Find why the tests in test_api.py are failing"
+sapiens task "Find why the tests in test_api.py are failing"
 
 # Code review
-sapiens react "Review main.py and suggest improvements"
+sapiens task "Review main.py and suggest improvements"
 ```
 
 ---
@@ -560,12 +560,12 @@ export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="2"
 
 2. **Use verbose mode when debugging**:
    ```bash
-   sapiens react "task" --verbose
+   sapiens task "task" --verbose
    ```
 
 3. **Adjust max iterations for complex tasks**:
    ```bash
-   sapiens react "complex refactoring task" --max-iterations 20
+   sapiens task "complex refactoring task" --max-iterations 20
    ```
 
 4. **Keep tasks focused** - Break large tasks into smaller ones.
@@ -664,7 +664,7 @@ sapiens --config /path/to/config.yaml process-issue --issue 1
 ### Start Ollama REPL
 ```bash
 ollama serve &
-sapiens react --repl --model qwen3:8b
+sapiens task --repl --model qwen3:8b
 ```
 
 ### Process Issue with Claude Code
@@ -679,5 +679,5 @@ sapiens --config .sapiens/config.yaml daemon --interval 120
 
 ### Execute Single Task
 ```bash
-sapiens react "Create a README.md for this project" --verbose
+sapiens task "Create a README.md for this project" --verbose
 ```

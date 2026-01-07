@@ -379,7 +379,7 @@ jobs:
 
           pip install repo-sapiens || pip3 install repo-sapiens
 
-          sapiens react "Analyze this SBOM and security report for a software project.
+          sapiens task "Analyze this SBOM and security report for a software project.
 
           $(cat sbom-report.md)
 

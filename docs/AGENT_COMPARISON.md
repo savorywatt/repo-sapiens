@@ -58,13 +58,13 @@ The ReAct (Reasoning + Acting) agent is built directly into repo-sapiens. It sup
 ```bash
 ollama serve
 ollama pull qwen3:8b
-sapiens react "Create a Python script that sorts a list"
+sapiens task "Create a Python script that sorts a list"
 ```
 
 **With vLLM (OpenAI-compatible):**
 ```bash
 vllm serve Qwen/Qwen2.5-Coder-32B-Instruct --port 8000
-sapiens react --ollama-url http://localhost:8000/v1 "Create hello.py"
+sapiens task --ollama-url http://localhost:8000/v1 "Create hello.py"
 ```
 
 ### Configuration
