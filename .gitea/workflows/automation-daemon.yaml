@@ -1,34 +1,25 @@
-# @repo-sapiens-template
-# @version: 1.1.0
-# @name: automation-daemon
-#
 # Sapiens Automation Daemon for Gitea Actions
 #
-# This workflow runs repo-sapiens periodically to process issues automatically.
+# This workflow runs repo-sapiens periodically to process issues automatically
+# using a local Ollama instance for AI processing.
 #
-# Setup:
-# 1. Copy this file to .gitea/workflows/automation-daemon.yaml
-# 2. Set required secrets in your repo settings:
-#    - SAPIENS_GITEA_TOKEN: Your Gitea API token
-#      (Note: Gitea reserves GITEA_* prefix for internal use)
-#    - OPENAI_API_KEY: (if using Goose with OpenAI)
-#    - ANTHROPIC_API_KEY or CLAUDE_API_KEY: (if using Claude)
-# 3. Update CONFIG_FILE to match your config
+# Required secrets:
+#   - SAPIENS_GITEA_TOKEN: Gitea API token with repo/issue access
 
 name: Sapiens Daemon
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
+    - cron: '*/15 * * * *'  # Every 15 minutes
   workflow_dispatch:  # Manual trigger
 
 env:
-  # Change this to your config file (use sapiens_config.ci.yaml for CI/CD specific config)
-  CONFIG_FILE: sapiens_config.yaml
+  CONFIG_FILE: sapiens_config.ci.yaml
 
 jobs:
   process-pending:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -39,29 +30,33 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install repo-sapiens
+      - name: Install repo-sapiens from source
         run: |
-          pip install repo-sapiens
-          # If using Goose, also install it:
-          # pip install goose-ai
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Verify installation
+        run: |
+          sapiens --version || echo "Version check failed, continuing..."
+          sapiens --help
 
       - name: Process all pending issues
         env:
           # Git provider credentials
           GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           GITEA_API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-
-          # AI provider credentials (uncomment the one you use)
-          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          # Gitea server URL (for API calls)
+          GITEA_URL: ${{ gitea.server_url }}
         run: |
-          sapiens --config $CONFIG_FILE process-all --log-level INFO
+          echo "Using config: $CONFIG_FILE"
+          echo "Server URL: $GITEA_URL"
+          sapiens --config "$CONFIG_FILE" process-all --log-level DEBUG
 
       - name: Upload state artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: workflow-state-${{ gitea.run_number }}
-          path: .automation/state/
+          path: .sapiens/state/
           retention-days: 7
+          if-no-files-found: ignore
