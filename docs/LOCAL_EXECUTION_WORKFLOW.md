@@ -60,7 +60,7 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama serve
 
 # Pull recommended models (in another terminal)
-ollama pull qwen3:latest       # Best for code tasks (recommended)
+ollama pull qwen3:8b           # Best for code tasks (recommended)
 ollama pull llama3.1:8b        # Good general purpose, faster
 ollama pull deepseek-coder:6.7b # Efficient code model
 
@@ -77,7 +77,7 @@ The easiest way to use the ReAct agent is through the interactive REPL:
 sapiens react --repl
 
 # With specific model
-sapiens react --repl --model qwen3:latest
+sapiens react --repl --model qwen3:8b
 
 # With custom working directory
 sapiens react --repl --working-dir /path/to/project
@@ -98,15 +98,15 @@ sapiens react --repl --working-dir /path/to/project
 **Example REPL Session:**
 
 ```
-$ sapiens react --repl --model qwen3:latest
+$ sapiens react --repl --model qwen3:8b
 
 ============================================================
 ReAct Agent REPL
 ============================================================
-Model: qwen3:latest
+Model: qwen3:8b
 Ollama: http://localhost:11434
 Working directory: /home/user/my-project
-Available models: qwen3:latest, llama3.1:8b, deepseek-coder:6.7b
+Available models: qwen3:8b, llama3.1:8b, deepseek-coder:6.7b
 
 Commands:
   Type a task to execute it
@@ -123,7 +123,7 @@ react> Create a Python function that calculates fibonacci numbers
 
 [Task #1] Create a Python function that calculates fibonacci numbers
 
-Starting ReAct agent with model: qwen3:latest
+Starting ReAct agent with model: qwen3:8b
 
 --- Result ---
 Status: SUCCESS
@@ -214,7 +214,7 @@ ACTION_INPUT: {"answer": "Found 3 Python files that import requests:\n- api/clie
 Configure repo-sapiens to use Ollama for issue processing:
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
@@ -227,13 +227,13 @@ repository:
 
 agent_provider:
   provider_type: ollama
-  model: qwen3:latest
+  model: qwen3:8b
   base_url: http://localhost:11434
   local_mode: true
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   max_concurrent_tasks: 1
 ```
 
@@ -259,7 +259,7 @@ Use the full power of Claude Code for local task execution.
 ### 2.1 Install Claude Code
 
 ```bash
-# Install Claude Code CLI
+# Install Claude Code
 npm install -g @anthropic-ai/claude-code
 
 # Verify installation
@@ -272,7 +272,7 @@ claude auth
 ### 2.2 Configure for Claude Local
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
@@ -285,13 +285,13 @@ repository:
 
 agent_provider:
   provider_type: claude-local
-  model: claude-sonnet-4.5
+  model: claude-sonnet-4-20250514
   local_mode: true
   # No API key needed - uses Claude Code authentication
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   max_concurrent_tasks: 1
 ```
 
@@ -401,7 +401,7 @@ sapiens react "<task>" \
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--config` | Path to config file | `repo_sapiens/config/automation_config.yaml` |
+| `--config` | Path to config file | `.sapiens/config.yaml` |
 | `--log-level` | Logging verbosity | `INFO` |
 
 ---
@@ -418,7 +418,7 @@ ollama serve &
 
 # 2. Start REPL in your project
 cd /path/to/my-project
-sapiens react --repl --model qwen3:latest
+sapiens react --repl --model qwen3:8b
 
 # 3. Interactively develop
 react> What's the structure of this project?
@@ -440,7 +440,7 @@ git commit -m "Add user profile API endpoint"
 
 ```bash
 # 1. Configure for claude-local
-cat > repo_sapiens/config/local_config.yaml << 'EOF'
+cat > .sapiens/config.yaml << 'EOF'
 git_provider:
   provider_type: gitea
   base_url: http://localhost:3000
@@ -453,7 +453,7 @@ repository:
 
 agent_provider:
   provider_type: claude-local
-  model: claude-sonnet-4.5
+  model: claude-sonnet-4-20250514
   local_mode: true
 EOF
 
@@ -461,7 +461,7 @@ EOF
 export SAPIENS_GITEA_TOKEN="your-gitea-token"
 
 # 3. Process an issue
-sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 15
+sapiens --config .sapiens/config.yaml process-issue --issue 15
 
 # Claude Code will:
 # - Read the issue
@@ -478,7 +478,7 @@ sapiens --config repo_sapiens/config/local_config.yaml process-issue --issue 15
 
 ```bash
 # Start daemon with Ollama backend
-sapiens --config repo_sapiens/config/ollama_config.yaml daemon --interval 120
+sapiens --config .sapiens/config.yaml daemon --interval 120
 
 # The daemon will:
 # - Poll Gitea every 2 minutes
@@ -515,7 +515,7 @@ sapiens react "Review main.py and suggest improvements"
 ```yaml
 agent_provider:
   provider_type: ollama
-  model: qwen3:latest           # Model name
+  model: qwen3:8b              # Model name
   base_url: http://localhost:11434  # Ollama server URL
   local_mode: true
 ```
@@ -525,7 +525,7 @@ agent_provider:
 ```yaml
 agent_provider:
   provider_type: claude-local
-  model: claude-sonnet-4.5       # Claude model
+  model: claude-sonnet-4-20250514  # Claude model
   local_mode: true
   # No API key - uses Claude Code auth
 ```
@@ -539,7 +539,7 @@ export SAPIENS_GITEA_TOKEN="your-token"
 
 # Ollama settings
 export OLLAMA_BASE_URL="http://localhost:11434"
-export OLLAMA_MODEL="qwen3:latest"
+export OLLAMA_MODEL="qwen3:8b"
 
 # Override config values
 export AUTOMATION__AGENT_PROVIDER__MODEL="llama3.1:8b"
@@ -553,7 +553,7 @@ export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="2"
 ### For Ollama + ReAct
 
 1. **Choose the right model**:
-   - `qwen3:latest` - Best balance for code tasks (recommended)
+   - `qwen3:8b` - Best balance for code tasks (recommended)
    - `codellama:7b` - Fast, good for simple tasks
    - `llama3.1:8b` - Good general purpose
    - `deepseek-coder:6.7b` - Efficient code model
@@ -578,8 +578,8 @@ export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="2"
    ```
 
 2. **Use appropriate model**:
-   - `claude-sonnet-4.5` - Fast, good for most tasks
-   - `claude-opus-4.5` - Best quality for complex tasks
+   - `claude-sonnet-4-20250514` - Fast, good for most tasks
+   - `claude-opus-4-20250514` - Best quality for complex tasks
 
 3. **Interactive Q&A** - Claude Code can ask questions via issue comments when it needs clarification.
 
@@ -618,11 +618,11 @@ curl http://localhost:11434/api/tags
 ollama list
 
 # Pull missing model
-ollama pull qwen3:latest
+ollama pull qwen3:8b
 ```
 
 **Slow performance**
-- Use a smaller model: `qwen3:latest` or `codellama:7b`
+- Use a smaller model: `qwen3:8b` or `codellama:7b`
 - Ensure sufficient RAM
 - Check GPU acceleration is working: `nvidia-smi`
 
@@ -664,17 +664,17 @@ sapiens --config /path/to/config.yaml process-issue --issue 1
 ### Start Ollama REPL
 ```bash
 ollama serve &
-sapiens react --repl --model qwen3:latest
+sapiens react --repl --model qwen3:8b
 ```
 
 ### Process Issue with Claude Code
 ```bash
-sapiens --config repo_sapiens/config/claude_config.yaml process-issue --issue 42
+sapiens --config .sapiens/config.yaml process-issue --issue 42
 ```
 
 ### Run Daemon with Ollama
 ```bash
-sapiens --config repo_sapiens/config/ollama_config.yaml daemon --interval 120
+sapiens --config .sapiens/config.yaml daemon --interval 120
 ```
 
 ### Execute Single Task

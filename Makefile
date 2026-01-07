@@ -44,9 +44,9 @@ test-unit:
 test-integration:
 	uv run pytest tests/integration/ -n 0
 
-# Coverage requires sequential execution for accurate results
+# Coverage with parallel execution (pytest-cov handles xdist automatically)
 test-cov:
-	uv run pytest tests/ -n 0 --cov=repo_sapiens --cov-report=html --cov-report=term-missing --cov-fail-under=10
+	uv run pytest tests/ -n 4 --cov=repo_sapiens --cov-report=html --cov-report=term-missing --cov-fail-under=10
 
 # Verbose output for debugging
 test-verbose:

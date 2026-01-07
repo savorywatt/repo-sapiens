@@ -82,8 +82,8 @@ For development or to use the latest features:
 git clone https://github.com/savorywatt/repo-sapiens.git
 cd repo-sapiens
 
-# Install in development mode
-pip install -e .
+# Install in development mode (using uv)
+uv pip install -e .
 
 # Verify installation
 sapiens --version

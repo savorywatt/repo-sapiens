@@ -198,7 +198,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
   review_approval_threshold: 0.8
@@ -238,7 +238,7 @@ agent_provider:
 
 workflow:
   plans_directory: plans
-  state_directory: .automation/state
+  state_directory: .sapiens/state
   branching_strategy: per-agent
   max_concurrent_tasks: 3
   review_approval_threshold: 0.8
@@ -274,7 +274,7 @@ sapiens init [OPTIONS]
 
 **`--config-path PATH`**
 - Where to save configuration file
-- Default: `repo_sapiens/config/automation_config.yaml`
+- Default: `.sapiens/config.yaml`
 - Example: `sapiens init --config-path config/my_config.yaml`
 
 **`--backend [keyring|environment|encrypted]`**
@@ -329,7 +329,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    Navigate to: https://gitea.example.com/myuser/my-repo/settings/secrets
 
 📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+   ✓ Created: .sapiens/config.yaml
 
 ✓ Validating setup...
    ✓ Credentials validated
@@ -343,7 +343,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    https://gitea.example.com/myuser/my-repo/issues
 
 2. Run the sapiens daemon:
-   sapiens --config repo_sapiens/config/automation_config.yaml daemon --interval 60
+   sapiens --config .sapiens/config.yaml daemon --interval 60
 
 3. Watch the automation work!
 ```
@@ -416,7 +416,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    Navigate to: https://gitlab.com/mygroup/subgroup/my-project/-/settings/ci_cd
 
 📝 Creating configuration file...
-   ✓ Created: repo_sapiens/config/automation_config.yaml
+   ✓ Created: .sapiens/config.yaml
 
 ✓ Validating setup...
    ✓ Credentials validated
@@ -430,7 +430,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    https://gitlab.com/mygroup/subgroup/my-project/-/issues
 
 2. Run the sapiens daemon:
-   sapiens --config repo_sapiens/config/automation_config.yaml daemon --interval 60
+   sapiens --config .sapiens/config.yaml daemon --interval 60
 
 3. Watch the automation create merge requests!
 ```
@@ -529,13 +529,13 @@ jobs:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          sapiens --config repo_sapiens/config/automation_config.yaml process-all
+          sapiens --config .sapiens/config.yaml process-all
 ```
 
 The workflow uses environment variable references in the config:
 
 ```yaml
-# repo_sapiens/config/automation_config.yaml
+# .sapiens/config.yaml
 git_provider:
   api_token: ${GITEA_TOKEN}  # Resolved from env var
 

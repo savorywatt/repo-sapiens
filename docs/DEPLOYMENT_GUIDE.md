@@ -179,50 +179,17 @@ sapiens list-plans
 2. Click on any run to view logs
 3. Download artifacts for debugging
 
-### 7. Configure Webhook (Optional)
-
-For real-time processing instead of cron-based:
-
-1. Deploy webhook server:
-   ```bash
-   # On server
-   uvicorn automation.webhook_server:app --host 0.0.0.0 --port 8000
-
-   # Or with systemd service
-   sudo systemctl enable automation-webhook
-   sudo systemctl start automation-webhook
-   ```
-
-2. Configure in Gitea:
-   - Repository Settings → Webhooks
-   - Click "Add Webhook" → Gitea
-   - Payload URL: `https://your-server.com/webhook/gitea`
-   - Content Type: `application/json`
-   - Secret: (optional)
-   - Events: Select "Issues" and "Push"
-   - Active: Checked
-   - Click "Add Webhook"
-
-3. Test webhook:
-   - Webhook Settings → "Test Delivery"
-   - Check webhook server logs
-
 ## Verification Checklist
 
 - [ ] Code pushed to Gitea
-- [ ] Core secrets configured (AUTOMATION__GIT_PROVIDER__API_TOKEN, AUTOMATION__GIT_PROVIDER__BASE_URL)
-- [ ] AI provider secrets configured:
-  - [ ] **Ollama**: AUTOMATION__OLLAMA__BASE_URL, AUTOMATION__OLLAMA__MODEL
-  - [ ] **Claude**: AUTOMATION__CLAUDE__API_KEY
+- [ ] Core secrets configured (`SAPIENS_GITEA_TOKEN`, `SAPIENS_CLAUDE_API_KEY`)
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
 - [ ] Workflow files present in `.gitea/workflows/`
-- [ ] (Ollama only) Ollama server running and model pulled
 - [ ] Test issue created with label
 - [ ] Workflow triggered successfully
 - [ ] Workflow logs show no errors
 - [ ] Health check passes
-- [ ] (Optional) Webhook configured and tested
 
 ## Troubleshooting
 
@@ -242,47 +209,10 @@ For real-time processing instead of cron-based:
 **Problem:** "401 Unauthorized" in workflow logs
 
 **Solutions:**
-1. Verify AUTOMATION__GIT_PROVIDER__API_TOKEN secret is set
+1. Verify `SAPIENS_GITEA_TOKEN` secret is set
 2. Check token has correct scopes
 3. Regenerate token if expired
 4. Ensure secret name matches exactly (case-sensitive)
-
-### Ollama Connection Issues
-
-**Problem:** "Ollama not running" or "Connection refused" errors
-
-**Solutions:**
-1. Verify Ollama is running: `curl http://localhost:11434/api/tags`
-2. Check AUTOMATION__OLLAMA__BASE_URL is correct
-3. Ensure runner can reach Ollama server (network/firewall)
-4. Verify model is pulled: `ollama list`
-
-```bash
-# Debug Ollama connectivity from runner
-curl http://localhost:11434/api/tags
-
-# If using remote Ollama, test connectivity
-curl http://ollama-server:11434/api/tags
-```
-
-### Ollama Model Not Found
-
-**Problem:** "Model not found" errors
-
-**Solutions:**
-1. Pull the model: `ollama pull codellama:13b`
-2. Check model name matches AUTOMATION__OLLAMA__MODEL exactly
-3. List available models: `ollama list`
-
-### Ollama Out of Memory
-
-**Problem:** Model fails to load or runs very slowly
-
-**Solutions:**
-1. Use smaller model: `codellama:7b` instead of `codellama:34b`
-2. Ensure sufficient RAM (model size + 2GB overhead)
-3. Check GPU memory if using GPU acceleration
-4. Close other applications using GPU memory
 
 ### Permission Errors
 
@@ -400,11 +330,7 @@ Create a simple dashboard to monitor automation:
 
 ```bash
 # View recent activity
-sapiens list-active-plans
-
-# Check for issues
-sapiens check-stale --max-age-hours 12
-sapiens check-failures --since-hours 24
+sapiens list-plans
 
 # Generate report
 sapiens health-check > /tmp/health.txt

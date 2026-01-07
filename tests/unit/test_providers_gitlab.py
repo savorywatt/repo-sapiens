@@ -23,7 +23,6 @@ from repo_sapiens.models.domain import IssueState
 from repo_sapiens.providers.gitlab_rest import GitLabRestProvider
 from repo_sapiens.utils.connection_pool import HTTPConnectionPool
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -397,9 +396,7 @@ class TestGitLabRestProviderIssues:
         mock_pool.post = AsyncMock(return_value=mock_response)
         provider._pool = mock_pool
 
-        issue = await provider.create_issue(
-            title="New bug report", body="Description of the bug"
-        )
+        issue = await provider.create_issue(title="New bug report", body="Description of the bug")
 
         assert issue.id == 1001
         call_args = mock_pool.post.call_args

@@ -6,11 +6,14 @@ This guide explains how to use the Gitea automation system in CI/CD environments
 
 The automation system provides several workflows that run automatically in response to repository events:
 
-1. **Automation Trigger** - Processes issues based on labels
-2. **Plan Merged** - Generates prompts when plans are merged
-3. **Automation Daemon** - Periodically processes pending issues
-4. **Monitor** - Health checks and failure detection
-5. **Tests** - Runs tests on PRs and pushes
+1. **Needs Planning** - Processes issues labeled for planning
+2. **Approved** - Handles approved plans
+3. **Execute Task** - Runs task execution
+4. **Needs Review** - Code review workflow
+5. **Needs Fix** - Handles issues requiring fixes
+6. **Requires QA** - QA workflow
+7. **Build Artifacts** - Artifact building
+8. **Tests** - Runs tests on PRs and pushes
 
 ## Workflow Files
 
@@ -18,41 +21,38 @@ All workflows are located in `.gitea/workflows/`:
 
 ```
 .gitea/workflows/
-├── automation-trigger.yaml   # Issue event handler
-├── plan-merged.yaml          # Plan merge handler
-├── automation-daemon.yaml    # Scheduled processor
-├── monitor.yaml              # Health monitoring
-└── test.yaml                 # Test runner
+├── needs-planning.yaml    # Issue planning handler
+├── approved.yaml          # Approved plan handler
+├── execute-task.yaml      # Task execution
+├── needs-review.yaml      # Code review workflow
+├── needs-fix.yaml         # Fix workflow
+├── requires-qa.yaml       # QA workflow
+├── build-artifacts.yaml   # Build artifacts
+└── test.yaml              # Test runner
 ```
 
-## Automation Trigger Workflow
+## Needs Planning Workflow
 
-**File:** `.gitea/workflows/automation-trigger.yaml`
+**File:** `.gitea/workflows/needs-planning.yaml`
 
 **Triggers:**
-- Issue opened
-- Issue labeled/unlabeled
-- Issue edited
-- Issue closed
-- Comment created
+- Issue labeled with `needs-planning`
 
 **How It Works:**
 
-1. Workflow triggers on issue event
-2. Examines issue labels to determine stage
-3. Calls appropriate `sapiens` CLI command
-4. Reports success/failure
+1. Workflow triggers on label event
+2. Calls `sapiens` CLI to generate plan
+3. Reports success/failure
 
-**Label to Stage Mapping:**
+**Label to Workflow Mapping:**
 
-| Label | Stage | Action |
-|-------|-------|--------|
-| `needs-planning` | planning | Generate development plan |
-| `plan-review` | plan-review | Review and approve plan |
-| `prompts` | prompts | Generate prompt issues |
-| `implement` | implementation | Execute task |
-| `code-review` | code-review | Review code changes |
-| `merge-ready` | merge | Create pull request |
+| Label | Workflow | Action |
+|-------|----------|--------|
+| `needs-planning` | needs-planning.yaml | Generate development plan |
+| `approved` | approved.yaml | Execute approved plan |
+| `needs-review` | needs-review.yaml | Review code changes |
+| `needs-fix` | needs-fix.yaml | Handle fix requests |
+| `requires-qa` | requires-qa.yaml | Run QA checks |
 
 **Example Usage:**
 
@@ -60,87 +60,6 @@ All workflows are located in `.gitea/workflows/`:
 2. Add label `needs-planning`
 3. Workflow automatically triggers
 4. Automation generates plan
-5. Plan review issue created
-
-## Plan Merged Workflow
-
-**File:** `.gitea/workflows/plan-merged.yaml`
-
-**Triggers:**
-- Push to `main` branch
-- Modified files in `plans/` directory
-
-**How It Works:**
-
-1. Detects which plan files changed
-2. Extracts plan ID from filename
-3. Generates prompt issues for each task
-4. Updates workflow state
-
-**Expected Plan Format:**
-
-```
-plans/42-feature-name.md
-```
-
-Where `42` is the plan ID (usually matches issue number).
-
-**Example Usage:**
-
-1. Create plan file: `plans/42-add-auth.md`
-2. Commit and push to feature branch
-3. Create PR and merge to main
-4. Workflow triggers and generates prompt issues
-
-## Automation Daemon Workflow
-
-**File:** `.gitea/workflows/automation-daemon.yaml`
-
-**Triggers:**
-- Scheduled: Every 5 minutes (cron)
-- Manual: workflow_dispatch
-
-**How It Works:**
-
-1. Processes all pending issues
-2. Checks for stale workflows (>24 hours)
-3. Uploads state files as artifacts
-
-**Manual Trigger:**
-
-Via Gitea UI:
-1. Go to Actions tab
-2. Select "Automation Daemon"
-3. Click "Run workflow"
-
-Via CLI:
-```bash
-curl -X POST "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/workflows/automation-daemon.yaml/dispatches" \
-  -H "Authorization: token ${GITEA_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{"ref": "main"}'
-```
-
-## Monitor Workflow
-
-**File:** `.gitea/workflows/monitor.yaml`
-
-**Triggers:**
-- Scheduled: Every 6 hours
-- Manual: workflow_dispatch
-
-**How It Works:**
-
-1. Generates health report
-2. Checks for failures in last 24 hours
-3. Uploads reports as artifacts
-
-**Viewing Reports:**
-
-1. Go to Actions tab
-2. Find completed "Automation Monitor" run
-3. Download "health-report" artifact
-4. View `health-report.md`
 
 ## Test Workflow
 
@@ -161,91 +80,6 @@ curl -X POST "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/work
 
 The automation system provides several commands designed for CI/CD:
 
-### process-issue
-
-Process specific issue at given stage.
-
-```bash
-sapiens process-issue --issue 42 --stage planning
-```
-
-**Options:**
-- `--issue`: Issue number (required)
-- `--stage`: Stage to execute (required)
-  - Choices: planning, plan-review, prompts, implementation, code-review, merge
-
-**Usage in Workflows:**
-```yaml
-- name: Process issue
-  run: |
-    sapiens process-issue \
-      --issue ${{ github.event.issue.number }} \
-      --stage planning
-```
-
-### generate-prompts
-
-Generate prompt issues from plan file.
-
-```bash
-sapiens generate-prompts --plan-file plans/42-feature.md --plan-id 42
-```
-
-**Options:**
-- `--plan-file`: Path to plan markdown file (required)
-- `--plan-id`: Plan identifier (required)
-
-**Usage in Workflows:**
-```yaml
-- name: Generate prompts
-  run: |
-    sapiens generate-prompts \
-      --plan-file "$plan_file" \
-      --plan-id "$plan_id"
-```
-
-### process-all
-
-Process all pending issues.
-
-```bash
-sapiens process-all
-```
-
-**Usage in Workflows:**
-```yaml
-- name: Process all pending
-  run: sapiens process-all --log-level INFO
-```
-
-### list-active-plans
-
-List all active workflow plans.
-
-```bash
-sapiens list-active-plans
-```
-
-**Output:**
-```
-Active Plans:
-  - Plan 42: in_progress
-    Updated: 2025-12-20T10:30:00
-  - Plan 43: pending
-    Updated: 2025-12-20T09:15:00
-```
-
-### check-stale
-
-Check for stale workflows.
-
-```bash
-sapiens check-stale --max-age-hours 24
-```
-
-**Options:**
-- `--max-age-hours`: Maximum age before considering stale (default: 24)
-
 ### health-check
 
 Generate health check report.
@@ -259,45 +93,43 @@ sapiens health-check
 # Automation System Health Report
 Generated: 2025-12-20T10:30:00
 
-## Active Plans: 2
-
-## Failed Plans: 0
-
 ## Provider Health
-- Git Provider: Configuration loaded ✓
-- Agent Provider: Configuration loaded ✓
-- State Manager: Operational ✓
+- Git Provider: Configuration loaded
+- Agent Provider: Configuration loaded
+- State Manager: Operational
 ```
 
-### check-failures
+### list-plans
 
-Check for workflow failures.
+List all workflow plans.
 
 ```bash
-sapiens check-failures --since-hours 24
+sapiens list-plans
 ```
 
-**Options:**
-- `--since-hours`: Check failures since N hours (default: 24)
+**Output:**
+```
+Active Plans:
+  - Plan 42: in_progress
+    Updated: 2025-12-20T10:30:00
+  - Plan 43: pending
+    Updated: 2025-12-20T09:15:00
+```
 
 ## Environment Variables
 
 Workflows use these environment variables:
 
-### Required
-- `GITEA_TOKEN`: Gitea API token
-- `CLAUDE_API_KEY`: Claude API key
+### Required Secrets
+- `SAPIENS_GITEA_TOKEN`: Gitea API token
+- `SAPIENS_CLAUDE_API_KEY`: Claude API key
 
-### Automatic (GitHub/Gitea Actions)
-- `GITHUB_REPOSITORY_OWNER`: Repository owner
-- `GITHUB_REPOSITORY`: Repository name
-- `GITHUB_REF_NAME`: Branch name
-- `GITHUB_SERVER_URL`: Gitea server URL
-
-### Configuration Overrides
-- `AUTOMATION__GIT_PROVIDER__API_TOKEN`: Override git token
-- `AUTOMATION__AGENT_PROVIDER__API_KEY`: Override agent key
-- `AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS`: Override concurrency
+### Gitea Actions Context Variables
+For Gitea workflows, use the `gitea.event.*` context:
+- `gitea.event.issue.number`: Issue number
+- `gitea.event.repository.owner.login`: Repository owner
+- `gitea.event.repository.name`: Repository name
+- `gitea.server_url`: Gitea server URL
 
 ## Monitoring Workflows
 

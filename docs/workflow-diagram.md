@@ -30,7 +30,6 @@ Implementation → Code Review → Merge → Pull Request
          ▼
 ┌─────────────────────────┐
 │ CLI: process-issue      │
-│ --stage planning        │
 └────────┬────────────────┘
          │
          ▼
@@ -76,14 +75,8 @@ Implementation → Code Review → Merge → Pull Request
          │
          ▼
 ┌─────────────────────────┐
-│ Gitea Actions Trigger   │
-│ (plan-merged)           │
-└────────┬────────────────┘
-         │
-         ▼
-┌─────────────────────────┐
-│ CLI: generate-prompts   │
-│ parses plan file        │
+│ Plan ready for          │
+│ implementation          │
 └─────────────────────────┘
 ```
 
@@ -253,9 +246,7 @@ pending → in_progress → completed
 
 ```
 Issue Event         →  automation-trigger.yaml
-Plan Merge (push)   →  plan-merged.yaml
 Cron Schedule       →  automation-daemon.yaml
-Cron Schedule       →  monitor.yaml
 PR/Push             →  test.yaml
 ```
 

@@ -522,7 +522,7 @@ Try each backend in order:
 Trigger
 (Manual/Webhook/Scheduled)
     ↓
-WorkflowOrchestrator.execute_workflow()
+WorkflowOrchestrator.process_issue()
     ↓
 StateManager: Load previous state if recovering
     ↓
