@@ -119,7 +119,7 @@ Commands:
   /quit          - Exit REPL
 ============================================================
 
-react> Create a Python function that calculates fibonacci numbers
+task> Create a Python function that calculates fibonacci numbers
 
 [Task #1] Create a Python function that calculates fibonacci numbers
 
@@ -136,7 +136,7 @@ Created fibonacci.py with the following function:
 
 Files changed: fibonacci.py
 
-react> Add unit tests for the fibonacci function
+task> Add unit tests for the fibonacci function
 
 [Task #2] Add unit tests for the fibonacci function
 
@@ -151,7 +151,7 @@ Created test_fibonacci.py with pytest tests:
 
 Files changed: test_fibonacci.py
 
-react> /quit
+task> /quit
 Goodbye!
 ```
 
@@ -421,11 +421,11 @@ cd /path/to/my-project
 sapiens task --repl --model qwen3:8b
 
 # 3. Interactively develop
-react> What's the structure of this project?
-react> Create a new API endpoint for user profiles
-react> Add validation for the email field
-react> Write tests for the new endpoint
-react> /quit
+task> What's the structure of this project?
+task> Create a new API endpoint for user profiles
+task> Add validation for the email field
+task> Write tests for the new endpoint
+task> /quit
 
 # 4. Review and commit changes
 git status
