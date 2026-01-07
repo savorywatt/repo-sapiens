@@ -45,8 +45,8 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
         ctx.obj = {"settings": None}
         return
 
-    # React can optionally use config but doesn't require it
-    if ctx.invoked_subcommand == "react":
+    # Task command can optionally use config but doesn't require it
+    if ctx.invoked_subcommand == "task":
         config_path = Path(config)
         if config_path.exists():
             try:
@@ -293,7 +293,7 @@ def task_command(
         while True:
             try:
                 user_input = click.prompt(
-                    click.style("react", fg="cyan") + click.style("> ", fg="white"),
+                    click.style("task", fg="cyan") + click.style("> ", fg="white"),
                     prompt_suffix="",
                 ).strip()
 

@@ -1218,23 +1218,32 @@ tags:
         def deploy_template(template_name: str, target_dir: Path) -> bool:
             """Deploy a single template file."""
             template_subpath = f"{template_base}/{template_name}"
+            content = None
+
             try:
-                # Try importlib.resources
-                template_files = (
-                    importlib.resources.files("repo_sapiens") / "templates" / template_subpath
-                )
-                if hasattr(template_files, "read_text"):
-                    content = template_files.read_text()
-                else:
-                    # Fallback: read from file system
+                # First try: repo root templates/ directory (development mode)
+                repo_root = Path(__file__).parent.parent.parent
+                template_path = repo_root / "templates" / template_subpath
+                if template_path.exists():
+                    content = template_path.read_text()
+
+                # Second try: package templates directory
+                if content is None:
                     package_dir = Path(__file__).parent.parent
                     template_path = package_dir / "templates" / template_subpath
                     if template_path.exists():
                         content = template_path.read_text()
-                    else:
-                        repo_root = Path(__file__).parent.parent.parent
-                        template_path = repo_root / "templates" / template_subpath
-                        content = template_path.read_text()
+
+                # Third try: importlib.resources (installed package)
+                if content is None:
+                    template_files = (
+                        importlib.resources.files("repo_sapiens") / "templates" / template_subpath
+                    )
+                    if template_files.is_file():
+                        content = template_files.read_text()
+
+                if content is None:
+                    return False
 
                 # For GitLab, core workflows go to .gitlab-ci.yml
                 if self.provider_type == "gitlab" and not template_name.startswith("examples/"):

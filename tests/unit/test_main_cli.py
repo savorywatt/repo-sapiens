@@ -1,7 +1,7 @@
 """Comprehensive unit tests for repo_sapiens.main CLI module.
 
 This module tests the main CLI entry point including:
-- All CLI commands (daemon, process-issue, process-all, process-plan, list-plans, show-plan, react)
+- All CLI commands (daemon, process-issue, process-all, process-plan, list-plans, show-plan, task)
 - Command options and arguments
 - Error handling for missing config
 - Help text generation
@@ -158,9 +158,9 @@ class TestCLIHelpText:
         assert "plan status" in result.output or "plan status" in result_alt.output
         assert "--plan-id" in result.output or "--plan-id" in result_alt.output
 
-    def test_react_help(self, cli_runner):
-        """Test react command help."""
-        result = cli_runner.invoke(cli, ["react", "--help"])
+    def test_task_help(self, cli_runner):
+        """Test task command help."""
+        result = cli_runner.invoke(cli, ["task", "--help"])
         assert result.exit_code == 0
         assert "Run a task using the ReAct agent" in result.output
         assert "--model" in result.output
@@ -207,10 +207,10 @@ class TestConfigurationLoading:
         # Should not fail due to missing config
         assert "Configuration file not found" not in result.output
 
-    def test_config_not_required_for_react(self, cli_runner):
-        """Test react command does not require config file."""
-        # React should fail for other reasons but not config
-        result = cli_runner.invoke(cli, ["--config", "/nonexistent/config.yaml", "react", "--help"])
+    def test_config_not_required_for_task(self, cli_runner):
+        """Test task command does not require config file."""
+        # Task should fail for other reasons but not config
+        result = cli_runner.invoke(cli, ["--config", "/nonexistent/config.yaml", "task", "--help"])
         assert result.exit_code == 0  # Help should work
 
     def test_config_not_required_for_credentials(self, cli_runner):
@@ -513,77 +513,77 @@ class TestShowPlanCommand:
 
 
 # =============================================================================
-# react Command Tests
+# task Command Tests
 # =============================================================================
 
 
-class TestReactCommand:
-    """Test react command."""
+class TestTaskCommand:
+    """Test task command."""
 
-    def test_react_requires_task_or_repl(self, cli_runner):
-        """Test react command requires either TASK or --repl."""
-        result = cli_runner.invoke(cli, ["react"])
+    def test_task_requires_task_or_repl(self, cli_runner):
+        """Test task command requires either TASK or --repl."""
+        result = cli_runner.invoke(cli, ["task"])
         assert result.exit_code == 1
-        assert "Either provide a TASK or use --repl" in result.output
+        assert "Either provide a PROMPT or use --repl" in result.output
 
-    def test_react_accepts_task_argument(self, cli_runner):
-        """Test react command accepts task argument."""
+    def test_task_accepts_task_argument(self, cli_runner):
+        """Test task command accepts task argument."""
         with patch("repo_sapiens.main.asyncio.run") as mock_run:
             mock_run.side_effect = RuntimeError("Connection refused")
-            result = cli_runner.invoke(cli, ["react", "Create a hello.py file"])
+            result = cli_runner.invoke(cli, ["task", "Create a hello.py file"])
 
         # Should fail due to mocked connection error, not argument parsing
         assert "Connection refused" in result.output or result.exit_code == 1
 
-    def test_react_model_option(self, cli_runner):
-        """Test react command accepts --model option."""
-        result = cli_runner.invoke(cli, ["react", "--model", "llama2:7b", "--help"])
+    def test_task_model_option(self, cli_runner):
+        """Test task command accepts --model option."""
+        result = cli_runner.invoke(cli, ["task", "--model", "llama2:7b", "--help"])
         # Help should show the model option
         assert "--model" in result.output
 
-    def test_react_ollama_url_option(self, cli_runner):
-        """Test react command accepts --ollama-url option."""
+    def test_task_ollama_url_option(self, cli_runner):
+        """Test task command accepts --ollama-url option."""
         result = cli_runner.invoke(
-            cli, ["react", "--ollama-url", "http://localhost:12345", "--help"]
+            cli, ["task", "--ollama-url", "http://localhost:12345", "--help"]
         )
         assert "--ollama-url" in result.output
 
-    def test_react_max_iterations_option(self, cli_runner):
-        """Test react command accepts --max-iterations option."""
-        result = cli_runner.invoke(cli, ["react", "--max-iterations", "5", "--help"])
+    def test_task_max_iterations_option(self, cli_runner):
+        """Test task command accepts --max-iterations option."""
+        result = cli_runner.invoke(cli, ["task", "--max-iterations", "5", "--help"])
         assert "--max-iterations" in result.output
 
-    def test_react_working_dir_option(self, cli_runner, tmp_path):
-        """Test react command accepts --working-dir option."""
-        result = cli_runner.invoke(cli, ["react", "--working-dir", str(tmp_path), "--help"])
+    def test_task_working_dir_option(self, cli_runner, tmp_path):
+        """Test task command accepts --working-dir option."""
+        result = cli_runner.invoke(cli, ["task", "--working-dir", str(tmp_path), "--help"])
         assert "--working-dir" in result.output
 
-    def test_react_verbose_flag(self, cli_runner):
-        """Test react command accepts --verbose flag."""
-        result = cli_runner.invoke(cli, ["react", "--verbose", "--help"])
+    def test_task_verbose_flag(self, cli_runner):
+        """Test task command accepts --verbose flag."""
+        result = cli_runner.invoke(cli, ["task", "--verbose", "--help"])
         assert "--verbose" in result.output or "-v" in result.output
 
-    def test_react_repl_flag(self, cli_runner):
-        """Test react command accepts --repl flag."""
-        result = cli_runner.invoke(cli, ["react", "--repl", "--help"])
+    def test_task_repl_flag(self, cli_runner):
+        """Test task command accepts --repl flag."""
+        result = cli_runner.invoke(cli, ["task", "--repl", "--help"])
         assert "--repl" in result.output
 
     @patch("repo_sapiens.main.asyncio.run")
-    def test_react_keyboard_interrupt(self, mock_run, cli_runner):
-        """Test react handles KeyboardInterrupt."""
+    def test_task_keyboard_interrupt(self, mock_run, cli_runner):
+        """Test task handles KeyboardInterrupt."""
         mock_run.side_effect = KeyboardInterrupt()
 
-        result = cli_runner.invoke(cli, ["react", "Test task"])
+        result = cli_runner.invoke(cli, ["task", "Test task"])
 
         assert result.exit_code == 130
         assert "Interrupted" in result.output
 
     @patch("repo_sapiens.main.asyncio.run")
-    def test_react_runtime_error(self, mock_run, cli_runner):
-        """Test react handles runtime errors."""
+    def test_task_runtime_error(self, mock_run, cli_runner):
+        """Test task handles runtime errors."""
         mock_run.side_effect = RuntimeError("Ollama not available")
 
-        result = cli_runner.invoke(cli, ["react", "Test task"])
+        result = cli_runner.invoke(cli, ["task", "Test task"])
 
         assert result.exit_code == 1
         assert "Ollama not available" in result.output
