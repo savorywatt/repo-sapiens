@@ -193,6 +193,36 @@ class RepoInitializer:
         # Fall back to environment
         return "environment"
 
+    def _normalize_url(self, url: str, service_name: str = "service") -> str:
+        """Normalize a URL by ensuring it has a protocol prefix.
+
+        Args:
+            url: The URL to normalize (may or may not have http/https prefix)
+            service_name: Name of the service for user prompts (e.g., "Ollama", "vLLM")
+
+        Returns:
+            URL with proper http:// or https:// prefix
+        """
+        url = url.strip()
+
+        # Already has protocol - return as-is
+        if url.startswith("http://") or url.startswith("https://"):
+            return url.rstrip("/")
+
+        # No protocol - ask user which one to use
+        click.echo()
+        click.echo(f"The URL '{url}' doesn't specify a protocol.")
+        use_https = click.confirm(
+            f"Use HTTPS for {service_name}? (No = HTTP)",
+            default=False,  # Default to HTTP for local services
+        )
+
+        protocol = "https" if use_https else "http"
+        normalized = f"{protocol}://{url}"
+        click.echo(f"  Using: {normalized}")
+
+        return normalized.rstrip("/")
+
     def _detect_existing_gitea_token(self) -> tuple[str | None, str | None]:
         """Check for existing Gitea token in keyring or environment.
 
@@ -627,7 +657,8 @@ class RepoInitializer:
         if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
             self.builtin_base_url = default_url
         else:
-            self.builtin_base_url = click.prompt("Ollama URL", default=default_url)
+            custom_url = click.prompt("Ollama URL (host:port)", default="localhost:11434")
+            self.builtin_base_url = self._normalize_url(custom_url, "Ollama")
 
     def _configure_builtin_vllm(self, provider_info: dict) -> None:
         """Configure vLLM for builtin agent."""
@@ -682,7 +713,8 @@ class RepoInitializer:
         if click.confirm("Use default vLLM URL (localhost:8000)?", default=True):
             self.builtin_base_url = default_url
         else:
-            self.builtin_base_url = click.prompt("vLLM URL", default=default_url)
+            custom_url = click.prompt("vLLM URL (host:port)", default="localhost:8000")
+            self.builtin_base_url = self._normalize_url(custom_url, "vLLM")
 
     def _configure_builtin_cloud(self, provider_info: dict) -> None:
         """Configure cloud LLM provider for builtin agent."""
