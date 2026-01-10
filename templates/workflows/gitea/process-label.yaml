@@ -1,0 +1,85 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: process-label
+#
+# Process Label Workflow for Gitea Actions
+#
+# Triggers when an issue or PR is labeled with a sapiens-managed label.
+# Routes to the appropriate handler based on configuration.
+
+name: Process Label
+
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    # Process any label starting with 'sapiens/' or configured labels
+    if: |
+      startsWith(gitea.event.label.name, 'sapiens/') ||
+      gitea.event.label.name == 'needs-planning' ||
+      gitea.event.label.name == 'needs-review' ||
+      gitea.event.label.name == 'execute'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Process label event
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          # Agent credentials (uncomment as needed)
+          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          ISSUE_NUMBER="${{ gitea.event.issue.number }}"
+          PR_NUMBER="${{ gitea.event.pull_request.number }}"
+          TARGET_NUMBER="${ISSUE_NUMBER:-$PR_NUMBER}"
+
+          echo "Processing label '${{ gitea.event.label.name }}' on #${TARGET_NUMBER}"
+
+          sapiens process-label \
+            --event-type "issues.labeled" \
+            --label "${{ gitea.event.label.name }}" \
+            --issue "${TARGET_NUMBER}" \
+            --source gitea
+
+      - name: Post success comment
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          TARGET_NUMBER="${{ gitea.event.issue.number || gitea.event.pull_request.number }}"
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "Label handler completed successfully for `${{ gitea.event.label.name }}`"}' \
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${TARGET_NUMBER}/comments"
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          TARGET_NUMBER="${{ gitea.event.issue.number || gitea.event.pull_request.number }}"
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "Label handler failed for `${{ gitea.event.label.name }}`. Check [workflow logs](${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }})."}' \
+            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${TARGET_NUMBER}/comments"

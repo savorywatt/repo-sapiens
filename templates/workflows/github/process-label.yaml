@@ -1,0 +1,54 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: process-label
+#
+# Process Label Workflow for GitHub Actions
+
+name: Process Label
+
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    if: |
+      startsWith(github.event.label.name, 'sapiens/') ||
+      github.event.label.name == 'needs-planning' ||
+      github.event.label.name == 'needs-review' ||
+      github.event.label.name == 'execute'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Process label event
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          TARGET_NUMBER="${ISSUE_NUMBER:-$PR_NUMBER}"
+
+          echo "Processing label '${{ github.event.label.name }}' on #${TARGET_NUMBER}"
+
+          sapiens process-label \
+            --event-type "issues.labeled" \
+            --label "${{ github.event.label.name }}" \
+            --issue "${TARGET_NUMBER}" \
+            --source github
