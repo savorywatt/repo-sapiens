@@ -3,7 +3,7 @@ name = "repo-sapiens"
 version = "0.3.0"
 description = "Intelligent repository automation and management tool"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = {text = "MIT"}
 authors = [
     {name = "savorywatt", email = "maintainer@savorywatt.com"}
@@ -13,7 +13,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Build Tools",
     "Topic :: Software Development :: Quality Assurance",
@@ -87,14 +86,14 @@ repo_sapiens = [
 
 [tool.black]
 line-length = 100
-target-version = ["py311"]
+target-version = ["py312"]
 # Prevent wrapping lines that Ruff prefers unwrapped
 skip-string-normalization = false
 skip-magic-trailing-comma = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "SIM"]
@@ -105,7 +104,7 @@ select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "SIM"]
 "tests/**/*.py" = ["SIM117", "F841"]  # Nested with statements and unused vars acceptable in tests
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
