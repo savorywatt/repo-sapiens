@@ -188,6 +188,9 @@ exclude_dirs = [
 # Exclude specific tests that are false positives for this project
 skips = [
     "B101",  # assert_used - we use asserts in tests and validation
+    "B105",  # hardcoded_password_string - credential reference templates, not actual passwords
+    "B110",  # try_except_pass - acceptable for optional keyring fallback
+    "B404",  # import_subprocess - subprocess usage is safe and necessary
     "B601",  # paramiko_calls - not using paramiko
     "B602",  # subprocess_popen_with_shell_equals_true - reviewed usages are safe
 ]

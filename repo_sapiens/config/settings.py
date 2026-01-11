@@ -131,7 +131,7 @@ class AutomationSettings(BaseSettings):
     agent_provider: AgentProviderConfig
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     tags: TagsConfig = Field(default_factory=TagsConfig)
-    automation: AutomationConfig | None = Field(default=None)
+    automation: AutomationConfig = Field(default_factory=AutomationConfig)
 
     @property
     def state_dir(self) -> Path:
