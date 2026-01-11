@@ -99,8 +99,9 @@ jobs:
             repo-sapiens:latest
             repo-sapiens:${{ gitea.sha }}
           outputs: type=docker,dest=/tmp/sapiens-image.tar
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Gitea Actions cache service has connectivity issues
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
 
       - name: Upload Docker image
         uses: actions/upload-artifact@v3
