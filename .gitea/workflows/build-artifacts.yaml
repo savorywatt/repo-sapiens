@@ -63,7 +63,7 @@ jobs:
           cat > package-info.json <<EOF
           {
             "version": "$(grep '^version = ' pyproject.toml | cut -d'"' -f2)",
-            "python_version": "3.11",
+            "python_version": "3.12",
             "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "git_commit": "${{ gitea.sha }}",
             "git_branch": "${{ gitea.ref_name }}"
@@ -78,63 +78,10 @@ jobs:
           path: package-info.json
           retention-days: 30
 
-  # Build Docker image
-  build-docker:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          tags: |
-            repo-sapiens:latest
-            repo-sapiens:${{ gitea.sha }}
-          outputs: type=docker,dest=/tmp/sapiens-image.tar
-          # Gitea Actions cache service has connectivity issues
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
-
-      - name: Upload Docker image
-        uses: actions/upload-artifact@v3
-        with:
-          name: docker-image
-          path: /tmp/sapiens-image.tar
-          retention-days: 7
-          # Docker images are large, shorter retention
-
-      - name: Create image metadata
-        run: |
-          cat > image-info.json <<EOF
-          {
-            "image_name": "repo-sapiens",
-            "tags": ["latest", "${{ gitea.sha }}"],
-            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "git_commit": "${{ gitea.sha }}",
-            "git_branch": "${{ gitea.ref_name }}"
-          }
-          EOF
-          cat image-info.json
-
-      - name: Upload image metadata
-        uses: actions/upload-artifact@v3
-        with:
-          name: docker-metadata
-          path: image-info.json
-          retention-days: 7
-
   # Test the built artifacts
   test-artifacts:
     name: Test Built Artifacts
-    needs: [build-package, build-docker]
+    needs: [build-package]
     runs-on: ubuntu-latest
 
     steps:
@@ -171,18 +118,6 @@ jobs:
           print('✅ Package imports work correctly')
           "
 
-      - name: Download Docker image
-        uses: actions/download-artifact@v3
-        with:
-          name: docker-image
-          path: /tmp/
-
-      - name: Load and test Docker image
-        run: |
-          docker load < /tmp/sapiens-image.tar
-          docker run --rm repo-sapiens:latest --help
-          echo "✅ Docker image works correctly"
-
       - name: Report success
         run: |
           echo "### ✅ Artifact Build Success" >> $GITHUB_STEP_SUMMARY
@@ -194,4 +129,3 @@ jobs:
           echo "Artifacts available for download:" >> $GITHUB_STEP_SUMMARY
           echo "- \`sapiens-wheel\` (Python package)" >> $GITHUB_STEP_SUMMARY
           echo "- \`sapiens-sdist\` (Source distribution)" >> $GITHUB_STEP_SUMMARY
-          echo "- \`docker-image\` (Docker container)" >> $GITHUB_STEP_SUMMARY
