@@ -31,6 +31,8 @@ Example Usage:
     ...     raise ConfigurationError(f"Config file not found: {path}") from e
 """
 
+from typing import Any
+
 
 class RepoSapiensError(Exception):
     """Base exception for all repo-sapiens errors.
@@ -352,7 +354,7 @@ class AgentToolError(AgentError):
         self,
         message: str,
         tool_name: str | None = None,
-        tool_args: dict | None = None,
+        tool_args: dict[str, Any] | None = None,
         agent_type: str | None = None,
         task_id: str | None = None,
     ) -> None:

@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repo_sapiens.config.credential_fields import CredentialSecret
+from repo_sapiens.config.triggers import AutomationConfig
 from repo_sapiens.exceptions import ConfigurationError
 
 
@@ -27,12 +28,8 @@ class GitProviderConfig(BaseModel):
     - api_token: "@encrypted:gitea/api_token"
     """
 
-    provider_type: Literal["gitea", "github", "gitlab"] = Field(
-        default="gitea", description="Type of Git provider"
-    )
-    mcp_server: str | None = Field(
-        default=None, description="Name of MCP server for Git operations"
-    )
+    provider_type: Literal["gitea", "github", "gitlab"] = Field(default="gitea", description="Type of Git provider")
+    mcp_server: str | None = Field(default=None, description="Name of MCP server for Git operations")
     base_url: HttpUrl = Field(..., description="Base URL of the Git provider")
     api_token: CredentialSecret = Field(
         ..., description="API token for authentication (supports @keyring:, ${ENV}, @encrypted:)"
@@ -53,9 +50,7 @@ class GooseConfig(BaseModel):
     toolkit: str = Field(default="default", description="Goose toolkit to use")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0, description="LLM temperature")
     max_tokens: int = Field(default=4096, ge=1, description="Maximum tokens for response")
-    llm_provider: str | None = Field(
-        default=None, description="LLM provider (openai, anthropic, ollama, etc.)"
-    )
+    llm_provider: str | None = Field(default=None, description="LLM provider (openai, anthropic, ollama, etc.)")
 
 
 class AgentProviderConfig(BaseModel):
@@ -81,9 +76,7 @@ class AgentProviderConfig(BaseModel):
         default=None,
         description="API key for cloud providers (supports @keyring:, ${ENV}, @encrypted:)",
     )
-    local_mode: bool = Field(
-        default=True, description="Whether to use local CLI (Claude Code or Goose)"
-    )
+    local_mode: bool = Field(default=True, description="Whether to use local CLI (Claude Code or Goose)")
     base_url: str | None = Field(
         default="http://localhost:11434", description="Base URL for Ollama or custom API endpoints"
     )
@@ -97,15 +90,11 @@ class WorkflowConfig(BaseModel):
     """Workflow behavior configuration."""
 
     plans_directory: str = Field(default="plans", description="Directory for plan files")
-    state_directory: str = Field(
-        default=".automation/state", description="Directory for state files"
-    )
+    state_directory: str = Field(default=".automation/state", description="Directory for state files")
     branching_strategy: Literal["per-agent", "shared"] = Field(
         default="per-agent", description="Branch creation strategy"
     )
-    max_concurrent_tasks: int = Field(
-        default=3, ge=1, le=10, description="Maximum concurrent agent tasks"
-    )
+    max_concurrent_tasks: int = Field(default=3, ge=1, le=10, description="Maximum concurrent agent tasks")
     review_approval_threshold: float = Field(
         default=0.8, ge=0.0, le=1.0, description="Minimum confidence for auto-approval"
     )
@@ -116,16 +105,12 @@ class TagsConfig(BaseModel):
 
     needs_planning: str = Field(default="needs-planning", description="Issue needs planning")
     plan_review: str = Field(default="plan-review", description="Plan is under review")
-    ready_to_implement: str = Field(
-        default="ready-to-implement", description="Plan approved, ready for implementation"
-    )
+    ready_to_implement: str = Field(default="ready-to-implement", description="Plan approved, ready for implementation")
     in_progress: str = Field(default="in-progress", description="Implementation in progress")
     code_review: str = Field(default="code-review", description="Code is under review")
     merge_ready: str = Field(default="merge-ready", description="Ready to merge")
     completed: str = Field(default="completed", description="Task completed")
-    needs_attention: str = Field(
-        default="needs-attention", description="Requires human intervention"
-    )
+    needs_attention: str = Field(default="needs-attention", description="Requires human intervention")
 
 
 class AutomationSettings(BaseSettings):
@@ -146,6 +131,7 @@ class AutomationSettings(BaseSettings):
     agent_provider: AgentProviderConfig
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     tags: TagsConfig = Field(default_factory=TagsConfig)
+    automation: AutomationConfig | None = Field(default=None)
 
     @property
     def state_dir(self) -> Path:
@@ -187,17 +173,13 @@ class AutomationSettings(BaseSettings):
             # Interpolate environment variables
             yaml_content = cls._interpolate_env_vars(yaml_content)
         except ValueError as e:
-            raise ConfigurationError(
-                f"Invalid environment variable reference in config: {e}"
-            ) from e
+            raise ConfigurationError(f"Invalid environment variable reference in config: {e}") from e
 
         try:
             # Parse YAML
             config_dict = yaml.safe_load(yaml_content)
             if not isinstance(config_dict, dict):
-                raise ConfigurationError(
-                    "Configuration must be a YAML object, not a list or scalar"
-                )
+                raise ConfigurationError("Configuration must be a YAML object, not a list or scalar")
         except yaml.YAMLError as e:
             raise ConfigurationError(f"Invalid YAML syntax in {config_path}: {e}") from e
 
