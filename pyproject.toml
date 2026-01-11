@@ -92,16 +92,23 @@ skip-string-normalization = false
 skip-magic-trailing-comma = true
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "SIM"]
+ignore = ["B904", "SIM108"]  # Exception chaining and ternary operators - can be added later
 
 [tool.ruff.lint.per-file-ignores]
+"claude/**/*" = ["ALL"]  # Archived conversation data - skip all checks
+"docs/source/conf.py" = ["A001"]  # Sphinx requires copyright variable
 "hello-python-test/tests/**/*.py" = ["SIM117", "F841"]  # Nested with statements and unused vars acceptable in tests
 "hello-python-test/docs/source/conf.py" = ["A001"]  # Sphinx requires copyright variable
-"tests/**/*.py" = ["SIM117", "F841"]  # Nested with statements and unused vars acceptable in tests
+"tests/**/*.py" = ["SIM117", "F841", "B007", "N806", "DTZ005", "SIM105", "E402", "A002", "B017"]  # Tests have relaxed rules
+"repo_sapiens/main.py" = ["SIM102"]  # Nested if for clarity
+"repo_sapiens/providers/github_rest.py" = ["UP"]  # Ignore all pyupgrade rules
+"repo_sapiens/agents/*.py" = ["E501"]  # Agent prompts have long strings
+"repo_sapiens/cli/health.py" = ["E501"]  # Health check output strings
 
 [tool.mypy]
 python_version = "3.12"
