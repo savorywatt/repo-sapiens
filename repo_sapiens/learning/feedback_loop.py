@@ -17,7 +17,7 @@ log = structlog.get_logger(__name__)
 class FeedbackLoop:
     """Learn from past executions to improve prompts and strategies."""
 
-    def __init__(self, feedback_dir: str = ".automation/feedback") -> None:
+    def __init__(self, feedback_dir: str = ".sapiens/feedback") -> None:
         self.feedback_dir = Path(feedback_dir)
         self.feedback_dir.mkdir(parents=True, exist_ok=True)
         self._lock = asyncio.Lock()

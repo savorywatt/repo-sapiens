@@ -76,7 +76,7 @@ def init_command(
         sapiens init
 
         # Non-interactive setup (for CI/CD)
-        export GITEA_TOKEN="your-token"
+        export SAPIENS_GITEA_TOKEN="your-token"
         export CLAUDE_API_KEY="your-key"
         sapiens init --non-interactive
 
@@ -534,9 +534,9 @@ class RepoInitializer:
         """Collect credentials from environment variables."""
         import os
 
-        self.gitea_token = os.getenv("GITEA_TOKEN")
+        self.gitea_token = os.getenv("SAPIENS_GITEA_TOKEN") or os.getenv("GITEA_TOKEN")
         if not self.gitea_token:
-            raise click.ClickException("GITEA_TOKEN environment variable required in non-interactive mode")
+            raise click.ClickException("SAPIENS_GITEA_TOKEN environment variable required in non-interactive mode")
 
         self.claude_api_key = os.getenv("CLAUDE_API_KEY")
         # Claude API key is optional (can use local mode)
@@ -822,23 +822,31 @@ class RepoInitializer:
         click.echo()
         default_url = "http://localhost:11434"
 
-        # Check Ollama availability
+        # URL configuration FIRST
+        if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
+            self.builtin_base_url = default_url
+        else:
+            custom_url = click.prompt("Ollama URL (host:port)", default="localhost:11434")
+            self.builtin_base_url = self._normalize_url(custom_url, "Ollama")
+
+        # NOW check Ollama availability using the configured URL
+        available_models = []
         try:
-            response = httpx.get(f"{default_url}/api/tags", timeout=5.0)
+            response = httpx.get(f"{self.builtin_base_url}/api/tags", timeout=5.0)
             if response.status_code == 200:
                 models_data = response.json()
                 available_models = [m["name"] for m in models_data.get("models", [])]
-                click.echo(click.style("✓ Ollama is running", fg="green"))
+                click.echo(click.style(f"✓ Ollama is running at {self.builtin_base_url}", fg="green"))
                 if available_models:
                     click.echo(f"  Available models: {', '.join(available_models[:5])}")
                     if len(available_models) > 5:
                         click.echo(f"  ... and {len(available_models) - 5} more")
             else:
-                available_models = []
-                click.echo(click.style("⚠ Ollama responded but no models found", fg="yellow"))
+                click.echo(
+                    click.style(f"⚠ Ollama responded but no models found at {self.builtin_base_url}", fg="yellow")
+                )
         except Exception:
-            available_models = []
-            click.echo(click.style("⚠ Ollama not detected at localhost:11434", fg="yellow"))
+            click.echo(click.style(f"⚠ Ollama not detected at {self.builtin_base_url}", fg="yellow"))
             click.echo("  Install Ollama: https://ollama.ai")
             click.echo("  Then run: ollama pull qwen3:8b")
 
@@ -864,13 +872,6 @@ class RepoInitializer:
 
         self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
 
-        # URL configuration
-        if click.confirm("Use default Ollama URL (localhost:11434)?", default=True):
-            self.builtin_base_url = default_url
-        else:
-            custom_url = click.prompt("Ollama URL (host:port)", default="localhost:11434")
-            self.builtin_base_url = self._normalize_url(custom_url, "Ollama")
-
     def _configure_builtin_vllm(self, provider_info: dict) -> None:
         """Configure vLLM for builtin agent."""
         import httpx
@@ -878,21 +879,27 @@ class RepoInitializer:
         click.echo()
         default_url = "http://localhost:8000"
 
-        # Check vLLM availability
+        # URL configuration FIRST
+        if click.confirm("Use default vLLM URL (localhost:8000)?", default=True):
+            self.builtin_base_url = default_url
+        else:
+            custom_url = click.prompt("vLLM URL (host:port)", default="localhost:8000")
+            self.builtin_base_url = self._normalize_url(custom_url, "vLLM")
+
+        # NOW check vLLM availability using the configured URL
+        available_models = []
         try:
-            response = httpx.get(f"{default_url}/v1/models", timeout=5.0)
+            response = httpx.get(f"{self.builtin_base_url}/v1/models", timeout=5.0)
             if response.status_code == 200:
                 models_data = response.json()
                 available_models = [m["id"] for m in models_data.get("data", [])]
-                click.echo(click.style("✓ vLLM is running", fg="green"))
+                click.echo(click.style(f"✓ vLLM is running at {self.builtin_base_url}", fg="green"))
                 if available_models:
                     click.echo(f"  Available models: {', '.join(available_models)}")
             else:
-                available_models = []
-                click.echo(click.style("⚠ vLLM responded but no models found", fg="yellow"))
+                click.echo(click.style(f"⚠ vLLM responded but no models found at {self.builtin_base_url}", fg="yellow"))
         except Exception:
-            available_models = []
-            click.echo(click.style("⚠ vLLM not detected at localhost:8000", fg="yellow"))
+            click.echo(click.style(f"⚠ vLLM not detected at {self.builtin_base_url}", fg="yellow"))
             click.echo("  Start vLLM: vllm serve qwen3:8b --port 8000")
 
         click.echo()
@@ -909,13 +916,6 @@ class RepoInitializer:
         click.echo()
 
         self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
-
-        # URL configuration
-        if click.confirm("Use default vLLM URL (localhost:8000)?", default=True):
-            self.builtin_base_url = default_url
-        else:
-            custom_url = click.prompt("vLLM URL (host:port)", default="localhost:8000")
-            self.builtin_base_url = self._normalize_url(custom_url, "vLLM")
 
     def _configure_builtin_cloud(self, provider_info: dict) -> None:
         """Configure cloud LLM provider for builtin agent."""
@@ -994,8 +994,17 @@ class RepoInitializer:
         # Configure label prefix for native/hybrid modes
         if self.automation_mode in ("native", "hybrid"):
             click.echo()
+            click.echo(click.style("Label Prefix Configuration:", bold=True))
+            click.echo()
+            click.echo("The label prefix determines which labels trigger automation:")
+            click.echo(
+                "  • With prefix 'sapiens/', labels like 'sapiens/triage' or 'sapiens/review' will trigger workflows"
+            )
+            click.echo("  • Other labels like 'bug' or 'enhancement' will be ignored by automation")
+            click.echo("  • This helps you control which labels activate AI agents")
+            click.echo()
             self.label_prefix = click.prompt(
-                "Label prefix for triggers (e.g., 'sapiens/' matches 'sapiens/triage')",
+                "Label prefix for automation triggers",
                 type=str,
                 default="sapiens/",
             )
@@ -1057,8 +1066,8 @@ class RepoInitializer:
             backend.set("GITLAB_TOKEN", self.gitea_token)
             click.echo("   ✓ Set: GITLAB_TOKEN")
         else:
-            backend.set("GITEA_TOKEN", self.gitea_token)
-            click.echo("   ✓ Set: GITEA_TOKEN")
+            backend.set("SAPIENS_GITEA_TOKEN", self.gitea_token)
+            click.echo("   ✓ Set: SAPIENS_GITEA_TOKEN")
 
         # Store agent API key if provided
         if self.agent_api_key:
@@ -1119,7 +1128,7 @@ class RepoInitializer:
         asyncio.run(github.connect())
 
         # Set GitHub token secret (for workflows)
-        token_secret_name = "GITHUB_TOKEN" if self.provider_type == "github" else "GITEA_TOKEN"
+        token_secret_name = "GITHUB_TOKEN" if self.provider_type == "github" else "SAPIENS_GITEA_TOKEN"
         click.echo(f"   ⏳ Setting {token_secret_name} secret...")
         asyncio.run(github.set_repository_secret(token_secret_name, self.gitea_token))
         click.echo(f"   ✓ Set repository secret: {token_secret_name}")
@@ -1143,12 +1152,12 @@ class RepoInitializer:
 
     def _setup_gitea_secrets_mcp(self) -> None:
         """Set up Gitea Actions secrets via MCP."""
-        # Set GITEA_TOKEN secret
-        click.echo("   ⏳ Setting GITEA_TOKEN secret...")
+        # Set SAPIENS_GITEA_TOKEN secret (note: GITEA_ prefix is reserved by Gitea)
+        click.echo("   ⏳ Setting SAPIENS_GITEA_TOKEN secret...")
         # Note: We'll need to use the MCP server directly since GiteaRestProvider
         # doesn't expose secret management yet
-        self._set_gitea_secret_via_mcp("GITEA_TOKEN", self.gitea_token)
-        click.echo("   ✓ Set repository secret: GITEA_TOKEN")
+        self._set_gitea_secret_via_mcp("SAPIENS_GITEA_TOKEN", self.gitea_token)
+        click.echo("   ✓ Set repository secret: SAPIENS_GITEA_TOKEN")
 
         # Set agent API key secret if using API mode
         if self.agent_mode == "api" and self.agent_api_key:
@@ -1208,7 +1217,7 @@ class RepoInitializer:
             if self.provider_type == "gitlab":
                 git_token_ref = "${GITLAB_TOKEN}"  # nosec B105
             else:
-                git_token_ref = "${GITEA_TOKEN}"  # nosec B105
+                git_token_ref = "${SAPIENS_GITEA_TOKEN}"  # nosec B105
             # fmt: on
 
             # Determine agent API key reference
@@ -1674,7 +1683,7 @@ tags:
                 if self.provider_type == "gitlab":
                     token_ref = "${GITLAB_TOKEN}"
                 else:
-                    token_ref = "${GITEA_TOKEN}"
+                    token_ref = "${SAPIENS_GITEA_TOKEN}"
 
             resolved = resolver.resolve(token_ref, cache=False)
             if not resolved:
@@ -1744,7 +1753,7 @@ tags:
             click.echo()
             click.echo("Add the following secrets:")
             if self.provider_type == "gitea":
-                click.echo("  - GITEA_TOKEN (your Gitea API token)")
+                click.echo("  - SAPIENS_GITEA_TOKEN (your Gitea API token)")
             if self.agent_mode == "api":
                 if self.agent_type == "goose" and self.goose_llm_provider:
                     secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"

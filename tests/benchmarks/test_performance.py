@@ -62,7 +62,7 @@ class TestConfigurationLoadingPerformance:
             },
             "workflow": {
                 "plans_directory": "plans",
-                "state_directory": ".automation/state",
+                "state_directory": ".sapiens/state",
                 "branching_strategy": "per-agent",
                 "max_concurrent_tasks": 3,
                 "review_approval_threshold": 0.8,
@@ -534,7 +534,7 @@ class TestIntegrationPerformance:
             },
             "workflow": {
                 "plans_directory": "plans",
-                "state_directory": ".automation/state",
+                "state_directory": ".sapiens/state",
             },
         }
 

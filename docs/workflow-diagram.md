@@ -257,7 +257,7 @@ Issue #42 created
     ↓
 plans/42-feature-name.md created
     ↓
-.automation/state/42.json created
+.sapiens/state/42.json created
     ↓
 Task issues created (#43, #44, #45)
     ↓
