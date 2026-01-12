@@ -49,11 +49,7 @@ class MergeStage(WorkflowStage):
             )
 
             # 4. Create integration branch based on strategy
-            task_branches = [
-                task_data.get("branch")
-                for task_data in tasks_state.values()
-                if task_data.get("branch")
-            ]
+            task_branches = [task_data.get("branch") for task_data in tasks_state.values() if task_data.get("branch")]
 
             log.info("creating_integration_branch", plan_id=plan_id, branches=len(task_branches))
             integration_branch = await branching.create_integration(plan_id, task_branches)
@@ -76,9 +72,7 @@ class MergeStage(WorkflowStage):
             pr_link = pr.url
             for task_data in tasks_state.values():
                 if task_issue_num := task_data.get("issue_number"):
-                    await self.git.add_comment(
-                        task_issue_num, f"✅ Task included in pull request: {pr_link}"
-                    )
+                    await self.git.add_comment(task_issue_num, f"✅ Task included in pull request: {pr_link}")
                     await self.git.update_issue(task_issue_num, state="closed")
 
             # 8. Update plan issue

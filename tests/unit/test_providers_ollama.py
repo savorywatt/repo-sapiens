@@ -113,9 +113,7 @@ class TestOllamaProviderConnection:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "get", AsyncMock(return_value=mock_response)
-        ) as mock_get:
+        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)) as mock_get:
             await provider.connect()
 
             mock_get.assert_called_once_with("http://localhost:11434/api/tags")
@@ -192,9 +190,9 @@ class TestOllamaProviderContextManager:
         mock_response.json.return_value = {"models": [{"name": "llama3.1:8b"}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "get", AsyncMock(return_value=mock_response)
-        ), patch.object(provider.client, "aclose", AsyncMock()) as mock_aclose:
+        with patch.object(provider.client, "get", AsyncMock(return_value=mock_response)), patch.object(
+            provider.client, "aclose", AsyncMock()
+        ) as mock_aclose:
             async with provider:
                 pass
             mock_aclose.assert_called_once()
@@ -232,9 +230,7 @@ class TestOllamaProviderExecutePrompt:
         mock_response.json.return_value = {"response": "Response text"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)) as mock_post:
             await provider.execute_prompt("Test prompt")
 
         mock_post.assert_called_once()
@@ -575,9 +571,7 @@ Good implementation. Code follows best practices."""
         mock_response.json.return_value = {"response": "APPROVE"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)) as mock_post:
             # We expect TypeError due to Review instantiation bug
             try:
                 await provider.review_code(diff, context)
@@ -601,9 +595,7 @@ Good implementation. Code follows best practices."""
         mock_response.json.return_value = {"response": "APPROVE\nLooks good"}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ) as mock_post:
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)) as mock_post:
             # We expect TypeError due to Review instantiation bug
             try:
                 await provider.review_code(large_diff, {})
@@ -639,9 +631,9 @@ Good implementation. Code follows best practices."""
         mock_response.json.return_value = {"response": review_output}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ), patch.object(ollama_module, "Review", mock_review):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)), patch.object(
+            ollama_module, "Review", mock_review
+        ):
             try:
                 await provider.review_code("+code", {})
             except TypeError:
@@ -667,9 +659,9 @@ Good implementation. Code follows best practices."""
         mock_response.json.return_value = {"response": review_output}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            provider.client, "post", AsyncMock(return_value=mock_response)
-        ), patch.object(ollama_module, "Review", mock_review):
+        with patch.object(provider.client, "post", AsyncMock(return_value=mock_response)), patch.object(
+            ollama_module, "Review", mock_review
+        ):
             try:
                 await provider.review_code("+code", {})
             except TypeError:

@@ -106,32 +106,23 @@ class TestCLIHelpText:
         """Test process-issue command help."""
         # Note: Help for subcommands that need config require a valid config path
         # to avoid failing on config loading before showing help
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--help"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--help"])
         # Alternatively, test with missing config - help may still work
         result_alt = cli_runner.invoke(cli, ["process-issue", "--help"])
         # One of them should contain the help text
-        assert (
-            "Process a single issue" in result.output
-            or "Process a single issue" in result_alt.output
-        )
+        assert "Process a single issue" in result.output or "Process a single issue" in result_alt.output
         assert "--issue" in result.output or "--issue" in result_alt.output
 
     def test_process_all_help(self, cli_runner, mock_config_file):
         """Test process-all command help."""
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-all", "--help"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-all", "--help"])
         result_alt = cli_runner.invoke(cli, ["process-all", "--help"])
         assert "Process all issues" in result.output or "Process all issues" in result_alt.output
         assert "--tag" in result.output or "--tag" in result_alt.output
 
     def test_process_plan_help(self, cli_runner, mock_config_file):
         """Test process-plan command help."""
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-plan", "--help"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-plan", "--help"])
         result_alt = cli_runner.invoke(cli, ["process-plan", "--help"])
         assert "Process entire plan" in result.output or "Process entire plan" in result_alt.output
         assert "--plan-id" in result.output or "--plan-id" in result_alt.output
@@ -147,9 +138,7 @@ class TestCLIHelpText:
         """Test list-plans command help."""
         result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "list-plans", "--help"])
         result_alt = cli_runner.invoke(cli, ["list-plans", "--help"])
-        assert (
-            "List all active plans" in result.output or "List all active plans" in result_alt.output
-        )
+        assert "List all active plans" in result.output or "List all active plans" in result_alt.output
 
     def test_show_plan_help(self, cli_runner, mock_config_file):
         """Test show-plan command help."""
@@ -215,9 +204,7 @@ class TestConfigurationLoading:
 
     def test_config_not_required_for_credentials(self, cli_runner):
         """Test credentials command does not require config file."""
-        result = cli_runner.invoke(
-            cli, ["--config", "/nonexistent/config.yaml", "credentials", "--help"]
-        )
+        result = cli_runner.invoke(cli, ["--config", "/nonexistent/config.yaml", "credentials", "--help"])
         assert result.exit_code == 0
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
@@ -251,16 +238,12 @@ class TestProcessIssueCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_process_issue_success(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_process_issue_success(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test successful issue processing."""
         mock_settings_loader.return_value = mock_settings
         mock_run.return_value = None
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"])
 
         # Should attempt to run asyncio.run
         assert mock_run.called
@@ -280,9 +263,7 @@ class TestProcessIssueCommand:
         mock_settings_loader.return_value = mock_settings
         mock_run.side_effect = RepoSapiensError("Test error")
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"])
 
         assert result.exit_code == 1
         assert "Test error" in result.output
@@ -296,9 +277,7 @@ class TestProcessIssueCommand:
         mock_settings_loader.return_value = mock_settings
         mock_run.side_effect = KeyboardInterrupt()
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"])
 
         assert result.exit_code == 130
         assert "Interrupted" in result.output
@@ -312,9 +291,7 @@ class TestProcessIssueCommand:
         mock_settings_loader.return_value = mock_settings
         mock_run.side_effect = RuntimeError("Unexpected")
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"])
 
         assert result.exit_code == 1
         assert "Unexpected error" in result.output
@@ -330,9 +307,7 @@ class TestProcessAllCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_process_all_without_tag(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_process_all_without_tag(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test process-all without tag filter."""
         mock_settings_loader.return_value = mock_settings
 
@@ -342,15 +317,11 @@ class TestProcessAllCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_process_all_with_tag(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_process_all_with_tag(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test process-all with tag filter."""
         mock_settings_loader.return_value = mock_settings
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-all", "--tag", "urgent"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-all", "--tag", "urgent"])
 
         assert mock_run.called
 
@@ -392,15 +363,11 @@ class TestProcessPlanCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_process_plan_success(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_process_plan_success(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test successful plan processing."""
         mock_settings_loader.return_value = mock_settings
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-plan", "--plan-id", "plan-123"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-plan", "--plan-id", "plan-123"])
 
         assert mock_run.called
 
@@ -419,9 +386,7 @@ class TestProcessPlanCommand:
         mock_settings_loader.return_value = mock_settings
         mock_run.side_effect = RepoSapiensError("Plan error")
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-plan", "--plan-id", "plan-123"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-plan", "--plan-id", "plan-123"])
 
         assert result.exit_code == 1
         assert "Plan error" in result.output
@@ -437,9 +402,7 @@ class TestDaemonCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_daemon_default_interval(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_daemon_default_interval(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test daemon with default interval."""
         mock_settings_loader.return_value = mock_settings
 
@@ -449,15 +412,11 @@ class TestDaemonCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_daemon_custom_interval(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_daemon_custom_interval(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test daemon with custom interval."""
         mock_settings_loader.return_value = mock_settings
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "daemon", "--interval", "120"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "daemon", "--interval", "120"])
 
         assert mock_run.called
 
@@ -472,9 +431,7 @@ class TestListPlansCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_list_plans_success(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_list_plans_success(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test successful plan listing."""
         mock_settings_loader.return_value = mock_settings
 
@@ -493,15 +450,11 @@ class TestShowPlanCommand:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_show_plan_success(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_show_plan_success(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test successful plan display."""
         mock_settings_loader.return_value = mock_settings
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "show-plan", "--plan-id", "plan-123"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "show-plan", "--plan-id", "plan-123"])
 
         assert mock_run.called
 
@@ -543,9 +496,7 @@ class TestTaskCommand:
 
     def test_task_ollama_url_option(self, cli_runner):
         """Test task command accepts --ollama-url option."""
-        result = cli_runner.invoke(
-            cli, ["task", "--ollama-url", "http://localhost:12345", "--help"]
-        )
+        result = cli_runner.invoke(cli, ["task", "--ollama-url", "http://localhost:12345", "--help"])
         assert "--ollama-url" in result.output
 
     def test_task_max_iterations_option(self, cli_runner):
@@ -674,9 +625,7 @@ class TestAsyncHelperFunctions:
 
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=["plan-1", "plan-2"])
-        mock_state.load_state = AsyncMock(
-            side_effect=[{"status": "active"}, {"status": "completed"}]
-        )
+        mock_state.load_state = AsyncMock(side_effect=[{"status": "active"}, {"status": "completed"}])
 
         with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _list_active_plans(mock_settings)
@@ -942,21 +891,15 @@ class TestCLIOptions:
 
     def test_log_level_option(self, cli_runner, mock_config_file):
         """Test --log-level option is accepted."""
-        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
-            "repo_sapiens.main.asyncio.run"
-        ):
-            result = cli_runner.invoke(
-                cli, ["--log-level", "DEBUG", "--config", str(mock_config_file), "list-plans"]
-            )
+        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch("repo_sapiens.main.asyncio.run"):
+            result = cli_runner.invoke(cli, ["--log-level", "DEBUG", "--config", str(mock_config_file), "list-plans"])
 
         # Should not fail due to log level option
         assert "Invalid" not in result.output or "--log-level" not in result.output
 
     def test_config_option_accepts_path(self, cli_runner, mock_config_file):
         """Test --config option accepts file path."""
-        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
-            "repo_sapiens.main.asyncio.run"
-        ):
+        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch("repo_sapiens.main.asyncio.run"):
             result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "list-plans"])
 
         # Should use provided config path
@@ -979,15 +922,11 @@ class TestEdgeCases:
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
     @patch("repo_sapiens.main.asyncio.run")
-    def test_process_issue_with_zero(
-        self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_process_issue_with_zero(self, mock_run, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Test process-issue with issue number 0."""
         mock_settings_loader.return_value = mock_settings
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--issue", "0"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "0"])
 
         assert mock_run.called
 
@@ -999,20 +938,14 @@ class TestEdgeCases:
         """Test process-issue with large issue number."""
         mock_settings_loader.return_value = mock_settings
 
-        result = cli_runner.invoke(
-            cli, ["--config", str(mock_config_file), "process-issue", "--issue", "999999999"]
-        )
+        result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "999999999"])
 
         assert mock_run.called
 
     def test_daemon_with_zero_interval(self, cli_runner, mock_config_file):
         """Test daemon with zero interval."""
-        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch(
-            "repo_sapiens.main.asyncio.run"
-        ):
-            result = cli_runner.invoke(
-                cli, ["--config", str(mock_config_file), "daemon", "--interval", "0"]
-            )
+        with patch("repo_sapiens.main.AutomationSettings.from_yaml"), patch("repo_sapiens.main.asyncio.run"):
+            result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "daemon", "--interval", "0"])
 
         # Should accept zero interval (though not practical)
         assert result.exit_code in [0, 1]
@@ -1041,16 +974,12 @@ class TestCLIAsyncIntegration:
 
         with patch("repo_sapiens.main._process_single_issue") as mock_func:
             with patch("repo_sapiens.main.asyncio.run") as mock_run:
-                result = cli_runner.invoke(
-                    cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"]
-                )
+                result = cli_runner.invoke(cli, ["--config", str(mock_config_file), "process-issue", "--issue", "42"])
 
                 mock_run.assert_called_once()
 
     @patch("repo_sapiens.main.AutomationSettings.from_yaml")
-    def test_daemon_calls_async_function(
-        self, mock_settings_loader, cli_runner, mock_config_file, mock_settings
-    ):
+    def test_daemon_calls_async_function(self, mock_settings_loader, cli_runner, mock_config_file, mock_settings):
         """Verify daemon command calls async daemon mode."""
         mock_settings_loader.return_value = mock_settings
 

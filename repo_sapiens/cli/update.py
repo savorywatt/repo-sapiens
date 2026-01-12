@@ -92,11 +92,35 @@ def find_installed_templates(repo_path: Path, provider_type: str | None) -> list
                 if info:
                     templates.append(info)
     else:
+        # Scan sapiens/ subdirectory for core workflows
+        sapiens_dir = workflows_dir / "sapiens"
+        if sapiens_dir.exists():
+            for yaml_file in sapiens_dir.glob("*.yaml"):
+                info = extract_template_info(yaml_file)
+                if info:
+                    templates.append(info)
+            for yml_file in sapiens_dir.glob("*.yml"):
+                info = extract_template_info(yml_file)
+                if info:
+                    templates.append(info)
+
+        # Scan sapiens/recipes/ subdirectory
+        recipes_dir = workflows_dir / "sapiens" / "recipes"
+        if recipes_dir.exists():
+            for yaml_file in recipes_dir.glob("*.yaml"):
+                info = extract_template_info(yaml_file)
+                if info:
+                    templates.append(info)
+            for yml_file in recipes_dir.glob("*.yml"):
+                info = extract_template_info(yml_file)
+                if info:
+                    templates.append(info)
+
+        # Also scan root for backward compatibility (legacy flat structure)
         for yaml_file in workflows_dir.glob("*.yaml"):
             info = extract_template_info(yaml_file)
             if info:
                 templates.append(info)
-
         for yml_file in workflows_dir.glob("*.yml"):
             info = extract_template_info(yml_file)
             if info:
@@ -105,9 +129,7 @@ def find_installed_templates(repo_path: Path, provider_type: str | None) -> list
     return templates
 
 
-def find_available_templates(
-    templates_dir: Path, provider_type: str | None
-) -> list[dict[str, Any]]:
+def find_available_templates(templates_dir: Path, provider_type: str | None) -> list[dict[str, Any]]:
     """Find all available templates in the package."""
     if provider_type == "github":
         provider_dir = templates_dir / "github"
@@ -121,16 +143,18 @@ def find_available_templates(
 
     templates = []
 
-    # Scan root provider directory for core templates
-    for yaml_file in provider_dir.glob("*.yaml"):
-        info = extract_template_info(yaml_file)
-        if info:
-            templates.append(info)
+    # Scan sapiens subdirectory for core templates
+    sapiens_dir = provider_dir / "sapiens"
+    if sapiens_dir.exists():
+        for yaml_file in sapiens_dir.glob("*.yaml"):
+            info = extract_template_info(yaml_file)
+            if info:
+                templates.append(info)
 
-    # Scan examples subdirectory
-    examples_dir = provider_dir / "examples"
-    if examples_dir.exists():
-        for yaml_file in examples_dir.glob("*.yaml"):
+    # Scan sapiens/recipes subdirectory
+    recipes_dir = provider_dir / "sapiens" / "recipes"
+    if recipes_dir.exists():
+        for yaml_file in recipes_dir.glob("*.yaml"):
             info = extract_template_info(yaml_file)
             if info:
                 templates.append(info)
@@ -154,6 +178,20 @@ def find_templates_dir() -> Path | None:
         return cwd_templates
 
     return None
+
+
+def detect_legacy_structure(repo_path: Path, provider_type: str | None) -> bool:
+    """Detect if repository uses old flat structure."""
+    if provider_type == "github":
+        old_location = repo_path / ".github" / "workflows" / "process-label.yaml"
+        new_location = repo_path / ".github" / "workflows" / "sapiens" / "process-label.yaml"
+    elif provider_type == "gitlab":
+        return False  # GitLab doesn't use subdirectories
+    else:
+        old_location = repo_path / ".gitea" / "workflows" / "process-label.yaml"
+        new_location = repo_path / ".gitea" / "workflows" / "sapiens" / "process-label.yaml"
+
+    return old_location.exists() and not new_location.exists()
 
 
 @click.command(name="update")
@@ -239,12 +277,23 @@ class TemplateUpdater:
         # Discover repository type
         self._discover_repository()
 
+        # Check for legacy structure and offer migration
+        if detect_legacy_structure(self.repo_path, self.provider_type):
+            click.echo(click.style("⚠️  Legacy workflow structure detected", fg="yellow"))
+            click.echo("Your workflows are in the old flat structure.")
+            click.echo("New structure uses subdirectories:")
+            click.echo("  - Core workflows: .gitea/workflows/sapiens/")
+            click.echo("  - Recipe workflows: .gitea/workflows/sapiens/recipes/")
+            click.echo()
+            if click.confirm("Migrate to new structure?", default=True):
+                self._migrate_to_subdirectories()
+                click.echo(click.style("✓ Migration complete", fg="green"))
+                click.echo()
+
         # Find templates directory
         templates_dir = find_templates_dir()
         if not templates_dir:
-            click.echo(
-                click.style("Error: Could not find repo-sapiens templates directory.", fg="red")
-            )
+            click.echo(click.style("Error: Could not find repo-sapiens templates directory.", fg="red"))
             sys.exit(1)
 
         # Find installed templates
@@ -315,6 +364,31 @@ class TemplateUpdater:
             else:
                 raise
 
+    def _migrate_to_subdirectories(self) -> None:
+        """Migrate workflows from flat to subdirectory structure."""
+        # Determine directories
+        if self.provider_type == "github":
+            old_dir = self.repo_path / ".github" / "workflows"
+        elif self.provider_type == "gitlab":
+            return  # No migration needed for GitLab
+        else:
+            old_dir = self.repo_path / ".gitea" / "workflows"
+
+        sapiens_dir = old_dir / "sapiens"
+        recipes_dir = sapiens_dir / "recipes"  # Nested inside sapiens/
+        sapiens_dir.mkdir(exist_ok=True)
+        recipes_dir.mkdir(exist_ok=True)
+
+        # Move core workflows
+        core_patterns = ["automation-daemon.yaml", "process-label.yaml", "process-issue.yaml"]
+        for yaml_file in old_dir.glob("*.yaml"):
+            if yaml_file.name in core_patterns:
+                yaml_file.rename(sapiens_dir / yaml_file.name)
+                click.echo(f"  Moved {yaml_file.name} → sapiens/")
+            elif any(pattern in yaml_file.name for pattern in ["weekly-", "daily-", "post-merge-"]):
+                yaml_file.rename(recipes_dir / yaml_file.name)
+                click.echo(f"  Moved {yaml_file.name} → sapiens/recipes/")
+
     def _report_status(
         self,
         updates_available: list[dict[str, Any]],
@@ -331,10 +405,7 @@ class TemplateUpdater:
         if updates_available:
             click.echo(click.style("⬆ Updates available:", fg="yellow"))
             for update in updates_available:
-                click.echo(
-                    f"   {update['name']}: "
-                    f"v{update['installed_version']} → v{update['latest_version']}"
-                )
+                click.echo(f"   {update['name']}: " f"v{update['installed_version']} → v{update['latest_version']}")
             click.echo()
 
         if not_found:
@@ -365,8 +436,7 @@ class TemplateUpdater:
             source_path = update["source_path"]
 
             click.echo(
-                f"  {click.style(name, bold=True)}: "
-                f"v{update['installed_version']} → v{update['latest_version']}"
+                f"  {click.style(name, bold=True)}: " f"v{update['installed_version']} → v{update['latest_version']}"
             )
 
             if self.update_all:

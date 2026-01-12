@@ -301,10 +301,7 @@ class GiteaProvider(GitProvider):
             title=data["title"],
             body=data.get("body", ""),
             state=IssueState(data["state"]),
-            labels=[
-                label["name"] if isinstance(label, dict) else label
-                for label in data.get("labels", [])
-            ],
+            labels=[label["name"] if isinstance(label, dict) else label for label in data.get("labels", [])],
             created_at=self._parse_datetime(data["created_at"]),
             updated_at=self._parse_datetime(data["updated_at"]),
             author=data.get("user", {}).get("login", "unknown"),

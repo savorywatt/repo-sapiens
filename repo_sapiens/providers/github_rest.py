@@ -90,9 +90,7 @@ class GitHubRestProvider(GitProvider):
 
         try:
             # Wrap synchronous iteration in thread pool
-            gh_issues = await _run_sync(
-                lambda: list(self._repo.get_issues(state=gh_state, labels=labels or []))
-            )
+            gh_issues = await _run_sync(lambda: list(self._repo.get_issues(state=gh_state, labels=labels or [])))
 
             # Convert to our Issue model
             return [self._convert_issue(gh_issue) for gh_issue in gh_issues]

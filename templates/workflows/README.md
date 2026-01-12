@@ -7,17 +7,25 @@ Ready-to-use CI/CD workflow templates for repo-sapiens.
 ### For Gitea
 
 ```bash
-# Copy workflows to your repo
-mkdir -p .gitea/workflows
-cp templates/workflows/gitea/*.yaml .gitea/workflows/
+# Copy core workflows to your repo
+mkdir -p .gitea/workflows/sapiens
+cp templates/workflows/gitea/sapiens/*.yaml .gitea/workflows/sapiens/
+
+# Optionally copy recipe workflows
+mkdir -p .gitea/workflows/sapiens/recipes
+cp templates/workflows/gitea/sapiens/recipes/*.yaml .gitea/workflows/sapiens/recipes/
 ```
 
 ### For GitHub
 
 ```bash
-# Copy workflows to your repo
-mkdir -p .github/workflows
-cp templates/workflows/github/*.yaml .github/workflows/
+# Copy core workflows to your repo
+mkdir -p .github/workflows/sapiens
+cp templates/workflows/github/sapiens/*.yaml .github/workflows/sapiens/
+
+# Optionally copy recipe workflows
+mkdir -p .github/workflows/sapiens/recipes
+cp templates/workflows/github/sapiens/recipes/*.yaml .github/workflows/sapiens/recipes/
 ```
 
 ## Configuration

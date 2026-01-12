@@ -149,9 +149,7 @@ class TestSetCredentialCommand:
         assert result.exit_code == 0
         assert "Credential stored successfully" in result.output
 
-    def test_set_credential_encrypted_backend_with_password(
-        self, cli_runner, mock_encrypted_backend
-    ):
+    def test_set_credential_encrypted_backend_with_password(self, cli_runner, mock_encrypted_backend):
         """Should store credential in encrypted backend with master password."""
         result = cli_runner.invoke(
             credentials_group,
@@ -207,9 +205,7 @@ class TestSetCredentialCommand:
     def test_set_credential_handles_credential_error(self, cli_runner):
         """Should handle CredentialError gracefully."""
         with patch("repo_sapiens.cli.credentials._set_keyring") as mock_set:
-            mock_set.side_effect = CredentialError(
-                "Backend unavailable", suggestion="Install keyring"
-            )
+            mock_set.side_effect = CredentialError("Backend unavailable", suggestion="Install keyring")
 
             result = cli_runner.invoke(
                 credentials_group,

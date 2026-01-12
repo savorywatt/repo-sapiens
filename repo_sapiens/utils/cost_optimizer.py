@@ -184,17 +184,11 @@ class CostOptimizer:
             requires_deep_analysis=context.get("requires_deep_analysis", False),
             file_count=context.get("file_count", 0),
             estimated_changes=context.get("estimated_changes", 0),
-            has_security_implications=any(
-                kw in description_lower for kw in ["security", "auth", "crypto"]
-            ),
-            has_performance_requirements=any(
-                kw in description_lower for kw in ["performance", "optimize", "fast"]
-            ),
+            has_security_implications=any(kw in description_lower for kw in ["security", "auth", "crypto"]),
+            has_performance_requirements=any(kw in description_lower for kw in ["performance", "optimize", "fast"]),
         )
 
-    async def estimate_cost(
-        self, plan: Any, estimated_tokens: dict[str, int] | None = None
-    ) -> dict[str, float]:
+    async def estimate_cost(self, plan: Any, estimated_tokens: dict[str, int] | None = None) -> dict[str, float]:
         """
         Estimate total cost for plan execution.
 
@@ -286,14 +280,11 @@ class CostOptimizer:
 
         if impl_ratio > 1.5:
             recommendations.append(
-                "Implementation tasks are exceeding estimates - "
-                "consider using more structured task descriptions"
+                "Implementation tasks are exceeding estimates - " "consider using more structured task descriptions"
             )
 
         # Check if we're using expensive models too often
         if actual_costs["implementation"] > actual_costs["total"] * 0.8:
-            recommendations.append(
-                "High proportion of advanced model usage - review task complexity assessments"
-            )
+            recommendations.append("High proportion of advanced model usage - review task complexity assessments")
 
         return recommendations

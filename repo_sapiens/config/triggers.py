@@ -30,20 +30,12 @@ class TriggerType(str, Enum):
 class LabelTriggerConfig(BaseModel):
     """Configuration for label-based triggers."""
 
-    label_pattern: str = Field(
-        ..., description="Label name or glob pattern (e.g., 'sapiens/*', 'needs-*')"
-    )
+    label_pattern: str = Field(..., description="Label name or glob pattern (e.g., 'sapiens/*', 'needs-*')")
     handler: str = Field(..., description="Handler name to invoke (maps to workflow stage)")
     ai_enabled: bool = Field(default=True, description="Whether this handler requires AI agent")
-    remove_on_complete: bool = Field(
-        default=True, description="Remove trigger label after successful processing"
-    )
-    success_label: str | None = Field(
-        default=None, description="Label to add on successful completion"
-    )
-    failure_label: str | None = Field(
-        default="needs-attention", description="Label to add on failure"
-    )
+    remove_on_complete: bool = Field(default=True, description="Remove trigger label after successful processing")
+    success_label: str | None = Field(default=None, description="Label to add on successful completion")
+    failure_label: str | None = Field(default="needs-attention", description="Label to add on failure")
 
 
 class ScheduleTriggerConfig(BaseModel):
@@ -51,9 +43,7 @@ class ScheduleTriggerConfig(BaseModel):
 
     cron: str = Field(..., description="Cron expression (e.g., '0 8 * * 1-5' for weekdays at 8am)")
     handler: str = Field(..., description="Handler name to invoke")
-    task_prompt: str | None = Field(
-        default=None, description="Task prompt for AI agent (if ai_enabled)"
-    )
+    task_prompt: str | None = Field(default=None, description="Task prompt for AI agent (if ai_enabled)")
     ai_enabled: bool = Field(default=True, description="Whether this handler requires AI agent")
 
 
@@ -66,9 +56,7 @@ class AutomationModeConfig(BaseModel):
     )
     native_enabled: bool = Field(default=True, description="Enable native CI/CD triggers")
     daemon_enabled: bool = Field(default=True, description="Enable polling daemon")
-    daemon_fallback_only: bool = Field(
-        default=True, description="Only use daemon for tasks native can't handle"
-    )
+    daemon_fallback_only: bool = Field(default=True, description="Only use daemon for tasks native can't handle")
     label_prefix: str = Field(default="sapiens/", description="Prefix for sapiens-managed labels")
 
 
@@ -81,9 +69,7 @@ class AutomationConfig(BaseModel):
     mode: AutomationModeConfig = Field(
         default_factory=AutomationModeConfig, description="Automation mode configuration"
     )
-    label_triggers: dict[str, LabelTriggerConfig] = Field(
-        default_factory=dict, description="Label-to-handler mappings"
-    )
+    label_triggers: dict[str, LabelTriggerConfig] = Field(default_factory=dict, description="Label-to-handler mappings")
     schedule_triggers: list[ScheduleTriggerConfig] = Field(
         default_factory=list, description="Scheduled automation tasks"
     )

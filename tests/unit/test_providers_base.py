@@ -114,9 +114,7 @@ class TestClaudeLocalProviderPlanGeneration:
     """Tests for plan generation in ClaudeLocalProvider."""
 
     @pytest.mark.asyncio
-    async def test_generate_plan_builds_prompt(
-        self, sample_issue: Issue, temp_workspace: Path
-    ) -> None:
+    async def test_generate_plan_builds_prompt(self, sample_issue: Issue, temp_workspace: Path) -> None:
         """Should build proper planning prompt from issue."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
 
@@ -141,9 +139,7 @@ class TestClaudeLocalProviderGeneratePrompts:
     """Tests for generate_prompts in ClaudeLocalProvider."""
 
     @pytest.mark.asyncio
-    async def test_generate_prompts_missing_file_path(
-        self, sample_plan: Plan, temp_workspace: Path
-    ) -> None:
+    async def test_generate_prompts_missing_file_path(self, sample_plan: Plan, temp_workspace: Path) -> None:
         """Should raise ValueError when plan has no file_path."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         sample_plan.file_path = None
@@ -152,9 +148,7 @@ class TestClaudeLocalProviderGeneratePrompts:
             await provider.generate_prompts(sample_plan)
 
     @pytest.mark.asyncio
-    async def test_generate_prompts_file_not_found(
-        self, sample_plan: Plan, temp_workspace: Path
-    ) -> None:
+    async def test_generate_prompts_file_not_found(self, sample_plan: Plan, temp_workspace: Path) -> None:
         """Should raise FileNotFoundError when plan file doesn't exist."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         sample_plan.file_path = "plans/nonexistent.md"
@@ -257,9 +251,7 @@ Committed: abc123def456789012345678901234567890abcd
             assert result.execution_time > 0
 
     @pytest.mark.asyncio
-    async def test_execute_task_uses_default_branch(
-        self, sample_task: Task, temp_workspace: Path
-    ) -> None:
+    async def test_execute_task_uses_default_branch(self, sample_task: Task, temp_workspace: Path) -> None:
         """Should use 'main' as default branch when not specified."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         context = {}
@@ -626,9 +618,7 @@ class TestExternalAgentProviderExecutePrompt:
         provider = ExternalAgentProvider(agent_type="claude")
 
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(
-            return_value=(b"Created file: src/main.py\nTask completed", b"")
-        )
+        mock_process.communicate = AsyncMock(return_value=(b"Created file: src/main.py\nTask completed", b""))
         mock_process.returncode = 0
 
         with patch(
@@ -671,9 +661,7 @@ class TestExternalAgentProviderExecutePrompt:
         )
 
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(
-            return_value=(b"Modified file: config.json\nDone", b"")
-        )
+        mock_process.communicate = AsyncMock(return_value=(b"Modified file: config.json\nDone", b""))
         mock_process.returncode = 0
 
         with patch(
@@ -803,9 +791,7 @@ class TestExternalAgentProviderTaskExecution:
                 "files_changed": ["src/crypto.py"],
             }
 
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock, side_effect=mock_execute
-        ):
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock, side_effect=mock_execute):
             result = await provider.execute_task(sample_task, context)
 
             assert result.success is True
@@ -842,15 +828,11 @@ class TestExternalAgentProviderCodeReview:
 
         # Test the approval detection logic
         output_approved = "LGTM! Code looks good and follows best practices. Approve."
-        approved = any(
-            word in output_approved.lower() for word in ["approve", "looks good", "lgtm"]
-        )
+        approved = any(word in output_approved.lower() for word in ["approve", "looks good", "lgtm"])
         assert approved is True
 
         output_not_approved = "Critical security issue: hardcoded password. Request changes."
-        approved = any(
-            word in output_not_approved.lower() for word in ["approve", "looks good", "lgtm"]
-        )
+        approved = any(word in output_not_approved.lower() for word in ["approve", "looks good", "lgtm"])
         assert approved is False
 
     @pytest.mark.asyncio
@@ -1482,9 +1464,7 @@ class TestProviderIntegration:
     """Integration-style tests covering provider interactions."""
 
     @pytest.mark.asyncio
-    async def test_claude_provider_task_execution_workflow(
-        self, sample_task: Task, temp_workspace: Path
-    ) -> None:
+    async def test_claude_provider_task_execution_workflow(self, sample_task: Task, temp_workspace: Path) -> None:
         """Test task execution workflow with mocked Claude."""
         provider = ClaudeLocalProvider(workspace=temp_workspace)
         context = {"branch": "feature/test", "plan_content": "Test plan"}
@@ -1555,9 +1535,7 @@ Task complete!
                 "files_changed": ["file.py"],
             }
 
-        with patch.object(
-            provider, "execute_prompt", new_callable=AsyncMock, side_effect=mock_execute
-        ):
+        with patch.object(provider, "execute_prompt", new_callable=AsyncMock, side_effect=mock_execute):
             # First call fails
             result1 = await provider.execute_task(sample_task, context)
             assert result1.success is False

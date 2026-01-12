@@ -150,9 +150,7 @@ Be constructive and specific in your feedback.
                     ]
 
                     for i, comment in enumerate(comments, 1):
-                        summary_lines.append(
-                            f"\n{i}. **{comment['file']}** (Line {comment.get('line', 'N/A')})"
-                        )
+                        summary_lines.append(f"\n{i}. **{comment['file']}** (Line {comment.get('line', 'N/A')})")
                         summary_lines.append(f"   - {comment['issue']}")
 
                     summary_lines.extend(

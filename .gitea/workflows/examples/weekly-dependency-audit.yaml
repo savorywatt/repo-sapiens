@@ -97,7 +97,7 @@ jobs:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          python -m repo_sapiens.cli task "Review the dependency audit report and update safe dependencies.
+          sapiens task "Review the dependency audit report and update safe dependencies.
 
           $(cat dependency-report.md)
 

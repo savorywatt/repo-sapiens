@@ -223,9 +223,7 @@ class TestLabelRouter:
         mock_orchestrator.stages["proposal"].execute.assert_called_once_with(sample_issue)
 
     @pytest.mark.asyncio
-    async def test_route_with_pr_number(
-        self, mock_settings, mock_git, mock_orchestrator, sample_issue
-    ):
+    async def test_route_with_pr_number(self, mock_settings, mock_git, mock_orchestrator, sample_issue):
         """Test routing when event has PR number instead of issue number."""
         mock_git.get_issue.return_value = sample_issue
 
@@ -277,9 +275,7 @@ class TestLabelRouter:
         assert "No issue or PR number" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_route_custom_handler_with_ai(
-        self, mock_settings, mock_git, mock_orchestrator, sample_issue
-    ):
+    async def test_route_custom_handler_with_ai(self, mock_settings, mock_git, mock_orchestrator, sample_issue):
         """Test routing to custom AI handler."""
         mock_git.get_issue.return_value = sample_issue
 
@@ -307,9 +303,7 @@ class TestLabelRouter:
         mock_orchestrator.agent.execute_task.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_route_unknown_handler(
-        self, mock_settings, mock_git, mock_orchestrator, sample_issue
-    ):
+    async def test_route_unknown_handler(self, mock_settings, mock_git, mock_orchestrator, sample_issue):
         """Test routing to unknown handler without AI."""
         mock_git.get_issue.return_value = sample_issue
 
@@ -337,9 +331,7 @@ class TestLabelRouter:
         assert "Unknown handler" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_route_exception_handling(
-        self, mock_settings, mock_git, mock_orchestrator, classified_event
-    ):
+    async def test_route_exception_handling(self, mock_settings, mock_git, mock_orchestrator, classified_event):
         """Test routing handles exceptions gracefully."""
         mock_git.get_issue.side_effect = Exception("API error")
 
@@ -354,9 +346,7 @@ class TestPostProcessing:
     """Tests for post-processing methods."""
 
     @pytest.mark.asyncio
-    async def test_post_process_success_removes_label(
-        self, mock_settings, mock_git, mock_orchestrator
-    ):
+    async def test_post_process_success_removes_label(self, mock_settings, mock_git, mock_orchestrator):
         """Test successful post-processing removes trigger label."""
         issue = Issue(
             id=1,
@@ -387,9 +377,7 @@ class TestPostProcessing:
         assert "proposed" in call_args.kwargs["labels"]
 
     @pytest.mark.asyncio
-    async def test_post_process_success_no_label_change(
-        self, mock_settings, mock_git, mock_orchestrator
-    ):
+    async def test_post_process_success_no_label_change(self, mock_settings, mock_git, mock_orchestrator):
         """Test post-processing when no label changes needed."""
         issue = Issue(
             id=1,
@@ -418,9 +406,7 @@ class TestPostProcessing:
         mock_git.update_issue.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_post_process_failure_adds_label_and_comment(
-        self, mock_settings, mock_git, mock_orchestrator
-    ):
+    async def test_post_process_failure_adds_label_and_comment(self, mock_settings, mock_git, mock_orchestrator):
         """Test failure post-processing adds label and comment."""
         issue = Issue(
             id=1,
@@ -475,9 +461,7 @@ class TestExecuteHandler:
         mock_orchestrator.stages["proposal"].execute.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_execute_ai_task(
-        self, mock_settings, mock_git, mock_orchestrator, sample_issue, classified_event
-    ):
+    async def test_execute_ai_task(self, mock_settings, mock_git, mock_orchestrator, sample_issue, classified_event):
         """Test executing an AI task for custom handler."""
         router = LabelRouter(mock_settings, mock_git, mock_orchestrator)
 
@@ -502,9 +486,7 @@ class TestExecuteAITask:
     """Tests for _execute_ai_task method."""
 
     @pytest.mark.asyncio
-    async def test_execute_ai_task_success(
-        self, mock_settings, mock_git, mock_orchestrator, sample_issue
-    ):
+    async def test_execute_ai_task_success(self, mock_settings, mock_git, mock_orchestrator, sample_issue):
         """Test successful AI task execution."""
         config = LabelTriggerConfig(
             label_pattern="custom",
@@ -526,9 +508,7 @@ class TestExecuteAITask:
         assert "custom" in task.description
 
     @pytest.mark.asyncio
-    async def test_execute_ai_task_failure(
-        self, mock_settings, mock_git, mock_orchestrator, sample_issue
-    ):
+    async def test_execute_ai_task_failure(self, mock_settings, mock_git, mock_orchestrator, sample_issue):
         """Test failed AI task execution."""
         # Configure agent to return failure
         mock_result = MagicMock()

@@ -35,9 +35,7 @@ Started: {datetime.now(UTC).isoformat()}
         await self.git.add_comment(issue.number, message.strip())
         log.info("status_reported", issue=issue.number, stage=stage, status="started")
 
-    async def report_stage_complete(
-        self, issue: Any, stage: str, details: str | None = None
-    ) -> None:
+    async def report_stage_complete(self, issue: Any, stage: str, details: str | None = None) -> None:
         """Report that stage completed successfully.
 
         Args:

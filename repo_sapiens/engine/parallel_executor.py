@@ -154,9 +154,7 @@ class ParallelExecutor:
 
             try:
                 # Execute with timeout
-                result = await asyncio.wait_for(
-                    task.func(*task.args, **task.kwargs), timeout=task.timeout
-                )
+                result = await asyncio.wait_for(task.func(*task.args, **task.kwargs), timeout=task.timeout)
 
                 execution_time = time.time() - start_time
 

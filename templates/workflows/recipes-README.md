@@ -2,7 +2,7 @@
 
 These example workflows demonstrate how to use repo-sapiens for automated, recurring tasks in your repository. Each workflow is available for both **Gitea Actions** and **GitHub Actions**.
 
-## Available Examples
+## Available Recipes
 
 | Workflow | Schedule | Description |
 |----------|----------|-------------|
@@ -19,7 +19,7 @@ These example workflows demonstrate how to use repo-sapiens for automated, recur
 
 ```bash
 # Copy desired workflow to your repo
-cp templates/workflows/gitea/examples/weekly-test-coverage.yaml \
+cp templates/workflows/gitea/recipes/weekly-test-coverage.yaml \
    .gitea/workflows/weekly-test-coverage.yaml
 
 # Set required secrets in Gitea repo settings:
@@ -31,7 +31,7 @@ cp templates/workflows/gitea/examples/weekly-test-coverage.yaml \
 
 ```bash
 # Copy desired workflow to your repo
-cp templates/workflows/github/examples/weekly-test-coverage.yaml \
+cp templates/workflows/github/recipes/weekly-test-coverage.yaml \
    .github/workflows/weekly-test-coverage.yaml
 
 # Set required secrets in GitHub repo settings:
@@ -73,7 +73,7 @@ Each workflow includes a `sapiens task` command with a task prompt. Modify the p
 
 ### Using Different AI Backends
 
-The examples use Claude by default. For Ollama:
+The recipes use Claude by default. For Ollama:
 
 ```yaml
 - name: Run task with Ollama

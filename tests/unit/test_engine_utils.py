@@ -609,9 +609,7 @@ class TestManualInterventionStrategy:
 class TestAdvancedRecovery:
     """Tests for AdvancedRecovery class."""
 
-    def test_initialization(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    def test_initialization(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test AdvancedRecovery initialization."""
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
@@ -654,9 +652,7 @@ class TestAdvancedRecovery:
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_attempt_recovery_failure(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    async def test_attempt_recovery_failure(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test recovery failure (unknown error type)."""
         mock_checkpoint_manager.get_latest_checkpoint.return_value = {
             "checkpoint_id": "test-cp",
@@ -671,35 +667,24 @@ class TestAdvancedRecovery:
         # ManualInterventionStrategy always raises RecoveryError
         assert result is False
 
-    def test_classify_error_from_type_string(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    def test_classify_error_from_type_string(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test error classification from explicit type string."""
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
         result = recovery._classify_error({"error_type": "timeout"})
         assert result == ErrorType.TIMEOUT
 
-    def test_classify_error_from_message(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    def test_classify_error_from_message(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test error classification from error message."""
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
         assert recovery._classify_error({"error": "Connection timeout"}) == ErrorType.TIMEOUT
-        assert (
-            recovery._classify_error({"error": "Merge conflict in file"})
-            == ErrorType.MERGE_CONFLICT
-        )
+        assert recovery._classify_error({"error": "Merge conflict in file"}) == ErrorType.MERGE_CONFLICT
         assert recovery._classify_error({"error": "Test failed"}) == ErrorType.TEST_FAILURE
-        assert (
-            recovery._classify_error({"error": "API rate limit"}) == ErrorType.TRANSIENT_API_ERROR
-        )
+        assert recovery._classify_error({"error": "API rate limit"}) == ErrorType.TRANSIENT_API_ERROR
         assert recovery._classify_error({"error": "Random error"}) == ErrorType.UNKNOWN
 
-    def test_select_recovery_strategy(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    def test_select_recovery_strategy(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test correct strategy selection for error types."""
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
@@ -721,9 +706,7 @@ class TestAdvancedRecovery:
         )
 
     @pytest.mark.asyncio
-    async def test_create_recovery_checkpoint(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    async def test_create_recovery_checkpoint(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test creation of recovery checkpoint on error."""
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
@@ -738,18 +721,14 @@ class TestAdvancedRecovery:
         assert checkpoint_id == "new-checkpoint-id"
         mock_checkpoint_manager.create_checkpoint.assert_called_once()
 
-    def test_infer_error_type(
-        self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock
-    ):
+    def test_infer_error_type(self, mock_state_manager: MagicMock, mock_checkpoint_manager: AsyncMock):
         """Test error type inference from exception."""
         recovery = AdvancedRecovery(mock_state_manager, mock_checkpoint_manager)
 
         assert recovery._infer_error_type(TimeoutError("timeout")) == ErrorType.TIMEOUT
         assert recovery._infer_error_type(Exception("merge conflict")) == ErrorType.MERGE_CONFLICT
         assert recovery._infer_error_type(Exception("API error")) == ErrorType.TRANSIENT_API_ERROR
-        assert (
-            recovery._infer_error_type(Exception("validation failed")) == ErrorType.VALIDATION_ERROR
-        )
+        assert recovery._infer_error_type(Exception("validation failed")) == ErrorType.VALIDATION_ERROR
         assert recovery._infer_error_type(Exception("random")) == ErrorType.UNKNOWN
 
 
@@ -857,9 +836,7 @@ class TestCheckpointManager:
         assert len(plan99_files) == 1
 
     @pytest.mark.asyncio
-    async def test_cleanup_old_checkpoints(
-        self, checkpoint_manager: CheckpointManager, tmp_path: Path
-    ):
+    async def test_cleanup_old_checkpoints(self, checkpoint_manager: CheckpointManager, tmp_path: Path):
         """Test cleanup of old checkpoints."""
         # Create a checkpoint with old timestamp
         old_checkpoint = {

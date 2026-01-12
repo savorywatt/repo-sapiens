@@ -143,9 +143,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
                     hint=f"Run: ollama pull {self.config.model}",
                 )
         except httpx.ConnectError as e:
-            raise RuntimeError(
-                f"Ollama not running at {self.config.ollama_url}. " "Start it with: ollama serve"
-            ) from e
+            raise RuntimeError(f"Ollama not running at {self.config.ollama_url}. " "Start it with: ollama serve") from e
 
     def set_model(self, model: str) -> None:
         """Change the model to use."""
@@ -263,9 +261,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
         for step in self._trajectory:
             # Assistant's previous response
             assistant_msg = (
-                f"THOUGHT: {step.thought}\n"
-                f"ACTION: {step.action}\n"
-                f"ACTION_INPUT: {json.dumps(step.action_input)}"
+                f"THOUGHT: {step.thought}\n" f"ACTION: {step.action}\n" f"ACTION_INPUT: {json.dumps(step.action_input)}"
             )
             messages.append({"role": "assistant", "content": assistant_msg})
 

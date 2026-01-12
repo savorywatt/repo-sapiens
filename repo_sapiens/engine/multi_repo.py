@@ -94,9 +94,7 @@ class MultiRepoOrchestrator:
                 self.repositories[repo_name]["status"] = RepositoryStatus.IN_PROGRESS
 
                 # Create issue in target repo
-                issue = await self._create_cross_repo_issue(
-                    provider, trigger_issue, repo_name, context
-                )
+                issue = await self._create_cross_repo_issue(provider, trigger_issue, repo_name, context)
 
                 # Wait for completion
                 completed = await self._wait_for_completion(provider, issue.number, timeout=3600)
@@ -192,9 +190,7 @@ class MultiRepoOrchestrator:
         log.info("cross_repo_issue_created", repo=repo_name, issue_number=issue.number)
         return issue
 
-    def _create_cross_repo_issue_body(
-        self, trigger_issue: Any, repo_name: str, context: dict[str, Any]
-    ) -> str:
+    def _create_cross_repo_issue_body(self, trigger_issue: Any, repo_name: str, context: dict[str, Any]) -> str:
         """Create body for cross-repo issue."""
         return f"""# Cross-Repository Workflow
 
@@ -215,9 +211,7 @@ This issue is part of a multi-repository workflow triggered by:
 *This issue was automatically created by the multi-repository orchestrator.*
 """
 
-    async def _wait_for_completion(
-        self, provider: Any, issue_number: int, timeout: int = 3600
-    ) -> bool:
+    async def _wait_for_completion(self, provider: Any, issue_number: int, timeout: int = 3600) -> bool:
         """Wait for issue workflow to complete."""
         start_time = time.time()
         check_interval = 30  # Check every 30 seconds
@@ -285,9 +279,7 @@ This issue is part of a multi-repository workflow triggered by:
         """Get overall status of multi-repo orchestration."""
         statuses = {name: repo["status"].value for name, repo in self.repositories.items()}
 
-        all_completed = all(
-            status == RepositoryStatus.COMPLETED for status in self.repositories.values()
-        )
+        all_completed = all(status == RepositoryStatus.COMPLETED for status in self.repositories.values())
         any_failed = any(status == RepositoryStatus.FAILED for status in self.repositories.values())
 
         overall = "completed" if all_completed else "failed" if any_failed else "in_progress"

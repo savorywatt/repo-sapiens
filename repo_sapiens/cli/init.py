@@ -1495,14 +1495,14 @@ tags:
         # Determine paths based on provider type
         if self.provider_type == "github":
             workflows_dir = self.repo_path / ".github" / "workflows"
-            template_base = "workflows/github"
+            template_base = "workflows/github/sapiens"
         elif self.provider_type == "gitlab":
             # GitLab uses single .gitlab-ci.yml at root
             workflows_dir = self.repo_path
-            template_base = "workflows/gitlab"
+            template_base = "workflows/gitlab/sapiens"
         else:
             workflows_dir = self.repo_path / ".gitea" / "workflows"
-            template_base = "workflows/gitea"
+            template_base = "workflows/gitea/sapiens"
 
         workflows_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1520,14 +1520,14 @@ tags:
         # Process issue is useful for manual triggers in all modes
         core_workflows.append(("process-issue.yaml", "Process issue (manual trigger)"))
 
-        # Example workflows
-        example_workflows = [
-            ("examples/daily-issue-triage.yaml", "Daily issue triage"),
-            ("examples/weekly-test-coverage.yaml", "Weekly test coverage report"),
-            ("examples/weekly-dependency-audit.yaml", "Weekly dependency audit"),
-            ("examples/weekly-security-review.yaml", "Weekly security review"),
-            ("examples/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
-            ("examples/post-merge-docs.yaml", "Post-merge documentation update"),
+        # Recipe workflows
+        recipe_workflows = [
+            ("recipes/daily-issue-triage.yaml", "Daily issue triage"),
+            ("recipes/weekly-test-coverage.yaml", "Weekly test coverage report"),
+            ("recipes/weekly-dependency-audit.yaml", "Weekly dependency audit"),
+            ("recipes/weekly-security-review.yaml", "Weekly security review"),
+            ("recipes/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
+            ("recipes/post-merge-docs.yaml", "Post-merge documentation update"),
         ]
 
         def deploy_template(template_name: str, target_dir: Path) -> bool:
@@ -1558,12 +1558,25 @@ tags:
                 if content is None:
                     return False
 
-                # For GitLab, core workflows go to .gitlab-ci.yml
-                if self.provider_type == "gitlab" and not template_name.startswith("examples/"):
-                    target_file = target_dir / ".gitlab-ci.yml"
+                # Determine target file path
+                is_recipe = template_name.startswith("recipes/")
+
+                if self.provider_type == "gitlab":
+                    if not is_recipe:
+                        # Core workflows go to .gitlab-ci.yml
+                        target_file = target_dir / ".gitlab-ci.yml"
+                    else:
+                        # Recipes go to .gitlab/sapiens/recipes/
+                        gitlab_dir = self.repo_path / ".gitlab" / "sapiens" / "recipes"
+                        gitlab_dir.mkdir(parents=True, exist_ok=True)
+                        target_file = gitlab_dir / template_name.replace("recipes/", "")
                 else:
-                    # Create subdirectories if needed
-                    target_file = target_dir / template_name
+                    # GitHub/Gitea: use subdirectory structure - recipes nested inside sapiens
+                    sapiens_dir = target_dir / "sapiens"
+                    if is_recipe:
+                        target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
+                    else:
+                        target_file = sapiens_dir / template_name
                     target_file.parent.mkdir(parents=True, exist_ok=True)
 
                 target_file.write_text(content)
@@ -1585,22 +1598,25 @@ tags:
         if deploy_core:
             for template_name, description in core_workflows:
                 if deploy_template(template_name, workflows_dir):
-                    if self.provider_type == "gitlab" and not template_name.startswith("examples/"):
+                    if self.provider_type == "gitlab":
                         click.echo(f"   ✓ {description} → .gitlab-ci.yml")
                     else:
-                        click.echo(f"   ✓ {description}")
+                        click.echo(f"   ✓ {description} → sapiens/")
                 else:
                     click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
 
         click.echo()
 
-        # Ask about example workflows (one by one in interactive mode)
+        # Ask about recipe workflows (one by one in interactive mode)
         if not self.non_interactive:  # nosec B105
-            click.echo("Example workflows available:")
-            for template_name, description in example_workflows:  # nosec B105
+            click.echo("Recipe workflows available:")
+            for template_name, description in recipe_workflows:  # nosec B105
                 if click.confirm(f"  Deploy '{description}'?", default=False):
                     if deploy_template(template_name, workflows_dir):
-                        click.echo(click.style("     ✓ Deployed", fg="green"))  # nosec B105
+                        if self.provider_type == "gitlab":
+                            click.echo(click.style("     ✓ Deployed → .gitlab/sapiens/recipes/", fg="green"))  # nosec B105
+                        else:
+                            click.echo(click.style("     ✓ Deployed → sapiens/recipes/", fg="green"))  # nosec B105
                     else:
                         click.echo(click.style("     ⚠ Could not deploy", fg="yellow"))  # nosec B105
 

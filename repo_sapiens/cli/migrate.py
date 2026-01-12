@@ -178,15 +178,15 @@ def generate_workflows(ctx: click.Context, dry_run: bool, force: bool) -> None:
         if automation_config.label_triggers:
             provider = settings.git_provider.provider_type
             if provider == "github":
-                click.echo("  .github/workflows/process-label.yaml")
+                click.echo("  .github/workflows/sapiens/process-label.yaml")
             elif provider == "gitlab":
                 click.echo("  .gitlab-ci.yml (process-label job)")
             else:
-                click.echo("  .gitea/workflows/process-label.yaml")
+                click.echo("  .gitea/workflows/sapiens/process-label.yaml")
 
         for schedule in automation_config.schedule_triggers:
             filename = f"schedule-{schedule.handler.replace('/', '-')}.yaml"
-            click.echo(f"  .../{filename}")
+            click.echo(f"  .../sapiens/{filename}")
 
         return
 
@@ -194,11 +194,11 @@ def generate_workflows(ctx: click.Context, dry_run: bool, force: bool) -> None:
     if not force:
         provider = settings.git_provider.provider_type
         if provider == "github":
-            existing = Path(".github/workflows/process-label.yaml")
+            existing = Path(".github/workflows/sapiens/process-label.yaml")
         elif provider == "gitlab":
             existing = Path(".gitlab-ci.yml")
         else:
-            existing = Path(".gitea/workflows/process-label.yaml")
+            existing = Path(".gitea/workflows/sapiens/process-label.yaml")
 
         if existing.exists():
             click.echo(f"Workflow file already exists: {existing}")
@@ -236,7 +236,7 @@ def validate_setup(ctx: click.Context) -> None:
         return
 
     automation_config = _get_automation_config(settings)
-    checks = []
+    checks: list[tuple[str, bool, str | None]] = []
     all_passed = True
 
     # Check 1: Native mode enabled
@@ -262,11 +262,11 @@ def validate_setup(ctx: click.Context) -> None:
     # Check 3: Workflow file exists
     provider = settings.git_provider.provider_type
     if provider == "github":
-        workflow_path = Path(".github/workflows/process-label.yaml")
+        workflow_path = Path(".github/workflows/sapiens/process-label.yaml")
     elif provider == "gitlab":
         workflow_path = Path(".gitlab-ci.yml")
     else:
-        workflow_path = Path(".gitea/workflows/process-label.yaml")
+        workflow_path = Path(".gitea/workflows/sapiens/process-label.yaml")
 
     if workflow_path.exists():
         checks.append(("Workflow file exists", True, str(workflow_path)))

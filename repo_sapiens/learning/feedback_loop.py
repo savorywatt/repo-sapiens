@@ -93,9 +93,7 @@ class FeedbackLoop:
 
         return improved_prompt
 
-    async def _find_similar_tasks(
-        self, task: Any, similarity_threshold: float = 0.7
-    ) -> list[dict[str, Any]]:
+    async def _find_similar_tasks(self, task: Any, similarity_threshold: float = 0.7) -> list[dict[str, Any]]:
         """Find similar historical tasks."""
         similar: list[dict[str, Any]] = []
 
@@ -260,9 +258,7 @@ Please implement this task following these learned best practices.
         return {
             "total_executions": total_executions,
             "successful_executions": successful_executions,
-            "success_rate": (
-                successful_executions / total_executions if total_executions > 0 else 0.0
-            ),
+            "success_rate": (successful_executions / total_executions if total_executions > 0 else 0.0),
             "average_review_score": average_review_score,
         }
 

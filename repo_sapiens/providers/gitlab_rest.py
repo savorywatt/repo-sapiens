@@ -242,9 +242,7 @@ class GitLabRestProvider(GitProvider):
         """
         log.info("get_comments", issue_number=issue_number)
 
-        response = await self._pool.get(
-            f"/projects/{self.project_path}/issues/{issue_number}/notes"
-        )
+        response = await self._pool.get(f"/projects/{self.project_path}/issues/{issue_number}/notes")
         response.raise_for_status()
 
         notes_data = response.json()
@@ -291,9 +289,7 @@ class GitLabRestProvider(GitProvider):
 
         try:
             encoded_branch = urllib.parse.quote(branch_name, safe="")
-            response = await self._pool.get(
-                f"/projects/{self.project_path}/repository/branches/{encoded_branch}"
-            )
+            response = await self._pool.get(f"/projects/{self.project_path}/repository/branches/{encoded_branch}")
             response.raise_for_status()
 
             branch_data = response.json()
@@ -529,9 +525,7 @@ class GitLabRestProvider(GitProvider):
         log.info("get_merge_request", mr=mr_number)
 
         try:
-            response = await self._pool.get(
-                f"/projects/{self.project_path}/merge_requests/{mr_number}"
-            )
+            response = await self._pool.get(f"/projects/{self.project_path}/merge_requests/{mr_number}")
             response.raise_for_status()
             return self._parse_merge_request(response.json())
         except httpx.HTTPStatusError as e:

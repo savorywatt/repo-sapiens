@@ -299,9 +299,7 @@ workflows:
                     "description": f"Workflow {i}",
                     "enabled": i % 2 == 0,
                     "requires_approval": i % 3 == 0,
-                    "steps": [
-                        {"name": f"step-{j}", "command": f'echo "Step {j}"'} for j in range(5)
-                    ],
+                    "steps": [{"name": f"step-{j}", "command": f'echo "Step {j}"'} for j in range(5)],
                 }
                 for i in range(10)
             ]
@@ -495,10 +493,7 @@ class TestStateManagementPerformance:
             "created_at": "2024-01-01T00:00:00",
             "updated_at": "2024-01-01T00:00:00",
             "stages": {f"stage_{i}": {"status": "pending", "data": {}} for i in range(20)},
-            "tasks": {
-                f"task_{i}": {"status": "pending", "data": {"details": "x" * 1000}}
-                for i in range(100)
-            },
+            "tasks": {f"task_{i}": {"status": "pending", "data": {"details": "x" * 1000}} for i in range(100)},
         }
 
         async def save_large():
@@ -642,10 +637,7 @@ class TestMemoryUsage:
                 "status": "pending",
                 "created_at": "2024-01-01T00:00:00",
                 "updated_at": "2024-01-01T00:00:00",
-                "tasks": {
-                    f"task_{i}": {"status": "pending", "data": {"content": "x" * 1000}}
-                    for i in range(size)
-                },
+                "tasks": {f"task_{i}": {"status": "pending", "data": {"content": "x" * 1000}} for i in range(size)},
             }
 
             # Write and verify

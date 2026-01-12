@@ -180,9 +180,7 @@ class EncryptedFileBackend:
             decrypted_data = self.fernet.decrypt(encrypted_data)
 
             # Parse JSON
-            credentials = cast(
-                dict[str, dict[str, str]], json.loads(decrypted_data.decode("utf-8"))
-            )
+            credentials = cast(dict[str, dict[str, str]], json.loads(decrypted_data.decode("utf-8")))
 
             self._credentials_cache = credentials
             return credentials

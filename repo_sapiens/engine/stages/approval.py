@@ -142,9 +142,7 @@ class ApprovalStage(WorkflowStage):
             await self.git.add_comment(original_issue_number, "\n".join(comment_parts))
 
             # Remove awaiting-approval, add in-progress
-            updated_labels = [
-                label for label in original_issue.labels if label != "awaiting-approval"
-            ]
+            updated_labels = [label for label in original_issue.labels if label != "awaiting-approval"]
             updated_labels.append("in-progress")
             await self.git.update_issue(original_issue_number, labels=updated_labels)
 
@@ -158,17 +156,13 @@ class ApprovalStage(WorkflowStage):
                 f"🤖 Posted by Builder Automation",
             )
 
-            log.info(
-                "approval_stage_complete", original=original_issue_number, tasks=len(task_issues)
-            )
+            log.info("approval_stage_complete", original=original_issue_number, tasks=len(task_issues))
 
         except Exception as e:
             log.error("approval_stage_failed", issue=issue.number, error=str(e), exc_info=True)
             await self.git.add_comment(
                 issue.number,
-                f"❌ **Approval Processing Failed**\n\n"
-                f"Error: {str(e)}\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"❌ **Approval Processing Failed**\n\n" f"Error: {str(e)}\n\n" f"🤖 Posted by Builder Automation",
             )
             raise
 

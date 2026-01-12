@@ -60,14 +60,9 @@ class CodeReviewStage(WorkflowStage):
             await self.git.add_comment(issue.number, review_comment)
 
             # 7. Update based on approval
-            if (
-                review.approved
-                and review.confidence_score >= self.settings.workflow.review_approval_threshold
-            ):
+            if review.approved and review.confidence_score >= self.settings.workflow.review_approval_threshold:
                 # Approved - mark as merge-ready
-                labels = [
-                    label for label in issue.labels if label != self.settings.tags.code_review
-                ]
+                labels = [label for label in issue.labels if label != self.settings.tags.code_review]
                 labels.append(self.settings.tags.merge_ready)
                 await self.git.update_issue(issue.number, labels=labels)
 
@@ -75,9 +70,7 @@ class CodeReviewStage(WorkflowStage):
                     plan_id, task_id, "merge_ready", {"review_confidence": review.confidence_score}
                 )
 
-                log.info(
-                    "code_review_approved", task_id=task_id, confidence=review.confidence_score
-                )
+                log.info("code_review_approved", task_id=task_id, confidence=review.confidence_score)
 
             else:
                 # Not approved - keep in review or create follow-up
@@ -88,9 +81,7 @@ class CodeReviewStage(WorkflowStage):
                         "Please review the comments above and make necessary changes.",
                     )
 
-                log.warning(
-                    "code_review_rejected", task_id=task_id, confidence=review.confidence_score
-                )
+                log.warning("code_review_rejected", task_id=task_id, confidence=review.confidence_score)
 
             # 8. Update state
             await self.state.mark_stage_complete(

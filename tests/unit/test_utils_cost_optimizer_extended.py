@@ -423,9 +423,7 @@ class TestCostSavingsRecommendations:
         recommendations = optimizer.get_cost_savings_recommendations(actual, estimated)
 
         # Should recommend structured task descriptions
-        assert any(
-            "implementation" in rec.lower() or "task" in rec.lower() for rec in recommendations
-        )
+        assert any("implementation" in rec.lower() or "task" in rec.lower() for rec in recommendations)
 
     def test_recommendations_high_advanced_usage(self):
         """Test recommendations when advanced models dominate."""

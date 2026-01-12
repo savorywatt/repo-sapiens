@@ -275,9 +275,7 @@ class TestCredentialResolver:
         """Test resolver with custom encrypted file path."""
         file_path = tmp_path / "custom_creds.enc"
 
-        resolver = CredentialResolver(
-            encrypted_file_path=file_path, encrypted_master_password="password"
-        )
+        resolver = CredentialResolver(encrypted_file_path=file_path, encrypted_master_password="password")
 
         # Set and resolve credential
         resolver.encrypted_backend.set("test", "key", "value")

@@ -135,9 +135,7 @@ class StateManager:
 
         return "pending"
 
-    async def mark_stage_complete(
-        self, plan_id: str, stage: str, data: dict[str, Any] | None = None
-    ) -> None:
+    async def mark_stage_complete(self, plan_id: str, stage: str, data: dict[str, Any] | None = None) -> None:
         """Mark a stage as completed."""
         async with self.transaction(plan_id) as state:
             if stage in state["stages"]:

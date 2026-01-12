@@ -98,9 +98,7 @@ class KeyringBackend:
             return credential
 
         except KeyringError as e:
-            raise CredentialError(
-                f"Keyring operation failed: {e}", reference=f"@keyring:{service}/{key}"
-            ) from e
+            raise CredentialError(f"Keyring operation failed: {e}", reference=f"@keyring:{service}/{key}") from e
 
     def set(self, service: str, key: str, value: str) -> None:
         """Store credential in OS keyring.
@@ -129,9 +127,7 @@ class KeyringBackend:
             logger.info(f"Stored credential in keyring: {service}/{key}")
 
         except KeyringError as e:
-            raise CredentialError(
-                f"Failed to store credential: {e}", reference=f"@keyring:{service}/{key}"
-            ) from e
+            raise CredentialError(f"Failed to store credential: {e}", reference=f"@keyring:{service}/{key}") from e
 
     def delete(self, service: str, key: str) -> bool:
         """Delete credential from OS keyring.
@@ -161,6 +157,4 @@ class KeyringBackend:
             return False
 
         except KeyringError as e:
-            raise CredentialError(
-                f"Failed to delete credential: {e}", reference=f"@keyring:{service}/{key}"
-            ) from e
+            raise CredentialError(f"Failed to delete credential: {e}", reference=f"@keyring:{service}/{key}") from e

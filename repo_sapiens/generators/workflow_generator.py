@@ -74,9 +74,9 @@ class WorkflowGenerator:
         """Generate Gitea/GitHub Actions label workflow."""
         # Determine workflow directory
         if self.provider == "github":
-            workflow_dir = self.output_dir / ".github" / "workflows"
+            workflow_dir = self.output_dir / ".github" / "workflows" / "sapiens"
         else:
-            workflow_dir = self.output_dir / ".gitea" / "workflows"
+            workflow_dir = self.output_dir / ".gitea" / "workflows" / "sapiens"
 
         workflow_dir.mkdir(parents=True, exist_ok=True)
 
@@ -276,9 +276,9 @@ class WorkflowGenerator:
 
         # Gitea/GitHub Actions
         if self.provider == "github":
-            workflow_dir = self.output_dir / ".github" / "workflows"
+            workflow_dir = self.output_dir / ".github" / "workflows" / "sapiens"
         else:
-            workflow_dir = self.output_dir / ".gitea" / "workflows"
+            workflow_dir = self.output_dir / ".gitea" / "workflows" / "sapiens"
 
         workflow_dir.mkdir(parents=True, exist_ok=True)
 

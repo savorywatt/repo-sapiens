@@ -31,9 +31,7 @@ class TestCredentialExceptions:
 
     def test_credential_error_with_suggestion(self):
         """Test CredentialError with suggestion."""
-        error = CredentialError(
-            "Test error", reference="@keyring:service/key", suggestion="Try installing keyring"
-        )
+        error = CredentialError("Test error", reference="@keyring:service/key", suggestion="Try installing keyring")
 
         assert error.message == "Test error"
         assert error.suggestion == "Try installing keyring"

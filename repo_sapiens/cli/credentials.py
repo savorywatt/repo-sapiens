@@ -236,9 +236,7 @@ def test_credentials(master_password: str | None):
     click.echo(click.style("Available", fg="green"))
 
     # Test encrypted backend
-    encrypted_backend = EncryptedFileBackend(
-        Path(".sapiens/credentials.enc"), master_password or "test"
-    )
+    encrypted_backend = EncryptedFileBackend(Path(".sapiens/credentials.enc"), master_password or "test")
     click.echo("Encrypted file backend: ", nl=False)
     if encrypted_backend.available:
         click.echo(click.style("Available", fg="green"))
@@ -267,8 +265,7 @@ def _parse_service_key(reference: str) -> tuple[str, str]:
     """
     if "/" not in reference:
         raise ValueError(
-            f"Invalid reference format: {reference}\n"
-            "Expected format: service/key (e.g., gitea/api_token)"
+            f"Invalid reference format: {reference}\n" "Expected format: service/key (e.g., gitea/api_token)"
         )
 
     parts = reference.split("/", 1)
@@ -293,9 +290,7 @@ def _set_environment(var_name: str, value: str) -> None:
 
     click.echo(f"Set environment variable: {var_name}")
     click.echo(f"Reference: ${{{var_name}}}")
-    click.echo(
-        click.style("Note: Environment variables only persist in current session", fg="yellow")
-    )
+    click.echo(click.style("Note: Environment variables only persist in current session", fg="yellow"))
 
 
 def _set_encrypted(reference: str, value: str, master_password: str | None) -> None:
@@ -305,9 +300,7 @@ def _set_encrypted(reference: str, value: str, master_password: str | None) -> N
     if not master_password:
         master_password = click.prompt("Master password", hide_input=True, confirmation_prompt=True)
 
-    backend = EncryptedFileBackend(
-        file_path=Path(".sapiens/credentials.enc"), master_password=master_password
-    )
+    backend = EncryptedFileBackend(file_path=Path(".sapiens/credentials.enc"), master_password=master_password)
     backend.set(service, key, value)
 
     click.echo(f"Stored in encrypted file: {service}/{key}")
@@ -335,7 +328,5 @@ def _delete_encrypted(reference: str, master_password: str | None) -> bool:
     if not master_password:
         master_password = click.prompt("Master password", hide_input=True)
 
-    backend = EncryptedFileBackend(
-        file_path=Path(".sapiens/credentials.enc"), master_password=master_password
-    )
+    backend = EncryptedFileBackend(file_path=Path(".sapiens/credentials.enc"), master_password=master_password)
     return backend.delete(service, key)

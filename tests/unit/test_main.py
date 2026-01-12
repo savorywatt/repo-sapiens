@@ -127,9 +127,7 @@ class TestAsyncMainFunctions:
 
         mock_state = AsyncMock()
         mock_state.get_active_plans = AsyncMock(return_value=["plan-1", "plan-2"])
-        mock_state.load_state = AsyncMock(
-            side_effect=[{"status": "active"}, {"status": "completed"}]
-        )
+        mock_state.load_state = AsyncMock(side_effect=[{"status": "active"}, {"status": "completed"}])
 
         with patch("repo_sapiens.main.StateManager", return_value=mock_state):
             await _list_active_plans(mock_settings)

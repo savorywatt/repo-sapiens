@@ -108,9 +108,7 @@ workflow:
 
         # Mock the CLI check
         with patch("shutil.which", return_value="/usr/bin/claude"):
-            result = runner.invoke(
-                health_check, ["--config", str(config_file), "--skip-connectivity"]
-            )
+            result = runner.invoke(health_check, ["--config", str(config_file), "--skip-connectivity"])
 
         # Should complete without network checks
         assert "repo-sapiens Health Check" in result.output
@@ -142,9 +140,7 @@ workflow:
         )
 
         with patch("shutil.which", return_value="/usr/bin/claude"):
-            result = runner.invoke(
-                health_check, ["--config", str(config_file), "--skip-connectivity", "-v"]
-            )
+            result = runner.invoke(health_check, ["--config", str(config_file), "--skip-connectivity", "-v"])
 
         # Verbose should include more details
         assert "repo-sapiens Health Check" in result.output

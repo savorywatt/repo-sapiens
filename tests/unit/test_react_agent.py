@@ -206,9 +206,7 @@ class TestToolRegistry:
     @pytest.mark.asyncio
     async def test_search_files_invalid_path(self, registry):
         """Test search_files with non-existent path."""
-        result = await registry.execute(
-            "search_files", {"pattern": "test", "path": "nonexistent_dir"}
-        )
+        result = await registry.execute("search_files", {"pattern": "test", "path": "nonexistent_dir"})
         assert "does not exist" in result
 
     # ==================== find_files tests ====================
@@ -717,11 +715,7 @@ class TestGenerateStep:
         with patch.object(
             agent.client,
             "post",
-            AsyncMock(
-                side_effect=httpx.HTTPStatusError(
-                    "Server error", request=MagicMock(), response=MagicMock()
-                )
-            ),
+            AsyncMock(side_effect=httpx.HTTPStatusError("Server error", request=MagicMock(), response=MagicMock())),
         ):
             with pytest.raises(httpx.HTTPStatusError):
                 await agent._generate_step("Test task")
@@ -748,9 +742,7 @@ class TestGenerateStep:
             nonlocal captured_json
             captured_json = json
             mock_resp = MagicMock()
-            mock_resp.json.return_value = {
-                "message": {"content": "THOUGHT: Done\nACTION: finish\nACTION_INPUT: {}"}
-            }
+            mock_resp.json.return_value = {"message": {"content": "THOUGHT: Done\nACTION: finish\nACTION_INPUT: {}"}}
             mock_resp.raise_for_status = MagicMock()
             return mock_resp
 
@@ -996,9 +988,7 @@ class TestRunReactTask:
                 nonlocal captured_config
                 captured_config = config
                 mock = AsyncMock()
-                mock.execute_task = AsyncMock(
-                    return_value=TaskResult(success=True, output="", files_changed=[])
-                )
+                mock.execute_task = AsyncMock(return_value=TaskResult(success=True, output="", files_changed=[]))
                 mock.connect = AsyncMock()
                 mock.get_trajectory = MagicMock(return_value=[])
                 mock.__aenter__ = AsyncMock(return_value=mock)

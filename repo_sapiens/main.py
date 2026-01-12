@@ -310,9 +310,7 @@ def task_command(
                         click.echo("Goodbye!")
                         break
                     elif cmd == "/help":
-                        click.echo(
-                            "\nCommands: /help, /models, /model <name>, /pwd, /verbose, /clear, /quit"
-                        )
+                        click.echo("\nCommands: /help, /models, /model <name>, /pwd, /verbose, /clear, /quit")
                         click.echo("Or type any task for the agent to execute.\n")
                     elif cmd == "/models":
                         models = await agent.list_models()

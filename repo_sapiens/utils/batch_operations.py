@@ -156,10 +156,7 @@ class BatchOperations:
         log.info("updating_issues_batch", count=len(updates))
 
         async def update_batch(batch: list[dict[str, Any]]) -> list[Any]:
-            tasks = [
-                self.git.update_issue(update["issue_number"], **update["fields"])
-                for update in batch
-            ]
+            tasks = [self.git.update_issue(update["issue_number"], **update["fields"]) for update in batch]
             return await asyncio.gather(*tasks)
 
         results: list[Any] = await self.batch_processor.process_batches(updates, update_batch)
@@ -172,9 +169,7 @@ class BatchOperations:
         log.info("adding_comments_batch", count=len(comments))
 
         async def comment_batch(batch: list[dict[str, Any]]) -> list[Any]:
-            tasks = [
-                self.git.add_comment(comment["issue_number"], comment["body"]) for comment in batch
-            ]
+            tasks = [self.git.add_comment(comment["issue_number"], comment["body"]) for comment in batch]
             return await asyncio.gather(*tasks)
 
         results: list[Any] = await self.batch_processor.process_batches(comments, comment_batch)

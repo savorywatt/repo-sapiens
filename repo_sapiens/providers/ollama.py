@@ -61,9 +61,7 @@ class OllamaProvider(AgentProvider):
 
         except httpx.ConnectError as e:
             log.error("ollama_not_running", url=self.base_url)
-            raise RuntimeError(
-                f"Ollama not running at {self.base_url}. Start it with: ollama serve"
-            ) from e
+            raise RuntimeError(f"Ollama not running at {self.base_url}. Start it with: ollama serve") from e
         except Exception as e:
             log.error("ollama_connection_failed", error=str(e))
             raise
@@ -259,9 +257,7 @@ IMPORTANT:
                 try:
                     return self[key]
                 except KeyError as e:
-                    raise AttributeError(
-                        f"'{type(self).__name__}' object has no attribute '{key}'"
-                    ) from e
+                    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'") from e
 
             def __setattr__(self, key, value):
                 self[key] = value

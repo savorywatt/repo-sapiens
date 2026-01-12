@@ -30,9 +30,7 @@ workflow_duration = Histogram(
 active_workflows = Gauge("automation_active_workflows", "Number of currently active workflows")
 
 # API call metrics
-api_calls = Counter(
-    "automation_api_calls_total", "Total API calls", ["provider", "method", "status"]
-)
+api_calls = Counter("automation_api_calls_total", "Total API calls", ["provider", "method", "status"])
 
 api_call_duration = Histogram(
     "automation_api_call_duration_seconds",
@@ -70,9 +68,7 @@ cache_hits = Counter("automation_cache_hits_total", "Cache hits", ["cache_name"]
 cache_misses = Counter("automation_cache_misses_total", "Cache misses", ["cache_name"])
 
 # Cost metrics
-estimated_cost = Gauge(
-    "automation_estimated_cost_dollars", "Estimated cost in dollars", ["component"]
-)
+estimated_cost = Gauge("automation_estimated_cost_dollars", "Estimated cost in dollars", ["component"])
 
 token_usage = Counter("automation_token_usage_total", "Total tokens used", ["model", "operation"])
 

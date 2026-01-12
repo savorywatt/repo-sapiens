@@ -106,9 +106,7 @@ class TestEncryptedBackendSaltPermissionWarning:
         assert len(backend.salt) == 16
 
         # Check warning was logged
-        assert any(
-            "Could not set salt file permissions" in record.message for record in caplog.records
-        )
+        assert any("Could not set salt file permissions" in record.message for record in caplog.records)
 
 
 class TestEncryptedBackendLoadCredentialsErrors:
@@ -565,9 +563,7 @@ class TestKeyringBackendServiceNamespace:
                 backend = KeyringBackend()
                 backend.set("testservice", "testkey", "testvalue")
 
-                mock_keyring.set_password.assert_called_with(
-                    "sapiens/testservice", "testkey", "testvalue"
-                )
+                mock_keyring.set_password.assert_called_with("sapiens/testservice", "testkey", "testvalue")
 
     def test_delete_uses_namespaced_service(self):
         """Should use namespaced service name in delete operations."""

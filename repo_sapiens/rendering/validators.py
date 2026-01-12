@@ -220,9 +220,7 @@ def validate_template_context(context: dict[str, Any]) -> None:
     max_value_length = 10000
     for key, value in context.items():
         if isinstance(value, str) and len(value) > max_value_length:
-            raise ValueError(
-                f"Value for '{key}' exceeds maximum length ({len(value)} > {max_value_length})"
-            )
+            raise ValueError(f"Value for '{key}' exceeds maximum length ({len(value)} > {max_value_length})")
 
     # Recursively check nested structures
     def check_nested(obj: Any, path: str = "") -> None:

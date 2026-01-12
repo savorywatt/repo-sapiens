@@ -19,9 +19,7 @@ try:
     import git
     from git.exc import InvalidGitRepositoryError
 except ImportError as e:
-    raise ImportError(
-        "GitPython is required for Git discovery. Install it with: pip install gitpython"
-    ) from e
+    raise ImportError("GitPython is required for Git discovery. Install it with: pip install gitpython") from e
 
 from repo_sapiens.git.exceptions import (
     MultipleRemotesError,
@@ -152,9 +150,7 @@ class GitDiscovery:
             for remote in remotes:
                 if remote.name == remote_name:
                     return remote
-            raise ValueError(
-                f"Remote '{remote_name}' not found. Available: {', '.join(r.name for r in remotes)}"
-            )
+            raise ValueError(f"Remote '{remote_name}' not found. Available: {', '.join(r.name for r in remotes)}")
 
         # Single remote - use it
         if len(remotes) == 1:
@@ -215,9 +211,7 @@ class GitDiscovery:
 
         return MultipleRemotesInfo(remotes=remotes, suggested=suggested)
 
-    def parse_repository(
-        self, remote_name: str | None = None, allow_multiple: bool = False
-    ) -> RepositoryInfo:
+    def parse_repository(self, remote_name: str | None = None, allow_multiple: bool = False) -> RepositoryInfo:
         """Parse repository information from Git remote.
 
         Extracts complete repository information from a Git remote URL,
@@ -256,9 +250,7 @@ class GitDiscovery:
             https_url=parser.https_url,
         )
 
-    def detect_provider_type(
-        self, remote_name: str | None = None
-    ) -> Literal["github", "gitlab", "gitea"]:
+    def detect_provider_type(self, remote_name: str | None = None) -> Literal["github", "gitlab", "gitea"]:
         """Detect Git provider type (GitHub, GitLab, or Gitea) from remote URL.
 
         Detection order:
