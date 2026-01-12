@@ -157,6 +157,7 @@ class RepoInitializer:
         # Automation mode settings
         self.automation_mode = "native"  # 'native', 'daemon', or 'hybrid'
         self.label_prefix = "sapiens/"
+        self.is_cicd_setup = False  # True if setting up for CI/CD workflows
 
         # Configuration mode settings
         self.run_mode: Literal["local", "cicd", "both"] = "local"  # What to configure
@@ -401,11 +402,14 @@ class RepoInitializer:
 
     def _run_configuration_pass(self) -> None:
         """Run a single configuration pass (local or CI/CD)."""
-        # For CI/CD config, force environment backend
+        # For CI/CD config, force environment backend and set is_cicd_setup flag
         if self.config_target == "cicd":
             self.backend = "environment"
+            self.is_cicd_setup = True
             click.echo(click.style("   Using environment backend for CI/CD configuration", fg="yellow"))
             click.echo()
+        else:
+            self.is_cicd_setup = False
 
         # Check for existing configuration
         has_existing = self._load_existing_config()
@@ -675,6 +679,26 @@ class RepoInitializer:
 
     def _collect_gitea_token_interactively(self) -> None:
         """Collect Gitea token interactively."""
+        # CI/CD mode: just confirm env var is set
+        if self.is_cicd_setup:
+            click.echo("For CI/CD workflows, you need to set repository secrets:")
+            click.echo()
+            click.echo("   • SAPIENS_GITEA_TOKEN - Your Gitea API token")
+            click.echo(f"   • Get it from: {self.repo_info.base_url}/user/settings/applications")
+            click.echo()
+            confirmed = click.confirm("Did you set SAPIENS_GITEA_TOKEN in repository secrets?", default=False)
+            if not confirmed:
+                secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/settings/secrets"
+                click.echo()
+                click.echo(f"Set it at: {secrets_url}")
+                click.echo()
+                if not click.confirm("Continue anyway?", default=False):
+                    raise click.ClickException("Setup cancelled - please set repository secrets first")
+            # Don't store actual token for CI/CD
+            self.gitea_token = None
+            return
+
+        # Local mode: collect token
         # Check for existing Gitea token in keyring or environment
         existing_token, source = self._detect_existing_gitea_token()
 
@@ -698,6 +722,28 @@ class RepoInitializer:
 
     def _collect_gitlab_token_interactively(self) -> None:
         """Collect GitLab token interactively."""
+        # CI/CD mode: just confirm env var is set
+        if self.is_cicd_setup:
+            click.echo("For CI/CD workflows, you need to set repository secrets:")
+            click.echo()
+            click.echo("   • SAPIENS_GITLAB_TOKEN - Your GitLab Personal Access Token")
+            pat_url = f"{self.repo_info.base_url}/-/user_settings/personal_access_tokens"
+            click.echo(f"   • Get it from: {pat_url}")
+            click.echo("   • Required scopes: api, read_repository, write_repository")
+            click.echo()
+            confirmed = click.confirm("Did you set SAPIENS_GITLAB_TOKEN in repository secrets?", default=False)
+            if not confirmed:
+                secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/-/settings/ci_cd"
+                click.echo()
+                click.echo(f"Set it at: {secrets_url}")
+                click.echo()
+                if not click.confirm("Continue anyway?", default=False):
+                    raise click.ClickException("Setup cancelled - please set repository secrets first")
+            # Don't store actual token for CI/CD
+            self.gitea_token = None
+            return
+
+        # Local mode: collect token
         # Check for existing GitLab token in keyring or environment
         existing_token, source = self._detect_existing_gitlab_token()
 
@@ -772,7 +818,26 @@ class RepoInitializer:
         """Configure Claude agent."""
         click.echo()
 
-        # Ask local vs API
+        # CI/CD mode: Force API mode and confirm env var
+        if self.is_cicd_setup:
+            click.echo("For CI/CD workflows, Claude API is required.")
+            click.echo()
+            click.echo("You need to set repository secrets:")
+            click.echo("   • SAPIENS_CLAUDE_API_KEY - Your Claude API key")
+            click.echo("   • Get it from: https://console.anthropic.com/")
+            click.echo()
+            confirmed = click.confirm("Did you set SAPIENS_CLAUDE_API_KEY in repository secrets?", default=False)
+            if not confirmed:
+                click.echo()
+                click.echo("Set it in your repository's CI/CD secrets settings.")
+                click.echo()
+                if not click.confirm("Continue anyway?", default=False):
+                    raise click.ClickException("Setup cancelled - please set repository secrets first")
+            self.agent_mode = "api"
+            self.agent_api_key = None
+            return
+
+        # Local mode: Ask local vs API
         self.agent_mode = click.prompt(
             "Use local Claude Code or Claude API?",
             type=click.Choice(["local", "api"]),
@@ -800,6 +865,53 @@ class RepoInitializer:
         click.echo(click.style("🪿 Goose Configuration", bold=True, fg="cyan"))
         click.echo()
 
+        # CI/CD mode: Simplified setup
+        if self.is_cicd_setup:
+            click.echo("For CI/CD workflows, you need to:")
+            click.echo("   1. Choose an LLM provider (API-based)")
+            click.echo("   2. Set the provider's API key in repository secrets")
+            click.echo()
+
+            self.goose_llm_provider = click.prompt(
+                "Which LLM provider?",
+                type=click.Choice(["openai", "anthropic", "groq", "openrouter"]),
+                default="anthropic",
+            )
+
+            provider_info = get_provider_info(self.goose_llm_provider)
+            click.echo()
+            click.echo(f"Available models for {provider_info['name']}:")
+            for model in provider_info["models"][:3]:  # Show top 3
+                click.echo(f"  • {model}")
+
+            self.goose_model = click.prompt(
+                "Which model?",
+                type=click.Choice(provider_info["models"]),
+                default=provider_info["default_model"]
+            )
+
+            if provider_info.get("api_key_env"):
+                api_key_env = provider_info["api_key_env"]
+                click.echo()
+                click.echo(f"You need to set repository secrets:")
+                click.echo(f"   • {api_key_env} - Your {provider_info['name']} API key")
+                click.echo(f"   • Get it from: {provider_info.get('website', 'provider website')}")
+                click.echo()
+
+                confirmed = click.confirm(f"Did you set {api_key_env} in repository secrets?", default=False)
+                if not confirmed:
+                    click.echo()
+                    click.echo("Set it in your repository's CI/CD secrets settings.")
+                    click.echo()
+                    if not click.confirm("Continue anyway?", default=False):
+                        raise click.ClickException("Setup cancelled - please set repository secrets first")
+
+                self.agent_api_key = None
+
+            self.agent_mode = "local"  # Goose runs locally (but with API-based LLM)
+            return
+
+        # Local mode: Full configuration
         # Show provider comparison
         click.echo(format_provider_comparison())
         click.echo()
@@ -888,6 +1000,23 @@ class RepoInitializer:
         click.echo("The builtin agent uses an LLM for reasoning and executes tools locally.")
         click.echo()
 
+        # CI/CD mode: Only cloud providers are supported
+        if self.is_cicd_setup:
+            click.echo("For CI/CD workflows, only API-based providers are supported.")
+            click.echo()
+
+            self.builtin_provider = click.prompt(
+                "Which LLM provider?",
+                type=click.Choice(["openai", "anthropic", "groq", "openrouter"]),
+                default="anthropic",
+            )
+
+            provider_info = get_provider_info(self.builtin_provider)
+            self._configure_builtin_cloud(provider_info)
+            self.agent_mode = "local"
+            return
+
+        # Local mode: Full configuration
         # Show provider comparison
         click.echo(format_provider_comparison())
         click.echo()
@@ -1048,6 +1177,26 @@ class RepoInitializer:
         # API key
         api_key_env = provider_info.get("api_key_env")
         if api_key_env:
+            # CI/CD mode: Just confirm env var is set
+            if self.is_cicd_setup:
+                click.echo()
+                click.echo(f"You need to set repository secrets:")
+                click.echo(f"   • {api_key_env} - Your {provider_info['name']} API key")
+                click.echo(f"   • Get it from: {provider_info.get('website', 'provider website')}")
+                click.echo()
+
+                confirmed = click.confirm(f"Did you set {api_key_env} in repository secrets?", default=False)
+                if not confirmed:
+                    click.echo()
+                    click.echo("Set it in your repository's CI/CD secrets settings.")
+                    click.echo()
+                    if not click.confirm("Continue anyway?", default=False):
+                        raise click.ClickException("Setup cancelled - please set repository secrets first")
+
+                self.agent_api_key = None
+                return
+
+            # Local mode: Collect API key
             existing_key = os.getenv(api_key_env)
 
             if existing_key:

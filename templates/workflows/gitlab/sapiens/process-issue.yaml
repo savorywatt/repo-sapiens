@@ -25,7 +25,7 @@
 #   - Webhook: Configure issue webhook to call pipeline trigger
 
 variables:
-  CONFIG_FILE: sapiens_config.yaml
+  CONFIG_FILE: sapiens_config.ci.yaml
   PYTHON_VERSION: "3.11"
   # Set this when triggering the pipeline
   ISSUE_NUMBER: ""
