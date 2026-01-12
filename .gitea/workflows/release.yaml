@@ -1,0 +1,194 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.2.3
+
+jobs:
+  release:
+    name: Build and Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: false
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}"
+
+      - name: Verify version matches pyproject.toml
+        run: |
+          PROJECT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          if [ "$PROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: pyproject.toml version ($PROJECT_VERSION) doesn't match tag ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version matches: $PROJECT_VERSION"
+
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Extract section for this version from CHANGELOG.md
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "\\[" ver "\\]") {
+                found=1
+                next
+              }
+            }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+
+          # Check if we got any content
+          if [ ! -s release-notes.md ]; then
+            echo "⚠️ No release notes found for version $VERSION in CHANGELOG.md"
+            echo "Release $VERSION" > release-notes.md
+          else
+            echo "✅ Extracted release notes for version $VERSION"
+            echo "📝 Release notes content:"
+            echo "---"
+            cat release-notes.md
+            echo "---"
+            echo ""
+            LINES=$(wc -l < release-notes.md)
+            echo "Extracted $LINES lines of release notes"
+          fi
+
+      - name: Build package
+        run: |
+          uv build
+          ls -lh dist/
+          echo "Built packages:"
+          ls -1 dist/
+
+      - name: Test package installation
+        run: |
+          uv venv
+          uv pip install dist/*.whl
+          uv run sapiens --version
+          uv run sapiens --help
+
+      - name: Publish to PyPI
+        if: success()
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          if [ -z "$PYPI_TOKEN" ]; then
+            echo "⚠️ PYPI_TOKEN secret not set - skipping PyPI publish"
+            echo "To publish to PyPI, add PYPI_TOKEN secret in repository settings"
+            exit 0
+          fi
+
+          echo "📦 Publishing to PyPI..."
+          uv publish --token "$PYPI_TOKEN"
+          echo "✅ Published to PyPI: https://pypi.org/project/repo-sapiens/${{ steps.version.outputs.version }}/"
+
+      - name: Create Gitea Release
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          # Create release via Gitea API
+          RELEASE_NAME="v${{ steps.version.outputs.version }}"
+          TAG_NAME="${{ steps.version.outputs.tag }}"
+
+          # Read release notes
+          RELEASE_BODY=$(cat release-notes.md | jq -Rs .)
+
+          echo "📝 Using extracted release notes from CHANGELOG.md"
+          echo "Preview (first 200 chars):"
+          head -c 200 release-notes.md
+          echo ""
+          echo "..."
+
+          # Create release
+          curl -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"tag_name\": \"$TAG_NAME\",
+              \"name\": \"$RELEASE_NAME\",
+              \"body\": $RELEASE_BODY,
+              \"draft\": false,
+              \"prerelease\": false
+            }" \
+            "${{ gitea.api_url }}/repos/${{ gitea.repository }}/releases"
+
+          echo "✅ Created Gitea release: $RELEASE_NAME with extracted release notes"
+
+      - name: Upload release artifacts
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+        run: |
+          # Get release ID
+          RELEASE_ID=$(curl -s \
+            -H "Authorization: token $GITEA_TOKEN" \
+            "${{ gitea.api_url }}/repos/${{ gitea.repository }}/releases/tags/${{ steps.version.outputs.tag }}" \
+            | jq -r '.id')
+
+          echo "Release ID: $RELEASE_ID"
+
+          # Upload wheel
+          for file in dist/*.whl; do
+            echo "Uploading $(basename $file)..."
+            curl -X POST \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$file" \
+              "${{ gitea.api_url }}/repos/${{ gitea.repository }}/releases/$RELEASE_ID/assets?name=$(basename $file)"
+          done
+
+          # Upload source tarball
+          for file in dist/*.tar.gz; do
+            echo "Uploading $(basename $file)..."
+            curl -X POST \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$file" \
+              "${{ gitea.api_url }}/repos/${{ gitea.repository }}/releases/$RELEASE_ID/assets?name=$(basename $file)"
+          done
+
+          echo "✅ Uploaded release artifacts"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ gitea.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Release published successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**PyPI:** https://pypi.org/project/repo-sapiens/${{ steps.version.outputs.version }}/" >> $GITHUB_STEP_SUMMARY
+            echo "**Gitea:** ${{ gitea.server_url }}/${{ gitea.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Release failed" >> $GITHUB_STEP_SUMMARY
+          fi

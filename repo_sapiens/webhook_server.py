@@ -102,12 +102,12 @@ def extract_plan_id(file_path: str) -> str:
     """Extract plan ID from file path.
 
     Args:
-        file_path: Path like 'plans/42-feature.md'
+        file_path: Path like 'plans/42-feature.md' or 'plans/archive/42-feature.md'
 
     Returns:
         Plan ID like '42' or None
     """
-    match = re.search(r"plans/(\d+)-", file_path)
+    match = re.search(r"plans/(?:.*/)?(\d+)-", file_path)
     return match.group(1) if match else None
 
 

@@ -33,9 +33,7 @@ log = structlog.get_logger(__name__)
     default=None,
     help="Credential backend (auto-detected if not specified)",
 )
-@click.option(
-    "--non-interactive", is_flag=True, help="Non-interactive mode (requires environment variables)"
-)
+@click.option("--non-interactive", is_flag=True, help="Non-interactive mode (requires environment variables)")
 @click.option(
     "--setup-secrets",
     is_flag=True,
@@ -106,9 +104,7 @@ def init_command(
     except GitDiscoveryError as e:
         click.echo(click.style(f"Error: {e}", fg="red"), err=True)
         click.echo(
-            click.style(
-                "Make sure you're in a Git repository with a configured remote.", fg="yellow"
-            ),
+            click.style("Make sure you're in a Git repository with a configured remote.", fg="yellow"),
             err=True,
         )
         sys.exit(1)
@@ -158,11 +154,16 @@ class RepoInitializer:
         self.builtin_model = None
         self.builtin_base_url = None  # For ollama/vllm
 
+        # Automation mode settings
+        self.automation_mode = "native"  # 'native', 'daemon', or 'hybrid'
+        self.label_prefix = "sapiens/"
+
         # Existing config tracking
         self.existing_config: dict | None = None
         self.update_git_provider = True
         self.update_agent_provider = True
         self.update_credentials = True
+        self.update_automation = True
 
     def _load_existing_config(self) -> bool:
         """Load existing configuration if present.
@@ -225,20 +226,20 @@ class RepoInitializer:
         click.echo()
 
         self.update_git_provider = click.confirm("  Update git provider settings?", default=False)
-        self.update_agent_provider = click.confirm(
-            "  Update agent provider settings?", default=False
-        )
+        self.update_agent_provider = click.confirm("  Update agent provider settings?", default=False)
         self.update_credentials = click.confirm("  Update stored credentials?", default=False)
+        self.update_automation = click.confirm("  Update automation mode settings?", default=False)
 
         # If nothing selected, offer to start fresh
-        if not any([self.update_git_provider, self.update_agent_provider, self.update_credentials]):
+        if not any(
+            [self.update_git_provider, self.update_agent_provider, self.update_credentials, self.update_automation]
+        ):
             click.echo()
-            if click.confirm(
-                "No updates selected. Start fresh with new configuration?", default=False
-            ):
+            if click.confirm("No updates selected. Start fresh with new configuration?", default=False):
                 self.update_git_provider = True
                 self.update_agent_provider = True
                 self.update_credentials = True
+                self.update_automation = True
                 self.existing_config = None  # Treat as fresh install
             else:
                 click.echo()
@@ -273,6 +274,17 @@ class RepoInitializer:
             self.agent_type = "builtin"
             self.builtin_provider = provider_type
             self.builtin_model = agent.get("model")
+
+    def _load_automation_from_config(self) -> None:
+        """Load automation settings from existing config."""
+        if not self.existing_config:
+            return
+
+        automation = self.existing_config.get("automation", {})
+        mode_config = automation.get("mode", {})
+
+        self.automation_mode = mode_config.get("mode", "native")
+        self.label_prefix = mode_config.get("label_prefix", "sapiens/")
 
     def run(self) -> None:
         """Run the initialization workflow."""
@@ -524,9 +536,7 @@ class RepoInitializer:
 
         self.gitea_token = os.getenv("GITEA_TOKEN")
         if not self.gitea_token:
-            raise click.ClickException(
-                "GITEA_TOKEN environment variable required in non-interactive mode"
-            )
+            raise click.ClickException("GITEA_TOKEN environment variable required in non-interactive mode")
 
         self.claude_api_key = os.getenv("CLAUDE_API_KEY")
         # Claude API key is optional (can use local mode)
@@ -550,6 +560,13 @@ class RepoInitializer:
             # Load agent settings from existing config
             self._load_agent_type_from_config()
 
+        # Automation mode configuration (only if updating automation settings)
+        if self.update_automation:
+            self._configure_automation_mode()
+        else:
+            # Load automation settings from existing config
+            self._load_automation_from_config()
+
     def _collect_gitea_token_interactively(self) -> None:
         """Collect Gitea token interactively."""
         # Check for existing Gitea token in keyring or environment
@@ -564,14 +581,11 @@ class RepoInitializer:
                 self.gitea_token = existing_token
                 click.echo(f"   ✓ Using Gitea token from {source}")
             else:
-                self.gitea_token = click.prompt(
-                    "Enter your Gitea API token", hide_input=True, type=str
-                )
+                self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
         else:
             # No existing token - prompt for it
             click.echo(
-                "Gitea API Token is required. Get it from:\n"
-                f"   {self.repo_info.base_url}/user/settings/applications"
+                "Gitea API Token is required. Get it from:\n" f"   {self.repo_info.base_url}/user/settings/applications"
             )
             click.echo()
             self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
@@ -590,9 +604,7 @@ class RepoInitializer:
                 self.gitea_token = existing_token  # Reuse gitea_token field
                 click.echo(f"   ✓ Using GitLab token from {source}")
             else:
-                self.gitea_token = click.prompt(
-                    "Enter your GitLab Personal Access Token", hide_input=True, type=str
-                )
+                self.gitea_token = click.prompt("Enter your GitLab Personal Access Token", hide_input=True, type=str)
         else:
             # No existing token - prompt for it
             pat_url = f"{self.repo_info.base_url}/-/user_settings/personal_access_tokens"
@@ -600,9 +612,7 @@ class RepoInitializer:
             click.echo()
             click.echo("Required scopes: api, read_repository, write_repository")
             click.echo()
-            self.gitea_token = click.prompt(
-                "Enter your GitLab Personal Access Token", hide_input=True, type=str
-            )
+            self.gitea_token = click.prompt("Enter your GitLab Personal Access Token", hide_input=True, type=str)
 
     def _configure_ai_agent(self) -> None:
         """Configure AI agent (Claude or Goose) interactively."""
@@ -669,9 +679,7 @@ class RepoInitializer:
             click.echo("   https://console.anthropic.com/")
             click.echo()
 
-            self.agent_api_key = click.prompt(
-                "Enter your Claude API key", hide_input=True, type=str
-            )
+            self.agent_api_key = click.prompt("Enter your Claude API key", hide_input=True, type=str)
 
     def _configure_goose(self) -> None:
         """Configure Goose agent with LLM provider selection."""
@@ -719,9 +727,7 @@ class RepoInitializer:
             click.echo(f"  {i}. {model}{marker}")
         click.echo()
 
-        self.goose_model = click.prompt(
-            "Which model?", type=click.Choice(available_models), default=default_model
-        )
+        self.goose_model = click.prompt("Which model?", type=click.Choice(available_models), default=default_model)
 
         # API key if needed
         if provider_info.get("api_key_env"):
@@ -734,9 +740,7 @@ class RepoInitializer:
             existing_key = os.getenv(api_key_name)
 
             if existing_key:
-                use_existing = click.confirm(
-                    f"{api_key_name} found in environment. Use it?", default=True
-                )
+                use_existing = click.confirm(f"{api_key_name} found in environment. Use it?", default=True)
                 if use_existing:
                     self.agent_api_key = existing_key
                 else:
@@ -852,11 +856,7 @@ class RepoInitializer:
         click.echo("Recommended models for tool-calling:")
         for model in recommended_models[:4]:
             marker = (
-                " (recommended)"
-                if model == "qwen3:8b"
-                else " (requires 24GB VRAM)"
-                if model == "qwen3:14b"
-                else ""
+                " (recommended)" if model == "qwen3:8b" else " (requires 24GB VRAM)" if model == "qwen3:14b" else ""
             )
             available = " ✓" if model in available_models else ""
             click.echo(f"  • {model}{marker}{available}")
@@ -899,21 +899,11 @@ class RepoInitializer:
 
         # Model selection
         recommended_models = provider_info.get("models", ["qwen3:8b", "qwen3:14b", "llama3.1:8b"])
-        default_model = (
-            available_models[0]
-            if available_models
-            else provider_info.get("default_model", "qwen3:8b")
-        )
+        default_model = available_models[0] if available_models else provider_info.get("default_model", "qwen3:8b")
 
         click.echo("Recommended models for tool-calling:")
         for model in recommended_models[:4]:
-            marker = (
-                " (recommended)"
-                if model == "qwen3:8b"
-                else " (requires 24GB VRAM)"
-                if "14b" in model
-                else ""
-            )
+            marker = " (recommended)" if model == "qwen3:8b" else " (requires 24GB VRAM)" if "14b" in model else ""
             available = " ✓" if model in available_models else ""
             click.echo(f"  • {model}{marker}{available}")
         click.echo()
@@ -935,9 +925,7 @@ class RepoInitializer:
 
         # Model selection
         available_models = provider_info.get("models", [])
-        default_model = provider_info.get(
-            "default_model", available_models[0] if available_models else "gpt-4o"
-        )
+        default_model = provider_info.get("default_model", available_models[0] if available_models else "gpt-4o")
 
         click.echo(f"Available models for {provider_info['name']}:")
         for i, model in enumerate(available_models[:5], 1):
@@ -957,9 +945,7 @@ class RepoInitializer:
             existing_key = os.getenv(api_key_env)
 
             if existing_key:
-                use_existing = click.confirm(
-                    f"{api_key_env} found in environment. Use it?", default=True
-                )
+                use_existing = click.confirm(f"{api_key_env} found in environment. Use it?", default=True)
                 if use_existing:
                     self.agent_api_key = existing_key
                 else:
@@ -973,6 +959,51 @@ class RepoInitializer:
                 self.agent_api_key = click.prompt(
                     f"Enter your {provider_info['name']} API key", hide_input=True, type=str
                 )
+
+    def _configure_automation_mode(self) -> None:
+        """Configure automation mode (native/daemon/hybrid) interactively."""
+        click.echo()
+        click.echo(click.style("🔧 Automation Mode Configuration", bold=True, fg="cyan"))
+        click.echo()
+
+        # Show mode options with explanations
+        click.echo("Available modes:")
+        click.echo()
+        click.echo(click.style("  native", bold=True) + " (recommended)")
+        click.echo("    • Instant response via CI/CD workflows")
+        click.echo("    • Triggers on label events")
+        click.echo("    • No daemon process needed")
+        click.echo("    • Uses Gitea/GitHub Actions runners")
+        click.echo()
+        click.echo(click.style("  daemon", bold=True))
+        click.echo("    • Polling-based (checks every N minutes)")
+        click.echo("    • Requires continuous process")
+        click.echo("    • Works without CI/CD")
+        click.echo()
+        click.echo(click.style("  hybrid", bold=True))
+        click.echo("    • Native triggers + daemon fallback")
+        click.echo("    • Best of both worlds")
+        click.echo()
+
+        self.automation_mode = click.prompt(
+            "Which mode?",
+            type=click.Choice(["native", "daemon", "hybrid"]),
+            default="native",
+        )
+
+        # Configure label prefix for native/hybrid modes
+        if self.automation_mode in ("native", "hybrid"):
+            click.echo()
+            self.label_prefix = click.prompt(
+                "Label prefix for triggers (e.g., 'sapiens/' matches 'sapiens/triage')",
+                type=str,
+                default="sapiens/",
+            )
+
+        click.echo()
+        click.echo(f"   ✓ Configured {self.automation_mode} mode")
+        if self.automation_mode in ("native", "hybrid"):
+            click.echo(f"   ✓ Label prefix: {self.label_prefix}")
 
     def _store_credentials(self) -> None:
         """Store credentials in selected backend."""
@@ -1046,9 +1077,7 @@ class RepoInitializer:
                 click.echo("   ✓ Set: CLAUDE_API_KEY")
 
         click.echo()
-        click.echo(
-            click.style("Note: Environment variables only persist in current session.", fg="yellow")
-        )
+        click.echo(click.style("Note: Environment variables only persist in current session.", fg="yellow"))
         click.echo(
             click.style(
                 "Add them to your shell profile or use --backend keyring for persistence.",
@@ -1068,16 +1097,8 @@ class RepoInitializer:
                 self._setup_gitea_secrets_mcp()
 
         except Exception as e:
-            click.echo(
-                click.style(
-                    f"   ⚠ Warning: Failed to set {provider_name} secrets: {e}", fg="yellow"
-                )
-            )
-            click.echo(
-                click.style(
-                    f"   You can set them manually in {provider_name} UI later.", fg="yellow"
-                )
-            )
+            click.echo(click.style(f"   ⚠ Warning: Failed to set {provider_name} secrets: {e}", fg="yellow"))
+            click.echo(click.style(f"   You can set them manually in {provider_name} UI later.", fg="yellow"))
             click.echo()
 
     def _setup_github_secrets(self) -> None:
@@ -1154,19 +1175,14 @@ class RepoInitializer:
         """
         # TODO: Use mcp__gitea__upsert_repo_action_secret when MCP integration is complete
         click.echo(click.style(f"   ℹ Please set {name} manually in Gitea UI for now", fg="yellow"))
-        secrets_url = (
-            f"{self.repo_info.base_url}/{self.repo_info.owner}/"
-            f"{self.repo_info.repo}/settings/secrets"
-        )
+        secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/settings/secrets"
         click.echo(f"   Navigate to: {secrets_url}")
 
     def _generate_config(self) -> None:
         """Generate configuration file."""
         click.echo(
             click.style(
-                "📝 Updating configuration file..."
-                if self.existing_config
-                else "📝 Creating configuration file...",
+                "📝 Updating configuration file..." if self.existing_config else "📝 Creating configuration file...",
                 bold=True,
             )
         )
@@ -1180,13 +1196,9 @@ class RepoInitializer:
 
             # Determine agent API key reference
             if self.agent_type == "goose" and self.goose_llm_provider:
-                agent_api_key_ref = (
-                    f"@keyring:{self.goose_llm_provider}/api_key" if self.agent_api_key else "null"
-                )
+                agent_api_key_ref = f"@keyring:{self.goose_llm_provider}/api_key" if self.agent_api_key else "null"
             elif self.agent_type == "builtin" and self.builtin_provider:
-                agent_api_key_ref = (
-                    f"@keyring:{self.builtin_provider}/api_key" if self.agent_api_key else "null"
-                )
+                agent_api_key_ref = f"@keyring:{self.builtin_provider}/api_key" if self.agent_api_key else "null"
             elif self.agent_type == "claude":
                 agent_api_key_ref = "@keyring:claude/api_key" if self.agent_api_key else "null"
             else:
@@ -1311,6 +1323,26 @@ class RepoInitializer:
                     agent_config += f"  {key}: {value}\n"
             agent_config = agent_config.rstrip("\n")
 
+        # Build automation section (use existing if not updating)
+        if not self.update_automation and self.existing_config:
+            existing_automation = self.existing_config.get("automation", {})
+            if existing_automation:
+                # Preserve existing automation config
+                import yaml
+
+                automation_section = "automation:\n"
+                automation_yaml = yaml.safe_dump(existing_automation, default_flow_style=False, sort_keys=False)
+                for line in automation_yaml.split("\n"):
+                    if line:
+                        automation_section += f"  {line}\n"
+                automation_section = automation_section.rstrip("\n")
+            else:
+                # No existing automation, generate default native mode
+                automation_section = self._generate_automation_section()
+        else:
+            # Generate new automation section based on selected mode
+            automation_section = self._generate_automation_section()
+
         # Generate configuration content
         config_content = f"""# Automation System Configuration
 # Generated by: sapiens init
@@ -1324,6 +1356,8 @@ repository:
   default_branch: main
 
 {agent_config}
+
+{automation_section}
 
 workflow:
   plans_directory: plans
@@ -1351,6 +1385,52 @@ tags:
         click.echo(f"   ✓ Created: {self.config_path}")
         click.echo()
 
+    def _generate_automation_section(self) -> str:
+        """Generate automation section based on selected mode."""
+        # Determine enabled flags based on mode
+        if self.automation_mode == "native":
+            native_enabled = "true"
+            daemon_enabled = "false"
+        elif self.automation_mode == "daemon":
+            native_enabled = "false"
+            daemon_enabled = "true"
+        else:  # hybrid
+            native_enabled = "true"
+            daemon_enabled = "true"
+
+        # Build the automation section
+        automation_section = f"""automation:
+  mode:
+    mode: {self.automation_mode}
+    native_enabled: {native_enabled}
+    daemon_enabled: {daemon_enabled}
+    label_prefix: "{self.label_prefix}\""""
+
+        # Add label triggers for native/hybrid modes
+        if self.automation_mode in ("native", "hybrid"):
+            automation_section += """
+
+  label_triggers:
+    "sapiens/triage":
+      handler: triage
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: triaged
+
+    "needs-planning":
+      handler: proposal
+      ai_enabled: true
+      remove_on_complete: false
+      success_label: plan-ready
+
+    "execute":
+      handler: task_execution
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: implemented"""
+
+        return automation_section
+
     def _deploy_composite_action(self) -> None:
         """Deploy reusable composite action for AI tasks."""
         import importlib.resources
@@ -1374,9 +1454,7 @@ tags:
         # Get the template from package resources
         try:
             # Try importlib.resources (Python 3.9+)
-            template_files = (
-                importlib.resources.files("repo_sapiens") / "templates" / template_subpath
-            )
+            template_files = importlib.resources.files("repo_sapiens") / "templates" / template_subpath
             if hasattr(template_files, "read_text"):
                 action_content = template_files.read_text()
             else:
@@ -1428,11 +1506,19 @@ tags:
 
         workflows_dir.mkdir(parents=True, exist_ok=True)
 
-        # Core workflows
-        core_workflows = [
-            ("automation-daemon.yaml", "Automation daemon (scheduled processing)"),
-            ("process-issue.yaml", "Process issue (manual trigger)"),
-        ]
+        # Core workflows based on automation mode
+        core_workflows = []
+
+        if self.automation_mode in ("native", "hybrid"):
+            # Native/hybrid modes use label triggers
+            core_workflows.append(("process-label.yaml", "Process label (native triggers)"))
+
+        if self.automation_mode in ("daemon", "hybrid"):
+            # Daemon/hybrid modes use the daemon
+            core_workflows.append(("automation-daemon.yaml", "Automation daemon (scheduled processing)"))
+
+        # Process issue is useful for manual triggers in all modes
+        core_workflows.append(("process-issue.yaml", "Process issue (manual trigger)"))
 
         # Example workflows
         example_workflows = [
@@ -1465,9 +1551,7 @@ tags:
 
                 # Third try: importlib.resources (installed package)
                 if content is None:
-                    template_files = (
-                        importlib.resources.files("repo_sapiens") / "templates" / template_subpath
-                    )
+                    template_files = importlib.resources.files("repo_sapiens") / "templates" / template_subpath
                     if template_files.is_file():
                         content = template_files.read_text()
 
@@ -1489,8 +1573,10 @@ tags:
 
         # Ask about core workflows
         if not self.non_interactive:
+            # Build workflow list description
+            workflow_names = ", ".join([desc for _, desc in core_workflows])
             deploy_core = click.confirm(
-                "Deploy core workflows (automation-daemon, process-issue)?",
+                f"Deploy core workflows ({workflow_names})?",
                 default=True,
             )
         else:
@@ -1509,14 +1595,14 @@ tags:
         click.echo()
 
         # Ask about example workflows (one by one in interactive mode)
-        if not self.non_interactive:
+        if not self.non_interactive:  # nosec B105
             click.echo("Example workflows available:")
-            for template_name, description in example_workflows:
+            for template_name, description in example_workflows:  # nosec B105
                 if click.confirm(f"  Deploy '{description}'?", default=False):
                     if deploy_template(template_name, workflows_dir):
-                        click.echo(click.style("     ✓ Deployed", fg="green"))
+                        click.echo(click.style("     ✓ Deployed", fg="green"))  # nosec B105
                     else:
-                        click.echo(click.style("     ⚠ Could not deploy", fg="yellow"))
+                        click.echo(click.style("     ⚠ Could not deploy", fg="yellow"))  # nosec B105
 
         click.echo()
 
@@ -1561,23 +1647,37 @@ tags:
 
         # Build issues URL based on provider
         if self.provider_type == "gitlab":
-            issues_url = (
-                f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/-/issues"
-            )
+            issues_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/-/issues"
         else:
-            issues_url = (
-                f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
-            )
+            issues_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
         click.echo(f"   {issues_url}")
         click.echo()
-        click.echo("2. Run the automation daemon:")
-        click.echo(f"   sapiens --config {self.config_path} daemon --interval 60")
-        click.echo()
-        click.echo("3. Watch the automation work!")
+
+        # Mode-specific instructions
+        if self.automation_mode == "native":
+            click.echo("2. Workflows will trigger automatically when you add labels!")
+            click.echo()
+            click.echo("   • Label triggers are active immediately")
+            click.echo("   • No daemon process needed")
+            click.echo(f"   • Check workflows: {issues_url.rsplit('/', 1)[0]}/actions")
+        elif self.automation_mode == "daemon":
+            click.echo("2. Run the automation daemon:")
+            click.echo(f"   sapiens --config {self.config_path} daemon --interval 60")
+            click.echo()
+            click.echo("3. Watch the automation work!")
+        else:  # hybrid
+            click.echo("2. Automation runs in hybrid mode:")
+            click.echo("   • Label triggers work instantly via workflows")
+            click.echo(f"   • Check workflows: {issues_url.rsplit('/', 1)[0]}/actions")
+            click.echo()
+            click.echo("   • Optional: Run daemon for additional automation:")
+            click.echo(f"     sapiens --config {self.config_path} daemon --interval 60")
+
         click.echo()
 
         # Print manual secret setup if needed (not for GitLab - uses CI/CD variables)
-        if self.setup_secrets and self.provider_type != "gitlab":
+        # Only needed for native/hybrid modes that use workflows
+        if self.setup_secrets and self.provider_type != "gitlab" and self.automation_mode in ("native", "hybrid"):
             click.echo(
                 click.style(
                     f"⚠ Important: Set {provider_name} Actions Secrets Manually",
@@ -1585,11 +1685,10 @@ tags:
                     fg="yellow",
                 )
             )
+            click.echo("   (Required for workflow automation)")
+
             click.echo()
-            secrets_url = (
-                f"{self.repo_info.base_url}/{self.repo_info.owner}/"
-                f"{self.repo_info.repo}/settings/secrets"
-            )
+            secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/settings/secrets"
             click.echo(f"Navigate to: {secrets_url}")
             click.echo()
             click.echo("Add the following secrets:")
@@ -1605,16 +1704,13 @@ tags:
             click.echo()
 
         # GitLab uses CI/CD variables instead of Actions secrets
-        if self.setup_secrets and self.provider_type == "gitlab":
-            click.echo(
-                click.style(
-                    "⚠ Important: Set GitLab CI/CD Variables Manually", bold=True, fg="yellow"
-                )
-            )
+        # Only needed for native/hybrid modes that use workflows
+        if self.setup_secrets and self.provider_type == "gitlab" and self.automation_mode in ("native", "hybrid"):
+            click.echo(click.style("⚠ Important: Set GitLab CI/CD Variables Manually", bold=True, fg="yellow"))
+            click.echo("   (Required for workflow automation)")
             click.echo()
             variables_url = (
-                f"{self.repo_info.base_url}/{self.repo_info.owner}/"
-                f"{self.repo_info.repo}/-/settings/ci_cd"
+                f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/-/settings/ci_cd"
             )
             click.echo(f"Navigate to: {variables_url}")
             click.echo("Expand 'Variables' section and add:")
@@ -1651,11 +1747,7 @@ tags:
         test_prompt = "Summarize this project's README in 2-3 sentences."
 
         # Only include --config if non-default path
-        config_flag = (
-            ""
-            if str(self.config_path) == ".sapiens/config.yaml"
-            else f"--config {self.config_path} "
-        )
+        config_flag = "" if str(self.config_path) == ".sapiens/config.yaml" else f"--config {self.config_path} "
 
         if self.agent_type == "claude":
             test_cmd = f'claude -p "{test_prompt}"'

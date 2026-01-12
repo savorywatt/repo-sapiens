@@ -339,9 +339,7 @@ class TestRepoInitializerCollectCredentials:
 
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.cli.init.click.prompt")
-    def test_collect_interactively_gitea_token(
-        self, mock_prompt, mock_confirm, tmp_path, mock_repo_info
-    ):
+    def test_collect_interactively_gitea_token(self, mock_prompt, mock_confirm, tmp_path, mock_repo_info):
         """Should prompt for Gitea token interactively."""
         mock_prompt.return_value = "interactive-token-456"
         mock_confirm.return_value = False  # Don't use existing keyring token
@@ -357,8 +355,8 @@ class TestRepoInitializerCollectCredentials:
 
         initializer.repo_info = mock_repo_info
 
-        # Mock the AI agent configuration
-        with patch.object(initializer, "_configure_ai_agent"):
+        # Mock the AI agent and automation mode configuration
+        with patch.object(initializer, "_configure_ai_agent"), patch.object(initializer, "_configure_automation_mode"):
             initializer._collect_interactively()
 
         assert initializer.gitea_token == "interactive-token-456"
@@ -366,9 +364,7 @@ class TestRepoInitializerCollectCredentials:
 
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.cli.init.click.prompt")
-    def test_init_prompts_for_gitlab_token(
-        self, mock_prompt, mock_confirm, tmp_path, gitlab_repo_info
-    ):
+    def test_init_prompts_for_gitlab_token(self, mock_prompt, mock_confirm, tmp_path, gitlab_repo_info):
         """Should prompt for GitLab Personal Access Token interactively."""
         mock_prompt.return_value = "glpat-interactive-token-789"
         mock_confirm.return_value = False  # Don't use existing keyring token
@@ -385,8 +381,8 @@ class TestRepoInitializerCollectCredentials:
         initializer.repo_info = gitlab_repo_info
         initializer.provider_type = "gitlab"
 
-        # Mock the AI agent configuration
-        with patch.object(initializer, "_configure_ai_agent"):
+        # Mock the AI agent and automation mode configuration
+        with patch.object(initializer, "_configure_ai_agent"), patch.object(initializer, "_configure_automation_mode"):
             initializer._collect_interactively()
 
         assert initializer.gitea_token == "glpat-interactive-token-789"
@@ -414,8 +410,8 @@ class TestRepoInitializerCollectCredentials:
         initializer.repo_info = gitlab_repo_info
         initializer.provider_type = "gitlab"
 
-        # Mock the AI agent configuration
-        with patch.object(initializer, "_configure_ai_agent"):
+        # Mock the AI agent and automation mode configuration
+        with patch.object(initializer, "_configure_ai_agent"), patch.object(initializer, "_configure_automation_mode"):
             initializer._collect_interactively()
 
         assert initializer.gitea_token == "existing-gitlab-token"
@@ -490,9 +486,7 @@ class TestRepoInitializerConfigureAIAgent:
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.utils.agent_detector.detect_available_agents")
-    def test_configure_agent_with_goose_uvx(
-        self, mock_detect, mock_confirm, mock_prompt, tmp_path, mock_repo_info
-    ):
+    def test_configure_agent_with_goose_uvx(self, mock_detect, mock_confirm, mock_prompt, tmp_path, mock_repo_info):
         """Should handle goose-uvx variant and normalize to goose."""
         mock_detect.return_value = ["goose-uvx"]
         mock_prompt.return_value = "goose"
@@ -516,9 +510,7 @@ class TestRepoInitializerConfigureAIAgent:
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.utils.agent_detector.detect_available_agents")
-    def test_configure_agent_no_agents_use_api(
-        self, mock_detect, mock_confirm, mock_prompt, tmp_path, mock_repo_info
-    ):
+    def test_configure_agent_no_agents_use_api(self, mock_detect, mock_confirm, mock_prompt, tmp_path, mock_repo_info):
         """Should offer API mode when no agents detected."""
         mock_detect.return_value = []
         mock_confirm.return_value = True  # Use API mode
@@ -620,9 +612,7 @@ class TestConfigureGoose:
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-openai-test"})
-    def test_configure_goose_openai_existing_key(
-        self, mock_confirm, mock_prompt, tmp_path, mock_repo_info
-    ):
+    def test_configure_goose_openai_existing_key(self, mock_confirm, mock_prompt, tmp_path, mock_repo_info):
         """Should configure Goose with OpenAI using existing env key."""
         mock_prompt.side_effect = ["openai", "gpt-4o"]
         mock_confirm.side_effect = [True, False]  # Use existing key, no custom settings
@@ -647,9 +637,7 @@ class TestConfigureGoose:
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch.dict(os.environ, {}, clear=True)
-    def test_configure_goose_anthropic_new_key(
-        self, mock_confirm, mock_prompt, tmp_path, mock_repo_info
-    ):
+    def test_configure_goose_anthropic_new_key(self, mock_confirm, mock_prompt, tmp_path, mock_repo_info):
         """Should configure Goose with Anthropic prompting for new key."""
         # Remove ANTHROPIC_API_KEY if present
         if "ANTHROPIC_API_KEY" in os.environ:
@@ -680,9 +668,7 @@ class TestConfigureGoose:
 
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
-    def test_configure_goose_ollama_no_api_key(
-        self, mock_confirm, mock_prompt, tmp_path, mock_repo_info
-    ):
+    def test_configure_goose_ollama_no_api_key(self, mock_confirm, mock_prompt, tmp_path, mock_repo_info):
         """Should configure Goose with Ollama without API key."""
         mock_prompt.side_effect = ["ollama", "qwen2.5-coder:32b"]
         mock_confirm.return_value = False  # No custom settings
@@ -706,9 +692,7 @@ class TestConfigureGoose:
     @patch("repo_sapiens.cli.init.click.prompt")
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch.dict(os.environ, {}, clear=True)
-    def test_configure_goose_custom_settings(
-        self, mock_confirm, mock_prompt, tmp_path, mock_repo_info
-    ):
+    def test_configure_goose_custom_settings(self, mock_confirm, mock_prompt, tmp_path, mock_repo_info):
         """Should configure Goose with custom temperature and toolkit."""
         mock_prompt.side_effect = [
             "ollama",
@@ -767,9 +751,7 @@ class TestRepoInitializerStoreCredentials:
         mock_keyring.set.assert_called_once_with("gitea", "api_token", "test-gitea-token")
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
-    def test_store_in_keyring_with_claude_api_key(
-        self, mock_keyring_class, tmp_path, mock_repo_info
-    ):
+    def test_store_in_keyring_with_claude_api_key(self, mock_keyring_class, tmp_path, mock_repo_info):
         """Should store both Gitea token and Claude API key in keyring."""
         mock_keyring = Mock()
         mock_keyring.available = True
@@ -795,9 +777,7 @@ class TestRepoInitializerStoreCredentials:
         mock_keyring.set.assert_any_call("claude", "api_key", "sk-ant-test-key")
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
-    def test_store_in_keyring_with_goose_provider_key(
-        self, mock_keyring_class, tmp_path, mock_repo_info
-    ):
+    def test_store_in_keyring_with_goose_provider_key(self, mock_keyring_class, tmp_path, mock_repo_info):
         """Should store Goose provider API key under provider name."""
         mock_keyring = Mock()
         mock_keyring.available = True
@@ -847,9 +827,7 @@ class TestRepoInitializerStoreCredentials:
         mock_env.set.assert_called_once_with("GITEA_TOKEN", "test-gitea-token")
 
     @patch("repo_sapiens.cli.init.EnvironmentBackend")
-    def test_store_in_environment_with_goose_provider_key(
-        self, mock_env_class, tmp_path, mock_repo_info
-    ):
+    def test_store_in_environment_with_goose_provider_key(self, mock_env_class, tmp_path, mock_repo_info):
         """Should store Goose provider key with correct env var name."""
         mock_env = Mock()
         mock_env_class.return_value = mock_env
@@ -875,9 +853,7 @@ class TestRepoInitializerStoreCredentials:
         mock_env.set.assert_any_call("ANTHROPIC_API_KEY", "sk-ant-key")
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
-    def test_init_stores_gitlab_credentials_keyring(
-        self, mock_keyring_class, tmp_path, gitlab_repo_info
-    ):
+    def test_init_stores_gitlab_credentials_keyring(self, mock_keyring_class, tmp_path, gitlab_repo_info):
         """Should store GitLab token in keyring under gitlab/api_token."""
         mock_keyring = Mock()
         mock_keyring.available = True
@@ -902,9 +878,7 @@ class TestRepoInitializerStoreCredentials:
         mock_keyring.set.assert_called_once_with("gitlab", "api_token", "glpat-test-gitlab-token")
 
     @patch("repo_sapiens.cli.init.EnvironmentBackend")
-    def test_init_stores_gitlab_credentials_environment(
-        self, mock_env_class, tmp_path, gitlab_repo_info
-    ):
+    def test_init_stores_gitlab_credentials_environment(self, mock_env_class, tmp_path, gitlab_repo_info):
         """Should store GitLab token in environment as GITLAB_TOKEN."""
         mock_env = Mock()
         mock_env_class.return_value = mock_env
@@ -928,9 +902,7 @@ class TestRepoInitializerStoreCredentials:
         mock_env.set.assert_called_once_with("GITLAB_TOKEN", "glpat-test-gitlab-token")
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
-    def test_init_stores_gitlab_credentials_with_agent_api_key(
-        self, mock_keyring_class, tmp_path, gitlab_repo_info
-    ):
+    def test_init_stores_gitlab_credentials_with_agent_api_key(self, mock_keyring_class, tmp_path, gitlab_repo_info):
         """Should store both GitLab token and agent API key in keyring."""
         mock_keyring = Mock()
         mock_keyring.available = True
@@ -1265,11 +1237,7 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         with patch.dict(
             "sys.modules",
-            {
-                "repo_sapiens.providers.github_rest": MagicMock(
-                    GitHubRestProvider=Mock(return_value=mock_github)
-                )
-            },
+            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))},
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1300,11 +1268,7 @@ class TestRepoInitializerSetupGitHubSecrets:
 
         with patch.dict(
             "sys.modules",
-            {
-                "repo_sapiens.providers.github_rest": MagicMock(
-                    GitHubRestProvider=Mock(return_value=mock_github)
-                )
-            },
+            {"repo_sapiens.providers.github_rest": MagicMock(GitHubRestProvider=Mock(return_value=mock_github))},
         ):
             with patch("asyncio.run") as mock_run:
                 initializer._setup_github_secrets()
@@ -1344,9 +1308,7 @@ class TestRepoInitializerValidateSetup:
         mock_resolver.resolve.assert_called_once_with("@keyring:gitea/api_token", cache=False)
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
-    def test_validate_setup_environment_success(
-        self, mock_resolver_class, tmp_path, mock_repo_info
-    ):
+    def test_validate_setup_environment_success(self, mock_resolver_class, tmp_path, mock_repo_info):
         """Should validate environment credentials successfully."""
         mock_resolver = Mock()
         mock_resolver.resolve.return_value = "resolved-token"
@@ -1367,9 +1329,7 @@ class TestRepoInitializerValidateSetup:
         mock_resolver.resolve.assert_called_once_with("${GITEA_TOKEN}", cache=False)
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
-    def test_validate_setup_failure_handled_gracefully(
-        self, mock_resolver_class, tmp_path, mock_repo_info
-    ):
+    def test_validate_setup_failure_handled_gracefully(self, mock_resolver_class, tmp_path, mock_repo_info):
         """Should handle validation failure gracefully with warning."""
         mock_resolver = Mock()
         mock_resolver.resolve.return_value = None  # Simulate failure
@@ -1521,9 +1481,7 @@ class TestInitCommand:
 
     def test_init_command_handles_git_discovery_error(self, cli_runner, tmp_path):
         """Should handle GitDiscoveryError gracefully."""
-        with patch.object(
-            RepoInitializer, "run", side_effect=GitDiscoveryError("No Git repository")
-        ):
+        with patch.object(RepoInitializer, "run", side_effect=GitDiscoveryError("No Git repository")):
             result = cli_runner.invoke(init_command, ["--repo-path", str(tmp_path)])
 
         assert result.exit_code == 1

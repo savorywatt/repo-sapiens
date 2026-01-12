@@ -1,5 +1,5 @@
 # Multi-stage build for repo-sapiens
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir .
 
 # Production stage
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -39,7 +39,7 @@ USER sapiens
 WORKDIR /app
 
 # Copy installed dependencies from builder
-COPY --from=builder --chown=sapiens:sapiens /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder --chown=sapiens:sapiens /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder --chown=sapiens:sapiens /usr/local/bin /usr/local/bin
 
 # Copy application code

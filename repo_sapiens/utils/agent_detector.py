@@ -231,7 +231,7 @@ def format_agent_list() -> str:
             if base_agent == "claude":
                 hint = "Claude models via CLI or API"
             elif base_agent == "goose":
-                providers = info.get("llm_providers", [])
+                providers = cast(list[str], info.get("llm_providers", []))
                 hint = ", ".join(p.title() for p in providers[:5])
             else:
                 hint = ""
@@ -243,7 +243,7 @@ def format_agent_list() -> str:
 
     # Always show builtin option (no CLI required)
     builtin_info = AGENT_INFO["builtin"]
-    builtin_providers = builtin_info.get("llm_providers", [])
+    builtin_providers = cast(list[str], builtin_info.get("llm_providers", []))
     builtin_hint = ", ".join(p.title() for p in builtin_providers[:4]) + ", etc."
     lines.append(f"  - {builtin_info['name']} - {builtin_hint} (always available)")
 
@@ -519,8 +519,7 @@ def get_provider_recommendation(use_case: str = "general") -> str:
         ),
         "privacy": (
             "ollama",
-            "Ollama runs entirely locally with complete data privacy. "
-            "No code or data leaves your machine.",
+            "Ollama runs entirely locally with complete data privacy. " "No code or data leaves your machine.",
         ),
         "speed": (
             "groq",

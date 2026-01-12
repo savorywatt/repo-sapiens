@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Native Label Trigger System**: Instant automation via CI/CD workflows instead of daemon polling
+  - `sapiens process-label` command for handling label events in workflows
+  - `sapiens migrate` commands for analyzing and generating native trigger workflows
+  - Event classifier for webhook events (issues, PRs, labels)
+  - Label-based routing system with pattern matching and handler dispatch
+  - Workflow generator for Gitea Actions, GitHub Actions, and GitLab CI
+  - Label trigger configuration with customizable handlers, success/failure labels
+  - `process-label.yaml` workflow templates for all three platforms
+  - Automation modes: native (instant), daemon (polling), hybrid (both)
+  - Comprehensive documentation in `docs/automation/native-triggers.md`
+- **Automated Release Workflows**: Complete release automation via GitHub Actions-style workflows
+  - `prepare-release.yaml` workflow with UI form for version, changelog entries
+  - Automated version bumping in `pyproject.toml`
+  - Automatic CHANGELOG.md generation and insertion
+  - Git commit, tag creation, and push automation
+  - `release.yaml` workflow for building and publishing on tags
+  - Automatic PyPI publishing with token authentication
+  - Gitea release creation with extracted CHANGELOG notes
+  - Release artifact uploads (wheel + sdist) to Gitea releases
+  - Complete documentation in `docs/RELEASE_PROCESS.md`
+- **Enhanced Init Command**: Automation mode selection during setup
+  - Interactive prompt for native/daemon/hybrid mode selection
+  - Automatic `automation:` section generation in config
+  - Label trigger configuration with sensible defaults
+  - Deploys correct workflow templates based on selected mode
+  - Mode-specific next steps guidance
+  - Smart config update mode - prompts which sections to update on re-init
+
+### Changed
+- **Python Requirement**: Now requires Python 3.12+ (was 3.13+)
+  - Updated all workflows, Docker images, and configs
+  - Better compatibility with stable Python releases
+- **CI Performance**: Migrated from pip to uv for 5-10x faster builds
+  - All workflows now use `astral-sh/setup-uv@v3`
+  - Eliminates pip cache timeout issues (ETIMEDOUT)
+  - Faster dependency installation and package builds
+  - More reliable CI runs
+- **Init Command Workflow Deployment**: Now asks which workflows to deploy based on automation mode
+  - Native mode: deploys `process-label.yaml` for label triggers
+  - Daemon mode: deploys `automation-daemon.yaml` for polling
+  - Hybrid mode: deploys both workflows
+  - All modes: includes `process-issue.yaml` for manual triggers
+
+### Fixed
+- API token whitespace stripping in all providers (Gitea, GitHub, GitLab)
+- Automation mode configuration test mocking
+- Automation field default in AutomationSettings (backward compatibility)
+- Plan ID extraction regex to handle subdirectories (`plans/archive/42-plan.md`)
+- Various mypy type errors and bandit false positives
+- Docker build cache connectivity issues in Gitea Actions
+- uv binary conflicts with explicit Python environment setup
+- CLI `--log-level` option position
+
+### Removed
+- Docker build from CI workflow (not used by any workflow)
+- Conversation history files from repository (moved to local storage)
+
 ## [0.3.1] - 2026-01-05
 
 ### Added
