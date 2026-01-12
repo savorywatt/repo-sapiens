@@ -108,38 +108,14 @@ Labels can be added at any time and workflows will trigger automatically.
 **When to use:** Issues were found during review or QA that need to be addressed.
 
 **What it does:**
-- Analyzes all review comments from reviewers and maintainers
-- Categorizes each comment as:
-  - **Simple fix**: Straightforward changes (implemented immediately)
-  - **Controversial fix**: Significant changes (require approval)
-  - **Question**: Needs an answer (posts answer)
-  - **Info**: Informational feedback (acknowledges)
-  - **Already done**: Already addressed in code
-  - **Won't fix**: Valid but not implementing
-- Replies to each comment with planned action
-- Executes simple fixes automatically and pushes to the PR
-- For controversial fixes:
-  - Posts the proposed action and reasoning
-  - Adds `needs-approval` label
-  - Waits for approval before implementing
-
-**How to approve controversial fixes:**
-When the agent identifies a controversial fix (significant change), it will:
-1. Reply to the review comment with the proposed action
-2. Add `needs-approval` label to the PR
-3. Wait for your approval
-
-To approve a controversial fix:
-- React with 👍 (thumbs up) to the agent's reply comment, OR
-- Reply to the comment with "approved"
-
-Once approved, the agent will implement the fix on the next run.
+- Analyzes the review feedback or QA failures
+- Implements fixes for the identified issues
+- Updates the existing PR with fixes
+- Re-triggers validation
 
 **Use on:** Pull requests **only** (does nothing on regular issues)
 
-**Next step:**
-- If fixes implemented: Re-add `needs-review` or `requires-qa` to re-validate
-- If waiting for approval: Approve controversial fixes, then re-run by removing and re-adding `needs-fix` label
+**Next step:** Re-add `needs-review` or `requires-qa` to re-validate.
 
 ---
 
@@ -243,10 +219,9 @@ Configure these secrets in your repository settings:
 
 | Secret | Description |
 |--------|-------------|
-| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo/issue access (required for Gitea) |
-| `SAPIENS_GITHUB_TOKEN` | GitHub token (required for GitHub) |
-| `SAPIENS_GITLAB_TOKEN` | GitLab personal access token with `api` scope (required for GitLab) |
+| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo/issue access (required) |
 | `SAPIENS_CLAUDE_API_KEY` | AI provider API key (only required if using API-based agents) |
+| `SAPIENS_GITHUB_TOKEN` | GitHub token (if using GitHub) |
 
 **Note:** `SAPIENS_CLAUDE_API_KEY` is only needed if your `.sapiens/config.yaml` uses an API-based agent provider like `claude-api`, `goose-api`, `openai`, `anthropic`, etc. If using local agents like `claude-local`, `ollama`, or `goose-local`, this secret is optional.
 
@@ -284,9 +259,8 @@ on:
 
 ### Add Custom Labels
 
-Create new workflow files following the pattern for your platform:
+Create new workflow files following the pattern:
 
-**Gitea/GitHub:**
 ```yaml
 name: My Custom Workflow
 on:
@@ -294,21 +268,8 @@ on:
     types: [labeled]
 jobs:
   process:
-    if: gitea.event.label.name == 'my-custom-label'  # or github.event.label.name
+    if: gitea.event.label.name == 'my-custom-label'
     # ... your steps
-```
-
-**GitLab:**
-```yaml
-workflow:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "issue_label"
-
-my-custom-job:
-  script:
-    - # ... your steps
-  rules:
-    - if: $CI_ISSUE_LABEL == "my-custom-label"
 ```
 
 ## Troubleshooting
@@ -322,10 +283,8 @@ my-custom-job:
 
 ### Permission Errors
 
-- Verify your platform token has correct permissions:
-  - **Gitea**: `SAPIENS_GITEA_TOKEN` needs `repo`, `read:org`, `write:issue`
-  - **GitHub**: `SAPIENS_GITHUB_TOKEN` or `GITHUB_TOKEN` needs `repo`, `read:org`, `write:issue`
-  - **GitLab**: `SAPIENS_GITLAB_TOKEN` needs `api` scope for full functionality
+- Verify `SAPIENS_GITEA_TOKEN` has correct permissions
+- Token needs: `repo`, `read:org`, `write:issue`
 
 ### AI Agent Errors
 

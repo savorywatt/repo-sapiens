@@ -60,7 +60,9 @@ class PRFixStage(WorkflowStage):
                     "🤖 Posted by Sapiens Automation",
                 )
                 # Remove both labels
-                updated_labels = [label for label in updated_labels if label not in ["needs-fix", "fixes-in-progress"]]
+                updated_labels = [
+                    label for label in updated_labels if label not in ["needs-fix", "fixes-in-progress"]
+                ]
                 await self.git.update_issue(issue.number, labels=updated_labels)
                 return
 

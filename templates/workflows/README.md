@@ -28,18 +28,6 @@ mkdir -p .github/workflows/sapiens/recipes
 cp templates/workflows/github/sapiens/recipes/*.yaml .github/workflows/sapiens/recipes/
 ```
 
-### For GitLab
-
-```bash
-# Copy core workflows to your repo
-mkdir -p .gitlab/workflows/sapiens
-cp templates/workflows/gitlab/sapiens/*.yaml .gitlab/workflows/sapiens/
-
-# Optionally copy recipe workflows
-mkdir -p .gitlab/workflows/sapiens/recipes
-cp templates/workflows/gitlab/sapiens/recipes/*.yaml .gitlab/workflows/sapiens/recipes/
-```
-
 ## Configuration
 
 ### Understanding Agents vs LLM Providers
@@ -47,7 +35,8 @@ cp templates/workflows/gitlab/sapiens/recipes/*.yaml .gitlab/workflows/sapiens/r
 **Agent Providers** (execute tasks, use tools):
 - `claude-local` - Claude Code CLI agent (local)
 - `claude-api` - Claude Code API agent
-- `goose-local` - Goose CLI agent (supports multiple LLM backends)
+- `goose-local` - Goose CLI agent (local)
+- `goose-api` - Goose API agent
 - `ollama` - Builtin ReAct agent with Ollama
 - `openai` - Builtin ReAct agent with OpenAI
 - `openai-compatible` - Builtin ReAct agent with compatible API
@@ -58,7 +47,7 @@ cp templates/workflows/gitlab/sapiens/recipes/*.yaml .gitlab/workflows/sapiens/r
 - OpenAI (GPT-4, etc.)
 - Groq, OpenRouter, vLLM, etc.
 
-Example: `goose-local` agent configured with OpenAI LLM = Goose CLI using OpenAI models
+Example: `goose-local` agent + `openai` LLM provider = Goose agent using OpenAI models
 
 ### Required Secrets
 
@@ -68,7 +57,6 @@ Go to your repository settings and add these secrets:
 |--------|----------|-------------|
 | `SAPIENS_GITEA_TOKEN` | Gitea only | Your Gitea API token (note: GITEA_ prefix is reserved) |
 | `GITHUB_TOKEN` | GitHub only | GitHub API token |
-| `SAPIENS_GITLAB_TOKEN` | GitLab only | Your GitLab personal access token |
 | `SAPIENS_CLAUDE_API_KEY` | If using API agents | API key for claude-api, openai, anthropic, etc. |
 | `OPENAI_API_KEY` | If using OpenAI models | OpenAI API key (for Goose or builtin agent) |
 | `CLAUDE_API_KEY` | If using Claude API | Anthropic API key (for claude-api agent) |
@@ -237,23 +225,9 @@ Labels can be added at any time and workflows will trigger automatically.
 - Removes `needs-fix` label when done
 - Adds `needs-approval` if controversial fixes need approval
 
-**How to approve controversial fixes:**
-When the agent identifies a controversial fix (significant change), it will:
-1. Reply to the review comment with the proposed action and reasoning
-2. Add `needs-approval` label to the PR
-3. Wait for your approval before implementing
-
-To approve a controversial fix:
-- React with 👍 (thumbs up) to the agent's reply comment, OR
-- Reply to the comment with "approved"
-
-Once approved, the agent will implement the fix on the next run.
-
 **Use on:** Pull requests **only** (does nothing on regular issues)
 
-**Next step:**
-- If fixes implemented: Re-add `needs-review` or `requires-qa` to re-validate
-- If waiting for approval: Approve controversial fixes, then re-run by removing and re-adding `needs-fix` label
+**Next step:** Re-add `needs-review` or `requires-qa` to re-validate.
 
 ---
 
@@ -368,7 +342,6 @@ on:
 
 Create additional workflow files for other labels:
 
-**Gitea:**
 ```yaml
 # custom-workflow.yaml
 on:
@@ -379,34 +352,6 @@ jobs:
   process:
     if: gitea.event.label.name == 'my-custom-label'
     # ... rest of workflow
-```
-
-**GitHub:**
-```yaml
-# custom-workflow.yaml
-on:
-  issues:
-    types: [labeled]
-
-jobs:
-  process:
-    if: github.event.label.name == 'my-custom-label'
-    # ... rest of workflow
-```
-
-**GitLab:**
-```yaml
-# .gitlab-ci.yml
-workflow:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "issue_label"
-      when: always
-
-process:
-  script:
-    - # ... your steps
-  rules:
-    - if: $CI_ISSUE_LABEL == "my-custom-label"
 ```
 
 ## Recipe Workflows
@@ -432,10 +377,9 @@ These are optional and can be customized for your project.
 
 ### Permission denied
 
-- Verify `SAPIENS_GITEA_TOKEN`, `GITHUB_TOKEN`, or `SAPIENS_GITLAB_TOKEN` has correct permissions
-- Token needs: `repo`, `read:org`, `write:issue` (or GitLab equivalent: `api`, `read_repository`, `write_repository`)
+- Verify `SAPIENS_GITEA_TOKEN` or `GITHUB_TOKEN` has correct permissions
+- Token needs: `repo`, `read:org`, `write:issue`
 - For GitHub, you may need a PAT instead of `GITHUB_TOKEN`
-- For GitLab, ensure the token has `api` scope for full functionality
 
 ### AI Agent Errors
 
