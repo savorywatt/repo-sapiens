@@ -8,7 +8,7 @@ on:
 jobs:
   create-tasks:
     name: Create Tasks from Approved Plan
-    if: gitea.event.label.name == 'approved' && contains(gitea.event.issue.labels.*.name, 'proposed')
+    if: github.event.label.name == 'approved' && contains(github.event.issue.labels.*.name, 'proposed')
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,22 +29,22 @@ jobs:
 
       - name: Process approved plan
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          echo "✅ Processing approved plan for issue #${{ gitea.event.issue.number }}"
-          sapiens process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/approved.md
+          echo "✅ Processing approved plan for issue #${{ github.event.issue.number }}"
+          sapiens process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/approved.md
 
       - name: Post success comment
         if: success()
         env:
-          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -sS -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"body": "🎯 **Tasks created!**\n\nThe plan has been broken down into executable tasks. Tasks will be automatically executed.\n\n🤖 Posted by Sapiens Automation"}' \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

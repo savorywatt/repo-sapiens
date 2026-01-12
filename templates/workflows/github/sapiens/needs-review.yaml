@@ -8,7 +8,7 @@ on:
 jobs:
   code-review:
     name: Automated Code Review
-    if: gitea.event.label.name == 'needs-review'
+    if: github.event.label.name == 'needs-review'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -30,19 +30,19 @@ jobs:
 
       - name: Run code review
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          echo "🔍 Running code review for issue/PR #${{ gitea.event.issue.number }}"
-          sapiens process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-review.md
+          echo "🔍 Running code review for issue/PR #${{ github.event.issue.number }}"
+          sapiens process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/needs-review.md
 
       - name: Upload review artifacts
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: review-artifacts-${{ gitea.event.issue.number }}
+          name: review-artifacts-${{ github.event.issue.number }}
           path: .automation/reviews/
           retention-days: 30

@@ -414,6 +414,7 @@ def task_command(
 @click.option("--timeout", default=300, type=int, help="Max execution time in seconds")
 @click.option("--working-dir", default=".", help="Working directory for execution")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed output")
+@click.option("--system-prompt", type=click.Path(exists=True, dir_okay=False), help="Path to custom system prompt file")
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -421,6 +422,7 @@ def run(
     timeout: int,
     working_dir: str,
     verbose: bool,
+    system_prompt: str | None,
 ) -> None:
     """Run a task using the configured AI agent.
 
@@ -446,6 +448,16 @@ def run(
             click.echo("Error: No task provided. Pass as argument or via stdin.", err=True)
             sys.exit(1)
 
+    # Load custom system prompt if provided
+    custom_system_prompt = None
+    if system_prompt:
+        try:
+            with open(system_prompt) as f:
+                custom_system_prompt = f.read()
+            click.echo(f"Loaded custom system prompt from: {system_prompt}")
+        except Exception as e:
+            click.echo(f"Warning: Failed to read system prompt file: {e}", err=True)
+
     settings = ctx.obj.get("settings") if ctx.obj else None
 
     if not settings:
@@ -458,7 +470,7 @@ def run(
     provider_type = settings.agent_provider.provider_type
 
     try:
-        asyncio.run(_run_task(settings, task, timeout, working_dir, verbose))
+        asyncio.run(_run_task(settings, task, timeout, working_dir, verbose, custom_system_prompt))
     except KeyboardInterrupt:
         click.echo("\nInterrupted by user", err=True)
         sys.exit(130)
@@ -474,6 +486,7 @@ async def _run_task(
     timeout: int,
     working_dir: str,
     verbose: bool,
+    system_prompt: str | None = None,
 ) -> None:
     """Execute task using the configured agent provider.
 
@@ -483,27 +496,32 @@ async def _run_task(
         timeout: Maximum execution time in seconds
         working_dir: Working directory for file operations
         verbose: Whether to show detailed output
+        system_prompt: Optional custom system prompt to prepend
     """
     provider_type = settings.agent_provider.provider_type
 
     if provider_type == "claude-local":
-        await _run_claude_cli(task, timeout, working_dir)
+        await _run_claude_cli(task, timeout, working_dir, system_prompt)
     elif provider_type == "goose-local":
-        await _run_goose_cli(task, timeout, working_dir, settings)
+        await _run_goose_cli(task, timeout, working_dir, settings, system_prompt)
     elif provider_type in ("ollama", "openai-compatible"):
-        await _run_react_agent(task, timeout, working_dir, verbose, settings)
+        await _run_react_agent(task, timeout, working_dir, verbose, settings, system_prompt)
     else:
         # API-based providers (openai, anthropic, claude-api, goose-api)
-        await _run_react_agent(task, timeout, working_dir, verbose, settings)
+        await _run_react_agent(task, timeout, working_dir, verbose, settings, system_prompt)
 
 
-async def _run_claude_cli(task: str, timeout: int, working_dir: str) -> None:
+async def _run_claude_cli(task: str, timeout: int, working_dir: str, system_prompt: str | None = None) -> None:
     """Run task using Claude CLI."""
     import shutil
 
     claude_path = shutil.which("claude")
     if not claude_path:
         raise RuntimeError("Claude CLI not found. Install it or choose a different agent provider.")
+
+    # Prepend system prompt if provided
+    if system_prompt:
+        task = f"{system_prompt}\n\n{task}"
 
     click.echo("Running task with Claude CLI...")
     click.echo(f"Working directory: {Path(working_dir).resolve()}")
@@ -535,6 +553,7 @@ async def _run_goose_cli(
     timeout: int,
     working_dir: str,
     settings: AutomationSettings,
+    system_prompt: str | None = None,
 ) -> None:
     """Run task using Goose CLI."""
     import shutil
@@ -542,6 +561,10 @@ async def _run_goose_cli(
     goose_path = shutil.which("goose")
     if not goose_path:
         raise RuntimeError("Goose CLI not found. Install it or choose a different agent provider.")
+
+    # Prepend system prompt if provided
+    if system_prompt:
+        task = f"{system_prompt}\n\n{task}"
 
     click.echo("Running task with Goose CLI...")
     click.echo(f"Working directory: {Path(working_dir).resolve()}")
@@ -580,6 +603,7 @@ async def _run_react_agent(
     working_dir: str,
     verbose: bool,
     settings: AutomationSettings,
+    system_prompt: str | None = None,
 ) -> None:
     """Run task using builtin ReAct agent."""
     from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
@@ -603,7 +627,7 @@ async def _run_react_agent(
         max_iterations=max_iterations,
         ollama_url=base_url,
     )
-    agent = ReActAgentProvider(working_dir=working_dir, config=config)
+    agent = ReActAgentProvider(working_dir=working_dir, config=config, system_prompt=system_prompt)
 
     async with agent:
         try:

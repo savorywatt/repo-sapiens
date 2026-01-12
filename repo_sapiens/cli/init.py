@@ -1532,6 +1532,16 @@ tags:
         # Process issue is useful for manual triggers in all modes
         core_workflows.append(("process-issue.yaml", "Process issue (manual trigger)"))
 
+        # Label-specific workflows
+        label_workflows = [
+            ("needs-planning.yaml", "Planning workflow"),
+            ("approved.yaml", "Approved plan workflow"),
+            ("execute-task.yaml", "Task execution workflow"),
+            ("needs-review.yaml", "Code review workflow"),
+            ("requires-qa.yaml", "QA testing workflow"),
+            ("needs-fix.yaml", "Fix proposal workflow"),
+        ]
+
         # Recipe workflows
         recipe_workflows = [
             ("recipes/daily-issue-triage.yaml", "Daily issue triage"),
@@ -1619,6 +1629,28 @@ tags:
 
         click.echo()
 
+        # Ask about label-specific workflows
+        if not self.non_interactive:
+            deploy_labels = click.confirm(
+                "Deploy label-specific workflows "
+                "(needs-planning, approved, execute-task, needs-review, requires-qa, needs-fix)?",
+                default=True,
+            )
+        else:
+            deploy_labels = True
+
+        if deploy_labels:
+            for template_name, description in label_workflows:
+                if deploy_template(template_name, workflows_dir):
+                    if self.provider_type == "gitlab":
+                        click.echo(f"   ✓ {description} → .gitlab-ci.yml")
+                    else:
+                        click.echo(f"   ✓ {description} → sapiens/")
+                else:
+                    click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
+
+        click.echo()
+
         # Deploy README to sapiens directory
         if deploy_core and self.provider_type != "gitlab":
             readme_content = None
@@ -1649,6 +1681,34 @@ tags:
                     readme_file = sapiens_dir / "README.md"
                     readme_file.write_text(readme_content)
                     click.echo("   ✓ Documentation → sapiens/README.md")
+            except Exception:
+                pass  # Non-critical, skip if fails
+
+        # Deploy prompts directory
+        if (deploy_core or deploy_labels) and self.provider_type != "gitlab":
+            try:
+                import shutil
+
+                # Determine source prompts directory
+                repo_root = Path(__file__).parent.parent.parent
+                source_prompts = repo_root / "templates" / template_base / "prompts"
+
+                if not source_prompts.exists():
+                    # Try package templates
+                    package_dir = Path(__file__).parent.parent
+                    source_prompts = package_dir / "templates" / template_base / "prompts"
+
+                if source_prompts.exists():
+                    # Determine target directory
+                    sapiens_dir = workflows_dir / "sapiens"
+                    target_prompts = sapiens_dir / "prompts"
+
+                    # Copy prompts directory
+                    if target_prompts.exists():
+                        shutil.rmtree(target_prompts)
+                    shutil.copytree(source_prompts, target_prompts)
+
+                    click.echo("   ✓ Workflow prompts → sapiens/prompts/")
             except Exception:
                 pass  # Non-critical, skip if fails
 
