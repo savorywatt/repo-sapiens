@@ -99,7 +99,7 @@ Both workflows and the CLI tool support either prefix for compatibility.
 
 #### Required Secrets
 
-**Secret: SAPIENS_GITEA_TOKEN** (or `BUILDER_GITEA_TOKEN`)
+**Secret: SAPIENS_GITEA_TOKEN** (or `BUILDER_SAPIENS_GITEA_TOKEN`)
 - Name: `SAPIENS_GITEA_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
@@ -188,7 +188,7 @@ ls -la .gitea/workflows/sapiens/
 
 ```bash
 # From local machine with configured tokens
-export GITEA_TOKEN="your-token"
+export SAPIENS_GITEA_TOKEN="your-token"
 export CLAUDE_API_KEY="your-key"
 
 # Run health check
@@ -292,7 +292,7 @@ sapiens list-plans
    - Immediately if compromised
 
 2. **Use minimal permissions:**
-   - GITEA_TOKEN: Only required scopes
+   - SAPIENS_GITEA_TOKEN: Only required scopes
    - Repository access: Only what's needed
 
 3. **Monitor secret usage:**

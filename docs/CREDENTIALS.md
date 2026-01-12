@@ -288,7 +288,7 @@ Format: `${VARIABLE_NAME}`
 
 ```python
 # Examples
-"${GITEA_TOKEN}"
+"${SAPIENS_GITEA_TOKEN}"
 "${CLAUDE_API_KEY}"
 "${DATABASE_PASSWORD}"
 ```
@@ -350,7 +350,7 @@ The `sapiens credentials` command provides CLI access to credential management:
 sapiens credentials set gitea/api_token --backend keyring
 
 # Store in environment (current session only)
-sapiens credentials set GITEA_TOKEN --backend environment
+sapiens credentials set SAPIENS_GITEA_TOKEN --backend environment
 
 # Store in encrypted file
 sapiens credentials set gitea/api_token --backend encrypted
@@ -373,7 +373,7 @@ sapiens credentials get @keyring:gitea/api_token --show-value
 sapiens credentials delete gitea/api_token --backend keyring
 
 # Delete from environment
-sapiens credentials delete GITEA_TOKEN --backend environment
+sapiens credentials delete SAPIENS_GITEA_TOKEN --backend environment
 ```
 
 ### Test Backends
@@ -478,7 +478,7 @@ try:
     token = resolver.resolve("@keyring:gitea/api_token")
 except BackendNotAvailableError:
     # Fallback to environment if keyring not available
-    token = resolver.resolve("${GITEA_TOKEN}")
+    token = resolver.resolve("${SAPIENS_GITEA_TOKEN}")
 ```
 
 ### Example 3: Rotating Credentials

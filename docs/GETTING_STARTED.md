@@ -187,7 +187,7 @@ You have three options for managing credentials. Choose the one that fits your e
 # For the current session (recommended for testing)
 # Choose the appropriate token for your Git provider:
 export GITEA_API_TOKEN="your-gitea-token-here"
-# or: export GITHUB_TOKEN="your-github-token-here"
+# or: export SAPIENS_GITHUB_TOKEN="your-github-token-here"
 # or: export GITLAB_TOKEN="your-gitlab-token-here"
 export CLAUDE_API_KEY="your-claude-api-key-here"
 
@@ -310,7 +310,7 @@ git_provider:
   provider_type: gitea  # or github, gitlab
   mcp_server: null  # Optional: Name of MCP server for git ops
   base_url: https://your-gitea-instance.com
-  api_token: "${GITEA_API_TOKEN}"  # or GITHUB_TOKEN, GITLAB_TOKEN
+  api_token: "${GITEA_API_TOKEN}"  # or SAPIENS_GITHUB_TOKEN, GITLAB_TOKEN
 
 # Repository Configuration
 repository:

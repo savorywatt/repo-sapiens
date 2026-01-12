@@ -379,7 +379,7 @@ For automated workflows, set secrets in Gitea:
 
 1. Navigate to: `https://your-gitea.com/owner/repo/settings/secrets`
 2. Add secrets:
-   - `GITEA_TOKEN` (your Gitea API token)
+   - `SAPIENS_GITEA_TOKEN` (your Gitea API token)
    - `OPENAI_API_KEY` (or whichever provider you use)
 
 Or let `sapiens init` set them automatically with `--setup-secrets`.

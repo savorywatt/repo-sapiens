@@ -1,14 +1,16 @@
-name: Plan Approved
+name: Approved
 
-# Triggers when 'approved' label is added to a proposal
+# Triggers when 'approved' label is added to an issue or PR
 on:
   issues:
     types: [labeled]
+  pull_request:
+    types: [labeled]
 
 jobs:
-  create-tasks:
-    name: Create Tasks from Approved Plan
-    if: github.event.label.name == 'approved' && contains(github.event.issue.labels.*.name, 'proposed')
+  process-approval:
+    name: Process Approval
+    if: github.event.label.name == 'approved'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -27,7 +29,7 @@ jobs:
       - name: Install sapiens
         run: pip install -e .
 
-      - name: Process approved plan
+      - name: Process approval
         env:
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,16 +37,6 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          echo "✅ Processing approved plan for issue #${{ github.event.issue.number }}"
-          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/approved.md
-
-      - name: Post success comment
-        if: success()
-        env:
-          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          curl -sS -X POST \
-            -H "Authorization: token $GITEA_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"body": "🎯 **Tasks created!**\n\nThe plan has been broken down into executable tasks. Tasks will be automatically executed.\n\n🤖 Posted by Sapiens Automation"}' \
-            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"
+          ISSUE_NUM="${{ github.event.issue.number }}${{ github.event.pull_request.number }}"
+          echo "✅ Processing approval for #${ISSUE_NUM}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${ISSUE_NUM} --system-prompt .github/workflows/sapiens/prompts/approved.md

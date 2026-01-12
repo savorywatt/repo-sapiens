@@ -50,14 +50,10 @@ class ReviewAnalysisResult(BaseModel):
     reviewer_comments: int = Field(..., description="Comments from reviewers/maintainers")
 
     simple_fixes: list[CommentAnalysis] = Field(default_factory=list, description="Fixes to execute immediately")
-    controversial_fixes: list[CommentAnalysis] = Field(
-        default_factory=list, description="Fixes requiring approval"
-    )
+    controversial_fixes: list[CommentAnalysis] = Field(default_factory=list, description="Fixes requiring approval")
     questions: list[CommentAnalysis] = Field(default_factory=list, description="Questions to answer")
     info_comments: list[CommentAnalysis] = Field(default_factory=list, description="Informational comments")
-    already_done: list[CommentAnalysis] = Field(
-        default_factory=list, description="Already addressed in code"
-    )
+    already_done: list[CommentAnalysis] = Field(default_factory=list, description="Already addressed in code")
     wont_fix: list[CommentAnalysis] = Field(default_factory=list, description="Valid but won't implement")
 
     def get_all_analyses(self) -> list[CommentAnalysis]:

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **GitHub Copilot Integration**: Support for GitHub Copilot as an AI agent provider
+  - New `copilot-local` provider type using the official `gh copilot` CLI
+  - Automatic detection of GitHub CLI and Copilot extension during `sapiens init`
+  - Interactive setup with extension installation prompt
+  - Health checks for GitHub CLI, Copilot extension, and authentication status
+  - Integration with ExternalAgentProvider for CLI-based execution
+  - Support in process-label workflow for label-triggered automation
 - **Native Label Trigger System**: Instant automation via CI/CD workflows instead of daemon polling
   - `sapiens process-label` command for handling label events in workflows
   - `sapiens migrate` commands for analyzing and generating native trigger workflows
@@ -184,7 +191,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Gitea Actions secret setup for provider-specific API keys
 - **Configuration System Updates**: Enhanced Pydantic models for multi-agent support
   - New `GooseConfig` model with toolkit, temperature, max_tokens, llm_provider
-  - Updated `AgentProviderConfig` to support goose-local, goose-api provider types
+  - Updated `AgentProviderConfig` to support goose-local provider type (Goose is CLI-only)
   - Provider-specific credential references (@keyring:openai/api_key, ${OPENAI_API_KEY})
 - **External Agent Provider**: Updated to support Goose CLI invocation
   - Correct `goose session start` command with provider, model, toolkit flags

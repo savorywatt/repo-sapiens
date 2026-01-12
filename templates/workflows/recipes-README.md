@@ -38,6 +38,18 @@ cp templates/workflows/github/recipes/weekly-test-coverage.yaml \
 # - ANTHROPIC_API_KEY
 ```
 
+### For GitLab
+
+```bash
+# Copy desired workflow to your repo
+cp templates/workflows/gitlab/recipes/weekly-test-coverage.yaml \
+   .gitlab/workflows/weekly-test-coverage.yaml
+
+# Set required secrets in GitLab repo settings (Settings > CI/CD > Variables):
+# - SAPIENS_GITLAB_TOKEN
+# - SAPIENS_CLAUDE_API_KEY
+```
+
 ## Customization
 
 ### Changing Schedules
@@ -97,6 +109,15 @@ The recipes use Claude by default. For Ollama:
 | `ANTHROPIC_API_KEY` | Anthropic Claude API key |
 
 Note: GitHub Actions provides `GITHUB_TOKEN` automatically with appropriate permissions.
+
+### GitLab
+
+| Secret | Description |
+|--------|-------------|
+| `SAPIENS_GITLAB_TOKEN` | GitLab personal access token with `api` scope |
+| `SAPIENS_CLAUDE_API_KEY` | Anthropic Claude API key |
+
+Note: Configure these as CI/CD variables in Settings > CI/CD > Variables. Mark them as "Protected" and "Masked" for security.
 
 ## Tips
 

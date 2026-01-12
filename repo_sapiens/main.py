@@ -14,6 +14,7 @@ from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.enums import AgentType, ProviderType
 from repo_sapiens.exceptions import ConfigurationError, RepoSapiensError
 from repo_sapiens.providers.base import AgentProvider
 from repo_sapiens.providers.external_agent import ExternalAgentProvider
@@ -509,8 +510,8 @@ async def _run_task(
     elif provider_type in ("ollama", "openai-compatible"):
         await _run_react_agent(task, timeout, working_dir, verbose, settings, system_prompt)
     else:
-        # API-based providers (openai, anthropic, claude-api, goose-api)
-        await _run_react_agent(task, timeout, working_dir, verbose, settings, system_prompt)
+        raise ValueError(f"Unsupported provider type: {provider_type}. "
+                        f"Supported: claude-local, goose-local, ollama, openai-compatible")
 
 
 async def _run_claude_cli(task: str, timeout: int, working_dir: str, system_prompt: str | None = None) -> None:
@@ -701,7 +702,9 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
 
     # Initialize agent provider based on configuration
     agent: AgentProvider
-    if settings.agent_provider.provider_type == "ollama":
+    provider_type = settings.agent_provider.provider_type
+
+    if provider_type == ProviderType.OLLAMA:
         from repo_sapiens.providers.ollama import OllamaProvider
 
         base_url = settings.agent_provider.base_url or "http://localhost:11434"
@@ -711,13 +714,15 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
             working_dir=str(Path.cwd()),
             qa_handler=qa_handler,
         )
-    else:
-        # Use external agent provider (claude or goose CLI)
-        agent_type = "claude" if "claude" in settings.agent_provider.provider_type else "goose"
+    elif provider_type.is_external_cli:
+        # Use external agent provider (claude, goose, or copilot CLI)
+        agent_type = provider_type.to_agent_type()
+        if agent_type is None:
+            raise ValueError(f"Unsupported provider type: {provider_type}")
 
         # Extract Goose config if using Goose
         goose_config = None
-        if agent_type == "goose" and settings.agent_provider.goose_config:
+        if agent_type == AgentType.GOOSE and settings.agent_provider.goose_config:
             goose_config = {
                 "toolkit": settings.agent_provider.goose_config.toolkit,
                 "temperature": settings.agent_provider.goose_config.temperature,
@@ -732,6 +737,8 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
             qa_handler=qa_handler,
             goose_config=goose_config,
         )
+    else:
+        raise ValueError(f"Unsupported provider type: {provider_type}")
 
     state = StateManager(settings.state_dir)
 

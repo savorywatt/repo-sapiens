@@ -78,12 +78,12 @@ Add a PyPI API token as a repository secret:
 
 ### 2. Gitea Token
 
-The workflow uses `${{ secrets.GITEA_TOKEN }}` which should be automatically available in Gitea Actions.
+The workflow uses `${{ secrets.SAPIENS_GITEA_TOKEN }}` which should be automatically available in Gitea Actions.
 
 If not, create a token:
 - Navigate to: `User Settings > Applications > Generate New Token`
 - Scopes: `repo` (all), `write:packages`
-- Add as repository secret: `GITEA_TOKEN`
+- Add as repository secret: `SAPIENS_GITEA_TOKEN`
 
 ## Automated Release (Recommended)
 
@@ -284,7 +284,7 @@ Error: Invalid or expired API token
 
 If Gitea release creation fails:
 
-1. Check `GITEA_TOKEN` secret exists and has correct permissions
+1. Check `SAPIENS_GITEA_TOKEN` secret exists and has correct permissions
 2. Verify Gitea Actions has access to repository secrets
 3. Check Gitea API is accessible from Actions runners
 

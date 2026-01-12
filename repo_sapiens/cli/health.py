@@ -8,6 +8,7 @@ import click
 import structlog
 
 from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.enums import ProviderType
 from repo_sapiens.exceptions import ConfigurationError
 
 log = structlog.get_logger(__name__)
@@ -239,9 +240,9 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
         # -------------------------------------------------------------------------
         # Check 5: Agent provider availability (optional)
         # -------------------------------------------------------------------------
-        agent_type = settings.agent_provider.provider_type
+        provider_type = settings.agent_provider.provider_type
 
-        if agent_type == "ollama":
+        if provider_type == ProviderType.OLLAMA:
             # Check Ollama connectivity
             async def check_ollama() -> tuple[bool, str | None, list[str]]:
                 """Test Ollama server connectivity."""
@@ -293,11 +294,11 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 _print_check("Ollama server", False, error)
                 all_passed = False
 
-        elif agent_type in ("claude-local", "goose-local"):
+        elif provider_type in (ProviderType.CLAUDE_LOCAL, ProviderType.GOOSE_LOCAL):
             # Check if CLI is available
             import shutil
 
-            cli_name = "claude" if "claude" in agent_type else "goose"
+            cli_name = "claude" if provider_type == ProviderType.CLAUDE_LOCAL else "goose"
             cli_path = shutil.which(cli_name)
 
             if cli_path:
@@ -314,14 +315,107 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 )
                 all_passed = False
 
-        elif agent_type in ("claude-api", "goose-api", "openai"):
-            # For API-based providers, we already checked the API key
-            # A full connectivity test would require making an API call
-            _print_check(
-                f"{agent_type} provider",
-                True,
-                "API key configured" if verbose else None,
-            )
+        elif provider_type == ProviderType.COPILOT_LOCAL:
+            # Check if GitHub CLI is available
+            import shutil
+            import subprocess
+
+            gh_path = shutil.which("gh")
+            if gh_path:
+                _print_check(
+                    "GitHub CLI (gh)",
+                    True,
+                    f"Found at {gh_path}" if verbose else None,
+                )
+
+                # Check if Copilot extension is installed
+                try:
+                    result = subprocess.run(  # nosec B607
+                        ["gh", "extension", "list"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    copilot_installed = "gh-copilot" in result.stdout or "copilot" in result.stdout
+                    if copilot_installed:
+                        _print_check(
+                            "Copilot extension",
+                            True,
+                            "Installed" if verbose else None,
+                        )
+                    else:
+                        _print_check(
+                            "Copilot extension",
+                            False,
+                            "Install with: gh extension install github/gh-copilot",
+                        )
+                        all_passed = False
+                except subprocess.TimeoutExpired:
+                    _print_check(
+                        "Copilot extension",
+                        False,
+                        "Timeout checking extensions",
+                    )
+                    all_passed = False
+                except Exception as e:
+                    _print_check(
+                        "Copilot extension",
+                        False,
+                        f"Error: {e}",
+                    )
+                    all_passed = False
+
+                # Check if gh is authenticated
+                try:
+                    result = subprocess.run(  # nosec B607
+                        ["gh", "auth", "status"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0:
+                        _print_check(
+                            "GitHub authentication",
+                            True,
+                            "Authenticated" if verbose else None,
+                        )
+                    else:
+                        _print_check(
+                            "GitHub authentication",
+                            False,
+                            "Run: gh auth login",
+                        )
+                        all_passed = False
+                except Exception as e:
+                    _print_check(
+                        "GitHub authentication",
+                        False,
+                        f"Error: {e}",
+                    )
+                    all_passed = False
+            else:
+                _print_check(
+                    "GitHub CLI (gh)",
+                    False,
+                    "Not found. Install from: https://cli.github.com/",
+                )
+                all_passed = False
+
+        elif provider_type in (ProviderType.OPENAI_COMPATIBLE, ProviderType.OLLAMA):
+            # For API-based providers and Ollama, no CLI check needed
+            # API connectivity would require making an actual API call
+            if provider_type == ProviderType.OLLAMA:
+                _print_check(
+                    "Ollama provider",
+                    True,
+                    f"Configured at {settings.agent_provider.base_url or 'http://localhost:11434'}" if verbose else None,
+                )
+            else:
+                _print_check(
+                    "OpenAI-compatible API",
+                    True,
+                    "API key configured" if verbose else None,
+                )
 
     # -------------------------------------------------------------------------
     # Summary

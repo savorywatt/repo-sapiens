@@ -1,23 +1,29 @@
 """External agent provider that runs Claude Code or Goose as CLI tools."""
 
+from __future__ import annotations
+
 import asyncio
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from repo_sapiens.enums import AgentType
 from repo_sapiens.models.domain import Issue, Plan, Review, Task, TaskResult
 from repo_sapiens.providers.base import AgentProvider
+
+if TYPE_CHECKING:
+    pass
 
 log = structlog.get_logger(__name__)
 
 
 class ExternalAgentProvider(AgentProvider):
-    """Agent provider that executes prompts using external CLI tools (Claude Code or Goose)."""
+    """Agent provider that executes prompts using external CLI tools (Claude Code, Goose, or GitHub Copilot)."""
 
     def __init__(
         self,
-        agent_type: str = "claude",
+        agent_type: AgentType | str = AgentType.CLAUDE,
         model: str = "claude-sonnet-4.5",
         working_dir: str | None = None,
         qa_handler: Any | None = None,
@@ -27,14 +33,18 @@ class ExternalAgentProvider(AgentProvider):
         """Initialize external agent provider.
 
         Args:
-            agent_type: Type of agent CLI ("claude" or "goose")
+            agent_type: Type of agent CLI (AgentType enum or string)
             model: Model to use
             working_dir: Working directory for agent execution
             qa_handler: Interactive Q&A handler for agent questions
             goose_config: Goose-specific configuration (toolkit, temperature, etc.)
             system_prompt: Custom system prompt to prepend to all prompts
         """
-        self.agent_type = agent_type
+        # Convert string to enum if needed (for backward compatibility)
+        if isinstance(agent_type, str):
+            self.agent_type = AgentType(agent_type)
+        else:
+            self.agent_type = agent_type
         self.model = model
         self.working_dir = working_dir or os.getcwd()
         self.qa_handler = qa_handler
@@ -44,23 +54,35 @@ class ExternalAgentProvider(AgentProvider):
 
     async def connect(self) -> None:
         """Check if the agent CLI is available."""
-        cmd = "claude" if self.agent_type == "claude" else "goose"
+        if self.agent_type == AgentType.CLAUDE:
+            cmd = "claude"
+            args = ["--version"]
+        elif self.agent_type == AgentType.GOOSE:
+            cmd = "goose"
+            args = ["--version"]
+        elif self.agent_type == AgentType.COPILOT:
+            cmd = "gh"
+            args = ["copilot", "--version"]
+        else:
+            raise ValueError(f"Unknown agent type: {self.agent_type}")
 
         try:
             result = await asyncio.create_subprocess_exec(
                 cmd,
-                "--version",
+                *args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             await result.communicate()
 
             if result.returncode == 0:
-                log.info("agent_cli_available", agent=self.agent_type)
+                log.info("agent_cli_available", agent=str(self.agent_type))
             else:
-                log.warning("agent_cli_check_failed", agent=self.agent_type, code=result.returncode)
+                log.warning("agent_cli_check_failed", agent=str(self.agent_type), code=result.returncode)
         except FileNotFoundError as e:
-            log.error("agent_cli_not_found", agent=self.agent_type)
+            log.error("agent_cli_not_found", agent=str(self.agent_type))
+            if self.agent_type == AgentType.COPILOT:
+                raise RuntimeError("GitHub CLI (gh) not found in PATH. Install from: https://cli.github.com/") from e
             raise RuntimeError(f"{cmd} CLI not found in PATH") from e
 
     async def execute_prompt(
@@ -83,13 +105,17 @@ class ExternalAgentProvider(AgentProvider):
                 - files_changed: List[str]
                 - error: Optional[str]
         """
-        log.info("executing_prompt", agent=self.agent_type, task_id=task_id)
+        log.info("executing_prompt", agent=str(self.agent_type), task_id=task_id)
 
         try:
-            if self.agent_type == "claude":
+            if self.agent_type == AgentType.CLAUDE:
                 result = await self._execute_claude(prompt, context, task_id)
-            else:
+            elif self.agent_type == AgentType.GOOSE:
                 result = await self._execute_goose(prompt, context, task_id)
+            elif self.agent_type == AgentType.COPILOT:
+                result = await self._execute_copilot(prompt, context, task_id)
+            else:
+                raise ValueError(f"Unknown agent type: {self.agent_type}")
 
             log.info("prompt_executed", task_id=task_id, success=result["success"])
             return result
@@ -260,6 +286,69 @@ class ExternalAgentProvider(AgentProvider):
                             files.append(filename)
 
         return files
+
+    async def _execute_copilot(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None,
+        task_id: str | None,
+    ) -> dict[str, Any]:
+        """Execute prompt using GitHub Copilot CLI.
+
+        Uses 'gh copilot suggest' for shell command suggestions.
+        Note: GitHub Copilot CLI has limited capabilities compared to Claude/Goose.
+        It's primarily designed for command suggestions rather than full code generation.
+        """
+        # Prepend system prompt if provided
+        if self.system_prompt:
+            prompt = f"{self.system_prompt}\n\n{prompt}"
+
+        # Build Copilot command
+        # gh copilot suggest -t shell "prompt"
+        cmd = [
+            "gh",
+            "copilot",
+            "suggest",
+            "-t",
+            "shell",  # Target type: shell command
+            prompt,
+        ]
+
+        log.debug(
+            "running_copilot",
+            cmd=" ".join(cmd[:4]) + " ...",  # Don't log full prompt
+            cwd=self.working_dir,
+            prompt_length=len(prompt),
+        )
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=self.working_dir,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        stdout, stderr = await process.communicate()
+
+        success = process.returncode == 0
+        output = stdout.decode("utf-8") if stdout else ""
+        error_output = stderr.decode("utf-8") if stderr else ""
+
+        files_changed = self._detect_changed_files(output)
+
+        log.info(
+            "copilot_execution_complete",
+            success=success,
+            output_length=len(output),
+            error_length=len(error_output),
+        )
+
+        return {
+            "success": success,
+            "output": output,
+            "files_changed": files_changed,
+            "error": error_output if not success else None,
+        }
 
     async def generate_plan(self, issue: Issue) -> Plan:
         """Generate development plan from issue."""
