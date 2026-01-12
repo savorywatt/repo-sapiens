@@ -801,6 +801,7 @@ class RepoInitializer:
             click.echo("  1. Use builtin ReAct agent (local or cloud LLM)")
             click.echo("  2. Install Claude Code: https://claude.com/install.sh")
             click.echo("  3. Install Goose: pip install goose-ai")
+            click.echo("  4. Install GitHub Copilot CLI: gh extension install github/gh-copilot")
             click.echo()
 
             self.agent_type = "builtin"
@@ -811,6 +812,8 @@ class RepoInitializer:
             self._configure_claude()
         elif self.agent_type == "goose":
             self._configure_goose()
+        elif self.agent_type == "copilot":
+            self._configure_copilot()
         elif self.agent_type == "builtin":
             self._configure_builtin()
 
@@ -885,15 +888,13 @@ class RepoInitializer:
                 click.echo(f"  • {model}")
 
             self.goose_model = click.prompt(
-                "Which model?",
-                type=click.Choice(provider_info["models"]),
-                default=provider_info["default_model"]
+                "Which model?", type=click.Choice(provider_info["models"]), default=provider_info["default_model"]
             )
 
             if provider_info.get("api_key_env"):
                 api_key_env = provider_info["api_key_env"]
                 click.echo()
-                click.echo(f"You need to set repository secrets:")
+                click.echo("You need to set repository secrets:")
                 click.echo(f"   • {api_key_env} - Your {provider_info['name']} API key")
                 click.echo(f"   • Get it from: {provider_info.get('website', 'provider website')}")
                 click.echo()
@@ -984,6 +985,95 @@ class RepoInitializer:
             self.goose_toolkit = click.prompt("Toolkit", type=str, default="default")
 
         self.agent_mode = "local"  # Goose runs locally
+
+    def _configure_copilot(self) -> None:
+        """Configure GitHub Copilot agent."""
+        import shutil
+        import subprocess
+
+        click.echo()
+        click.echo(click.style("🐙 GitHub Copilot Configuration", bold=True, fg="cyan"))
+        click.echo()
+
+        # Check if gh CLI is available
+        gh_path = shutil.which("gh")
+        if not gh_path:
+            click.echo(click.style("⚠ GitHub CLI (gh) not found", fg="red"))
+            click.echo("Install from: https://cli.github.com/")
+            click.echo()
+            if not click.confirm("Continue anyway?", default=False):
+                raise click.ClickException("GitHub CLI required for Copilot. Install it first.")
+        else:
+            click.echo(click.style(f"✓ GitHub CLI found at {gh_path}", fg="green"))
+
+        # Check if Copilot extension is installed
+        copilot_installed = False
+        if gh_path:
+            try:
+                result = subprocess.run(  # nosec B607
+                    ["gh", "extension", "list"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                copilot_installed = "gh-copilot" in result.stdout or "copilot" in result.stdout
+            except Exception:
+                pass
+
+        if copilot_installed:
+            click.echo(click.style("✓ Copilot extension installed", fg="green"))
+        else:
+            click.echo(click.style("⚠ Copilot extension not installed", fg="yellow"))
+            click.echo("Install with: gh extension install github/gh-copilot")
+            click.echo()
+            if gh_path and click.confirm("Install Copilot extension now?", default=True):
+                try:
+                    result = subprocess.run(  # nosec B607
+                        ["gh", "extension", "install", "github/gh-copilot"],
+                        capture_output=True,
+                        text=True,
+                        timeout=60,
+                    )
+                    if result.returncode == 0:
+                        click.echo(click.style("✓ Copilot extension installed", fg="green"))
+                        copilot_installed = True
+                    else:
+                        click.echo(click.style(f"✗ Installation failed: {result.stderr}", fg="red"))
+                except subprocess.TimeoutExpired:
+                    click.echo(click.style("✗ Installation timed out", fg="red"))
+                except Exception as e:
+                    click.echo(click.style(f"✗ Installation failed: {e}", fg="red"))
+
+        # Check if gh is authenticated
+        if gh_path:
+            click.echo()
+            try:
+                result = subprocess.run(  # nosec B607
+                    ["gh", "auth", "status"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    click.echo(click.style("✓ GitHub CLI authenticated", fg="green"))
+                else:
+                    click.echo(click.style("⚠ GitHub CLI not authenticated", fg="yellow"))
+                    click.echo("Run: gh auth login")
+            except Exception:
+                pass
+
+        click.echo()
+        click.echo(click.style("Note:", bold=True, fg="yellow"))
+        click.echo("GitHub Copilot CLI has limited capabilities compared to Claude/Goose.")
+        click.echo("It's primarily designed for command suggestions, not full code generation.")
+        click.echo("A GitHub Copilot subscription is required.")
+        click.echo()
+
+        if not click.confirm("Continue with Copilot?", default=True):
+            raise click.ClickException("Setup cancelled")
+
+        self.agent_mode = "local"  # Copilot runs locally via gh CLI
+        self.agent_api_key = None  # No separate API key needed - uses gh auth
 
     def _configure_builtin(self) -> None:
         """Configure builtin ReAct agent with LLM provider selection."""
@@ -1180,7 +1270,7 @@ class RepoInitializer:
             # CI/CD mode: Just confirm env var is set
             if self.is_cicd_setup:
                 click.echo()
-                click.echo(f"You need to set repository secrets:")
+                click.echo("You need to set repository secrets:")
                 click.echo(f"   • {api_key_env} - Your {provider_info['name']} API key")
                 click.echo(f"   • Get it from: {provider_info.get('website', 'provider website')}")
                 click.echo()
@@ -1537,6 +1627,15 @@ class RepoInitializer:
   model: {model}
   api_key: {agent_api_key_ref}
   local_mode: false"""
+        elif self.agent_type == "copilot":
+            # Copilot configuration
+            provider_type = "copilot-local"
+            model = "gpt-4"  # Default model for Copilot
+            agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: null
+  local_mode: true"""
         else:
             # Claude configuration
             provider_type = f"claude-{self.agent_mode}"

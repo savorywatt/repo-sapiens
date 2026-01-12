@@ -712,8 +712,15 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
             qa_handler=qa_handler,
         )
     else:
-        # Use external agent provider (claude or goose CLI)
-        agent_type = "claude" if "claude" in settings.agent_provider.provider_type else "goose"
+        # Use external agent provider (claude, goose, or copilot CLI)
+        if "claude" in settings.agent_provider.provider_type:
+            agent_type = "claude"
+        elif "goose" in settings.agent_provider.provider_type:
+            agent_type = "goose"
+        elif "copilot" in settings.agent_provider.provider_type:
+            agent_type = "copilot"
+        else:
+            raise ValueError(f"Unsupported provider type: {settings.agent_provider.provider_type}")
 
         # Extract Goose config if using Goose
         goose_config = None

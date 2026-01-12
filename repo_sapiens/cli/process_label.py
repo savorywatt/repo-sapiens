@@ -223,8 +223,15 @@ def _create_agent_provider(settings: AutomationSettings) -> AgentProvider:
             qa_handler=qa_handler,
         )
 
-    # External agent (Claude or Goose)
-    agent_type = "claude" if "claude" in settings.agent_provider.provider_type else "goose"
+    # External agent (Claude, Goose, or Copilot)
+    if "claude" in settings.agent_provider.provider_type:
+        agent_type = "claude"
+    elif "goose" in settings.agent_provider.provider_type:
+        agent_type = "goose"
+    elif "copilot" in settings.agent_provider.provider_type:
+        agent_type = "copilot"
+    else:
+        raise ValueError(f"Unsupported provider type: {settings.agent_provider.provider_type}")
 
     goose_config = None
     if agent_type == "goose" and settings.agent_provider.goose_config:

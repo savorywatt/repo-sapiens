@@ -38,6 +38,18 @@ AGENT_INFO = {
         "supports_local": True,
         "supports_api": False,
     },
+    "copilot": {
+        "name": "GitHub Copilot",
+        "binary": "gh",
+        "install_cmd": "gh extension install github/gh-copilot",
+        "docs_url": "https://docs.github.com/en/copilot/github-copilot-in-the-cli",
+        "provider": "GitHub",
+        "models": ["gpt-4", "gpt-3.5-turbo"],
+        "supports_local": True,
+        "supports_api": False,
+        "requires_auth": True,
+        "note": "Requires GitHub Copilot subscription and gh CLI authentication",
+    },
     "builtin": {
         "name": "Builtin ReAct Agent",
         "binary": None,  # Always available - no external CLI needed
@@ -77,6 +89,22 @@ def detect_available_agents() -> list[str]:
         # Goose can be run via: uvx goose
         # We'll consider this as "goose" being available
         available.append("goose-uvx")
+
+    # Check for GitHub Copilot
+    if shutil.which("gh"):
+        import subprocess
+
+        try:
+            result = subprocess.run(  # nosec B607
+                ["gh", "extension", "list"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if "gh-copilot" in result.stdout or "copilot" in result.stdout:
+                available.append("copilot")
+        except Exception:
+            pass  # gh exists but copilot extension not installed or error
 
     return available
 
@@ -233,6 +261,8 @@ def format_agent_list() -> str:
             elif base_agent == "goose":
                 providers = cast(list[str], info.get("llm_providers", []))
                 hint = ", ".join(p.title() for p in providers[:5])
+            elif base_agent == "copilot":
+                hint = "GPT-4 via GitHub CLI (requires Copilot subscription)"
             else:
                 hint = ""
 

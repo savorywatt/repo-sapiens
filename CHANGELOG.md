@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **GitHub Copilot Integration**: Support for GitHub Copilot as an AI agent provider
+  - New `copilot-local` provider type using the official `gh copilot` CLI
+  - Automatic detection of GitHub CLI and Copilot extension during `sapiens init`
+  - Interactive setup with extension installation prompt
+  - Health checks for GitHub CLI, Copilot extension, and authentication status
+  - Integration with ExternalAgentProvider for CLI-based execution
+  - Support in process-label workflow for label-triggered automation
 - **Native Label Trigger System**: Instant automation via CI/CD workflows instead of daemon polling
   - `sapiens process-label` command for handling label events in workflows
   - `sapiens migrate` commands for analyzing and generating native trigger workflows

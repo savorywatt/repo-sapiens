@@ -314,6 +314,92 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 )
                 all_passed = False
 
+        elif agent_type == "copilot-local":
+            # Check if GitHub CLI is available
+            import shutil
+            import subprocess
+
+            gh_path = shutil.which("gh")
+            if gh_path:
+                _print_check(
+                    "GitHub CLI (gh)",
+                    True,
+                    f"Found at {gh_path}" if verbose else None,
+                )
+
+                # Check if Copilot extension is installed
+                try:
+                    result = subprocess.run(  # nosec B607
+                        ["gh", "extension", "list"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    copilot_installed = "gh-copilot" in result.stdout or "copilot" in result.stdout
+                    if copilot_installed:
+                        _print_check(
+                            "Copilot extension",
+                            True,
+                            "Installed" if verbose else None,
+                        )
+                    else:
+                        _print_check(
+                            "Copilot extension",
+                            False,
+                            "Install with: gh extension install github/gh-copilot",
+                        )
+                        all_passed = False
+                except subprocess.TimeoutExpired:
+                    _print_check(
+                        "Copilot extension",
+                        False,
+                        "Timeout checking extensions",
+                    )
+                    all_passed = False
+                except Exception as e:
+                    _print_check(
+                        "Copilot extension",
+                        False,
+                        f"Error: {e}",
+                    )
+                    all_passed = False
+
+                # Check if gh is authenticated
+                try:
+                    result = subprocess.run(  # nosec B607
+                        ["gh", "auth", "status"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0:
+                        _print_check(
+                            "GitHub authentication",
+                            True,
+                            "Authenticated" if verbose else None,
+                        )
+                    else:
+                        _print_check(
+                            "GitHub authentication",
+                            False,
+                            "Run: gh auth login",
+                        )
+                        all_passed = False
+                except Exception as e:
+                    _print_check(
+                        "GitHub authentication",
+                        False,
+                        f"Error: {e}",
+                    )
+                    all_passed = False
+            else:
+                _print_check(
+                    "GitHub CLI (gh)",
+                    False,
+                    "Not found. Install from: https://cli.github.com/",
+                )
+                all_passed = False
+
         elif agent_type in ("claude-api", "goose-api", "openai"):
             # For API-based providers, we already checked the API key
             # A full connectivity test would require making an API call

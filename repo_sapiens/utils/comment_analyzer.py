@@ -140,9 +140,7 @@ class CommentAnalyzer:
         comment_id = comment.id if hasattr(comment, "id") else comment.get("id")
         comment_author = comment.author if hasattr(comment, "author") else comment.get("author", "unknown")
         comment_body = comment.body if hasattr(comment, "body") else comment.get("body", "")
-        comment_created = (
-            comment.created_at if hasattr(comment, "created_at") else comment.get("created_at", None)
-        )
+        comment_created = comment.created_at if hasattr(comment, "created_at") else comment.get("created_at", None)
 
         log.debug("analyzing_comment", comment_id=comment_id, author=comment_author)
 

@@ -68,6 +68,7 @@ class AgentProviderConfig(BaseModel):
         "claude-api",
         "goose-local",
         "goose-api",
+        "copilot-local",
         "openai",
         "openai-compatible",
         "anthropic",
