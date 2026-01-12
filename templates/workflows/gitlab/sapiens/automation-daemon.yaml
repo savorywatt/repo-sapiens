@@ -20,7 +20,7 @@
 
 variables:
   # Change this to your config file (use sapiens_config.ci.yaml for CI/CD specific config)
-  CONFIG_FILE: sapiens_config.yaml
+  CONFIG_FILE: sapiens_config.ci.yaml
   PYTHON_VERSION: "3.11"
 
 stages:
