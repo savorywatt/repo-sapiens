@@ -129,9 +129,7 @@ def find_installed_templates(repo_path: Path, provider_type: str | None) -> list
     return templates
 
 
-def find_available_templates(
-    templates_dir: Path, provider_type: str | None
-) -> list[dict[str, Any]]:
+def find_available_templates(templates_dir: Path, provider_type: str | None) -> list[dict[str, Any]]:
     """Find all available templates in the package."""
     if provider_type == "github":
         provider_dir = templates_dir / "github"
@@ -295,9 +293,7 @@ class TemplateUpdater:
         # Find templates directory
         templates_dir = find_templates_dir()
         if not templates_dir:
-            click.echo(
-                click.style("Error: Could not find repo-sapiens templates directory.", fg="red")
-            )
+            click.echo(click.style("Error: Could not find repo-sapiens templates directory.", fg="red"))
             sys.exit(1)
 
         # Find installed templates
@@ -409,10 +405,7 @@ class TemplateUpdater:
         if updates_available:
             click.echo(click.style("⬆ Updates available:", fg="yellow"))
             for update in updates_available:
-                click.echo(
-                    f"   {update['name']}: "
-                    f"v{update['installed_version']} → v{update['latest_version']}"
-                )
+                click.echo(f"   {update['name']}: " f"v{update['installed_version']} → v{update['latest_version']}")
             click.echo()
 
         if not_found:
@@ -443,8 +436,7 @@ class TemplateUpdater:
             source_path = update["source_path"]
 
             click.echo(
-                f"  {click.style(name, bold=True)}: "
-                f"v{update['installed_version']} → v{update['latest_version']}"
+                f"  {click.style(name, bold=True)}: " f"v{update['installed_version']} → v{update['latest_version']}"
             )
 
             if self.update_all:

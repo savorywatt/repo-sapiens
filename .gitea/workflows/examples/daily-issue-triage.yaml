@@ -51,7 +51,7 @@ jobs:
           AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          python -m repo_sapiens.cli task "Triage open issues in this repository.
+          sapiens task "Triage open issues in this repository.
 
           Repository: ${{ gitea.repository }}
 

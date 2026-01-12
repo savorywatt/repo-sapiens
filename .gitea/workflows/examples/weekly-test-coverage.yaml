@@ -79,7 +79,7 @@ jobs:
         run: |
           TARGET=${{ gitea.event.inputs.target_coverage || '60' }}
 
-          python -m repo_sapiens.cli task "Improve test coverage for this Python project.
+          sapiens task "Improve test coverage for this Python project.
 
           Current total coverage: ${{ steps.coverage.outputs.total_coverage }}%
           Target coverage: ${TARGET}%

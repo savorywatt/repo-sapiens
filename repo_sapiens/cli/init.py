@@ -1569,12 +1569,12 @@ tags:
                         # Recipes go to .gitlab/sapiens/recipes/
                         gitlab_dir = self.repo_path / ".gitlab" / "sapiens" / "recipes"
                         gitlab_dir.mkdir(parents=True, exist_ok=True)
-                        target_file = gitlab_dir / template_name.replace('recipes/', '')
+                        target_file = gitlab_dir / template_name.replace("recipes/", "")
                 else:
                     # GitHub/Gitea: use subdirectory structure - recipes nested inside sapiens
                     sapiens_dir = target_dir / "sapiens"
                     if is_recipe:
-                        target_file = sapiens_dir / "recipes" / template_name.replace('recipes/', '')
+                        target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
                     else:
                         target_file = sapiens_dir / template_name
                     target_file.parent.mkdir(parents=True, exist_ok=True)
