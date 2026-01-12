@@ -46,6 +46,7 @@ docs/source/_templates/
 .benchmarks/
 .credentials
 plans/*
+.agents/reports
 
 # User config is now in .sapiens/ (already ignored above)
 
