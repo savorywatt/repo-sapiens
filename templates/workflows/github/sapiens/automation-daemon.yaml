@@ -17,9 +17,9 @@
 name: Sapiens Daemon
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
-  workflow_dispatch:  # Manual trigger
+  # schedule:
+  #   - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:  # Manual trigger only
 
 permissions:
   contents: read
