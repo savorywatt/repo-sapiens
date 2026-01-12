@@ -47,8 +47,7 @@ cp templates/workflows/gitlab/sapiens/recipes/*.yaml .gitlab/workflows/sapiens/r
 **Agent Providers** (execute tasks, use tools):
 - `claude-local` - Claude Code CLI agent (local)
 - `claude-api` - Claude Code API agent
-- `goose-local` - Goose CLI agent (local)
-- `goose-api` - Goose API agent
+- `goose-local` - Goose CLI agent (supports multiple LLM backends)
 - `ollama` - Builtin ReAct agent with Ollama
 - `openai` - Builtin ReAct agent with OpenAI
 - `openai-compatible` - Builtin ReAct agent with compatible API
@@ -59,7 +58,7 @@ cp templates/workflows/gitlab/sapiens/recipes/*.yaml .gitlab/workflows/sapiens/r
 - OpenAI (GPT-4, etc.)
 - Groq, OpenRouter, vLLM, etc.
 
-Example: `goose-local` agent + `openai` LLM provider = Goose agent using OpenAI models
+Example: `goose-local` agent configured with OpenAI LLM = Goose CLI using OpenAI models
 
 ### Required Secrets
 
@@ -238,9 +237,23 @@ Labels can be added at any time and workflows will trigger automatically.
 - Removes `needs-fix` label when done
 - Adds `needs-approval` if controversial fixes need approval
 
+**How to approve controversial fixes:**
+When the agent identifies a controversial fix (significant change), it will:
+1. Reply to the review comment with the proposed action and reasoning
+2. Add `needs-approval` label to the PR
+3. Wait for your approval before implementing
+
+To approve a controversial fix:
+- React with 👍 (thumbs up) to the agent's reply comment, OR
+- Reply to the comment with "approved"
+
+Once approved, the agent will implement the fix on the next run.
+
 **Use on:** Pull requests **only** (does nothing on regular issues)
 
-**Next step:** Re-add `needs-review` or `requires-qa` to re-validate.
+**Next step:**
+- If fixes implemented: Re-add `needs-review` or `requires-qa` to re-validate
+- If waiting for approval: Approve controversial fixes, then re-run by removing and re-adding `needs-fix` label
 
 ---
 
