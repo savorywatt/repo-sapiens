@@ -331,10 +331,10 @@ class TestFindAvailableTemplates:
     """Tests for find_available_templates function."""
 
     def test_find_available_templates_gitea(self, tmp_path, sample_template_content):
-        """Should find templates in gitea subdirectory."""
-        gitea_dir = tmp_path / "gitea"
-        gitea_dir.mkdir()
-        (gitea_dir / "ci.yaml").write_text(sample_template_content)
+        """Should find templates in gitea/sapiens subdirectory."""
+        sapiens_dir = tmp_path / "gitea" / "sapiens"
+        sapiens_dir.mkdir(parents=True)
+        (sapiens_dir / "ci.yaml").write_text(sample_template_content)
 
         templates = find_available_templates(tmp_path, "gitea")
 
@@ -342,40 +342,38 @@ class TestFindAvailableTemplates:
         assert templates[0]["name"] == "sapiens-ci-workflow"
 
     def test_find_available_templates_github(self, tmp_path, sample_template_content):
-        """Should find templates in github subdirectory."""
-        github_dir = tmp_path / "github"
-        github_dir.mkdir()
-        (github_dir / "ci.yaml").write_text(sample_template_content)
+        """Should find templates in github/sapiens subdirectory."""
+        sapiens_dir = tmp_path / "github" / "sapiens"
+        sapiens_dir.mkdir(parents=True)
+        (sapiens_dir / "ci.yaml").write_text(sample_template_content)
 
         templates = find_available_templates(tmp_path, "github")
 
         assert len(templates) == 1
 
     def test_find_available_templates_examples_subdir(self, tmp_path, sample_template_content):
-        """Should find templates in examples subdirectory."""
-        gitea_dir = tmp_path / "gitea"
-        gitea_dir.mkdir()
-        examples_dir = gitea_dir / "examples"
-        examples_dir.mkdir()
-        (examples_dir / "advanced.yaml").write_text(sample_template_content)
+        """Should find templates in sapiens/recipes subdirectory."""
+        recipes_dir = tmp_path / "gitea" / "sapiens" / "recipes"
+        recipes_dir.mkdir(parents=True)
+        (recipes_dir / "advanced.yaml").write_text(sample_template_content)
 
         templates = find_available_templates(tmp_path, "gitea")
 
         assert len(templates) == 1
 
     def test_find_available_templates_both_root_and_examples(self, tmp_path, sample_template_content):
-        """Should find templates in both root and examples."""
-        gitea_dir = tmp_path / "gitea"
-        gitea_dir.mkdir()
-        (gitea_dir / "ci.yaml").write_text(sample_template_content)
+        """Should find templates in both sapiens root and recipes subdirectory."""
+        sapiens_dir = tmp_path / "gitea" / "sapiens"
+        sapiens_dir.mkdir(parents=True)
+        (sapiens_dir / "ci.yaml").write_text(sample_template_content)
 
-        examples_dir = gitea_dir / "examples"
-        examples_dir.mkdir()
+        recipes_dir = sapiens_dir / "recipes"
+        recipes_dir.mkdir()
         example_content = """# @repo-sapiens-template
 # @name: sapiens-example
 # @version: 1.0.0
 """
-        (examples_dir / "example.yaml").write_text(example_content)
+        (recipes_dir / "example.yaml").write_text(example_content)
 
         templates = find_available_templates(tmp_path, "gitea")
 
@@ -389,9 +387,9 @@ class TestFindAvailableTemplates:
 
     def test_find_available_templates_default_provider(self, tmp_path, sample_template_content):
         """Should default to Gitea when provider_type is None."""
-        gitea_dir = tmp_path / "gitea"
-        gitea_dir.mkdir()
-        (gitea_dir / "ci.yaml").write_text(sample_template_content)
+        sapiens_dir = tmp_path / "gitea" / "sapiens"
+        sapiens_dir.mkdir(parents=True)
+        (sapiens_dir / "ci.yaml").write_text(sample_template_content)
 
         templates = find_available_templates(tmp_path, None)
 
@@ -1113,8 +1111,8 @@ class TestTemplateUpdaterIntegration:
         installed_file = workflows_dir / "ci.yaml"
         installed_file.write_text(sample_template_content)
 
-        # Setup: Create mock templates directory
-        templates_dir = tmp_path / "templates" / "workflows" / "gitea"
+        # Setup: Create mock templates directory (in sapiens subdirectory)
+        templates_dir = tmp_path / "templates" / "workflows" / "gitea" / "sapiens"
         templates_dir.mkdir(parents=True)
         source_file = templates_dir / "ci.yaml"
         source_file.write_text(sample_template_v2_content)
