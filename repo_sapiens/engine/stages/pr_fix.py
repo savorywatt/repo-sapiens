@@ -60,7 +60,9 @@ class PRFixStage(WorkflowStage):
                     "🤖 Posted by Sapiens Automation",
                 )
                 # Remove both labels
-                updated_labels = [l for l in updated_labels if l not in ["needs-fix", "fixes-in-progress"]]
+                updated_labels = [
+                    label for label in updated_labels if label not in ["needs-fix", "fixes-in-progress"]
+                ]
                 await self.git.update_issue(issue.number, labels=updated_labels)
                 return
 
@@ -101,7 +103,7 @@ class PRFixStage(WorkflowStage):
                 f"🤖 Posted by Sapiens Automation",
             )
             # Remove in-progress label on failure
-            updated_labels = [l for l in issue.labels if l != "fixes-in-progress"]
+            updated_labels = [label for label in issue.labels if label != "fixes-in-progress"]
             await self.git.update_issue(issue.number, labels=updated_labels)
             raise
 
@@ -352,7 +354,7 @@ Implement the fix now.
             analysis: ReviewAnalysisResult
         """
         issue = await self.git.get_issue(pr_number)
-        updated_labels = [l for l in issue.labels if l not in ["needs-fix", "fixes-in-progress"]]
+        updated_labels = [label for label in issue.labels if label not in ["needs-fix", "fixes-in-progress"]]
 
         # Add needs-approval if there are controversial fixes
         if analysis.has_controversial_fixes():

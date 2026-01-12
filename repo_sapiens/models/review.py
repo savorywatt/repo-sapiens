@@ -1,7 +1,6 @@
 """Review and comment analysis models."""
 
 from enum import Enum
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
