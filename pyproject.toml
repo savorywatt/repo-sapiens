@@ -97,7 +97,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "SIM"]
-ignore = ["B904", "SIM108"]  # Exception chaining and ternary operators - can be added later
+ignore = ["B904", "SIM108", "SIM300"]  # Exception chaining, ternary operators, and Yoda conditions - can be added later
 
 [tool.ruff.lint.per-file-ignores]
 "claude/**/*" = ["ALL"]  # Archived conversation data - skip all checks

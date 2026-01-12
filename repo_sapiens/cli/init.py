@@ -1652,14 +1652,32 @@ tags:
             issues_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
         click.echo(f"   {issues_url}")
         click.echo()
-        click.echo("2. Run the automation daemon:")
-        click.echo(f"   sapiens --config {self.config_path} daemon --interval 60")
-        click.echo()
-        click.echo("3. Watch the automation work!")
+
+        # Mode-specific instructions
+        if self.automation_mode == "native":
+            click.echo("2. Workflows will trigger automatically when you add labels!")
+            click.echo()
+            click.echo("   • Label triggers are active immediately")
+            click.echo("   • No daemon process needed")
+            click.echo(f"   • Check workflows: {issues_url.rsplit('/', 1)[0]}/actions")
+        elif self.automation_mode == "daemon":
+            click.echo("2. Run the automation daemon:")
+            click.echo(f"   sapiens --config {self.config_path} daemon --interval 60")
+            click.echo()
+            click.echo("3. Watch the automation work!")
+        else:  # hybrid
+            click.echo("2. Automation runs in hybrid mode:")
+            click.echo("   • Label triggers work instantly via workflows")
+            click.echo(f"   • Check workflows: {issues_url.rsplit('/', 1)[0]}/actions")
+            click.echo()
+            click.echo("   • Optional: Run daemon for additional automation:")
+            click.echo(f"     sapiens --config {self.config_path} daemon --interval 60")
+
         click.echo()
 
         # Print manual secret setup if needed (not for GitLab - uses CI/CD variables)
-        if self.setup_secrets and self.provider_type != "gitlab":
+        # Only needed for native/hybrid modes that use workflows
+        if self.setup_secrets and self.provider_type != "gitlab" and self.automation_mode in ("native", "hybrid"):
             click.echo(
                 click.style(
                     f"⚠ Important: Set {provider_name} Actions Secrets Manually",
@@ -1667,6 +1685,8 @@ tags:
                     fg="yellow",
                 )
             )
+            click.echo("   (Required for workflow automation)")
+
             click.echo()
             secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/settings/secrets"
             click.echo(f"Navigate to: {secrets_url}")
@@ -1684,8 +1704,10 @@ tags:
             click.echo()
 
         # GitLab uses CI/CD variables instead of Actions secrets
-        if self.setup_secrets and self.provider_type == "gitlab":
+        # Only needed for native/hybrid modes that use workflows
+        if self.setup_secrets and self.provider_type == "gitlab" and self.automation_mode in ("native", "hybrid"):
             click.echo(click.style("⚠ Important: Set GitLab CI/CD Variables Manually", bold=True, fg="yellow"))
+            click.echo("   (Required for workflow automation)")
             click.echo()
             variables_url = (
                 f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/-/settings/ci_cd"
