@@ -14,28 +14,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-          cache: 'pip'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Set up Python
+        run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
+        run: uv sync --all-extras
 
       - name: Run linters
         run: |
-          black --check repo_sapiens/ tests/ || true
-          ruff check repo_sapiens/ tests/ || true
+          uv run ruff check repo_sapiens/ tests/ || true
 
       - name: Run type checker
         run: |
-          mypy repo_sapiens/ || true
+          uv run mypy repo_sapiens/ || true
 
       - name: Run tests
         run: |
-          pytest tests/ -v --cov=repo_sapiens --cov-report=xml --cov-report=html || true
+          uv run pytest tests/ -v --cov=repo_sapiens --cov-report=xml --cov-report=html || true
 
       - name: Upload coverage report
         if: always()
