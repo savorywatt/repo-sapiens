@@ -1421,18 +1421,21 @@ tags:
 
   label_triggers:
     "sapiens/triage":
+      label_pattern: "sapiens/triage"
       handler: triage
       ai_enabled: true
       remove_on_complete: true
       success_label: triaged
 
     "needs-planning":
+      label_pattern: "needs-planning"
       handler: proposal
       ai_enabled: true
       remove_on_complete: false
       success_label: plan-ready
 
     "execute":
+      label_pattern: "execute"
       handler: task_execution
       ai_enabled: true
       remove_on_complete: true

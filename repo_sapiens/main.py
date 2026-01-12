@@ -53,8 +53,15 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
                 settings = AutomationSettings.from_yaml(str(config_path))
                 ctx.obj = {"settings": settings}
                 return
-            except Exception:
-                pass  # Fall through to use defaults
+            except Exception as e:
+                click.echo(
+                    click.style(f"⚠ Warning: Config validation failed, using defaults: {e}", fg="yellow"), err=True
+                )
+                click.echo(click.style(f"  Fix config at: {config_path}", fg="yellow"), err=True)
+                click.echo()
+        else:
+            click.echo(click.style(f"⚠ Warning: Config not found at {config_path}, using defaults", fg="yellow"), err=True)
+            click.echo()
         ctx.obj = {"settings": None}
         return
 
