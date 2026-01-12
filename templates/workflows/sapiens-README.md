@@ -219,9 +219,10 @@ Configure these secrets in your repository settings:
 
 | Secret | Description |
 |--------|-------------|
-| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo/issue access (required) |
+| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo/issue access (required for Gitea) |
+| `SAPIENS_GITHUB_TOKEN` | GitHub token (required for GitHub) |
+| `SAPIENS_GITLAB_TOKEN` | GitLab personal access token with `api` scope (required for GitLab) |
 | `SAPIENS_CLAUDE_API_KEY` | AI provider API key (only required if using API-based agents) |
-| `SAPIENS_GITHUB_TOKEN` | GitHub token (if using GitHub) |
 
 **Note:** `SAPIENS_CLAUDE_API_KEY` is only needed if your `.sapiens/config.yaml` uses an API-based agent provider like `claude-api`, `goose-api`, `openai`, `anthropic`, etc. If using local agents like `claude-local`, `ollama`, or `goose-local`, this secret is optional.
 
@@ -259,8 +260,9 @@ on:
 
 ### Add Custom Labels
 
-Create new workflow files following the pattern:
+Create new workflow files following the pattern for your platform:
 
+**Gitea/GitHub:**
 ```yaml
 name: My Custom Workflow
 on:
@@ -268,8 +270,21 @@ on:
     types: [labeled]
 jobs:
   process:
-    if: gitea.event.label.name == 'my-custom-label'
+    if: gitea.event.label.name == 'my-custom-label'  # or github.event.label.name
     # ... your steps
+```
+
+**GitLab:**
+```yaml
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "issue_label"
+
+my-custom-job:
+  script:
+    - # ... your steps
+  rules:
+    - if: $CI_ISSUE_LABEL == "my-custom-label"
 ```
 
 ## Troubleshooting
@@ -283,8 +298,10 @@ jobs:
 
 ### Permission Errors
 
-- Verify `SAPIENS_GITEA_TOKEN` has correct permissions
-- Token needs: `repo`, `read:org`, `write:issue`
+- Verify your platform token has correct permissions:
+  - **Gitea**: `SAPIENS_GITEA_TOKEN` needs `repo`, `read:org`, `write:issue`
+  - **GitHub**: `SAPIENS_GITHUB_TOKEN` or `GITHUB_TOKEN` needs `repo`, `read:org`, `write:issue`
+  - **GitLab**: `SAPIENS_GITLAB_TOKEN` needs `api` scope for full functionality
 
 ### AI Agent Errors
 

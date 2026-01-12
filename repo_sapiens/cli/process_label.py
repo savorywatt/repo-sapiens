@@ -12,6 +12,7 @@ from repo_sapiens.engine.event_classifier import EventClassifier, EventSource
 from repo_sapiens.engine.label_router import LabelRouter
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
+from repo_sapiens.enums import AgentType, ProviderType
 from repo_sapiens.providers.base import AgentProvider
 from repo_sapiens.providers.external_agent import ExternalAgentProvider
 from repo_sapiens.providers.factory import create_git_provider
@@ -212,8 +213,9 @@ def _create_agent_provider(settings: AutomationSettings) -> AgentProvider:
 
     # Create a QA handler (non-interactive in CI)
     qa_handler = InteractiveQAHandler(None, poll_interval=30)
+    provider_type = settings.agent_provider.provider_type
 
-    if settings.agent_provider.provider_type == "ollama":
+    if provider_type == ProviderType.OLLAMA:
         from repo_sapiens.providers.ollama import OllamaProvider
 
         return OllamaProvider(
@@ -224,17 +226,15 @@ def _create_agent_provider(settings: AutomationSettings) -> AgentProvider:
         )
 
     # External agent (Claude, Goose, or Copilot)
-    if "claude" in settings.agent_provider.provider_type:
-        agent_type = "claude"
-    elif "goose" in settings.agent_provider.provider_type:
-        agent_type = "goose"
-    elif "copilot" in settings.agent_provider.provider_type:
-        agent_type = "copilot"
-    else:
-        raise ValueError(f"Unsupported provider type: {settings.agent_provider.provider_type}")
+    if not provider_type.is_external_cli:
+        raise ValueError(f"Unsupported provider type: {provider_type}")
+
+    agent_type = provider_type.to_agent_type()
+    if agent_type is None:
+        raise ValueError(f"Cannot determine agent type for provider: {provider_type}")
 
     goose_config = None
-    if agent_type == "goose" and settings.agent_provider.goose_config:
+    if agent_type == AgentType.GOOSE and settings.agent_provider.goose_config:
         goose_config = {
             "toolkit": settings.agent_provider.goose_config.toolkit,
             "temperature": settings.agent_provider.goose_config.temperature,

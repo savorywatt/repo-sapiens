@@ -1,13 +1,19 @@
 """External agent provider that runs Claude Code or Goose as CLI tools."""
 
+from __future__ import annotations
+
 import asyncio
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from repo_sapiens.enums import AgentType
 from repo_sapiens.models.domain import Issue, Plan, Review, Task, TaskResult
 from repo_sapiens.providers.base import AgentProvider
+
+if TYPE_CHECKING:
+    pass
 
 log = structlog.get_logger(__name__)
 
@@ -17,7 +23,7 @@ class ExternalAgentProvider(AgentProvider):
 
     def __init__(
         self,
-        agent_type: str = "claude",
+        agent_type: AgentType | str = AgentType.CLAUDE,
         model: str = "claude-sonnet-4.5",
         working_dir: str | None = None,
         qa_handler: Any | None = None,
@@ -27,14 +33,18 @@ class ExternalAgentProvider(AgentProvider):
         """Initialize external agent provider.
 
         Args:
-            agent_type: Type of agent CLI ("claude", "goose", or "copilot")
+            agent_type: Type of agent CLI (AgentType enum or string)
             model: Model to use
             working_dir: Working directory for agent execution
             qa_handler: Interactive Q&A handler for agent questions
             goose_config: Goose-specific configuration (toolkit, temperature, etc.)
             system_prompt: Custom system prompt to prepend to all prompts
         """
-        self.agent_type = agent_type
+        # Convert string to enum if needed (for backward compatibility)
+        if isinstance(agent_type, str):
+            self.agent_type = AgentType(agent_type)
+        else:
+            self.agent_type = agent_type
         self.model = model
         self.working_dir = working_dir or os.getcwd()
         self.qa_handler = qa_handler
@@ -44,13 +54,13 @@ class ExternalAgentProvider(AgentProvider):
 
     async def connect(self) -> None:
         """Check if the agent CLI is available."""
-        if self.agent_type == "claude":
+        if self.agent_type == AgentType.CLAUDE:
             cmd = "claude"
             args = ["--version"]
-        elif self.agent_type == "goose":
+        elif self.agent_type == AgentType.GOOSE:
             cmd = "goose"
             args = ["--version"]
-        elif self.agent_type == "copilot":
+        elif self.agent_type == AgentType.COPILOT:
             cmd = "gh"
             args = ["copilot", "--version"]
         else:
@@ -66,12 +76,12 @@ class ExternalAgentProvider(AgentProvider):
             await result.communicate()
 
             if result.returncode == 0:
-                log.info("agent_cli_available", agent=self.agent_type)
+                log.info("agent_cli_available", agent=str(self.agent_type))
             else:
-                log.warning("agent_cli_check_failed", agent=self.agent_type, code=result.returncode)
+                log.warning("agent_cli_check_failed", agent=str(self.agent_type), code=result.returncode)
         except FileNotFoundError as e:
-            log.error("agent_cli_not_found", agent=self.agent_type)
-            if self.agent_type == "copilot":
+            log.error("agent_cli_not_found", agent=str(self.agent_type))
+            if self.agent_type == AgentType.COPILOT:
                 raise RuntimeError("GitHub CLI (gh) not found in PATH. Install from: https://cli.github.com/") from e
             raise RuntimeError(f"{cmd} CLI not found in PATH") from e
 
@@ -95,14 +105,14 @@ class ExternalAgentProvider(AgentProvider):
                 - files_changed: List[str]
                 - error: Optional[str]
         """
-        log.info("executing_prompt", agent=self.agent_type, task_id=task_id)
+        log.info("executing_prompt", agent=str(self.agent_type), task_id=task_id)
 
         try:
-            if self.agent_type == "claude":
+            if self.agent_type == AgentType.CLAUDE:
                 result = await self._execute_claude(prompt, context, task_id)
-            elif self.agent_type == "goose":
+            elif self.agent_type == AgentType.GOOSE:
                 result = await self._execute_goose(prompt, context, task_id)
-            elif self.agent_type == "copilot":
+            elif self.agent_type == AgentType.COPILOT:
                 result = await self._execute_copilot(prompt, context, task_id)
             else:
                 raise ValueError(f"Unknown agent type: {self.agent_type}")

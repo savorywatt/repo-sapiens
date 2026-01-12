@@ -8,6 +8,7 @@ import click
 import structlog
 
 from repo_sapiens.config.settings import AutomationSettings
+from repo_sapiens.enums import ProviderType
 from repo_sapiens.exceptions import ConfigurationError
 
 log = structlog.get_logger(__name__)
@@ -239,9 +240,9 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
         # -------------------------------------------------------------------------
         # Check 5: Agent provider availability (optional)
         # -------------------------------------------------------------------------
-        agent_type = settings.agent_provider.provider_type
+        provider_type = settings.agent_provider.provider_type
 
-        if agent_type == "ollama":
+        if provider_type == ProviderType.OLLAMA:
             # Check Ollama connectivity
             async def check_ollama() -> tuple[bool, str | None, list[str]]:
                 """Test Ollama server connectivity."""
@@ -293,11 +294,11 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 _print_check("Ollama server", False, error)
                 all_passed = False
 
-        elif agent_type in ("claude-local", "goose-local"):
+        elif provider_type in (ProviderType.CLAUDE_LOCAL, ProviderType.GOOSE_LOCAL):
             # Check if CLI is available
             import shutil
 
-            cli_name = "claude" if "claude" in agent_type else "goose"
+            cli_name = "claude" if provider_type == ProviderType.CLAUDE_LOCAL else "goose"
             cli_path = shutil.which(cli_name)
 
             if cli_path:
@@ -314,7 +315,7 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 )
                 all_passed = False
 
-        elif agent_type == "copilot-local":
+        elif provider_type == ProviderType.COPILOT_LOCAL:
             # Check if GitHub CLI is available
             import shutil
             import subprocess
@@ -400,11 +401,11 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 )
                 all_passed = False
 
-        elif agent_type in ("claude-api", "goose-api", "openai"):
+        elif provider_type in (ProviderType.CLAUDE_API, ProviderType.GOOSE_API, ProviderType.OPENAI):
             # For API-based providers, we already checked the API key
             # A full connectivity test would require making an API call
             _print_check(
-                f"{agent_type} provider",
+                f"{provider_type} provider",
                 True,
                 "API key configured" if verbose else None,
             )

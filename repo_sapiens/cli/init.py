@@ -8,6 +8,7 @@ import click
 import structlog
 
 from repo_sapiens.credentials import CredentialResolver, EnvironmentBackend, KeyringBackend
+from repo_sapiens.enums import AgentType
 from repo_sapiens.git.discovery import GitDiscovery
 from repo_sapiens.git.exceptions import GitDiscoveryError
 
@@ -139,7 +140,7 @@ class RepoInitializer:
         self.repo_info = None
         self.provider_type = None  # 'github', 'gitea', or 'gitlab' (detected)
         self.gitea_token = None
-        self.agent_type = None  # 'claude', 'goose', or 'builtin'
+        self.agent_type: AgentType | None = None
         self.agent_mode: Literal["local", "api"] = "local"
         self.agent_api_key = None
 
@@ -268,21 +269,24 @@ class RepoInitializer:
         provider_type = agent.get("provider_type", "")
 
         if provider_type.startswith("claude"):
-            self.agent_type = "claude"
+            self.agent_type = AgentType.CLAUDE
             self.agent_mode = "api" if provider_type == "claude-api" else "local"
-        elif provider_type.startswith("goose"):
-            self.agent_type = "goose"
-            self.agent_mode = "api" if provider_type == "goose-api" else "local"
+        elif provider_type == "goose-local":
+            self.agent_type = AgentType.GOOSE
+            self.agent_mode = "local"  # Goose is CLI-only
             goose_config = agent.get("goose_config", {})
             self.goose_llm_provider = goose_config.get("llm_provider")
             self.goose_model = agent.get("model")
+        elif provider_type.startswith("copilot"):
+            self.agent_type = AgentType.COPILOT
+            self.agent_mode = "local"
         elif provider_type in ("ollama", "openai-compatible"):
-            self.agent_type = "builtin"
+            self.agent_type = AgentType.BUILTIN
             self.builtin_provider = "ollama" if provider_type == "ollama" else "vllm"
             self.builtin_model = agent.get("model")
             self.builtin_base_url = agent.get("base_url")
         else:
-            self.agent_type = "builtin"
+            self.agent_type = AgentType.BUILTIN
             self.builtin_provider = provider_type
             self.builtin_model = agent.get("model")
 
@@ -789,11 +793,12 @@ class RepoInitializer:
 
             agent_choices.append("builtin")  # Builtin ReAct agent (Ollama, vLLM, or API)
 
-            self.agent_type = click.prompt(
+            selected = click.prompt(
                 "Which agent do you want to use?",
                 type=click.Choice(agent_choices),
                 default=agent_choices[0] if agent_choices else "builtin",
             )
+            self.agent_type = AgentType(selected)
         else:
             click.echo(click.style("⚠ No AI agent CLIs detected", fg="yellow"))
             click.echo()
@@ -804,17 +809,17 @@ class RepoInitializer:
             click.echo("  4. Install GitHub Copilot CLI: gh extension install github/gh-copilot")
             click.echo()
 
-            self.agent_type = "builtin"
+            self.agent_type = AgentType.BUILTIN
             click.echo("Using builtin ReAct agent...")
 
         # Configure based on agent type
-        if self.agent_type == "claude":
+        if self.agent_type == AgentType.CLAUDE:
             self._configure_claude()
-        elif self.agent_type == "goose":
+        elif self.agent_type == AgentType.GOOSE:
             self._configure_goose()
-        elif self.agent_type == "copilot":
+        elif self.agent_type == AgentType.COPILOT:
             self._configure_copilot()
-        elif self.agent_type == "builtin":
+        elif self.agent_type == AgentType.BUILTIN:
             self._configure_builtin()
 
     def _configure_claude(self) -> None:
@@ -1390,15 +1395,15 @@ class RepoInitializer:
 
         # Store agent API key if provided
         if self.agent_api_key:
-            if self.agent_type == "goose" and self.goose_llm_provider:
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                 # Store under provider-specific key
                 backend.set(self.goose_llm_provider, "api_key", self.agent_api_key)
                 click.echo(f"   ✓ Stored: {self.goose_llm_provider}/api_key")
-            elif self.agent_type == "builtin" and self.builtin_provider:
+            elif self.agent_type == AgentType.BUILTIN and self.builtin_provider:
                 # Store under provider-specific key
                 backend.set(self.builtin_provider, "api_key", self.agent_api_key)
                 click.echo(f"   ✓ Stored: {self.builtin_provider}/api_key")
-            elif self.agent_type == "claude":
+            elif self.agent_type == AgentType.CLAUDE:
                 backend.set("claude", "api_key", self.agent_api_key)
                 click.echo("   ✓ Stored: claude/api_key")
 
@@ -1416,17 +1421,17 @@ class RepoInitializer:
 
         # Store agent API key if provided
         if self.agent_api_key:
-            if self.agent_type == "goose" and self.goose_llm_provider:
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                 # Store under provider-specific environment variable
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
                 backend.set(env_var, self.agent_api_key)
                 click.echo(f"   ✓ Set: {env_var}")
-            elif self.agent_type == "builtin" and self.builtin_provider:
+            elif self.agent_type == AgentType.BUILTIN and self.builtin_provider:
                 # Store under provider-specific environment variable
                 env_var = f"{self.builtin_provider.upper()}_API_KEY"
                 backend.set(env_var, self.agent_api_key)
                 click.echo(f"   ✓ Set: {env_var}")
-            elif self.agent_type == "claude":
+            elif self.agent_type == AgentType.CLAUDE:
                 backend.set("CLAUDE_API_KEY", self.agent_api_key)
                 click.echo("   ✓ Set: CLAUDE_API_KEY")
 
@@ -1480,13 +1485,13 @@ class RepoInitializer:
 
         # Set agent API key secret if using API mode
         if self.agent_mode == "api" and self.agent_api_key:
-            if self.agent_type == "goose" and self.goose_llm_provider:
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                 # Set provider-specific API key for Goose
                 secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
                 click.echo(f"   ⏳ Setting {secret_name} secret...")
                 asyncio.run(github.set_repository_secret(secret_name, self.agent_api_key))
                 click.echo(f"   ✓ Set repository secret: {secret_name}")
-            elif self.agent_type == "claude":
+            elif self.agent_type == AgentType.CLAUDE:
                 click.echo("   ⏳ Setting CLAUDE_API_KEY secret...")
                 asyncio.run(github.set_repository_secret("CLAUDE_API_KEY", self.agent_api_key))
                 click.echo("   ✓ Set repository secret: CLAUDE_API_KEY")
@@ -1506,13 +1511,13 @@ class RepoInitializer:
 
         # Set agent API key secret if using API mode
         if self.agent_mode == "api" and self.agent_api_key:
-            if self.agent_type == "goose" and self.goose_llm_provider:
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                 # Set provider-specific API key for Goose
                 secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
                 click.echo(f"   ⏳ Setting {secret_name} secret...")
                 self._set_gitea_secret_via_mcp(secret_name, self.agent_api_key)
                 click.echo(f"   ✓ Set repository secret: {secret_name}")
-            elif self.agent_type == "claude":
+            elif self.agent_type == AgentType.CLAUDE:
                 click.echo("   ⏳ Setting CLAUDE_API_KEY secret...")
                 self._set_gitea_secret_via_mcp("CLAUDE_API_KEY", self.agent_api_key)
                 click.echo("   ✓ Set repository secret: CLAUDE_API_KEY")
@@ -1549,11 +1554,11 @@ class RepoInitializer:
                 git_token_ref = "@keyring:gitea/api_token"  # nosec B105
 
             # Determine agent API key reference
-            if self.agent_type == "goose" and self.goose_llm_provider:
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                 agent_api_key_ref = f"@keyring:{self.goose_llm_provider}/api_key" if self.agent_api_key else "null"
-            elif self.agent_type == "builtin" and self.builtin_provider:
+            elif self.agent_type == AgentType.BUILTIN and self.builtin_provider:
                 agent_api_key_ref = f"@keyring:{self.builtin_provider}/api_key" if self.agent_api_key else "null"
-            elif self.agent_type == "claude":
+            elif self.agent_type == AgentType.CLAUDE:
                 agent_api_key_ref = "@keyring:claude/api_key" if self.agent_api_key else "null"
             else:
                 agent_api_key_ref = "null"
@@ -1566,19 +1571,19 @@ class RepoInitializer:
             # fmt: on
 
             # Determine agent API key reference
-            if self.agent_type == "goose" and self.goose_llm_provider:
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                 env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
                 agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
-            elif self.agent_type == "builtin" and self.builtin_provider:
+            elif self.agent_type == AgentType.BUILTIN and self.builtin_provider:
                 env_var = f"{self.builtin_provider.upper()}_API_KEY"
                 agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
-            elif self.agent_type == "claude":
+            elif self.agent_type == AgentType.CLAUDE:
                 agent_api_key_ref = "${CLAUDE_API_KEY}" if self.agent_api_key else "null"
             else:
                 agent_api_key_ref = "null"
 
         # Generate agent provider configuration
-        if self.agent_type == "goose":
+        if self.agent_type == AgentType.GOOSE:
             provider_type = f"goose-{self.agent_mode}"
             model = self.goose_model or "gpt-4o"
 
@@ -1597,7 +1602,7 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: {str(self.agent_mode == "local").lower()}
 {goose_config_section}"""
-        elif self.agent_type == "builtin":
+        elif self.agent_type == AgentType.BUILTIN:
             # Builtin ReAct agent with selected provider
             model = self.builtin_model or "qwen3:8b"
 
@@ -1627,7 +1632,7 @@ class RepoInitializer:
   model: {model}
   api_key: {agent_api_key_ref}
   local_mode: false"""
-        elif self.agent_type == "copilot":
+        elif self.agent_type == AgentType.COPILOT:
             # Copilot configuration
             provider_type = "copilot-local"
             model = "gpt-4"  # Default model for Copilot
@@ -2178,11 +2183,11 @@ tags:
             if self.provider_type == "gitea":
                 click.echo("  - SAPIENS_GITEA_TOKEN (your Gitea API token)")
             if self.agent_mode == "api":
-                if self.agent_type == "goose" and self.goose_llm_provider:
+                if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                     secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
                     provider_title = self.goose_llm_provider.title()
                     click.echo(f"  - {secret_name} (your {provider_title} API key for Goose)")
-                elif self.agent_type == "claude":
+                elif self.agent_type == AgentType.CLAUDE:
                     click.echo("  - CLAUDE_API_KEY (your Claude API key)")
             click.echo()
 
@@ -2200,11 +2205,11 @@ tags:
             click.echo()
             click.echo("  - GITLAB_TOKEN (your GitLab Personal Access Token)")
             if self.agent_mode == "api":
-                if self.agent_type == "goose" and self.goose_llm_provider:
+                if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
                     secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
                     provider_title = self.goose_llm_provider.title()
                     click.echo(f"  - {secret_name} (your {provider_title} API key for Goose)")
-                elif self.agent_type == "claude":
+                elif self.agent_type == AgentType.CLAUDE:
                     click.echo("  - CLAUDE_API_KEY (your Claude API key)")
             click.echo()
 
@@ -2232,11 +2237,11 @@ tags:
         # Only include --config if non-default path
         config_flag = "" if str(self.config_path) == ".sapiens/config.yaml" else f"--config {self.config_path} "
 
-        if self.agent_type == "claude":
+        if self.agent_type == AgentType.CLAUDE:
             test_cmd = f'claude -p "{test_prompt}"'
-        elif self.agent_type == "goose":
+        elif self.agent_type == AgentType.GOOSE:
             test_cmd = f'goose session start --prompt "{test_prompt}"'
-        elif self.agent_type == "builtin":
+        elif self.agent_type == AgentType.BUILTIN:
             # task command reads model from config, so no --model needed
             test_cmd = f'sapiens {config_flag}task "{test_prompt}"'.replace("  ", " ")
         else:
@@ -2276,11 +2281,11 @@ tags:
 
         # Suggest REPL for further exploration
         click.echo()
-        if self.agent_type == "builtin":
+        if self.agent_type == AgentType.BUILTIN:
             repl_cmd = f"sapiens {config_flag}task --repl".replace("  ", " ")
-        elif self.agent_type == "claude":
+        elif self.agent_type == AgentType.CLAUDE:
             repl_cmd = "claude"
-        elif self.agent_type == "goose":
+        elif self.agent_type == AgentType.GOOSE:
             repl_cmd = "goose session start"
         else:
             repl_cmd = None

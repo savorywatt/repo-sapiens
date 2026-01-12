@@ -28,6 +28,18 @@ mkdir -p .github/workflows/sapiens/recipes
 cp templates/workflows/github/sapiens/recipes/*.yaml .github/workflows/sapiens/recipes/
 ```
 
+### For GitLab
+
+```bash
+# Copy core workflows to your repo
+mkdir -p .gitlab/workflows/sapiens
+cp templates/workflows/gitlab/sapiens/*.yaml .gitlab/workflows/sapiens/
+
+# Optionally copy recipe workflows
+mkdir -p .gitlab/workflows/sapiens/recipes
+cp templates/workflows/gitlab/sapiens/recipes/*.yaml .gitlab/workflows/sapiens/recipes/
+```
+
 ## Configuration
 
 ### Understanding Agents vs LLM Providers
@@ -57,6 +69,7 @@ Go to your repository settings and add these secrets:
 |--------|----------|-------------|
 | `SAPIENS_GITEA_TOKEN` | Gitea only | Your Gitea API token (note: GITEA_ prefix is reserved) |
 | `GITHUB_TOKEN` | GitHub only | GitHub API token |
+| `SAPIENS_GITLAB_TOKEN` | GitLab only | Your GitLab personal access token |
 | `SAPIENS_CLAUDE_API_KEY` | If using API agents | API key for claude-api, openai, anthropic, etc. |
 | `OPENAI_API_KEY` | If using OpenAI models | OpenAI API key (for Goose or builtin agent) |
 | `CLAUDE_API_KEY` | If using Claude API | Anthropic API key (for claude-api agent) |
@@ -342,6 +355,7 @@ on:
 
 Create additional workflow files for other labels:
 
+**Gitea:**
 ```yaml
 # custom-workflow.yaml
 on:
@@ -352,6 +366,34 @@ jobs:
   process:
     if: gitea.event.label.name == 'my-custom-label'
     # ... rest of workflow
+```
+
+**GitHub:**
+```yaml
+# custom-workflow.yaml
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  process:
+    if: github.event.label.name == 'my-custom-label'
+    # ... rest of workflow
+```
+
+**GitLab:**
+```yaml
+# .gitlab-ci.yml
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "issue_label"
+      when: always
+
+process:
+  script:
+    - # ... your steps
+  rules:
+    - if: $CI_ISSUE_LABEL == "my-custom-label"
 ```
 
 ## Recipe Workflows
@@ -377,9 +419,10 @@ These are optional and can be customized for your project.
 
 ### Permission denied
 
-- Verify `SAPIENS_GITEA_TOKEN` or `GITHUB_TOKEN` has correct permissions
-- Token needs: `repo`, `read:org`, `write:issue`
+- Verify `SAPIENS_GITEA_TOKEN`, `GITHUB_TOKEN`, or `SAPIENS_GITLAB_TOKEN` has correct permissions
+- Token needs: `repo`, `read:org`, `write:issue` (or GitLab equivalent: `api`, `read_repository`, `write_repository`)
 - For GitHub, you may need a PAT instead of `GITHUB_TOKEN`
+- For GitLab, ensure the token has `api` scope for full functionality
 
 ### AI Agent Errors
 

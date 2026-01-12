@@ -16,6 +16,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repo_sapiens.config.credential_fields import CredentialSecret
 from repo_sapiens.config.triggers import AutomationConfig
+from repo_sapiens.enums import ProviderType
 from repo_sapiens.exceptions import ConfigurationError
 
 
@@ -63,19 +64,7 @@ class AgentProviderConfig(BaseModel):
     - api_key: "@keyring:openai/api_key" (for Goose with OpenAI)
     """
 
-    provider_type: Literal[
-        "claude-local",
-        "claude-api",
-        "goose-local",
-        "goose-api",
-        "copilot-local",
-        "openai",
-        "openai-compatible",
-        "anthropic",
-        "groq",
-        "openrouter",
-        "ollama",
-    ] = Field(default="claude-local", description="Type of agent provider")
+    provider_type: ProviderType = Field(default=ProviderType.CLAUDE_LOCAL, description="Type of agent provider")
     model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
     api_key: CredentialSecret | None = Field(
         default=None,
