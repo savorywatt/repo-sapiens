@@ -189,6 +189,7 @@ def show_plan(ctx: click.Context, plan_id: str) -> None:
 @click.option("--working-dir", default=".", help="Working directory for file operations")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed trajectory")
 @click.option("--repl", is_flag=True, help="Start interactive REPL mode")
+@click.option("--system-prompt", type=click.Path(exists=True, dir_okay=False), help="Path to custom system prompt file")
 @click.pass_context
 def task_command(
     ctx: click.Context,
@@ -199,6 +200,7 @@ def task_command(
     working_dir: str,
     verbose: bool,
     repl: bool,
+    system_prompt: str | None,
 ) -> None:
     """Run a task using the ReAct agent with Ollama/vLLM.
 
@@ -210,6 +212,7 @@ def task_command(
     Examples:
         sapiens task "Create a hello.py file that prints Hello World"
         sapiens task --repl  # Start interactive mode
+        sapiens task --system-prompt prompts/code-reviewer.txt "Review the code"
     """
     from repo_sapiens.agents.react import ReActAgentProvider, ReActConfig
     from repo_sapiens.models.domain import Task as DomainTask
@@ -233,6 +236,17 @@ def task_command(
             ollama_url = settings.agent_provider.base_url
         else:
             ollama_url = "http://localhost:11434"
+
+    # Load custom system prompt if provided
+    custom_system_prompt = None
+    if system_prompt:
+        try:
+            with open(system_prompt) as f:
+                custom_system_prompt = f.read()
+            click.echo(f"Loaded custom system prompt from: {system_prompt}")
+        except Exception as e:
+            click.echo(f"Warning: Failed to read system prompt file: {e}", err=True)
+            click.echo("Using default system prompt", err=True)
 
     async def execute_single_task(agent: ReActAgentProvider, task_text: str) -> bool:
         """Execute a single task and display results. Returns success status."""
@@ -365,7 +379,7 @@ def task_command(
 
     async def run() -> None:
         config = ReActConfig(model=model, max_iterations=max_iterations, ollama_url=ollama_url)
-        agent = ReActAgentProvider(working_dir=working_dir, config=config)
+        agent = ReActAgentProvider(working_dir=working_dir, config=config, system_prompt=custom_system_prompt)
 
         click.echo(f"Starting ReAct agent with model: {model}")
         click.echo(f"Ollama server: {ollama_url}")

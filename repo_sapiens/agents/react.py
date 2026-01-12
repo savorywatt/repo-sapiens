@@ -93,6 +93,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
         working_dir: str | Path | None = None,
         config: ReActConfig | None = None,
         allowed_commands: list[str] | None = None,
+        system_prompt: str | None = None,
     ):
         """Initialize the ReAct agent.
 
@@ -100,6 +101,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             working_dir: Base directory for file operations
             config: Agent configuration
             allowed_commands: Optional whitelist for shell commands
+            system_prompt: Custom system prompt (uses default if None)
         """
         self.config = config or ReActConfig()
         self.working_dir = Path(working_dir or os.getcwd()).resolve()
@@ -109,6 +111,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
         )
         self.client = httpx.AsyncClient(timeout=self.config.timeout)
         self._trajectory: list[TrajectoryStep] = []
+        self.system_prompt = system_prompt or self.SYSTEM_PROMPT
 
     async def __aenter__(self) -> ReActAgentProvider:
         """Async context manager entry."""
@@ -250,7 +253,13 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             Raw LLM response
         """
         # Build the full prompt
-        system = self.SYSTEM_PROMPT.format(tool_descriptions=self.tools.get_tool_descriptions())
+        # If custom system prompt contains {tool_descriptions}, replace it
+        # Otherwise, use it as-is
+        try:
+            system = self.system_prompt.format(tool_descriptions=self.tools.get_tool_descriptions())
+        except KeyError:
+            # System prompt doesn't use {tool_descriptions} placeholder
+            system = self.system_prompt
 
         messages = [
             {"role": "system", "content": system},
