@@ -36,7 +36,7 @@ jobs:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "✅ Processing approved plan for issue #${{ github.event.issue.number }}"
-          sapiens process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/approved.md
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/approved.md
 
       - name: Post success comment
         if: success()

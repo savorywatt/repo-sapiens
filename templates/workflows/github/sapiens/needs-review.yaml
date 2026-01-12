@@ -37,7 +37,7 @@ jobs:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "🔍 Running code review for issue/PR #${{ github.event.issue.number }}"
-          sapiens process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/needs-review.md
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/needs-review.md
 
       - name: Upload review artifacts
         if: always()

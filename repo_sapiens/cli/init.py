@@ -158,6 +158,11 @@ class RepoInitializer:
         self.automation_mode = "native"  # 'native', 'daemon', or 'hybrid'
         self.label_prefix = "sapiens/"
 
+        # Configuration mode settings
+        self.run_mode: Literal["local", "cicd", "both"] = "local"  # What to configure
+        self.config_target: Literal["local", "cicd"] = "local"  # Current configuration pass
+        self.cicd_config_path: Path | None = None  # Custom CI/CD config path
+
         # Existing config tracking
         self.existing_config: dict | None = None
         self.update_git_provider = True
@@ -172,7 +177,12 @@ class RepoInitializer:
         """
         import yaml
 
-        config_file = self.repo_path / self.config_path
+        # Determine which config file to load
+        if self.config_target == "cicd" and self.cicd_config_path:
+            config_file = self.repo_path / self.cicd_config_path
+        else:
+            config_file = self.repo_path / self.config_path
+
         if not config_file.exists():
             return False
 
@@ -286,10 +296,116 @@ class RepoInitializer:
         self.automation_mode = mode_config.get("mode", "native")
         self.label_prefix = mode_config.get("label_prefix", "sapiens/")
 
+    def _prompt_configuration_mode(self) -> None:
+        """Ask user whether to configure for local, CI/CD, or both."""
+        if self.non_interactive:
+            # In non-interactive mode, use command-line specified config path
+            self.run_mode = "local"  # Default to local
+            self.config_target = "local"
+            return
+
+        click.echo(click.style("Configuration Target", bold=True))
+        click.echo()
+        click.echo("Where will sapiens run?")
+        click.echo("  1. Local only (development, testing)")
+        click.echo("  2. CI/CD only (Gitea Actions, GitHub Actions)")
+        click.echo("  3. Both (create separate configs)")
+        click.echo()
+
+        choice = click.prompt(
+            "Select configuration target",
+            type=click.Choice(["1", "2", "3"]),
+            default="1",
+            show_choices=False,
+        )
+
+        if choice == "1":
+            self.run_mode = "local"
+            self.config_target = "local"
+        elif choice == "2":
+            self.run_mode = "cicd"
+            self.config_target = "cicd"
+        else:
+            self.run_mode = "both"
+            self.config_target = "local"  # Start with local
+
+        click.echo()
+
+    def _prompt_cicd_config_path(self) -> None:
+        """Ask for CI/CD config file path."""
+        if self.non_interactive:
+            self.cicd_config_path = Path("sapiens_config.ci.yaml")
+            return
+
+        default_path = "sapiens_config.ci.yaml"
+        click.echo(click.style("CI/CD Configuration Path", bold=True))
+        click.echo()
+        click.echo("Where should the CI/CD config be saved?")
+        click.echo(f"(Default: {default_path} in project root)")
+        click.echo()
+
+        path_str = click.prompt(
+            "Config path",
+            default=default_path,
+            type=str,
+        )
+
+        self.cicd_config_path = Path(path_str)
+        click.echo()
+
     def run(self) -> None:
         """Run the initialization workflow."""
         click.echo(click.style("🚀 Initializing repo-sapiens", bold=True, fg="cyan"))
         click.echo()
+
+        # Ask what to configure (local, CI/CD, or both)
+        self._prompt_configuration_mode()
+
+        # If configuring both, we'll loop through twice
+        if self.run_mode == "both":
+            # First pass: local configuration
+            click.echo(click.style("=== Configuring for Local Development ===", bold=True, fg="cyan"))
+            click.echo()
+            self.config_target = "local"
+            self._run_configuration_pass()
+
+            # Reset update flags for second pass
+            self.existing_config = None
+            self.update_git_provider = True
+            self.update_agent_provider = True
+            self.update_credentials = True
+            self.update_automation = True
+
+            # Second pass: CI/CD configuration
+            click.echo()
+            click.echo(click.style("=== Configuring for CI/CD ===", bold=True, fg="cyan"))
+            click.echo()
+            self.config_target = "cicd"
+            self._prompt_cicd_config_path()
+            self._run_configuration_pass()
+        else:
+            # Single pass configuration
+            if self.config_target == "cicd":
+                self._prompt_cicd_config_path()
+            self._run_configuration_pass()
+
+        # Done!
+        click.echo()
+        click.echo(click.style("✅ Initialization complete!", bold=True, fg="green"))
+        click.echo()
+        self._print_next_steps()
+
+        # Optional test (only for local config)
+        if not self.non_interactive and (self.run_mode == "local" or self.run_mode == "both"):
+            self._offer_test_run()
+
+    def _run_configuration_pass(self) -> None:
+        """Run a single configuration pass (local or CI/CD)."""
+        # For CI/CD config, force environment backend
+        if self.config_target == "cicd":
+            self.backend = "environment"
+            click.echo(click.style("   Using environment backend for CI/CD configuration", fg="yellow"))
+            click.echo()
 
         # Check for existing configuration
         has_existing = self._load_existing_config()
@@ -307,39 +423,29 @@ class RepoInitializer:
             # Load agent type from existing config for downstream steps
             self._load_agent_type_from_config()
 
-        # Step 3: Store credentials locally (only if updating)
-        if self.update_credentials:
+        # Step 3: Store credentials locally (only if updating and local config)
+        if self.update_credentials and self.config_target == "local":
             self._store_credentials()
 
-        # Step 4: Set up Gitea Actions secrets (optional, only if updating credentials)
-        if self.setup_secrets and self.update_credentials:
+        # Step 4: Set up Gitea Actions secrets (optional, only if updating credentials and local)
+        if self.setup_secrets and self.update_credentials and self.config_target == "local":
             self._setup_gitea_secrets()
 
         # Step 5: Generate configuration file
         self._generate_config()
 
-        # Step 6: Deploy reusable composite action
-        if self.deploy_actions:
+        # Step 6: Deploy reusable composite action (only for local)
+        if self.deploy_actions and self.config_target == "local":
             self._deploy_composite_action()
 
-        # Step 7: Deploy CI/CD workflows (optional)
+        # Step 7: Deploy CI/CD workflows (optional, only for local)
         # In interactive mode, always offer the choice
         # In non-interactive mode, only deploy if explicitly requested
-        if self.deploy_workflows or (not self.non_interactive):
+        if self.config_target == "local" and (self.deploy_workflows or (not self.non_interactive)):
             self._deploy_workflows()
 
         # Step 8: Validate setup
         self._validate_setup()
-
-        # Done!
-        click.echo()
-        click.echo(click.style("✅ Initialization complete!", bold=True, fg="green"))
-        click.echo()
-        self._print_next_steps()
-
-        # Step 9: Optional test
-        if not self.non_interactive:
-            self._offer_test_run()
 
     def _detect_backend(self) -> str:
         """Detect best credential backend for current environment."""
@@ -1386,12 +1492,18 @@ tags:
   needs_attention: needs-attention
 """
 
+        # Determine which config file to write
+        if self.config_target == "cicd" and self.cicd_config_path:
+            config_file = self.repo_path / self.cicd_config_path
+        else:
+            config_file = self.repo_path / self.config_path
+
         # Ensure directory exists
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Write configuration file
-        self.config_path.write_text(config_content)
-        click.echo(f"   ✓ Created: {self.config_path}")
+        config_file.write_text(config_content)
+        click.echo(f"   ✓ Created: {config_file.relative_to(self.repo_path)}")
         click.echo()
 
     def _generate_automation_section(self) -> str:

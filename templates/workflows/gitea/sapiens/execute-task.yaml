@@ -57,7 +57,7 @@ jobs:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "🚀 Executing task #${{ gitea.event.issue.number }}"
-          sapiens process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/execute-task.md
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/execute-task.md
 
       - name: Upload state
         if: always()

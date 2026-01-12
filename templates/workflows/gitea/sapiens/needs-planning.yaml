@@ -52,7 +52,7 @@ jobs:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           echo "🔍 Processing issue #${{ gitea.event.issue.number }} for planning"
-          sapiens process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-planning.md
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-planning.md
 
       - name: Post success comment
         if: success()
