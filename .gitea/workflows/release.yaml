@@ -86,9 +86,10 @@ jobs:
 
       - name: Test package installation
         run: |
+          uv venv
           uv pip install dist/*.whl
-          sapiens --version
-          sapiens --help
+          uv run sapiens --version
+          uv run sapiens --help
 
       - name: Publish to PyPI
         if: success()

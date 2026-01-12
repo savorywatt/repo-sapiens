@@ -106,12 +106,13 @@ jobs:
 
       - name: Install from wheel
         run: |
+          uv venv
           uv pip install dist/*.whl
-          sapiens --help
+          uv run sapiens --help
 
       - name: Test package import
         run: |
-          python -c "
+          uv run python -c "
           from repo_sapiens.config.settings import AutomationSettings
           from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
           from repo_sapiens.providers.gitea_rest import GiteaRestProvider
