@@ -6,7 +6,7 @@ This document describes how to configure secrets for the Gitea automation system
 
 The automation system requires two main secrets:
 
-### 1. GITEA_TOKEN
+### 1. SAPIENS_GITEA_TOKEN
 
 **Purpose:** Personal access token for Gitea API access
 
@@ -45,7 +45,7 @@ The automation system requires two main secrets:
 2. Go to Settings → Secrets
 3. Click "Add Secret"
 4. For each secret:
-   - Name: `GITEA_TOKEN` or `CLAUDE_API_KEY`
+   - Name: `SAPIENS_GITEA_TOKEN` or `CLAUDE_API_KEY`
    - Value: Paste the token/key
    - Click "Add Secret"
 
@@ -54,8 +54,8 @@ The automation system requires two main secrets:
 You can also add secrets programmatically:
 
 ```bash
-# Set GITEA_TOKEN secret
-curl -X PUT "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/secrets/GITEA_TOKEN" \
+# Set SAPIENS_GITEA_TOKEN secret
+curl -X PUT "https://gitea.example.com/api/v1/repos/{owner}/{repo}/actions/secrets/SAPIENS_GITEA_TOKEN" \
   -H "Authorization: token ${ADMIN_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
@@ -77,9 +77,9 @@ The workflow files map secrets to environment variables:
 
 ```yaml
 env:
-  GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+  SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
   CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITEA_TOKEN }}
+  AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
   AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
 ```
 
@@ -123,7 +123,7 @@ After setting up secrets, verify they're working:
 
 ## Troubleshooting
 
-### "Missing GITEA_TOKEN" Error
+### "Missing SAPIENS_GITEA_TOKEN" Error
 
 **Cause:** Secret not set or workflow doesn't have access
 
@@ -156,13 +156,13 @@ For local development without CI/CD:
 
 1. Create `.env` file (never commit):
    ```bash
-   GITEA_TOKEN=your-token-here
+   SAPIENS_GITEA_TOKEN=your-token-here
    CLAUDE_API_KEY=your-key-here
    ```
 
 2. Export environment variables:
    ```bash
-   export GITEA_TOKEN="your-token"
+   export SAPIENS_GITEA_TOKEN="your-token"
    export CLAUDE_API_KEY="your-key"
    ```
 

@@ -128,7 +128,7 @@ Located at `repo_sapiens/config/automation_config.yaml`:
 git_provider:
   provider_type: gitea  # or 'github', 'gitlab'
   base_url: ${GITEA_BASE_URL:-https://gitea.example.com}
-  api_token: ${GITEA_TOKEN}  # or GITHUB_TOKEN, GITLAB_TOKEN
+  api_token: ${SAPIENS_GITEA_TOKEN}  # or SAPIENS_GITHUB_TOKEN, GITLAB_TOKEN
 
 agent_provider:
   provider_type: ollama  # or 'claude-local', 'goose-local', 'openai-compatible'

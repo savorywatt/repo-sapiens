@@ -114,7 +114,7 @@ from repo_sapiens.credentials.resolver import CredentialResolver
 resolver = CredentialResolver()
 
 # Resolve from environment variable
-token = resolver.resolve("${GITHUB_TOKEN}")
+token = resolver.resolve("${SAPIENS_GITHUB_TOKEN}")
 
 # Resolve from keyring
 password = resolver.resolve("@keyring:github/password")
@@ -490,7 +490,7 @@ settings = AutomationSettings.from_yaml("config.yaml")
 
 ```
 Reference String
-(e.g., "${GITHUB_TOKEN}")
+(e.g., "${SAPIENS_GITHUB_TOKEN}")
     ↓
 CredentialResolver.resolve()
     ↓
@@ -499,7 +499,7 @@ Try each backend in order:
     │   │
     │   └─ Extract VAR_NAME
     │       │
-    │       └─ os.environ["GITHUB_TOKEN"]
+    │       └─ os.environ["SAPIENS_GITHUB_TOKEN"]
     │           ↓
     │           Return value
     │

@@ -191,7 +191,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Gitea Actions secret setup for provider-specific API keys
 - **Configuration System Updates**: Enhanced Pydantic models for multi-agent support
   - New `GooseConfig` model with toolkit, temperature, max_tokens, llm_provider
-  - Updated `AgentProviderConfig` to support goose-local, goose-api provider types
+  - Updated `AgentProviderConfig` to support goose-local provider type (Goose is CLI-only)
   - Provider-specific credential references (@keyring:openai/api_key, ${OPENAI_API_KEY})
 - **External Agent Provider**: Updated to support Goose CLI invocation
   - Correct `goose session start` command with provider, model, toolkit flags

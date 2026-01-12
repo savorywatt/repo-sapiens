@@ -23,7 +23,7 @@
 ### Valid Agent Provider Types
 Only these values are valid for `agent_provider.provider_type`:
 - `claude-local`, `claude-api`
-- `goose-local`, `goose-api`
+- `goose-local` (Goose is CLI-only)
 - `openai`, `openai-compatible`, `ollama`
 
 Do NOT use `react` as a provider type.

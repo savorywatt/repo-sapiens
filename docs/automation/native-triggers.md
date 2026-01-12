@@ -153,7 +153,7 @@ Workflow triggers on:
 Generated workflow location: `.github/workflows/process-label.yaml`
 
 Required secrets:
-- `GITHUB_TOKEN` - Automatically provided by GitHub
+- `SAPIENS_GITHUB_TOKEN` - Automatically provided by GitHub
 
 Workflow triggers on:
 - `issues.labeled`
@@ -257,7 +257,7 @@ automation:
 ### GitHub
 
 - GitHub Actions enabled on repository
-- No additional setup required (GITHUB_TOKEN automatic)
+- No additional setup required (SAPIENS_GITHUB_TOKEN automatic)
 
 ### GitLab
 

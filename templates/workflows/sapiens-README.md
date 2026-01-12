@@ -223,7 +223,7 @@ Configure these secrets in your repository settings:
 | `SAPIENS_CLAUDE_API_KEY` | AI provider API key (only required if using API-based agents) |
 | `SAPIENS_GITHUB_TOKEN` | GitHub token (if using GitHub) |
 
-**Note:** `SAPIENS_CLAUDE_API_KEY` is only needed if your `.sapiens/config.yaml` uses an API-based agent provider like `claude-api`, `goose-api`, `openai`, `anthropic`, etc. If using local agents like `claude-local`, `ollama`, or `goose-local`, this secret is optional.
+**Note:** `SAPIENS_CLAUDE_API_KEY` is only needed if your `.sapiens/config.yaml` uses an API-based agent provider like `claude-api`, `openai`, `anthropic`, etc. If using local agents like `claude-local`, `ollama`, or `goose-local`, this secret is optional.
 
 ### Config File
 
@@ -231,7 +231,7 @@ Each workflow uses the config file at `.sapiens/config.yaml` in your repository.
 
 **Important:** The AI agent used by all workflows is determined by your config file's `agent_provider` section. This can be:
 - `claude-local` or `claude-api` - Claude Code or Claude API
-- `goose-local` or `goose-api` - Goose agent with various LLM backends
+- `goose-local` - Goose CLI agent with various LLM backends
 - `ollama` - Local Ollama models (e.g., qwen3, codellama)
 - `openai`, `anthropic`, `groq`, `openrouter` - Cloud AI providers
 - `openai-compatible` - vLLM or compatible servers

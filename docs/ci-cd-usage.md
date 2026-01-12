@@ -51,7 +51,7 @@ workflow:
 git_provider:
   provider_type: gitea
   base_url: ${GITEA_BASE_URL}
-  api_token: ${GITEA_TOKEN}  # From CI secrets
+  api_token: ${SAPIENS_GITEA_TOKEN}  # From CI secrets
 
 agent_provider:
   provider_type: claude-api
@@ -245,7 +245,7 @@ jobs:
       - name: Create plan proposal
         env:
           AUTOMATION__GIT_PROVIDER__BASE_URL: https://github.com
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.CLAUDE_API_KEY }}
@@ -256,7 +256,7 @@ jobs:
 ```
 
 **Required Secrets (GitHub):**
-- `GITHUB_TOKEN` - Automatically provided by GitHub Actions
+- `SAPIENS_GITHUB_TOKEN` - Automatically provided by GitHub Actions
 - `CLAUDE_API_KEY` - AI provider API key (set in repository secrets)
 
 ### GitLab CI
@@ -340,7 +340,7 @@ scan-labeled-issues:
 - `SAPIENS_CLAUDE_API_KEY` - AI provider key
 
 **GitHub:**
-- `GITHUB_TOKEN` - Automatically provided
+- `SAPIENS_GITHUB_TOKEN` - Automatically provided
 - `CLAUDE_API_KEY` - AI provider key
 
 **GitLab:**
@@ -425,7 +425,7 @@ env:
 ```bash
 # View recent workflow runs via API
 curl "https://api.github.com/repos/{owner}/{repo}/actions/runs" \
-  -H "Authorization: token ${GITHUB_TOKEN}"
+  -H "Authorization: token ${SAPIENS_GITHUB_TOKEN}"
 ```
 
 **GitLab:**
@@ -441,7 +441,7 @@ Test commands locally:
 
 ```bash
 # Set up environment
-export GITEA_TOKEN="your-token"
+export SAPIENS_GITEA_TOKEN="your-token"
 export CLAUDE_API_KEY="your-key"
 
 # Run command

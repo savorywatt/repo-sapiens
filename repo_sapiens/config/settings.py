@@ -76,7 +76,7 @@ class AgentProviderConfig(BaseModel):
     )
     goose_config: GooseConfig | None = Field(
         default=None,
-        description="Goose-specific configuration (only used with goose-local/goose-api)",
+        description="Goose-specific configuration (only used with goose-local)",
     )
 
 

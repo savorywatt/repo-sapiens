@@ -36,7 +36,7 @@ cp templates/workflows/github/sapiens/recipes/*.yaml .github/workflows/sapiens/r
 - `claude-local` - Claude Code CLI agent (local)
 - `claude-api` - Claude Code API agent
 - `goose-local` - Goose CLI agent (local)
-- `goose-api` - Goose API agent
+- `goose-local` - Goose CLI agent (local, supports multiple LLM backends)
 - `ollama` - Builtin ReAct agent with Ollama
 - `openai` - Builtin ReAct agent with OpenAI
 - `openai-compatible` - Builtin ReAct agent with compatible API

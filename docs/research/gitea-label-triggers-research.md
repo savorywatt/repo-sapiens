@@ -243,10 +243,10 @@ jobs:
       - name: Assign based on label
         if: gitea.event.label.name == 'needs-review'
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           curl -X PATCH \
-            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"assignees": ["reviewer-bot"]}' \
             "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}"
@@ -309,10 +309,10 @@ jobs:
 
       - name: Post comment with URL
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           curl -X POST \
-            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"body": "Preview deployed to https://preview-${{ gitea.event.pull_request.number }}.example.com"}' \
             "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.pull_request.number }}/comments"
@@ -421,7 +421,7 @@ jobs:
 
       - name: Run sapiens processor
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
           sapiens process-label \

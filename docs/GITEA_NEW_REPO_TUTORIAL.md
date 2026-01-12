@@ -508,7 +508,7 @@ Create these labels (colors are suggestions):
 ```bash
 # Set your variables
 GITEA_URL="https://gitea.example.com"
-GITEA_TOKEN="your-token"
+SAPIENS_GITEA_TOKEN="your-token"
 OWNER="your-username"
 REPO="my-project"
 
@@ -520,7 +520,7 @@ for label in "needs-planning:#0052CC" "proposed:#36B37E" "approved:#00875A" \
   name="${label%%:*}"
   color="${label##*:}"
   curl -X POST "$GITEA_URL/api/v1/repos/$OWNER/$REPO/labels" \
-    -H "Authorization: token $GITEA_TOKEN" \
+    -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
     -H "Content-Type: application/json" \
     -d "{\"name\": \"$name\", \"color\": \"${color#\#}\"}"
 done

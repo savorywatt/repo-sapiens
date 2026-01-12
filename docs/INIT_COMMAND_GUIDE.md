@@ -83,9 +83,9 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
 **Non-Interactive Mode** (CI/CD):
 ```bash
 # For Gitea
-export GITEA_TOKEN="your-token-here"
+export SAPIENS_GITEA_TOKEN="your-token-here"
 # For GitHub
-export GITHUB_TOKEN="your-token-here"
+export SAPIENS_GITHUB_TOKEN="your-token-here"
 # For GitLab
 export GITLAB_TOKEN="your-token-here"
 export CLAUDE_API_KEY="your-key-here"  # optional
@@ -121,7 +121,7 @@ The command guides you through setting up repository secrets for your CI/CD plat
 **For Gitea Actions**:
 ```
 🔐 Setting up Gitea Actions secrets...
-   ℹ Please set GITEA_TOKEN manually in Gitea UI for now
+   ℹ Please set SAPIENS_GITEA_TOKEN manually in Gitea UI for now
    Navigate to: https://gitea.example.com/myuser/my-project/settings/secrets
 ```
 
@@ -137,8 +137,8 @@ The command guides you through setting up repository secrets for your CI/CD plat
 
 | Provider | Secret Name | Description |
 |----------|-------------|-------------|
-| Gitea | `GITEA_TOKEN` | Gitea API token (required) |
-| GitHub | `GITHUB_TOKEN` | GitHub personal access token (often auto-provided) |
+| Gitea | `SAPIENS_GITEA_TOKEN` | Gitea API token (required) |
+| GitHub | `SAPIENS_GITHUB_TOKEN` | GitHub personal access token (often auto-provided) |
 | GitLab | `GITLAB_TOKEN` | GitLab personal access token with `api`, `read_repository`, `write_repository` scopes |
 | All | `CLAUDE_API_KEY` | Claude API key (only if using API mode)
 
@@ -147,12 +147,12 @@ The command guides you through setting up repository secrets for your CI/CD plat
 **Gitea**:
 1. Navigate to: `https://gitea.example.com/<owner>/<repo>/settings/secrets`
 2. Click "Add Secret"
-3. Add `GITEA_TOKEN` and `CLAUDE_API_KEY`
+3. Add `SAPIENS_GITEA_TOKEN` and `CLAUDE_API_KEY`
 
 **GitHub**:
 1. Navigate to: `https://github.com/<owner>/<repo>/settings/secrets/actions`
 2. Click "New repository secret"
-3. Add `GITHUB_TOKEN` (if not using the default) and `CLAUDE_API_KEY`
+3. Add `SAPIENS_GITHUB_TOKEN` (if not using the default) and `CLAUDE_API_KEY`
 
 **GitLab**:
 1. Navigate to: `https://gitlab.com/<namespace>/<project>/-/settings/ci_cd`
@@ -284,7 +284,7 @@ sapiens init [OPTIONS]
 
 **`--non-interactive`**
 - Skip interactive prompts
-- Requires `GITEA_TOKEN` and optionally `CLAUDE_API_KEY` env vars
+- Requires `SAPIENS_GITEA_TOKEN` and optionally `CLAUDE_API_KEY` env vars
 - Example: `sapiens init --non-interactive`
 
 **`--setup-secrets` / `--no-setup-secrets`**
@@ -325,7 +325,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    ✓ Credentials stored securely
 
 🔐 Setting up Gitea Actions secrets...
-   ℹ Please set GITEA_TOKEN manually in Gitea UI for now
+   ℹ Please set SAPIENS_GITEA_TOKEN manually in Gitea UI for now
    Navigate to: https://gitea.example.com/myuser/my-repo/settings/secrets
 
 📝 Creating configuration file...
@@ -352,7 +352,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
 
 ```bash
 # In your CI/CD pipeline
-export GITEA_TOKEN="${SECRETS_GITEA_TOKEN}"
+export SAPIENS_GITEA_TOKEN="${SECRETS_SAPIENS_GITEA_TOKEN}"
 export CLAUDE_API_KEY="${SECRETS_CLAUDE_API_KEY}"
 
 sapiens init --non-interactive --backend environment
@@ -451,7 +451,7 @@ sapiens init --non-interactive --backend environment
 
 CI/CD workflows run in isolated environments and need credentials to:
 
-1. **Access Git Provider API** (`GITEA_TOKEN` / `GITHUB_TOKEN` / `GITLAB_TOKEN`):
+1. **Access Git Provider API** (`SAPIENS_GITEA_TOKEN` / `SAPIENS_GITHUB_TOKEN` / `GITLAB_TOKEN`):
    - Read issues and comments
    - Create branches and pull/merge requests
    - Update issue labels and status
@@ -481,14 +481,14 @@ CI/CD workflows run in isolated environments and need credentials to:
 
 1. Navigate to: `https://gitea.example.com/<org>/<repo>/settings/secrets`
 2. Click "Add Secret"
-3. Add `GITEA_TOKEN` with your API token
+3. Add `SAPIENS_GITEA_TOKEN` with your API token
 4. Add `CLAUDE_API_KEY` if using API mode
 
 #### GitHub
 
 1. Navigate to: `https://github.com/<org>/<repo>/settings/secrets/actions`
 2. Click "New repository secret"
-3. Add `GITHUB_TOKEN` (if not using the default)
+3. Add `SAPIENS_GITHUB_TOKEN` (if not using the default)
 4. Add `CLAUDE_API_KEY` if using API mode
 
 #### GitLab
@@ -526,7 +526,7 @@ jobs:
 
       - name: Process Issues
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
           sapiens --config .sapiens/config.yaml process-all
@@ -537,7 +537,7 @@ The workflow uses environment variable references in the config:
 ```yaml
 # .sapiens/config.yaml
 git_provider:
-  api_token: ${GITEA_TOKEN}  # Resolved from env var
+  api_token: ${SAPIENS_GITEA_TOKEN}  # Resolved from env var
 
 agent_provider:
   api_key: ${CLAUDE_API_KEY}  # Resolved from env var
