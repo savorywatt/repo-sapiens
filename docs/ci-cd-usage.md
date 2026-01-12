@@ -33,7 +33,7 @@ All workflows are located in `.gitea/workflows/`:
 
 ## Needs Planning Workflow
 
-**File:** `.gitea/workflows/needs-planning.yaml`
+**File:** `.gitea/workflows/sapiens/needs-planning.yaml`
 
 **Triggers:**
 - Issue labeled with `needs-planning`
@@ -63,7 +63,7 @@ All workflows are located in `.gitea/workflows/`:
 
 ## Test Workflow
 
-**File:** `.gitea/workflows/test.yaml`
+**File:** `.gitea/workflows/sapiens/test.yaml`
 
 **Triggers:**
 - Pull request to `main`

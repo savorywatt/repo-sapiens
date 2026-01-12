@@ -154,18 +154,30 @@ export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="5"
 
 ### Workflow Templates
 
-The system includes workflow templates in `.gitea/workflows/`:
+The system includes workflow templates organized in `.gitea/workflows/sapiens/`:
 
+**Core Workflows:**
 | Workflow | Description |
 |----------|-------------|
-| `test.yaml` | Run tests on PRs and pushes |
+| `automation-daemon.yaml` | Periodic issue processing |
+| `process-issue.yaml` | Process individual issues |
 | `needs-planning.yaml` | Process issues labeled `needs-planning` |
 | `approved.yaml` | Create tasks from approved plans |
 | `execute-task.yaml` | Execute task implementations |
 | `needs-review.yaml` | Automated code review |
 | `requires-qa.yaml` | Run QA build and tests |
-| `automation-daemon.yaml` | Periodic issue processing |
-| `monitor.yaml` | Health monitoring |
+
+**Recipe Workflows** (`.gitea/workflows/sapiens/recipes/`):
+- `daily-issue-triage.yaml` - Automated issue triage
+- `weekly-test-coverage.yaml` - Test coverage analysis
+- `weekly-dependency-audit.yaml` - Dependency security audits
+- `weekly-security-review.yaml` - Comprehensive security scans
+- And more...
+
+**Repository Workflows** (`.gitea/workflows/`):
+- `test.yaml` - Run tests on PRs and pushes
+- `build-artifacts.yaml` - Build and test package artifacts
+- `release.yaml` - Release automation
 
 ### Required Secrets
 

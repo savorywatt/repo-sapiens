@@ -393,7 +393,7 @@ cp -r /path/to/repo-sapiens/templates/workflows/gitea/*.yaml .gitea/workflows/
 At minimum, you need `needs-planning.yaml` to get started. Create this file:
 
 ```bash
-cat > .gitea/workflows/needs-planning.yaml << 'EOF'
+cat > .gitea/workflows/sapiens/needs-planning.yaml << 'EOF'
 name: Needs Planning
 
 on:

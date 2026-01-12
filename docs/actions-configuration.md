@@ -117,7 +117,7 @@ curl -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
 
 ### Creating Custom Workflow
 
-Create `.gitea/workflows/custom.yaml`:
+Create `.gitea/workflows/sapiens/custom.yaml`:
 
 ```yaml
 name: Custom Workflow
