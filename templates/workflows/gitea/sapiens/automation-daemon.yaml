@@ -23,8 +23,8 @@ on:
   workflow_dispatch:  # Manual trigger only
 
 env:
-  # Change this to your config file (use sapiens_config.ci.yaml for CI/CD specific config)
-  CONFIG_FILE: sapiens_config.yaml
+  # CI-specific config (separates CI settings from local development config)
+  CONFIG_FILE: sapiens_config.ci.yaml
 
 jobs:
   process-pending:

@@ -43,6 +43,7 @@ env:
 jobs:
   security-review:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -788,7 +789,7 @@ jobs:
             }" || echo "PR creation failed - may need manual creation"
 
       - name: Upload security report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-report
           path: |

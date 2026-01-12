@@ -1,23 +1,247 @@
 # Sapiens Workflows
 
-This directory contains workflows managed by [repo-sapiens](https://github.com/savorywatt/repo-sapiens) for automated issue processing and task management.
+Ready-to-use CI/CD workflow templates for repo-sapiens automated issue processing and task management.
+
+## Quick Setup
+
+### For Gitea
+
+```bash
+# Copy core workflows to your repo
+mkdir -p .gitea/workflows/sapiens
+cp templates/workflows/gitea/sapiens/*.yaml .gitea/workflows/sapiens/
+
+# Optionally copy recipe workflows
+mkdir -p .gitea/workflows/sapiens/recipes
+cp templates/workflows/gitea/sapiens/recipes/*.yaml .gitea/workflows/sapiens/recipes/
+```
+
+### For GitHub
+
+```bash
+# Copy core workflows to your repo
+mkdir -p .github/workflows/sapiens
+cp templates/workflows/github/sapiens/*.yaml .github/workflows/sapiens/
+
+# Optionally copy recipe workflows
+mkdir -p .github/workflows/sapiens/recipes
+cp templates/workflows/github/sapiens/recipes/*.yaml .github/workflows/sapiens/recipes/
+```
+
+## Configuration
+
+### Understanding Agents vs LLM Providers
+
+**Agent Providers** (execute tasks, use tools):
+- `claude-local` - Claude Code CLI agent (local)
+- `claude-api` - Claude Code API agent
+- `goose-local` - Goose CLI agent (local)
+- `goose-api` - Goose API agent
+- `ollama` - Builtin ReAct agent with Ollama
+- `openai` - Builtin ReAct agent with OpenAI
+- `openai-compatible` - Builtin ReAct agent with compatible API
+
+**LLM Providers** (the actual models):
+- Ollama (local models: llama3.1, qwen3, etc.)
+- Claude API (Anthropic's API)
+- OpenAI (GPT-4, etc.)
+- Groq, OpenRouter, vLLM, etc.
+
+Example: `goose-local` agent + `openai` LLM provider = Goose agent using OpenAI models
+
+### Required Secrets
+
+Go to your repository settings and add these secrets:
+
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `SAPIENS_GITEA_TOKEN` | Gitea only | Your Gitea API token (note: GITEA_ prefix is reserved) |
+| `GITHUB_TOKEN` | GitHub only | GitHub API token |
+| `SAPIENS_CLAUDE_API_KEY` | If using API agents | API key for claude-api, openai, anthropic, etc. |
+| `OPENAI_API_KEY` | If using OpenAI models | OpenAI API key (for Goose or builtin agent) |
+| `CLAUDE_API_KEY` | If using Claude API | Anthropic API key (for claude-api agent) |
+| `ANTHROPIC_API_KEY` | If using Claude API | Alternative name for Claude API key |
+
+**Note:** API key secrets are only needed if your `.sapiens/config.yaml` uses an API-based agent provider. If using local agents like `claude-local`, `ollama`, or `goose-local`, these secrets are optional.
+
+### Multi-Environment Setup
+
+Create two configs for different environments:
+
+```bash
+# Local development (builtin agent + Ollama - free, runs locally)
+sapiens init --config-path .sapiens/config.yaml
+# Agent: builtin
+# LLM Provider: Ollama
+# Model: llama3.1:8b
+
+# CI/CD (builtin agent + OpenAI - better quality, costs money)
+sapiens init --config-path .sapiens/config.ci.yaml
+# Agent: builtin
+# LLM Provider: OpenAI
+# Model: gpt-4o
+```
+
+Then update the workflows to use the CI config by editing the `CONFIG_FILE` environment variable:
+
+```yaml
+env:
+  CONFIG_FILE: .sapiens/config.ci.yaml
+```
+
+**Note**: The builtin ReAct agent is recommended for CI/CD as it's lightweight and works directly with any LLM API.
 
 ## How It Works
 
-These workflows are triggered by **issue labels**. When you add a specific label to an issue, the corresponding workflow automatically processes it.
+These workflows are triggered by **issue labels**. When you add a specific label to an issue or PR, the corresponding workflow automatically processes it using the AI agent configured in `.sapiens/config.yaml`.
 
-## Workflow Triggers
+### Adding Labels
 
-### Core Workflows
+**On Issues:**
+1. Navigate to your issue
+2. Click the "Labels" section on the right sidebar
+3. Select the appropriate label (e.g., `needs-planning`, `execute`)
 
-| Workflow | Label | Description |
-|----------|-------|-------------|
-| `needs-planning.yaml` | `needs-planning` | Creates a development plan from an issue description |
-| `approved.yaml` | `approved` | Converts an approved plan into executable tasks |
-| `execute-task.yaml` | `execute-task` | Implements code for a task issue |
-| `needs-review.yaml` | `needs-review` | Performs automated code review on a PR |
-| `requires-qa.yaml` | `requires-qa` | Runs QA validation and testing |
-| `needs-fix.yaml` | `needs-fix` | Fixes issues identified during review/QA |
+**On Pull Requests:**
+1. Navigate to your pull request
+2. Click the "Labels" section on the right sidebar
+3. Select labels like `needs-review` or `requires-qa` to trigger automated review/testing
+
+Labels can be added at any time and workflows will trigger automatically.
+
+## Label Reference
+
+### `sapiens/triage`
+**When to use:** New issues that need initial analysis and categorization.
+
+**What it does:**
+- Analyzes the issue description
+- Categorizes the issue (bug, feature, question, etc.)
+- Adds appropriate labels
+- Assigns priority if applicable
+- Comments with analysis results
+
+**Use on:** Issues (not PRs)
+
+---
+
+### `needs-planning`
+**When to use:** You have a new feature request or complex task that needs a development plan.
+
+**What it does:**
+- Analyzes the issue description and requirements
+- Researches the codebase to understand existing patterns
+- Generates a detailed implementation plan with steps
+- Posts the plan as a comment on the issue
+
+**Use on:** Issues (not PRs)
+
+**Next step:** Review the plan and add `approved` label if it looks good.
+
+---
+
+### `approved`
+**When to use:** A plan has been generated and reviewed, ready for implementation.
+
+**What it does:**
+- Converts the approved plan into executable task issues
+- Creates sub-issues for each step in the plan
+- Links tasks back to the parent issue
+- Each task can be executed independently
+
+**Use on:** Issues with completed plans
+
+**Next step:** Add `execute` label to individual task issues.
+
+---
+
+### `execute`
+**When to use:** A task issue is ready to be implemented.
+
+**What it does:**
+- Reads the task description and acceptance criteria
+- Implements the required code changes
+- Creates a new branch for the changes
+- Opens a pull request with the implementation
+- Links the PR back to the task issue
+
+**Use on:** Task issues created by the `approved` workflow
+
+**Next step:** Add `needs-review` to the created PR.
+
+---
+
+### `needs-review`
+**When to use:** A pull request is ready for automated code review.
+
+**What it does:**
+- Analyzes the PR diff and all changed files
+- Uses your configured AI agent to review for:
+  - Code quality and best practices
+  - Potential bugs or issues
+  - Performance concerns
+  - Security vulnerabilities
+  - Maintainability and readability
+- Posts inline comments with specific feedback
+- Updates label based on review results
+
+**Use on:** Pull requests **only** (does nothing on regular issues)
+
+**Next step:** Address feedback, then add `requires-qa` for testing.
+
+---
+
+### `requires-qa`
+**When to use:** A pull request has passed review and needs QA validation.
+
+**What it does:**
+- Checks out the PR branch
+- Runs build commands (npm build, make, python build, etc.)
+- Runs test commands (pytest, npm test, go test, etc.)
+- If no tests exist: Creates tests using AI, commits them
+- Posts QA results as a comment
+- Updates label to `qa-passed` or `qa-failed`
+
+**Use on:** Pull requests **only** (does nothing on regular issues)
+
+**Next step:** If passing, merge the PR. If failing, add `needs-fix`.
+
+---
+
+### `needs-fix`
+**When to use:** Issues were found during review or QA that need to be addressed.
+
+**What it does:**
+- Reads ALL comments from reviewers/maintainers
+- AI analyzes each comment and categorizes it:
+  - **Simple fix**: Implements immediately (typos, formatting, simple refactors)
+  - **Controversial fix**: Posts plan and waits for approval
+  - **Question**: Answers the question
+  - **Info**: Acknowledges the feedback
+  - **Already done**: Confirms it's in the code
+  - **Won't fix**: Explains why not
+- Replies to EACH comment with planned action
+- Batch executes simple fixes and commits to the PR branch
+- Removes `needs-fix` label when done
+- Adds `needs-approval` if controversial fixes need approval
+
+**Use on:** Pull requests **only** (does nothing on regular issues)
+
+**Next step:** Re-add `needs-review` or `requires-qa` to re-validate.
+
+---
+
+## Workflow Triggers Summary
+
+| Workflow | Label | Use On | Description |
+|----------|-------|--------|-------------|
+| `process-label.yaml` | `sapiens/triage` | Issues | Triage and categorize issues |
+| `process-label.yaml` | `needs-planning` | Issues | Generate implementation plan |
+| `process-label.yaml` | `approved` | Issues | Create executable tasks |
+| `process-label.yaml` | `execute` | Issues | Implement code changes |
+| `process-label.yaml` | `needs-review` | Pull Requests | Automated code review |
+| `requires-qa.yaml` | `requires-qa` | Pull Requests | Run tests and QA |
+| `process-label.yaml` | `needs-fix` | Pull Requests | Address review feedback |
 
 ### Automation Workflows
 
@@ -61,14 +285,14 @@ Review the generated plan. If it looks good:
 ### 5. Execute Tasks
 
 For each task created:
-- Add the `execute-task` label to trigger implementation
+- Add the `execute` label to trigger implementation
 - The workflow will write the code and create a PR
 
 ### 6. Review & QA
 
 - Add `needs-review` for automated code review
 - Add `requires-qa` for testing and validation
-- Add `needs-fix` if issues are found
+- Add `needs-fix` if issues are found (AI will respond to all comments)
 
 ## Label Workflow
 
@@ -83,7 +307,7 @@ Add: approved
     ↓
 Tasks Created
     ↓
-Add: execute-task (on each task)
+Add: execute (on each task)
     ↓
 PR Created
     ↓
@@ -100,86 +324,76 @@ Add: needs-fix (if issues found)
 Merge!
 ```
 
-## Configuration
-
-### Required Secrets
-
-Configure these secrets in your repository settings:
-
-| Secret | Description |
-|--------|-------------|
-| `SAPIENS_GITEA_TOKEN` | Gitea API token with repo/issue access |
-| `SAPIENS_CLAUDE_API_KEY` | Anthropic Claude API key |
-| `SAPIENS_GITHUB_TOKEN` | GitHub token (if using GitHub) |
-
-### Config File
-
-Each workflow uses the config file at `.sapiens/config.yaml` in your repository.
-
-You can customize:
-- AI agent provider (Claude, Goose, Ollama)
-- Workflow behavior
-- Automation settings
-
-Run `sapiens init` to create or update your config.
-
 ## Customization
 
-### Modify Schedules
+### Change the Schedule
 
-Edit `automation-daemon.yaml` to change processing frequency:
+Edit the cron expression in `automation-daemon.yaml`:
 
 ```yaml
 on:
   schedule:
     - cron: '*/15 * * * *'  # Every 15 minutes
+    - cron: '0 * * * *'     # Every hour
+    - cron: '0 9 * * 1-5'   # 9 AM weekdays
 ```
 
-### Add Custom Labels
+### Add More Label Triggers
 
-Create new workflow files following the pattern:
+Create additional workflow files for other labels:
 
 ```yaml
-name: My Custom Workflow
+# custom-workflow.yaml
 on:
   issues:
     types: [labeled]
+
 jobs:
   process:
     if: gitea.event.label.name == 'my-custom-label'
-    # ... your steps
+    # ... rest of workflow
 ```
-
-## Troubleshooting
-
-### Workflow Not Triggering
-
-- Verify the label name matches exactly (case-sensitive)
-- Check that Gitea Actions is enabled
-- Ensure a runner is active and online
-- Check workflow logs in Actions tab
-
-### Permission Errors
-
-- Verify `SAPIENS_GITEA_TOKEN` has correct permissions
-- Token needs: `repo`, `read:org`, `write:issue`
-
-### AI Errors
-
-- Check `SAPIENS_CLAUDE_API_KEY` is set correctly
-- Verify API quota/limits
-- Check workflow logs for specific error messages
 
 ## Recipe Workflows
 
 The `recipes/` subdirectory contains additional example workflows for:
 - Daily issue triage
 - Weekly test coverage reports
-- Security scans
+- Security scans and SBOM generation
 - Dependency audits
+- Post-merge documentation updates
 - And more...
 
 These are optional and can be customized for your project.
+
+## Troubleshooting
+
+### Workflow doesn't trigger
+
+- Check that Actions are enabled in repository settings
+- Verify the label name matches exactly (case-sensitive)
+- Check runner availability
+- Check workflow logs in Actions tab
+
+### Permission denied
+
+- Verify `SAPIENS_GITEA_TOKEN` or `GITHUB_TOKEN` has correct permissions
+- Token needs: `repo`, `read:org`, `write:issue`
+- For GitHub, you may need a PAT instead of `GITHUB_TOKEN`
+
+### AI Agent Errors
+
+- Check that your `.sapiens/config.yaml` is valid and accessible
+- If using API-based agents, verify the appropriate API key secret is set
+- Check API quota/limits for your AI provider
+- For local agents (Ollama, Claude Code), ensure they're running and accessible
+- Check workflow logs in Actions tab for specific error messages
+- Verify your agent provider configuration matches your installed tools
+
+### Config file not found
+
+- Ensure you committed your `.sapiens/config.yaml` to the repo
+- Check the `CONFIG_FILE` path is correct in the workflow
 
 ## Learn More
 

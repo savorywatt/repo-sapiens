@@ -48,6 +48,7 @@ env:
 jobs:
   sbom-and-license:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -443,7 +444,7 @@ jobs:
             }" || echo "Issue creation failed"
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ gitea.run_number }}
           path: |

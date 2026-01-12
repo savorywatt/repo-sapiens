@@ -74,9 +74,32 @@ git push -u origin main
 2. Go to **Settings** → **Secrets**
 3. Click **Add Secret**
 
+#### Secret Naming Conventions
+
+This project uses two prefixes for secrets to support different deployment scenarios:
+
+| Prefix | Scope | When to Use |
+|--------|-------|-------------|
+| `SAPIENS_*` | User/project-level | Individual repository settings, project-specific deployments |
+| `BUILDER_*` | Organization/instance-level | Shared automation daemon, multi-repository workflows, Gitea organization secrets |
+
+**Choosing the Right Prefix:**
+
+- **Use `SAPIENS_*`** when:
+  - Configuring secrets in a specific repository's settings
+  - Each repository has its own credentials
+  - Testing or development deployments
+
+- **Use `BUILDER_*`** when:
+  - Running a centralized automation daemon across multiple repositories
+  - Using Gitea organization-level secrets
+  - Shared CI/CD infrastructure serving multiple projects
+
+Both workflows and the CLI tool support either prefix for compatibility.
+
 #### Required Secrets
 
-**Secret: SAPIENS_GITEA_TOKEN**
+**Secret: SAPIENS_GITEA_TOKEN** (or `BUILDER_GITEA_TOKEN`)
 - Name: `SAPIENS_GITEA_TOKEN`
 - Value: Your Gitea personal access token
 - How to create:
@@ -86,7 +109,7 @@ git push -u origin main
   4. Click "Generate Token"
   5. Copy the token
 
-**Secret: SAPIENS_CLAUDE_API_KEY**
+**Secret: SAPIENS_CLAUDE_API_KEY** (or `BUILDER_CLAUDE_API_KEY`)
 - Name: `SAPIENS_CLAUDE_API_KEY`
 - Value: Your Anthropic Claude API key
 - How to get:
@@ -315,7 +338,7 @@ sapiens list-plans
 
 2. **Backup state files:**
    - State artifacts uploaded every run
-   - Regular backups of `.automation/state/`
+   - Regular backups of `.sapiens/state/`
 
 3. **Error recovery:**
    - Automatic retries configured

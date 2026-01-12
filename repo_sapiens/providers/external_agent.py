@@ -22,6 +22,7 @@ class ExternalAgentProvider(AgentProvider):
         working_dir: str | None = None,
         qa_handler: Any | None = None,
         goose_config: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
     ):
         """Initialize external agent provider.
 
@@ -31,12 +32,14 @@ class ExternalAgentProvider(AgentProvider):
             working_dir: Working directory for agent execution
             qa_handler: Interactive Q&A handler for agent questions
             goose_config: Goose-specific configuration (toolkit, temperature, etc.)
+            system_prompt: Custom system prompt to prepend to all prompts
         """
         self.agent_type = agent_type
         self.model = model
         self.working_dir = working_dir or os.getcwd()
         self.qa_handler = qa_handler
         self.goose_config = goose_config or {}
+        self.system_prompt = system_prompt
         self.current_issue_number: int | None = None
 
     async def connect(self) -> None:
@@ -110,6 +113,10 @@ class ExternalAgentProvider(AgentProvider):
 
         Claude Code runs in the current directory and modifies files directly.
         """
+        # Prepend system prompt if provided
+        if self.system_prompt:
+            prompt = f"{self.system_prompt}\n\n{prompt}"
+
         # Execute Claude Code with the prompt in non-interactive mode
         # Using --print for non-interactive output
         # Using --dangerously-skip-permissions to skip permission dialogs
@@ -161,6 +168,10 @@ class ExternalAgentProvider(AgentProvider):
         Goose runs in the current directory and modifies files directly.
         Uses 'goose session start' to run a one-shot session.
         """
+        # Prepend system prompt if provided
+        if self.system_prompt:
+            prompt = f"{self.system_prompt}\n\n{prompt}"
+
         # Build Goose command with configuration options
         cmd = ["goose", "session", "start"]
 

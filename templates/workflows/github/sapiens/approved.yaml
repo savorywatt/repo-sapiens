@@ -1,0 +1,50 @@
+name: Plan Approved
+
+# Triggers when 'approved' label is added to a proposal
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-tasks:
+    name: Create Tasks from Approved Plan
+    if: github.event.label.name == 'approved' && contains(github.event.issue.labels.*.name, 'proposed')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install sapiens
+        run: pip install -e .
+
+      - name: Process approved plan
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          echo "✅ Processing approved plan for issue #${{ github.event.issue.number }}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/approved.md
+
+      - name: Post success comment
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "🎯 **Tasks created!**\n\nThe plan has been broken down into executable tasks. Tasks will be automatically executed.\n\n🤖 Posted by Sapiens Automation"}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

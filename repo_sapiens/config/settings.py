@@ -69,6 +69,10 @@ class AgentProviderConfig(BaseModel):
         "goose-local",
         "goose-api",
         "openai",
+        "openai-compatible",
+        "anthropic",
+        "groq",
+        "openrouter",
         "ollama",
     ] = Field(default="claude-local", description="Type of agent provider")
     model: str = Field(default="claude-sonnet-4.5", description="Model identifier")
@@ -90,7 +94,7 @@ class WorkflowConfig(BaseModel):
     """Workflow behavior configuration."""
 
     plans_directory: str = Field(default="plans", description="Directory for plan files")
-    state_directory: str = Field(default=".automation/state", description="Directory for state files")
+    state_directory: str = Field(default=".sapiens/state", description="Directory for state files")
     branching_strategy: Literal["per-agent", "shared"] = Field(
         default="per-agent", description="Branch creation strategy"
     )

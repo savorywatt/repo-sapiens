@@ -26,7 +26,8 @@ permissions:
   issues: read
 
 env:
-  CONFIG_FILE: sapiens_config.yaml
+  # CI-specific config (separates CI settings from local development config)
+  CONFIG_FILE: sapiens_config.ci.yaml
 
 # Prevent concurrent runs to avoid race conditions
 concurrency:

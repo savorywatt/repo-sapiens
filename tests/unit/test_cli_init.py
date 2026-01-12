@@ -824,7 +824,7 @@ class TestRepoInitializerStoreCredentials:
 
         initializer._store_in_environment()
 
-        mock_env.set.assert_called_once_with("GITEA_TOKEN", "test-gitea-token")
+        mock_env.set.assert_called_once_with("SAPIENS_GITEA_TOKEN", "test-gitea-token")
 
     @patch("repo_sapiens.cli.init.EnvironmentBackend")
     def test_store_in_environment_with_goose_provider_key(self, mock_env_class, tmp_path, mock_repo_info):
@@ -849,7 +849,7 @@ class TestRepoInitializerStoreCredentials:
         initializer._store_in_environment()
 
         assert mock_env.set.call_count == 2
-        mock_env.set.assert_any_call("GITEA_TOKEN", "test-gitea-token")
+        mock_env.set.assert_any_call("SAPIENS_GITEA_TOKEN", "test-gitea-token")
         mock_env.set.assert_any_call("ANTHROPIC_API_KEY", "sk-ant-key")
 
     @patch("repo_sapiens.cli.init.KeyringBackend")
@@ -990,7 +990,7 @@ class TestRepoInitializerGenerateConfig:
         assert config_path.exists()
         content = config_path.read_text()
 
-        assert "${GITEA_TOKEN}" in content
+        assert "${SAPIENS_GITEA_TOKEN}" in content
         assert "provider_type: claude-api" in content
         assert "${CLAUDE_API_KEY}" in content
         assert "local_mode: false" in content
@@ -1326,7 +1326,7 @@ class TestRepoInitializerValidateSetup:
 
         initializer._validate_setup()
 
-        mock_resolver.resolve.assert_called_once_with("${GITEA_TOKEN}", cache=False)
+        mock_resolver.resolve.assert_called_once_with("${SAPIENS_GITEA_TOKEN}", cache=False)
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
     def test_validate_setup_failure_handled_gracefully(self, mock_resolver_class, tmp_path, mock_repo_info):

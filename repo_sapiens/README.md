@@ -195,7 +195,7 @@ workflow:
 
 ## State Management
 
-State files stored in `.automation/state/`:
+State files stored in `.sapiens/state/`:
 
 ```json
 {

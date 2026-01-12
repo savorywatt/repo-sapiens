@@ -377,7 +377,7 @@ class TestWorkflowConfig:
         config = WorkflowConfig()
 
         assert config.plans_directory == "plans"
-        assert config.state_directory == ".automation/state"
+        assert config.state_directory == ".sapiens/state"
         assert config.branching_strategy == "per-agent"
         assert config.max_concurrent_tasks == 3
         assert config.review_approval_threshold == 0.8

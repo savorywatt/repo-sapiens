@@ -17,7 +17,7 @@ log = structlog.get_logger(__name__)
 class CheckpointManager:
     """Manage workflow checkpoints for recovery."""
 
-    def __init__(self, checkpoint_dir: str = ".automation/checkpoints") -> None:
+    def __init__(self, checkpoint_dir: str = ".sapiens/checkpoints") -> None:
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self._locks: dict[str, asyncio.Lock] = {}

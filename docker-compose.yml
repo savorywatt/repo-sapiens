@@ -27,7 +27,7 @@ services:
       - AUTOMATION__WORKFLOW__BRANCHING_STRATEGY=${BRANCHING_STRATEGY:-per-agent}
 
       # State directory
-      - AUTOMATION__WORKFLOW__STATE_DIRECTORY=/workspace/.automation/state
+      - AUTOMATION__WORKFLOW__STATE_DIRECTORY=/workspace/.sapiens/state
       - AUTOMATION__WORKFLOW__PLANS_DIRECTORY=/workspace/plans
     volumes:
       # Mount workspace for file operations

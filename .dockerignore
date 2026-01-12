@@ -57,6 +57,7 @@ plans/
 
 # Project specific
 .automation/
+.sapiens/
 workspace/
 *.egg-info/
 test_*.py

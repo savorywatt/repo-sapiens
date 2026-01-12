@@ -135,7 +135,7 @@ agent_provider:
 workflow:
   branching_strategy: per-agent
   max_concurrent_tasks: 3
-  state_directory: .automation/state
+  state_directory: .sapiens/state
 ```
 
 ### Environment Variables

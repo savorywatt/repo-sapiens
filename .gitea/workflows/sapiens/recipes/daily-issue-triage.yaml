@@ -27,6 +27,7 @@ on:
 jobs:
   triage-issues:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -38,10 +39,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install repo-sapiens
-        run: |
-          pip install repo-sapiens
-          # Ensure pip scripts are in PATH
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: pip install repo-sapiens
 
       - name: Triage issues
         env:

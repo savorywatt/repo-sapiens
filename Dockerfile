@@ -55,7 +55,7 @@ USER sapiens
 WORKDIR /workspace
 
 # Environment variables (override these in CI/CD)
-ENV AUTOMATION__WORKFLOW__STATE_DIRECTORY=/workspace/.automation/state \
+ENV AUTOMATION__WORKFLOW__STATE_DIRECTORY=/workspace/.sapiens/state \
     AUTOMATION__WORKFLOW__PLANS_DIRECTORY=/workspace/plans \
     PYTHONUNBUFFERED=1
 
