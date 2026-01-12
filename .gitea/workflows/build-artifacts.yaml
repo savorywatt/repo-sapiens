@@ -106,7 +106,7 @@ jobs:
 
       - name: Install from wheel
         run: |
-          uv pip install --system dist/*.whl
+          uv pip install dist/*.whl
           sapiens --help
 
       - name: Test package import
