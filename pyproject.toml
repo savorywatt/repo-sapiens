@@ -82,6 +82,7 @@ repo_sapiens = [
     "templates/**/*.j2",
     "templates/**/*.json",
     "templates/**/*.yaml",
+    "templates/**/*.md",
 ]
 
 [tool.black]

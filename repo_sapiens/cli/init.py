@@ -1607,6 +1607,41 @@ tags:
 
         click.echo()
 
+        # Deploy README to sapiens directory
+        if deploy_core and self.provider_type != "gitlab":
+            readme_content = None
+            try:
+                # Try to read README from templates
+                repo_root = Path(__file__).parent.parent.parent
+                readme_path = repo_root / "templates" / "workflows" / "sapiens-README.md"
+                if readme_path.exists():
+                    readme_content = readme_path.read_text()
+
+                # Try package templates
+                if readme_content is None:
+                    package_dir = Path(__file__).parent.parent
+                    readme_path = package_dir / "templates" / "workflows" / "sapiens-README.md"
+                    if readme_path.exists():
+                        readme_content = readme_path.read_text()
+
+                # Try importlib.resources
+                if readme_content is None:
+                    readme_files = (
+                        importlib.resources.files("repo_sapiens") / "templates" / "workflows" / "sapiens-README.md"
+                    )
+                    if readme_files.is_file():
+                        readme_content = readme_files.read_text()
+
+                if readme_content:
+                    sapiens_dir = workflows_dir / "sapiens"
+                    readme_file = sapiens_dir / "README.md"
+                    readme_file.write_text(readme_content)
+                    click.echo("   ✓ Documentation → sapiens/README.md")
+            except Exception:
+                pass  # Non-critical, skip if fails
+
+        click.echo()
+
         # Ask about recipe workflows (one by one in interactive mode)
         if not self.non_interactive:  # nosec B105
             click.echo("Recipe workflows available:")
