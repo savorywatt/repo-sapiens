@@ -17,23 +17,27 @@ The automation system provides several workflows that run automatically in respo
 
 ## Workflow Files
 
-All workflows are located in `.gitea/workflows/`:
+Sapiens-managed workflows are located in `.gitea/workflows/sapiens/`:
 
 ```
 .gitea/workflows/
-├── needs-planning.yaml    # Issue planning handler
-├── approved.yaml          # Approved plan handler
-├── execute-task.yaml      # Task execution
-├── needs-review.yaml      # Code review workflow
-├── needs-fix.yaml         # Fix workflow
-├── requires-qa.yaml       # QA workflow
-├── build-artifacts.yaml   # Build artifacts
-└── test.yaml              # Test runner
+├── sapiens/
+│   ├── needs-planning.yaml    # Issue planning handler
+│   ├── approved.yaml          # Approved plan handler
+│   ├── execute-task.yaml      # Task execution
+│   ├── needs-review.yaml      # Code review workflow
+│   ├── needs-fix.yaml         # Fix workflow
+│   ├── requires-qa.yaml       # QA workflow
+│   ├── automation-daemon.yaml # Scheduled issue processor
+│   ├── process-issue.yaml     # Manual issue processor
+│   └── recipes/               # Optional recipe workflows
+├── build-artifacts.yaml       # Build artifacts (repo-specific)
+└── test.yaml                  # Test runner (repo-specific)
 ```
 
 ## Needs Planning Workflow
 
-**File:** `.gitea/workflows/needs-planning.yaml`
+**File:** `.gitea/workflows/sapiens/needs-planning.yaml`
 
 **Triggers:**
 - Issue labeled with `needs-planning`
@@ -71,7 +75,7 @@ All workflows are located in `.gitea/workflows/`:
 
 **How It Works:**
 
-1. Runs code linters (black, ruff)
+1. Runs code linters (ruff)
 2. Runs type checker (mypy)
 3. Runs test suite with coverage
 4. Uploads coverage report
@@ -125,9 +129,9 @@ Workflows use these environment variables:
 - `SAPIENS_CLAUDE_API_KEY`: Claude API key
 
 ### Gitea Actions Context Variables
-For Gitea workflows, use the `gitea.event.*` context:
+For Gitea workflows, use the `gitea.*` context:
 - `gitea.event.issue.number`: Issue number
-- `gitea.event.repository.owner.login`: Repository owner
+- `gitea.repository_owner`: Repository owner
 - `gitea.event.repository.name`: Repository name
 - `gitea.server_url`: Gitea server URL
 
@@ -208,7 +212,7 @@ export GITEA_TOKEN="your-token"
 export CLAUDE_API_KEY="your-key"
 
 # Run command
-sapiens process-issue --issue 42 --stage planning
+sapiens process-issue --issue 42
 ```
 
 ### State Inspection
@@ -216,11 +220,14 @@ sapiens process-issue --issue 42 --stage planning
 Check workflow state:
 
 ```bash
-# View state files
-ls -la .automation/state/
+# View state files (new location)
+ls -la .sapiens/state/
 
 # Read state
-cat .automation/state/42.json
+cat .sapiens/state/42.json
+
+# Legacy workflows may still use:
+# ls -la .automation/state/
 ```
 
 ## Additional Resources

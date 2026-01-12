@@ -56,7 +56,7 @@ repo-sapiens is an AI-driven automation system that transforms repository manage
 
 Before installing repo-sapiens, ensure you have:
 
-- **Python 3.11 or higher** - Check with: `python --version` or `python3 --version`
+- **Python 3.12 or higher** - Check with: `python --version` or `python3 --version`
 - **Git** - Check with: `git --version`
 - **Access to a Git provider** - GitHub, Gitea, or GitLab
 - **API tokens** - From your Git provider (and optionally from Claude API or other AI providers)
@@ -70,7 +70,7 @@ The easiest way to install repo-sapiens is from PyPI:
 pip install repo-sapiens
 
 # Verify installation
-repo-sapiens --version
+sapiens --version
 ```
 
 ### Installing from Source
@@ -447,7 +447,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install repo-sapiens
         run: pip install repo-sapiens
@@ -463,7 +463,7 @@ jobs:
 
 ```yaml
 automation:
-  image: python:3.11
+  image: python:3.12
   stage: automation
   rules:
     - if: $CI_PIPELINE_SOURCE == "issue"
@@ -513,7 +513,7 @@ agent_provider:
 **For Docker**:
 
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # ... install repo-sapiens ...
 
@@ -631,7 +631,7 @@ nohup sapiens --config my_config.yaml daemon --interval 60 > sapiens.log 2>&1 &
 
 # Using systemd (create /etc/systemd/system/sapiens.service)
 [Unit]
-Description=repo-sapiens Automation Daemon
+Description=sapiens Automation Daemon
 After=network.target
 
 [Service]

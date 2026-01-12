@@ -1,6 +1,6 @@
 # repo-sapiens
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://badge.fury.io/py/repo-sapiens.svg)](https://pypi.org/project/repo-sapiens/)
 
@@ -41,7 +41,7 @@ An AI-driven automation system for Git workflows with support for multiple AI ag
   - `sapiens health-check` - System health monitoring
 
 - **Developer Experience**
-  - 63% test coverage with 936+ unit tests
+  - 78% test coverage with 76 unit tests
   - Type hints throughout (mypy strict mode)
   - Pre-commit hooks for code quality
   - Comprehensive documentation
@@ -96,25 +96,23 @@ REPL commands:
 - `/model <name>` - Switch to a different model
 - `/pwd` - Show current working directory
 - `/verbose` - Toggle verbose output
+- `/clear` - Clear conversation history
 - `/quit` - Exit REPL
 
 ### Basic CLI Usage
 
 ```bash
-# List active plans
-sapiens list-active-plans
-
 # Process a specific issue
-sapiens process-issue --issue 42 --stage planning
+sapiens process-issue --issue 42
 
 # Check system health
 sapiens health-check
 
-# Check for stale workflows
-sapiens check-stale --max-age-hours 24
-
 # Run as daemon
 sapiens daemon --interval 60
+
+# Manage credentials
+sapiens credentials get @keyring:gitea/api_token
 ```
 
 ## Configuration
@@ -125,12 +123,12 @@ Located at `repo_sapiens/config/automation_config.yaml`:
 
 ```yaml
 git_provider:
-  type: gitea  # or 'github', 'gitlab'
+  provider_type: gitea  # or 'github', 'gitlab'
   base_url: ${GITEA_BASE_URL:-https://gitea.example.com}
   api_token: ${GITEA_TOKEN}  # or GITHUB_TOKEN, GITLAB_TOKEN
 
 agent_provider:
-  type: claude  # or 'goose', 'ollama'
+  provider_type: claude-local  # or 'claude-api', 'goose-local', 'goose-api', 'ollama', 'openai'
   model: claude-sonnet-4.5
   api_key: ${CLAUDE_API_KEY}
 
@@ -154,18 +152,30 @@ export AUTOMATION__WORKFLOW__MAX_CONCURRENT_TASKS="5"
 
 ### Workflow Templates
 
-The system includes workflow templates in `.gitea/workflows/`:
+The system includes workflow templates organized in `.gitea/workflows/sapiens/`:
 
+**Core Workflows:**
 | Workflow | Description |
 |----------|-------------|
-| `test.yaml` | Run tests on PRs and pushes |
+| `automation-daemon.yaml` | Periodic issue processing |
+| `process-issue.yaml` | Process individual issues |
 | `needs-planning.yaml` | Process issues labeled `needs-planning` |
 | `approved.yaml` | Create tasks from approved plans |
 | `execute-task.yaml` | Execute task implementations |
 | `needs-review.yaml` | Automated code review |
 | `requires-qa.yaml` | Run QA build and tests |
-| `automation-daemon.yaml` | Periodic issue processing |
-| `monitor.yaml` | Health monitoring |
+
+**Recipe Workflows** (`.gitea/workflows/sapiens/recipes/`):
+- `daily-issue-triage.yaml` - Automated issue triage
+- `weekly-test-coverage.yaml` - Test coverage analysis
+- `weekly-dependency-audit.yaml` - Dependency security audits
+- `weekly-security-review.yaml` - Comprehensive security scans
+- And more...
+
+**Repository Workflows** (`.gitea/workflows/`):
+- `test.yaml` - Run tests on PRs and pushes
+- `build-artifacts.yaml` - Build and test package artifacts
+- `release.yaml` - Release automation
 
 ### Required Secrets
 

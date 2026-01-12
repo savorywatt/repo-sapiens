@@ -18,9 +18,9 @@
 name: Sapiens Daemon
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
-  workflow_dispatch:  # Manual trigger
+  # schedule:
+  #   - cron: '*/5 * * * *'  # Every 5 minutes (disabled by default)
+  workflow_dispatch:  # Manual trigger only
 
 env:
   # Change this to your config file (use sapiens_config.ci.yaml for CI/CD specific config)

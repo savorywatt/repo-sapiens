@@ -212,7 +212,7 @@ class TestGiteaLabelWorkflow:
 
         path = generator.generate_label_workflow()
 
-        assert path == tmp_path / ".gitea" / "workflows" / "process-label.yaml"
+        assert path == tmp_path / ".gitea" / "workflows" / "sapiens" / "process-label.yaml"
         assert path.exists()
 
     def test_workflow_has_correct_name(self, tmp_path: Path):
@@ -324,7 +324,7 @@ class TestGitHubLabelWorkflow:
 
         path = generator.generate_label_workflow()
 
-        assert path == tmp_path / ".github" / "workflows" / "process-label.yaml"
+        assert path == tmp_path / ".github" / "workflows" / "sapiens" / "process-label.yaml"
 
     def test_workflow_uses_github_env_vars(self, tmp_path: Path):
         """Test GitHub workflow uses github-specific environment variables."""

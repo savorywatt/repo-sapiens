@@ -121,17 +121,19 @@ If no runner:
 Check that workflow files are present:
 
 ```bash
-ls -la .gitea/workflows/
+ls -la .gitea/workflows/sapiens/
 # Core workflows (installed by `sapiens init`):
 # - process-issue.yaml      # Issue event handler
 # - automation-daemon.yaml  # Scheduled processor
+# - process-label.yaml      # Label trigger processor
 #
-# Optional example workflows in templates/workflows/gitea/examples/:
+# Optional recipe workflows in templates/workflows/gitea/sapiens/recipes/:
 # - daily-issue-triage.yaml
 # - weekly-test-coverage.yaml
 # - weekly-security-review.yaml
 # - weekly-dependency-audit.yaml
 # - post-merge-docs.yaml
+# - weekly-sbom-license.yaml
 ```
 
 ### 5. Test the System
@@ -185,7 +187,7 @@ sapiens list-plans
 - [ ] Core secrets configured (`SAPIENS_GITEA_TOKEN`, `SAPIENS_CLAUDE_API_KEY`)
 - [ ] Gitea Actions enabled
 - [ ] Runner active and online
-- [ ] Workflow files present in `.gitea/workflows/`
+- [ ] Workflow files present in `.gitea/workflows/sapiens/`
 - [ ] Test issue created with label
 - [ ] Workflow triggered successfully
 - [ ] Workflow logs show no errors

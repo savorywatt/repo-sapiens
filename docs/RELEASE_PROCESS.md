@@ -21,8 +21,8 @@ Manually update files, commit, and push tags (see Manual Release section).
 
 The release automation uses two workflows:
 
-1. **`.gitea/workflows/prepare-release.yaml`** - Prepares release files (manual trigger)
-2. **`.gitea/workflows/release.yaml`** - Builds and publishes (triggered by tags)
+1. **`.gitea/workflows/sapiens/prepare-release.yaml`** - Prepares release files (manual trigger)
+2. **`.gitea/workflows/sapiens/release.yaml`** - Builds and publishes (triggered by tags)
 
 When you run the prepare-release workflow, it automatically triggers the release workflow by pushing a version tag.
 

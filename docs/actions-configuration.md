@@ -4,7 +4,7 @@ This document explains the Gitea Actions workflows and how to configure them for
 
 ## Workflow Files Overview
 
-The system includes workflow files in `.gitea/workflows/`:
+The system includes workflow files in `.gitea/workflows/sapiens/`:
 
 ### Label-Triggered Workflows
 
@@ -16,7 +16,8 @@ The system includes workflow files in `.gitea/workflows/`:
 | `needs-review.yaml` | `needs-review` | Code review workflow |
 | `needs-fix.yaml` | `needs-fix` | Handle fix requests |
 | `requires-qa.yaml` | `requires-qa` | QA workflow |
-| `build-artifacts.yaml` | `build-artifacts` | Build artifacts |
+| `automation-daemon.yaml` | (scheduled) | Periodic issue processing |
+| `process-issue.yaml` | (manual dispatch) | On-demand issue processing |
 
 ### test.yaml
 
@@ -27,14 +28,14 @@ The system includes workflow files in `.gitea/workflows/`:
 - Pushes to main
 
 **Process:**
-1. Runs linters (black, ruff)
+1. Runs linters (ruff)
 2. Runs type checker (mypy)
 3. Runs test suite with coverage
 4. Uploads coverage report
 
 **Configuration:**
 - Runs on: `ubuntu-latest`
-- Python: 3.11
+- Python: 3.12
 
 **Customization:**
 ```yaml
@@ -70,26 +71,34 @@ env:
 
 ### Python Dependencies
 
-All workflows install the package:
+Sapiens automation workflows install the package from PyPI:
 ```yaml
 - name: Install dependencies
-  run: pip install -e .
+  run: pip install repo-sapiens
 ```
 
-For development workflows (test.yaml):
+For development workflows (test.yaml), use uv:
 ```yaml
 - name: Install dependencies
-  run: pip install -e ".[dev]"
+  run: uv sync --all-extras
 ```
 
 ### Caching
 
-Workflows use pip caching for faster runs:
+Development workflows use uv caching:
+```yaml
+- name: Install uv
+  uses: astral-sh/setup-uv@v3
+  with:
+    enable-cache: false  # Disable for local Gitea
+```
+
+Production workflows may cache pip dependencies:
 ```yaml
 - name: Setup Python
   uses: actions/setup-python@v5
   with:
-    python-version: '3.11'
+    python-version: '3.12'
     cache: 'pip'  # Cache pip dependencies
 ```
 
@@ -117,7 +126,7 @@ curl -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
 
 ### Creating Custom Workflow
 
-Create `.gitea/workflows/custom.yaml`:
+Create `.gitea/workflows/sapiens/custom.yaml`:
 
 ```yaml
 name: Custom Workflow
@@ -138,11 +147,11 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
       - name: Install dependencies
-        run: pip install -e .
+        run: pip install repo-sapiens
 
       - name: Run custom command
         env:

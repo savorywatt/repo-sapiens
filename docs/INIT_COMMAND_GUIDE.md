@@ -508,7 +508,7 @@ CI/CD workflows run in isolated environments and need credentials to:
 Gitea Actions workflows access secrets via `${{ secrets.SECRET_NAME }}`:
 
 ```yaml
-# .gitea/workflows/automation-daemon.yaml
+# .gitea/workflows/sapiens/automation-daemon.yaml
 name: Automation Daemon
 
 on:
