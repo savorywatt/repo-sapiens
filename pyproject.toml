@@ -136,6 +136,8 @@ module = [
     "repo_sapiens.cli.init",
     "repo_sapiens.cli.credentials",
     "repo_sapiens.cli.health",
+    "repo_sapiens.cli.process_label",
+    "repo_sapiens.engine.event_classifier",
     "repo_sapiens.engine.stages.qa",
     "repo_sapiens.engine.stages.approval",
     "repo_sapiens.engine.stages.pr_review",
