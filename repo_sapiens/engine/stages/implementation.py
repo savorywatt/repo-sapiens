@@ -32,9 +32,7 @@ class ImplementationStage(WorkflowStage):
             # 2. Check dependencies are complete
             if not await self._check_dependencies(plan_id, task):
                 log.warning("dependencies_not_complete", task_id=task.id)
-                await self.git.add_comment(
-                    issue.number, "⏳ Task dependencies not yet complete. Waiting..."
-                )
+                await self.git.add_comment(issue.number, "⏳ Task dependencies not yet complete. Waiting...")
                 return
 
             # 3. Create/checkout branch based on strategy
@@ -67,9 +65,7 @@ class ImplementationStage(WorkflowStage):
             )
 
             # 7. Tag issue for code review
-            labels = [
-                label for label in issue.labels if label != self.settings.tags.needs_implementation
-            ]
+            labels = [label for label in issue.labels if label != self.settings.tags.needs_implementation]
             labels.append(self.settings.tags.code_review)
             await self.git.update_issue(issue.number, labels=labels)
 
@@ -138,9 +134,7 @@ class ImplementationStage(WorkflowStage):
         for dep_id in task.dependencies:
             dep_status = tasks_state.get(dep_id, {}).get("status")
             if dep_status not in ["code_review", "merge_ready", "completed"]:
-                log.info(
-                    "dependency_not_ready", task_id=task.id, dependency=dep_id, status=dep_status
-                )
+                log.info("dependency_not_ready", task_id=task.id, dependency=dep_id, status=dep_status)
                 return False
 
         return True

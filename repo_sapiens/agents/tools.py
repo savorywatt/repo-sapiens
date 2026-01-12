@@ -367,9 +367,7 @@ class ToolRegistry:
             max_matches = 50
             if len(lines) > max_matches:
                 lines = lines[:max_matches]
-                lines.append(
-                    f"\n[Truncated - showing first {max_matches} of {len(output.split(chr(10)))} matches]"
-                )
+                lines.append(f"\n[Truncated - showing first {max_matches} of {len(output.split(chr(10)))} matches]")
 
             # Convert absolute paths to relative paths
             formatted_lines = []

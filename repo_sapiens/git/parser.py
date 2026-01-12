@@ -70,9 +70,7 @@ class GitUrlParser:
 
     # Regex pattern for HTTPS format: https://host/path or http://host/path
     # Matches: https://gitea.com/owner/repo.git or https://gitea.com:3000/owner/repo
-    HTTPS_PATTERN = re.compile(
-        r"^https?://(?P<host>[a-zA-Z0-9._-]+)(?::(?P<port>\d+))?/(?P<path>.+?)(?:\.git)?$"
-    )
+    HTTPS_PATTERN = re.compile(r"^https?://(?P<host>[a-zA-Z0-9._-]+)(?::(?P<port>\d+))?/(?P<path>.+?)(?:\.git)?$")
 
     def __init__(self, url: str) -> None:
         """Initialize parser.

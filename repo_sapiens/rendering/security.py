@@ -132,6 +132,4 @@ class SecurityAudit:
         severity_order = ["low", "medium", "high", "critical"]
         min_index = severity_order.index(min_severity)
 
-        return [
-            event for event in self.events if severity_order.index(event["severity"]) >= min_index
-        ]
+        return [event for event in self.events if severity_order.index(event["severity"]) >= min_index]

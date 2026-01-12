@@ -363,9 +363,7 @@ class TestFindAvailableTemplates:
 
         assert len(templates) == 1
 
-    def test_find_available_templates_both_root_and_examples(
-        self, tmp_path, sample_template_content
-    ):
+    def test_find_available_templates_both_root_and_examples(self, tmp_path, sample_template_content):
         """Should find templates in both root and examples."""
         gitea_dir = tmp_path / "gitea"
         gitea_dir.mkdir()
@@ -936,12 +934,8 @@ class TestTemplateUpdaterRun:
     ):
         """Should not apply updates in check-only mode."""
         mock_find_templates.return_value = tmp_path / "templates"
-        mock_find_installed.return_value = [
-            {"name": "sapiens-ci", "version": "1.0.0", "path": tmp_path / "ci.yaml"}
-        ]
-        mock_find_available.return_value = [
-            {"name": "sapiens-ci", "version": "2.0.0", "path": tmp_path / "new.yaml"}
-        ]
+        mock_find_installed.return_value = [{"name": "sapiens-ci", "version": "1.0.0", "path": tmp_path / "ci.yaml"}]
+        mock_find_available.return_value = [{"name": "sapiens-ci", "version": "2.0.0", "path": tmp_path / "new.yaml"}]
 
         updater = TemplateUpdater(
             repo_path=tmp_path,
@@ -1053,9 +1047,7 @@ class TestUpdateCommand:
 
     def test_update_command_handles_git_discovery_error(self, cli_runner, tmp_path):
         """Should handle GitDiscoveryError gracefully."""
-        with patch.object(
-            TemplateUpdater, "run", side_effect=GitDiscoveryError("No Git repository")
-        ):
+        with patch.object(TemplateUpdater, "run", side_effect=GitDiscoveryError("No Git repository")):
             result = cli_runner.invoke(
                 update_command,
                 ["--repo-path", str(tmp_path)],
@@ -1113,9 +1105,7 @@ class TestUpdateCommand:
 class TestTemplateUpdaterIntegration:
     """Integration-style tests combining multiple components."""
 
-    def test_full_update_workflow_gitea(
-        self, tmp_path, sample_template_content, sample_template_v2_content
-    ):
+    def test_full_update_workflow_gitea(self, tmp_path, sample_template_content, sample_template_v2_content):
         """Test complete update workflow for Gitea repository."""
         # Setup: Create mock repository structure
         workflows_dir = tmp_path / ".gitea" / "workflows"
@@ -1149,9 +1139,7 @@ class TestTemplateUpdaterIntegration:
         # Verify file was updated
         assert "2.0.0" in installed_file.read_text()
 
-    def test_check_only_mode_no_changes(
-        self, tmp_path, sample_template_content, sample_template_v2_content
-    ):
+    def test_check_only_mode_no_changes(self, tmp_path, sample_template_content, sample_template_v2_content):
         """Test check-only mode does not modify files."""
         # Setup installed template
         workflows_dir = tmp_path / ".gitea" / "workflows"

@@ -178,9 +178,7 @@ class DependencyTracker:
             for dep_id in task.dependencies:
                 # Check for invalid dependency reference
                 if dep_id not in self.tasks:
-                    raise ValueError(
-                        f"Invalid dependency: {dep_id} referenced by {task_id} but not found"
-                    )
+                    raise ValueError(f"Invalid dependency: {dep_id} referenced by {task_id} but not found")
 
                 if dep_id not in visited:
                     if has_cycle(dep_id, visited, rec_stack):

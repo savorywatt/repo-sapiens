@@ -65,9 +65,7 @@ class TestAllTemplates:
 
         # Verify we have at least 12 templates (base.yaml.j2 doesn't count)
         workflow_templates = [t for t in templates if not t.startswith("base")]
-        assert (
-            len(workflow_templates) >= 12
-        ), f"Expected at least 12 templates, found {len(workflow_templates)}"
+        assert len(workflow_templates) >= 12, f"Expected at least 12 templates, found {len(workflow_templates)}"
 
     def test_ci_build_template(self, renderer, base_config):
         """Test CI build workflow template."""
@@ -284,10 +282,7 @@ class TestAllTemplates:
                             continue
 
                         # Skip built-in filters like int, lower, default
-                        if any(
-                            builtin in match
-                            for builtin in ["| int", "| lower", "| default", "| upper"]
-                        ):
+                        if any(builtin in match for builtin in ["| int", "| lower", "| default", "| upper"]):
                             continue
 
                         # Variables that take user input should have security filters
@@ -309,16 +304,12 @@ class TestAllTemplates:
                         var_name = match.split("|")[0].strip().split(".")[0].strip()
                         if var_name in user_input_vars:
                             has_filter = "|" in match and any(
-                                f"| {f}" in match
-                                for f in ["safe_url", "safe_identifier", "safe_label"]
+                                f"| {f}" in match for f in ["safe_url", "safe_identifier", "safe_label"]
                             )
                             if not has_filter:
                                 # This is informational - some variables may be safe without filters
                                 # but we log them for review
-                                print(
-                                    f"Warning: {template_name} has {var_name} "
-                                    "without explicit security filter"
-                                )
+                                print(f"Warning: {template_name} has {var_name} " "without explicit security filter")
 
             except Exception as e:
                 print(f"Could not check template {template_name}: {str(e)}")

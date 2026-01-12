@@ -227,11 +227,7 @@ class TaskExecutionStage(WorkflowStage):
                         "setup" in task_title_lower
                         or "structure" in task_title_lower
                         or "initialize" in task_title_lower
-                    ) or (
-                        "implement" in task_title_lower
-                        or "add" in task_title_lower
-                        or "create" in task_title_lower
-                    ):
+                    ) or ("implement" in task_title_lower or "add" in task_title_lower or "create" in task_title_lower):
                         commit_type = "feat"
                     elif "fix" in task_title_lower or "bug" in task_title_lower:
                         commit_type = "fix"
@@ -285,9 +281,7 @@ class TaskExecutionStage(WorkflowStage):
             # Create or get pull request (plan-based, shared across all tasks)
             # Do this AFTER updating issue labels so the checklist reflects the completed task
             pr_title = f"{plan_label.replace('plan-', 'Plan #')}: {original_issue.title}"
-            pr_body = await self._format_plan_pr_body(
-                plan_label, original_issue, task_num, total_tasks
-            )
+            pr_body = await self._format_plan_pr_body(plan_label, original_issue, task_num, total_tasks)
 
             pr = await self.git.create_pull_request(
                 title=pr_title,
@@ -455,10 +449,7 @@ class TaskExecutionStage(WorkflowStage):
                 "",
                 "---",
                 "",
-                (
-                    f"**Related Issues**: Closes #{task_issue.number}, "
-                    f"Implements #{original_issue.number}"
-                ),
+                (f"**Related Issues**: Closes #{task_issue.number}, " f"Implements #{original_issue.number}"),
                 "",
                 "🤖 Posted by Builder Automation",
             ]

@@ -429,6 +429,4 @@ def create_backend(
             timeout=timeout,
         )
     else:
-        raise ValueError(
-            f"Unknown backend type: {backend_type}. " f"Supported types: 'ollama', 'openai'"
-        )
+        raise ValueError(f"Unknown backend type: {backend_type}. " f"Supported types: 'ollama', 'openai'")

@@ -86,9 +86,7 @@ class ProposalStage(WorkflowStage):
             )
 
             # Update labels on original issue
-            updated_labels = [
-                label for label in issue.labels if label != self.settings.tags.needs_planning
-            ]
+            updated_labels = [label for label in issue.labels if label != self.settings.tags.needs_planning]
             updated_labels.append("awaiting-approval")
 
             await self.git.update_issue(
@@ -102,9 +100,7 @@ class ProposalStage(WorkflowStage):
             log.error("proposal_stage_failed", issue=issue.number, error=str(e), exc_info=True)
             await self.git.add_comment(
                 issue.number,
-                f"❌ **Plan Generation Failed**\n\n"
-                f"Error: {str(e)}\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"❌ **Plan Generation Failed**\n\n" f"Error: {str(e)}\n\n" f"🤖 Posted by Builder Automation",
             )
             raise
 
@@ -135,10 +131,7 @@ class ProposalStage(WorkflowStage):
                         f"### Task {i}: {task.title}",
                         "",
                         f"**ID**: {task.id}",
-                        (
-                            f"**Dependencies**: "
-                            f"{', '.join(task.dependencies) if task.dependencies else 'None'}"
-                        ),
+                        (f"**Dependencies**: " f"{', '.join(task.dependencies) if task.dependencies else 'None'}"),
                         "",
                         task.description,
                         "",

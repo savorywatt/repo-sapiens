@@ -255,9 +255,7 @@ def mock_settings(tmp_path):
 class TestTaskExecutionStageCoverage:
     """Additional coverage tests for TaskExecutionStage."""
 
-    def test_format_pr_body(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_format_pr_body(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _format_pr_body method formats PR body correctly."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -359,9 +357,7 @@ Implement the feature logic.
         assert "This task required:" not in body
 
     @pytest.mark.asyncio
-    async def test_format_plan_pr_body(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_format_plan_pr_body(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _format_plan_pr_body method."""
         # Create task issues for the plan
         task1 = Issue(
@@ -526,9 +522,7 @@ Implement the feature logic.
         result = stage._extract_dependencies(body)
         assert result == []
 
-    def test_slugify_special_chars(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_slugify_special_chars(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _slugify handles special characters."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -550,9 +544,7 @@ Implement the feature logic.
 class TestFixExecutionStageCoverage:
     """Additional coverage tests for FixExecutionStage."""
 
-    def test_extract_feedback(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_feedback(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _extract_feedback method."""
         stage = FixExecutionStage(
             git=mock_git_provider,
@@ -722,9 +714,7 @@ Some other info.
 class TestImplementationStageCoverage:
     """Additional coverage tests for ImplementationStage."""
 
-    def test_extract_task_from_issue(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_task_from_issue(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _extract_task_from_issue method."""
         stage = ImplementationStage(
             git=mock_git_provider,
@@ -793,9 +783,7 @@ Implement user authentication with JWT tokens.
         task = stage._extract_task_from_issue(issue)
         assert task.id == "unknown"
 
-    def test_extract_plan_id(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_plan_id(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _extract_plan_id method."""
         stage = ImplementationStage(
             git=mock_git_provider,
@@ -894,9 +882,7 @@ Implement user authentication with JWT tokens.
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_build_task_context(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_build_task_context(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _build_task_context method."""
         mock_state_manager.load_state.return_value = {
             "plan_id": "42",
@@ -935,9 +921,7 @@ Implement user authentication with JWT tokens.
         assert context["dependencies_completed"][0]["task_id"] == "task-1"
 
     @pytest.mark.asyncio
-    async def test_get_plan_path(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_get_plan_path(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _get_plan_path method."""
         mock_state_manager.load_state.return_value = {
             "plan_id": "42",
@@ -1019,9 +1003,7 @@ Implement task 2
             settings=mock_settings,
         )
 
-        with patch(
-            "repo_sapiens.engine.stages.implementation.get_branching_strategy"
-        ) as mock_branching:
+        with patch("repo_sapiens.engine.stages.implementation.get_branching_strategy") as mock_branching:
             mock_strategy = MagicMock()
             mock_strategy.create_task_branch = AsyncMock(return_value="feature/task-2")
             mock_branching.return_value = mock_strategy
@@ -1044,9 +1026,7 @@ Implement task 2
 class TestMergeStageCoverage:
     """Additional coverage tests for MergeStage."""
 
-    def test_extract_plan_id(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_plan_id(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _extract_plan_id method."""
         stage = MergeStage(
             git=mock_git_provider,
@@ -1059,9 +1039,7 @@ class TestMergeStageCoverage:
         assert stage._extract_plan_id("Plan #123 implementation") == "123"
         assert stage._extract_plan_id("No plan here") == ""
 
-    def test_get_plan_title(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_get_plan_title(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _get_plan_title method."""
         stage = MergeStage(
             git=mock_git_provider,
@@ -1076,9 +1054,7 @@ class TestMergeStageCoverage:
         state_empty = {}
         assert stage._get_plan_title(state_empty) == "Plan unknown"
 
-    def test_generate_pr_body(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_generate_pr_body(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _generate_pr_body method."""
         stage = MergeStage(
             git=mock_git_provider,
@@ -1118,9 +1094,7 @@ class TestMergeStageCoverage:
         assert "file2.py" in body
         assert "file3.py" in body
 
-    def test_generate_pr_body_no_files(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_generate_pr_body_no_files(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _generate_pr_body when no files listed."""
         stage = MergeStage(
             git=mock_git_provider,
@@ -1185,9 +1159,7 @@ class TestMergeStageCoverage:
         mock_git_provider.create_pull_request.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_execute_success(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_execute_success(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test successful merge stage execution."""
         mock_state_manager.load_state.return_value = {
             "plan_id": "42",
@@ -1251,9 +1223,7 @@ class TestMergeStageCoverage:
 class TestPlanReviewStageCoverage:
     """Additional coverage tests for PlanReviewStage."""
 
-    def test_extract_plan_id(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_plan_id(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _extract_plan_id method."""
         stage = PlanReviewStage(
             git=mock_git_provider,
@@ -1266,9 +1236,7 @@ class TestPlanReviewStageCoverage:
         assert stage._extract_plan_id("No reference here") == ""
         assert stage._extract_plan_id("Original Issue: #123") == "123"
 
-    def test_extract_plan_path(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_plan_path(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _extract_plan_path method."""
         stage = PlanReviewStage(
             git=mock_git_provider,
@@ -1281,9 +1249,7 @@ class TestPlanReviewStageCoverage:
         assert stage._extract_plan_path("No path here") == ""
         assert stage._extract_plan_path("Plan File: `some/other/path.md`") == "some/other/path.md"
 
-    def test_create_task_issue_body(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_create_task_issue_body(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test _create_task_issue_body method."""
         stage = PlanReviewStage(
             git=mock_git_provider,
@@ -1335,9 +1301,7 @@ class TestPlanReviewStageCoverage:
         assert "task-init" in body
 
     @pytest.mark.asyncio
-    async def test_execute_no_plan_id(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_execute_no_plan_id(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test execute when plan_id cannot be extracted."""
         issue = Issue(
             id=50,
@@ -1391,9 +1355,7 @@ class TestPlanReviewStageCoverage:
             await stage.execute(issue)
 
     @pytest.mark.asyncio
-    async def test_execute_success(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_execute_success(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test successful plan review execution."""
         issue = Issue(
             id=50,
@@ -1489,9 +1451,7 @@ class TestHandleStageError:
             await stage.execute(issue)
 
     @pytest.mark.asyncio
-    async def test_merge_handle_error(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    async def test_merge_handle_error(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test MergeStage error handling."""
         mock_state_manager.load_state.side_effect = Exception("State load failed")
 

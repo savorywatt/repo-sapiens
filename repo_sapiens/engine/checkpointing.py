@@ -28,9 +28,7 @@ class CheckpointManager:
             self._locks[plan_id] = asyncio.Lock()
         return self._locks[plan_id]
 
-    async def create_checkpoint(
-        self, plan_id: str, stage: str, checkpoint_data: dict[str, Any]
-    ) -> str:
+    async def create_checkpoint(self, plan_id: str, stage: str, checkpoint_data: dict[str, Any]) -> str:
         """Create a recovery checkpoint."""
         checkpoint_id = f"{plan_id}-{stage}-{int(datetime.now(UTC).timestamp())}"
 
@@ -49,9 +47,7 @@ class CheckpointManager:
         log.info("checkpoint_created", checkpoint_id=checkpoint_id, stage=stage)
         return checkpoint_id
 
-    async def get_latest_checkpoint(
-        self, plan_id: str, stage: str | None = None
-    ) -> dict[str, Any] | None:
+    async def get_latest_checkpoint(self, plan_id: str, stage: str | None = None) -> dict[str, Any] | None:
         """Get the most recent checkpoint for a plan."""
         pattern = f"{plan_id}-{stage}-*" if stage else f"{plan_id}-*"
         checkpoints = sorted(self.checkpoint_dir.glob(f"{pattern}.json"), reverse=True)

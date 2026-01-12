@@ -129,11 +129,7 @@ class InvalidGitUrlError(GitDiscoveryError):
 
         super().__init__(
             message=msg,
-            hint=(
-                "Expected formats:\n"
-                "  - git@gitea.com:owner/repo.git\n"
-                "  - https://gitea.com/owner/repo.git"
-            ),
+            hint=("Expected formats:\n" "  - git@gitea.com:owner/repo.git\n" "  - https://gitea.com/owner/repo.git"),
         )
         self.url = url
 

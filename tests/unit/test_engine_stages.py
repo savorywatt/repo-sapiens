@@ -275,9 +275,7 @@ def closed_issue():
 class TestApprovalStageInitialization:
     """Tests for ApprovalStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly with all required providers."""
         stage = ApprovalStage(
             git=mock_git_provider,
@@ -291,9 +289,7 @@ class TestApprovalStageInitialization:
         assert stage.state is mock_state_manager
         assert stage.settings is mock_settings
 
-    def test_approval_keywords_defined(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_approval_keywords_defined(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test that approval keywords are properly defined."""
         stage = ApprovalStage(
             git=mock_git_provider,
@@ -553,9 +549,7 @@ Description of task 1
 class TestApprovalStageHelperMethods:
     """Tests for ApprovalStage helper methods."""
 
-    def test_is_bot_comment_true(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_is_bot_comment_true(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test bot comment detection returns True for bot comments."""
         stage = ApprovalStage(
             git=mock_git_provider,
@@ -567,9 +561,7 @@ class TestApprovalStageHelperMethods:
         assert stage._is_bot_comment("Some text\n\n\U0001F916 Posted by Builder Automation")
         assert stage._is_bot_comment("\U0001F916 Posted by Builder Automation")
 
-    def test_is_bot_comment_false(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_is_bot_comment_false(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test bot comment detection returns False for non-bot comments."""
         stage = ApprovalStage(
             git=mock_git_provider,
@@ -581,9 +573,7 @@ class TestApprovalStageHelperMethods:
         assert not stage._is_bot_comment("Regular comment")
         assert not stage._is_bot_comment("lgtm")
 
-    def test_parse_tasks_from_plan(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_parse_tasks_from_plan(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test parsing tasks from plan content."""
         stage = ApprovalStage(
             git=mock_git_provider,
@@ -667,9 +657,7 @@ class TestApprovalStageErrorHandling:
 class TestCodeReviewStageInitialization:
     """Tests for CodeReviewStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly."""
         stage = CodeReviewStage(
             git=mock_git_provider,
@@ -865,9 +853,7 @@ class TestCodeReviewStageExecute:
 class TestCodeReviewStageHelperMethods:
     """Tests for CodeReviewStage helper methods."""
 
-    def test_extract_task_id(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_task_id(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test task ID extraction from issue body."""
         stage = CodeReviewStage(
             git=mock_git_provider,
@@ -882,9 +868,7 @@ class TestCodeReviewStageHelperMethods:
         # Empty body
         assert stage._extract_task_id("") == ""
 
-    def test_extract_plan_id(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_plan_id(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test plan ID extraction from issue body."""
         stage = CodeReviewStage(
             git=mock_git_provider,
@@ -959,9 +943,7 @@ class TestCodeReviewStageHelperMethods:
 class TestTaskExecutionStageInitialization:
     """Tests for TaskExecutionStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -1081,9 +1063,7 @@ class TestTaskExecutionStageExecute:
 class TestTaskExecutionStageHelperMethods:
     """Tests for TaskExecutionStage helper methods."""
 
-    def test_extract_original_issue(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_original_issue(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test extracting original issue number from body."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -1098,9 +1078,7 @@ class TestTaskExecutionStageHelperMethods:
         # No original issue
         assert stage._extract_original_issue("No issue reference") is None
 
-    def test_extract_description(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_description(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test extracting description from task body."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -1125,9 +1103,7 @@ that spans multiple lines.
         assert "actual description" in desc
         assert "Dependencies" not in desc
 
-    def test_extract_dependencies(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_extract_dependencies(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test extracting dependencies from task body."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -1154,9 +1130,7 @@ This task requires:
         assert "Task 1" in deps
         assert "Task 2" in deps
 
-    def test_slugify(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_slugify(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test slugify method."""
         stage = TaskExecutionStage(
             git=mock_git_provider,
@@ -1181,9 +1155,7 @@ This task requires:
 class TestPlanningStageInitialization:
     """Tests for PlanningStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly."""
         stage = PlanningStage(
             git=mock_git_provider,
@@ -1314,9 +1286,7 @@ class TestPlanningStageExecute:
 class TestPlanningStageHelperMethods:
     """Tests for PlanningStage helper methods."""
 
-    def test_format_plan_basic(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_format_plan_basic(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test basic plan formatting."""
         stage = PlanningStage(
             git=mock_git_provider,
@@ -1352,9 +1322,7 @@ class TestPlanningStageHelperMethods:
         assert "**Issue:** #42" in formatted
         assert "Plan description" in formatted
 
-    def test_format_plan_with_tasks(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_format_plan_with_tasks(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test plan formatting with tasks."""
         stage = PlanningStage(
             git=mock_git_provider,
@@ -1406,9 +1374,7 @@ class TestPlanningStageHelperMethods:
         assert "### Task 2: Second Task" in formatted
         assert "**Dependencies:**" in formatted
 
-    def test_create_review_body(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_create_review_body(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test review issue body creation."""
         stage = PlanningStage(
             git=mock_git_provider,
@@ -1493,9 +1459,7 @@ class TestPlanningStageHelperMethods:
 class TestQAStageInitialization:
     """Tests for QAStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly."""
         stage = QAStage(
             git=mock_git_provider,
@@ -1883,9 +1847,7 @@ class TestStageIntegration:
 
         # Verify review issue was created with correct label
         create_call = mock_git_provider.create_issue.call_args
-        assert "Plan Review" in create_call.kwargs.get(
-            "title", create_call.args[0] if create_call.args else ""
-        )
+        assert "Plan Review" in create_call.kwargs.get("title", create_call.args[0] if create_call.args else "")
 
         # Verify original issue labels were updated
         update_call = mock_git_provider.update_issue.call_args

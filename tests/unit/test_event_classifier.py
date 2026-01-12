@@ -558,28 +558,18 @@ class TestDetermineTrigerType:
         classifier = EventClassifier(mock_settings)
 
         # Test different casing
-        assert (
-            classifier._determine_trigger_type("issues.labeled", {}, EventSource.GITEA)
-            == TriggerType.LABEL_ADDED
-        )
+        assert classifier._determine_trigger_type("issues.labeled", {}, EventSource.GITEA) == TriggerType.LABEL_ADDED
 
-        assert (
-            classifier._determine_trigger_type("Issues.Labeled", {}, EventSource.GITHUB)
-            == TriggerType.LABEL_ADDED
-        )
+        assert classifier._determine_trigger_type("Issues.Labeled", {}, EventSource.GITHUB) == TriggerType.LABEL_ADDED
 
-        assert (
-            classifier._determine_trigger_type("ISSUES.LABELED", {}, EventSource.GITEA)
-            == TriggerType.LABEL_ADDED
-        )
+        assert classifier._determine_trigger_type("ISSUES.LABELED", {}, EventSource.GITEA) == TriggerType.LABEL_ADDED
 
     def test_unlabeled_takes_precedence(self, mock_settings):
         """Test that unlabeled is detected even if 'labeled' is in the string."""
         classifier = EventClassifier(mock_settings)
 
         assert (
-            classifier._determine_trigger_type("issues.unlabeled", {}, EventSource.GITEA)
-            == TriggerType.LABEL_REMOVED
+            classifier._determine_trigger_type("issues.unlabeled", {}, EventSource.GITEA) == TriggerType.LABEL_REMOVED
         )
 
 

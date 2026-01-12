@@ -140,10 +140,7 @@ class InteractiveQAHandler:
             [
                 "",
                 "---",
-                (
-                    "*Please reply to this comment with your answer. "
-                    "The agent will continue once you respond.*"
-                ),
+                ("*Please reply to this comment with your answer. " "The agent will continue once you respond.*"),
                 "",
                 "🤖 Posted by Builder Automation",
             ]

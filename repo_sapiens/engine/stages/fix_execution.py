@@ -62,9 +62,7 @@ class FixExecutionStage(WorkflowStage):
 
         branch_name = f"{plan_label}-implementation"
 
-        log.info(
-            "fix_execution_starting", fix_proposal=issue.number, pr=pr_number, branch=branch_name
-        )
+        log.info("fix_execution_starting", fix_proposal=issue.number, pr=pr_number, branch=branch_name)
 
         try:
             # Notify start

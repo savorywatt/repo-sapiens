@@ -163,10 +163,7 @@ class CredentialResolver:
             raise BackendNotAvailableError(
                 "Keyring backend is not available on this system",
                 reference=reference,
-                suggestion=(
-                    "Install keyring: pip install keyring\n"
-                    "Or use environment variables: ${VAR_NAME}"
-                ),
+                suggestion=("Install keyring: pip install keyring\n" "Or use environment variables: ${VAR_NAME}"),
             )
 
         try:
@@ -177,8 +174,7 @@ class CredentialResolver:
                     f"Credential not found in keyring: {service}/{key}",
                     reference=reference,
                     suggestion=(
-                        f"Store the credential with:\n"
-                        f"  sapiens credentials set {service}/{key} --backend keyring"
+                        f"Store the credential with:\n" f"  sapiens credentials set {service}/{key} --backend keyring"
                     ),
                 )
 
@@ -212,9 +208,7 @@ class CredentialResolver:
             raise CredentialNotFoundError(
                 f"Environment variable not set: {var_name}",
                 reference=reference,
-                suggestion=(
-                    f"Set the environment variable:\n  export {var_name}='your-credential-here'"
-                ),
+                suggestion=(f"Set the environment variable:\n  export {var_name}='your-credential-here'"),
             )
 
         logger.debug(f"Resolved environment credential: {var_name}")
@@ -250,8 +244,7 @@ class CredentialResolver:
                     f"Credential not found in encrypted file: {service}/{key}",
                     reference=reference,
                     suggestion=(
-                        f"Store the credential with:\n"
-                        f"  sapiens credentials set {service}/{key} --backend encrypted"
+                        f"Store the credential with:\n" f"  sapiens credentials set {service}/{key} --backend encrypted"
                     ),
                 )
 

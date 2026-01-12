@@ -210,9 +210,7 @@ class TestGitLabRestProviderConnection:
 
     @pytest.mark.asyncio
     @patch("repo_sapiens.providers.gitlab_rest.get_pool")
-    async def test_connect_creates_client(
-        self, mock_get_pool: AsyncMock, provider: GitLabRestProvider
-    ) -> None:
+    async def test_connect_creates_client(self, mock_get_pool: AsyncMock, provider: GitLabRestProvider) -> None:
         """Should create connection pool with proper headers on connect."""
         mock_pool = AsyncMock(spec=HTTPConnectionPool)
         mock_response = MagicMock()
@@ -233,9 +231,7 @@ class TestGitLabRestProviderConnection:
 
     @pytest.mark.asyncio
     @patch("repo_sapiens.providers.gitlab_rest.get_pool")
-    async def test_connect_verifies_connectivity(
-        self, mock_get_pool: AsyncMock, provider: GitLabRestProvider
-    ) -> None:
+    async def test_connect_verifies_connectivity(self, mock_get_pool: AsyncMock, provider: GitLabRestProvider) -> None:
         """Should verify connectivity by calling /version endpoint."""
         mock_pool = AsyncMock(spec=HTTPConnectionPool)
         mock_response = MagicMock()
@@ -249,9 +245,7 @@ class TestGitLabRestProviderConnection:
 
     @pytest.mark.asyncio
     @patch("repo_sapiens.providers.gitlab_rest.get_pool")
-    async def test_connect_raises_on_failure(
-        self, mock_get_pool: AsyncMock, provider: GitLabRestProvider
-    ) -> None:
+    async def test_connect_raises_on_failure(self, mock_get_pool: AsyncMock, provider: GitLabRestProvider) -> None:
         """Should raise ConnectionError if verification fails."""
         mock_pool = AsyncMock(spec=HTTPConnectionPool)
         mock_response = MagicMock()
@@ -263,9 +257,7 @@ class TestGitLabRestProviderConnection:
             await provider.connect()
 
     @pytest.mark.asyncio
-    async def test_disconnect_clears_pool(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_disconnect_clears_pool(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should clear pool reference on disconnect."""
         provider._pool = mock_pool
 
@@ -323,9 +315,7 @@ class TestGitLabRestProviderIssues:
         assert call_args.kwargs["params"]["state"] == "opened"
 
     @pytest.mark.asyncio
-    async def test_get_issues_maps_state_correctly(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_issues_maps_state_correctly(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should map 'open'/'closed'/'all' to GitLab states."""
         mock_response = MagicMock()
         mock_response.json.return_value = []
@@ -346,9 +336,7 @@ class TestGitLabRestProviderIssues:
         assert mock_pool.get.call_args.kwargs["params"]["state"] == "all"
 
     @pytest.mark.asyncio
-    async def test_get_issues_with_labels_filter(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_issues_with_labels_filter(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should filter issues by labels as comma-separated string."""
         mock_response = MagicMock()
         mock_response.json.return_value = []
@@ -420,9 +408,7 @@ class TestGitLabRestProviderIssues:
         mock_pool.post = AsyncMock(return_value=mock_response)
         provider._pool = mock_pool
 
-        await provider.create_issue(
-            title="New feature", body="Feature description", labels=["bug", "enhancement"]
-        )
+        await provider.create_issue(title="New feature", body="Feature description", labels=["bug", "enhancement"])
 
         create_call = mock_pool.post.call_args
         posted_data = create_call.kwargs["json"]
@@ -443,9 +429,7 @@ class TestGitLabRestProviderIssues:
         mock_pool.put = AsyncMock(return_value=mock_response)
         provider._pool = mock_pool
 
-        issue = await provider.update_issue(
-            issue_number=42, title="Updated title", body="Updated description"
-        )
+        issue = await provider.update_issue(issue_number=42, title="Updated title", body="Updated description")
 
         assert issue.number == 42
         put_call = mock_pool.put.call_args
@@ -768,13 +752,9 @@ class TestGitLabRestProviderMergeRequests:
         assert pr.title == "Fix authentication with special characters"
 
     @pytest.mark.asyncio
-    async def test_get_merge_request_not_found(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_merge_request_not_found(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should return None for non-existent MR."""
-        http_error = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
-        )
+        http_error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=MagicMock(status_code=404))
         mock_pool.get = AsyncMock(side_effect=http_error)
         provider._pool = mock_pool
 
@@ -783,9 +763,7 @@ class TestGitLabRestProviderMergeRequests:
         assert pr is None
 
     @pytest.mark.asyncio
-    async def test_get_diff_from_mr(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_diff_from_mr(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should get diff from MR changes endpoint."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -809,9 +787,7 @@ class TestGitLabRestProviderMergeRequests:
         assert "/merge_requests/42/changes" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_get_diff_compare_branches(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_diff_compare_branches(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should compare branches when no MR number provided."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -871,9 +847,7 @@ class TestGitLabRestProviderBranches:
         assert branch.sha == "abc123def456789"
 
     @pytest.mark.asyncio
-    async def test_get_branch_encodes_name(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_branch_encodes_name(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should URL-encode branch name in API call."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -891,13 +865,9 @@ class TestGitLabRestProviderBranches:
         assert "feature%2Ftest" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_get_branch_not_found(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_branch_not_found(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should return None for non-existent branch."""
-        http_error = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
-        )
+        http_error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=MagicMock(status_code=404))
         mock_pool.get = AsyncMock(side_effect=http_error)
         provider._pool = mock_pool
 
@@ -906,9 +876,7 @@ class TestGitLabRestProviderBranches:
         assert branch is None
 
     @pytest.mark.asyncio
-    async def test_get_branch_other_error_propagates(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_branch_other_error_propagates(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should propagate non-404 HTTP errors."""
         http_error = httpx.HTTPStatusError(
             "Internal Server Error", request=MagicMock(), response=MagicMock(status_code=500)
@@ -927,9 +895,7 @@ class TestGitLabRestProviderBranches:
         sample_branch_data: dict,
     ) -> None:
         """Should create new branch when it doesn't exist."""
-        http_error = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=MagicMock(status_code=404)
-        )
+        http_error = httpx.HTTPStatusError("Not Found", request=MagicMock(), response=MagicMock(status_code=404))
 
         create_response = MagicMock()
         create_response.json.return_value = sample_branch_data
@@ -997,9 +963,7 @@ class TestGitLabRestProviderFiles:
         assert call_args.kwargs["params"]["ref"] == "main"
 
     @pytest.mark.asyncio
-    async def test_get_file_encodes_path(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_get_file_encodes_path(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should URL-encode file path in API call."""
         file_content = "content"
         encoded_content = base64.b64encode(file_content.encode()).decode()
@@ -1017,9 +981,7 @@ class TestGitLabRestProviderFiles:
         assert "src%2Fmain%2Ftest.py" in call_args.args[0]
 
     @pytest.mark.asyncio
-    async def test_commit_file_new(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_commit_file_new(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should create new file when it doesn't exist."""
         not_found_response = MagicMock()
         not_found_response.status_code = 404
@@ -1048,9 +1010,7 @@ class TestGitLabRestProviderFiles:
         assert posted_data["branch"] == "main"
 
     @pytest.mark.asyncio
-    async def test_commit_file_update(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_commit_file_update(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should update existing file with PUT."""
         existing_response = MagicMock()
         existing_response.status_code = 200
@@ -1380,9 +1340,7 @@ class TestGitLabRestProviderErrorHandling:
     """Tests for error handling."""
 
     @pytest.mark.asyncio
-    async def test_http_error_propagates(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_http_error_propagates(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should propagate HTTP errors from API calls."""
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
@@ -1395,9 +1353,7 @@ class TestGitLabRestProviderErrorHandling:
             await provider.get_issues()
 
     @pytest.mark.asyncio
-    async def test_network_error_propagates(
-        self, provider: GitLabRestProvider, mock_pool: AsyncMock
-    ) -> None:
+    async def test_network_error_propagates(self, provider: GitLabRestProvider, mock_pool: AsyncMock) -> None:
         """Should propagate network errors."""
         mock_pool.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
         provider._pool = mock_pool

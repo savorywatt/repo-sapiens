@@ -315,9 +315,7 @@ class TestIssueProcessing:
         mock_stage.execute.assert_called_once_with(issue)
 
     @pytest.mark.asyncio
-    async def test_process_issue_no_matching_stage_returns_early(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_process_issue_no_matching_stage_returns_early(self, orchestrator: WorkflowOrchestrator):
         """Test that process_issue returns without execution for unmatched labels."""
         issue = create_test_issue(labels=["random-label"])
 
@@ -367,9 +365,7 @@ class TestIssueProcessing:
 
         await orchestrator.process_all_issues(tag="needs-planning")
 
-        mock_git_provider.get_issues.assert_called_once_with(
-            labels=["needs-planning"], state="open"
-        )
+        mock_git_provider.get_issues.assert_called_once_with(labels=["needs-planning"], state="open")
 
     @pytest.mark.asyncio
     async def test_process_all_issues_sorts_by_number_ascending(
@@ -536,9 +532,7 @@ class TestParallelTaskExecution:
     """Tests for execute_parallel_tasks method."""
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_tasks_validates_dependencies(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_execute_parallel_tasks_validates_dependencies(self, orchestrator: WorkflowOrchestrator):
         """Test that execute_parallel_tasks validates dependencies before execution."""
         tasks = [
             create_test_task(task_id="task-1", dependencies=["nonexistent"]),
@@ -548,9 +542,7 @@ class TestParallelTaskExecution:
             await orchestrator.execute_parallel_tasks(tasks, "test-plan")
 
     @pytest.mark.asyncio
-    async def test_execute_parallel_tasks_detects_circular_dependencies(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_execute_parallel_tasks_detects_circular_dependencies(self, orchestrator: WorkflowOrchestrator):
         """Test that circular dependencies are detected."""
         tasks = [
             create_test_task(task_id="task-1", dependencies=["task-2"]),
@@ -611,8 +603,7 @@ class TestParallelTaskExecution:
         # Create more tasks than max_concurrent_tasks
         max_concurrent = mock_settings.workflow.max_concurrent_tasks
         tasks = [
-            create_test_task(task_id=f"task-{i}", issue_id=40 + i, dependencies=[])
-            for i in range(max_concurrent + 2)
+            create_test_task(task_id=f"task-{i}", issue_id=40 + i, dependencies=[]) for i in range(max_concurrent + 2)
         ]
 
         mock_git_provider.get_issue.return_value = create_test_issue(number=43)
@@ -855,9 +846,7 @@ class TestErrorHandling:
     """Tests for error handling and recovery scenarios."""
 
     @pytest.mark.asyncio
-    async def test_stage_execution_error_is_logged_and_raised(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_stage_execution_error_is_logged_and_raised(self, orchestrator: WorkflowOrchestrator):
         """Test that stage execution errors are logged and re-raised."""
         issue = create_test_issue(labels=["needs-planning"])
 
@@ -899,9 +888,7 @@ class TestErrorHandling:
         assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_deadlock_detection_in_parallel_execution(
-        self, orchestrator: WorkflowOrchestrator
-    ):
+    async def test_deadlock_detection_in_parallel_execution(self, orchestrator: WorkflowOrchestrator):
         """Test that circular dependencies are detected during parallel task execution."""
         # The dependency tracker validates for circular dependencies before execution.
         # This test verifies that circular dependencies are caught and raise ValueError.

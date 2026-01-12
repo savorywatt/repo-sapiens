@@ -251,9 +251,7 @@ class TestKeyringBackend:
         """Should store credential in keyring."""
         backend = KeyringBackend()
         backend.set("gitea", "api_token", "ghp_abc123")
-        mock_keyring_available.set_password.assert_called_once_with(
-            "sapiens/gitea", "api_token", "ghp_abc123"
-        )
+        mock_keyring_available.set_password.assert_called_once_with("sapiens/gitea", "api_token", "ghp_abc123")
 
     def test_set_empty_value_raises_error(self, mock_keyring_available):
         """Should raise ValueError for empty value."""

@@ -98,9 +98,7 @@ class AsyncCache:
         }
 
 
-def cached(
-    ttl_seconds: int = 300, key_prefix: str = ""
-) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def cached(ttl_seconds: int = 300, key_prefix: str = "") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """
     Decorator for caching async function results.
 
@@ -124,9 +122,7 @@ def cached(
                 "args": str(args),  # Simple string representation
                 "kwargs": str(sorted(kwargs.items())),
             }
-            key = hashlib.md5(
-                json.dumps(key_data, sort_keys=True).encode(), usedforsecurity=False
-            ).hexdigest()
+            key = hashlib.md5(json.dumps(key_data, sort_keys=True).encode(), usedforsecurity=False).hexdigest()
 
             # Try cache first
             cached_value = await cache.get(key)
@@ -167,9 +163,7 @@ class CacheManager:
         self._caches: dict[str, AsyncCache] = {}
         self._lock = asyncio.Lock()
 
-    async def get_cache(
-        self, name: str, ttl_seconds: int = 300, max_size: int = 1000
-    ) -> AsyncCache:
+    async def get_cache(self, name: str, ttl_seconds: int = 300, max_size: int = 1000) -> AsyncCache:
         """Get or create a named cache."""
         async with self._lock:
             if name not in self._caches:

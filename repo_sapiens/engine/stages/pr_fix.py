@@ -75,9 +75,7 @@ class PRFixStage(WorkflowStage):
 
             # Create fix proposal issue
             fix_issue_title = f"[FIX PROPOSAL] Address review feedback for PR #{pr_number}"
-            fix_issue_body = self._format_fix_proposal(
-                pr_number, pr_title, branch_name, review_comment.body
-            )
+            fix_issue_body = self._format_fix_proposal(pr_number, pr_title, branch_name, review_comment.body)
 
             fix_issue = await self.git.create_issue(
                 title=fix_issue_title,
@@ -112,9 +110,7 @@ class PRFixStage(WorkflowStage):
             )
             raise
 
-    def _format_fix_proposal(
-        self, pr_number: int, pr_title: str, branch_name: str, review_feedback: str
-    ) -> str:
+    def _format_fix_proposal(self, pr_number: int, pr_title: str, branch_name: str, review_feedback: str) -> str:
         """Format fix proposal issue body."""
         lines = [
             f"# Fix Proposal for PR #{pr_number}",

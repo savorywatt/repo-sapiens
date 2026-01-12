@@ -315,9 +315,7 @@ class TestMarkTaskStatus:
         """Test marking task with additional data."""
         await state_manager.load_state("plan-1")
 
-        await state_manager.mark_task_status(
-            "plan-1", "task-1", "completed", data={"pr_number": 123}
-        )
+        await state_manager.mark_task_status("plan-1", "task-1", "completed", data={"pr_number": 123})
 
         saved_state = await state_manager.load_state("plan-1")
         assert saved_state["tasks"]["task-1"]["data"]["pr_number"] == 123

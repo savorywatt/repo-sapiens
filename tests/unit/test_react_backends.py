@@ -126,9 +126,7 @@ class TestOllamaBackend:
         assert models == ["model1", ""]
 
     @pytest.mark.asyncio
-    async def test_list_models_returns_empty_on_connection_error(
-        self, ollama_backend: OllamaBackend
-    ) -> None:
+    async def test_list_models_returns_empty_on_connection_error(self, ollama_backend: OllamaBackend) -> None:
         """Test list_models returns empty list on connection error by default."""
         with patch.object(
             ollama_backend.client,
@@ -140,9 +138,7 @@ class TestOllamaBackend:
         assert models == []
 
     @pytest.mark.asyncio
-    async def test_list_models_raises_on_connection_error_when_requested(
-        self, ollama_backend: OllamaBackend
-    ) -> None:
+    async def test_list_models_raises_on_connection_error_when_requested(self, ollama_backend: OllamaBackend) -> None:
         """Test list_models raises exception on connection error when raise_on_error=True."""
         with patch.object(
             ollama_backend.client,
@@ -153,9 +149,7 @@ class TestOllamaBackend:
                 await ollama_backend.list_models(raise_on_error=True)
 
     @pytest.mark.asyncio
-    async def test_list_models_handles_generic_exception(
-        self, ollama_backend: OllamaBackend
-    ) -> None:
+    async def test_list_models_handles_generic_exception(self, ollama_backend: OllamaBackend) -> None:
         """Test list_models handles generic exceptions gracefully."""
         with patch.object(
             ollama_backend.client,
@@ -167,9 +161,7 @@ class TestOllamaBackend:
         assert models == []
 
     @pytest.mark.asyncio
-    async def test_list_models_raises_generic_exception_when_requested(
-        self, ollama_backend: OllamaBackend
-    ) -> None:
+    async def test_list_models_raises_generic_exception_when_requested(self, ollama_backend: OllamaBackend) -> None:
         """Test list_models raises generic exception when raise_on_error=True."""
         with patch.object(
             ollama_backend.client,
@@ -211,9 +203,7 @@ class TestOllamaBackend:
     async def test_chat_parses_ollama_response(self, ollama_backend: OllamaBackend) -> None:
         """Test chat parses Ollama response format correctly."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "message": {"content": "This is the response from Ollama"}
-        }
+        mock_response.json.return_value = {"message": {"content": "This is the response from Ollama"}}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(ollama_backend.client, "post", AsyncMock(return_value=mock_response)):
@@ -245,11 +235,7 @@ class TestOllamaBackend:
         with patch.object(
             ollama_backend.client,
             "post",
-            AsyncMock(
-                side_effect=httpx.HTTPStatusError(
-                    "Server error", request=MagicMock(), response=MagicMock()
-                )
-            ),
+            AsyncMock(side_effect=httpx.HTTPStatusError("Server error", request=MagicMock(), response=MagicMock())),
         ):
             with pytest.raises(httpx.HTTPStatusError):
                 await ollama_backend.chat(
@@ -269,9 +255,7 @@ class TestOllamaBackend:
             await ollama_backend.connect()
 
     @pytest.mark.asyncio
-    async def test_connect_raises_runtime_error_when_server_not_running(
-        self, ollama_backend: OllamaBackend
-    ) -> None:
+    async def test_connect_raises_runtime_error_when_server_not_running(self, ollama_backend: OllamaBackend) -> None:
         """Test connect raises ProviderConnectionError when server not running."""
         with patch.object(
             ollama_backend.client,
@@ -323,9 +307,7 @@ class TestOpenAIBackend:
         assert openai_backend_with_key.base_url == "https://api.openai.com/v1"
         assert openai_backend_with_key.timeout == 120
 
-    def test_init_with_api_key_stores_correctly(
-        self, openai_backend_with_key: OpenAIBackend
-    ) -> None:
+    def test_init_with_api_key_stores_correctly(self, openai_backend_with_key: OpenAIBackend) -> None:
         """Test that api_key is stored correctly."""
         assert openai_backend_with_key.api_key == "sk-test-key-12345"  # pragma: allowlist secret
 
@@ -417,14 +399,10 @@ class TestOpenAIBackend:
         assert models == []
 
     @pytest.mark.asyncio
-    async def test_list_models_handles_api_error_response(
-        self, openai_backend: OpenAIBackend
-    ) -> None:
+    async def test_list_models_handles_api_error_response(self, openai_backend: OpenAIBackend) -> None:
         """Test list_models handles OpenAI-style error response."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "error": {"message": "Invalid API key", "type": "invalid_request_error"}
-        }
+        mock_response.json.return_value = {"error": {"message": "Invalid API key", "type": "invalid_request_error"}}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(openai_backend.client, "get", AsyncMock(return_value=mock_response)):
@@ -433,14 +411,10 @@ class TestOpenAIBackend:
         assert models == []
 
     @pytest.mark.asyncio
-    async def test_list_models_raises_on_api_error_when_requested(
-        self, openai_backend: OpenAIBackend
-    ) -> None:
+    async def test_list_models_raises_on_api_error_when_requested(self, openai_backend: OpenAIBackend) -> None:
         """Test list_models raises on API error when raise_on_error=True."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "error": {"message": "Invalid API key", "type": "invalid_request_error"}
-        }
+        mock_response.json.return_value = {"error": {"message": "Invalid API key", "type": "invalid_request_error"}}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(openai_backend.client, "get", AsyncMock(return_value=mock_response)):
@@ -448,9 +422,7 @@ class TestOpenAIBackend:
                 await openai_backend.list_models(raise_on_error=True)
 
     @pytest.mark.asyncio
-    async def test_list_models_returns_empty_on_connection_error(
-        self, openai_backend: OpenAIBackend
-    ) -> None:
+    async def test_list_models_returns_empty_on_connection_error(self, openai_backend: OpenAIBackend) -> None:
         """Test list_models returns empty list on connection error by default."""
         with patch.object(
             openai_backend.client,
@@ -462,9 +434,7 @@ class TestOpenAIBackend:
         assert models == []
 
     @pytest.mark.asyncio
-    async def test_list_models_raises_on_connection_error_when_requested(
-        self, openai_backend: OpenAIBackend
-    ) -> None:
+    async def test_list_models_raises_on_connection_error_when_requested(self, openai_backend: OpenAIBackend) -> None:
         """Test list_models raises on connection error when raise_on_error=True."""
         with patch.object(
             openai_backend.client,
@@ -475,9 +445,7 @@ class TestOpenAIBackend:
                 await openai_backend.list_models(raise_on_error=True)
 
     @pytest.mark.asyncio
-    async def test_list_models_handles_generic_exception(
-        self, openai_backend: OpenAIBackend
-    ) -> None:
+    async def test_list_models_handles_generic_exception(self, openai_backend: OpenAIBackend) -> None:
         """Test list_models handles generic exceptions gracefully."""
         with patch.object(
             openai_backend.client,
@@ -492,16 +460,12 @@ class TestOpenAIBackend:
     async def test_chat_calls_correct_endpoint(self, openai_backend: OpenAIBackend) -> None:
         """Test chat calls the correct OpenAI API endpoint with correct format."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "response"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"role": "assistant", "content": "response"}}]}
         mock_response.raise_for_status = MagicMock()
 
         captured_args: dict = {}
 
-        async def capture_post(
-            url: str, headers: dict | None = None, json: dict | None = None
-        ) -> MagicMock:
+        async def capture_post(url: str, headers: dict | None = None, json: dict | None = None) -> MagicMock:
             captured_args["url"] = url
             captured_args["headers"] = headers
             captured_args["json"] = json
@@ -526,16 +490,12 @@ class TestOpenAIBackend:
     ) -> None:
         """Test chat includes Authorization header when api_key is set."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "Hello!"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"role": "assistant", "content": "Hello!"}}]}
         mock_response.raise_for_status = MagicMock()
 
         captured_headers: dict | None = None
 
-        async def capture_post(
-            url: str, headers: dict | None = None, json: dict | None = None
-        ) -> MagicMock:
+        async def capture_post(url: str, headers: dict | None = None, json: dict | None = None) -> MagicMock:
             nonlocal captured_headers
             captured_headers = headers
             return mock_response
@@ -581,9 +541,7 @@ class TestOpenAIBackend:
     async def test_chat_handles_api_error_response(self, openai_backend: OpenAIBackend) -> None:
         """Test chat raises AgentError on OpenAI-style API error."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}
-        }
+        mock_response.json.return_value = {"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}
         mock_response.raise_for_status = MagicMock()
 
         with patch.object(openai_backend.client, "post", AsyncMock(return_value=mock_response)):
@@ -599,11 +557,7 @@ class TestOpenAIBackend:
         with patch.object(
             openai_backend.client,
             "post",
-            AsyncMock(
-                side_effect=httpx.HTTPStatusError(
-                    "Server error", request=MagicMock(), response=MagicMock()
-                )
-            ),
+            AsyncMock(side_effect=httpx.HTTPStatusError("Server error", request=MagicMock(), response=MagicMock())),
         ):
             with pytest.raises(httpx.HTTPStatusError):
                 await openai_backend.chat(
@@ -623,9 +577,7 @@ class TestOpenAIBackend:
             await openai_backend.connect()
 
     @pytest.mark.asyncio
-    async def test_connect_raises_runtime_error_when_server_not_running(
-        self, openai_backend: OpenAIBackend
-    ) -> None:
+    async def test_connect_raises_runtime_error_when_server_not_running(self, openai_backend: OpenAIBackend) -> None:
         """Test connect raises ProviderConnectionError when server not running."""
         with patch.object(
             openai_backend.client,
@@ -870,16 +822,12 @@ class TestBackendEdgeCases:
         """Test OpenAIBackend uses default temperature of 0.7."""
         backend = OpenAIBackend()
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "choices": [{"message": {"role": "assistant", "content": "response"}}]
-        }
+        mock_response.json.return_value = {"choices": [{"message": {"role": "assistant", "content": "response"}}]}
         mock_response.raise_for_status = MagicMock()
 
         captured_json: dict | None = None
 
-        async def capture_post(
-            url: str, headers: dict | None = None, json: dict | None = None
-        ) -> MagicMock:
+        async def capture_post(url: str, headers: dict | None = None, json: dict | None = None) -> MagicMock:
             nonlocal captured_json
             captured_json = json
             return mock_response

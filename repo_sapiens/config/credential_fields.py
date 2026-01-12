@@ -68,9 +68,7 @@ def resolve_credential_string(value: Any) -> str:
         if e.suggestion:
             error_msg = f"{error_msg}\n\nSuggestion: {e.suggestion}"
 
-        raise PydanticCustomError(
-            "credential_resolution_error", error_msg, {"reference": e.reference}
-        ) from e
+        raise PydanticCustomError("credential_resolution_error", error_msg, {"reference": e.reference}) from e
 
 
 def resolve_credential_secret(value: Any) -> SecretStr:

@@ -86,9 +86,7 @@ class TestCredentialIntegration:
         encrypted_backend.set("gitea", "api_token", "from-encrypted-file")
 
         # Create resolver
-        resolver = CredentialResolver(
-            encrypted_file_path=file_path, encrypted_master_password="password"
-        )
+        resolver = CredentialResolver(encrypted_file_path=file_path, encrypted_master_password="password")
 
         # Resolve from different backends
         env_result = resolver.resolve("${TEST_ENV_TOKEN}")
@@ -190,9 +188,7 @@ class TestCredentialIntegration:
         encrypted = EncryptedFileBackend(file_path, "password")
         encrypted.set("encrypted", "secret", "encrypted-value")
 
-        resolver = CredentialResolver(
-            encrypted_file_path=file_path, encrypted_master_password="password"
-        )
+        resolver = CredentialResolver(encrypted_file_path=file_path, encrypted_master_password="password")
 
         # Resolve from each backend in sequence
         results = {
@@ -225,9 +221,7 @@ class TestCredentialIntegration:
         encrypted.set("gitea", "api_token", "gitea-secret-token")
         encrypted.set("admin", "token", "admin-secret-token")
 
-        resolver = CredentialResolver(
-            encrypted_file_path=file_path, encrypted_master_password="password"
-        )
+        resolver = CredentialResolver(encrypted_file_path=file_path, encrypted_master_password="password")
 
         # Resolve all config values
         resolved = {key: resolver.resolve(value) for key, value in config_values.items()}

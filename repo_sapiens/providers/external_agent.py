@@ -348,9 +348,7 @@ Make each task specific and actionable. Include 3-10 tasks that break down the w
                 try:
                     return self[key]
                 except KeyError as e:
-                    raise AttributeError(
-                        f"'{type(self).__name__}' object has no attribute '{key}'"
-                    ) from e
+                    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'") from e
 
             def __setattr__(self, key, value):
                 self[key] = value

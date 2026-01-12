@@ -146,9 +146,7 @@ class TestToolRegistryEdgeCases:
         assert "Error" not in result or "No files found" in result
 
     @pytest.mark.asyncio
-    async def test_tree_depth_limit_returns_empty(
-        self, registry: ToolRegistry, temp_dir: Path
-    ) -> None:
+    async def test_tree_depth_limit_returns_empty(self, registry: ToolRegistry, temp_dir: Path) -> None:
         """Test that tree's build_tree returns empty list when depth exceeds max.
 
         This covers line 494 where depth > max_depth returns [].

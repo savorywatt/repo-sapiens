@@ -125,6 +125,7 @@ ignore_errors = true
 module = [
     "repo_sapiens.providers.gitea_rest",
     "repo_sapiens.providers.github_rest",
+    "repo_sapiens.providers.gitlab_rest",
     "repo_sapiens.providers.ollama",
     "repo_sapiens.providers.external_agent",
     "repo_sapiens.providers.agent_provider",
@@ -134,6 +135,7 @@ module = [
     "repo_sapiens.monitoring.metrics",
     "repo_sapiens.cli.init",
     "repo_sapiens.cli.credentials",
+    "repo_sapiens.cli.health",
     "repo_sapiens.engine.stages.qa",
     "repo_sapiens.engine.stages.approval",
     "repo_sapiens.engine.stages.pr_review",
@@ -193,6 +195,7 @@ skips = [
     "B404",  # import_subprocess - subprocess usage is safe and necessary
     "B601",  # paramiko_calls - not using paramiko
     "B602",  # subprocess_popen_with_shell_equals_true - reviewed usages are safe
+    "B603",  # subprocess_without_shell_equals_true - subprocess usage is reviewed and safe
 ]
 
 # Severity levels: LOW, MEDIUM, HIGH

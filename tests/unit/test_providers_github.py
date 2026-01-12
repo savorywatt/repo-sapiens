@@ -111,9 +111,7 @@ class TestGitHubRestProviderConnection:
 
         await provider.connect()
 
-        mock_github_class.assert_called_once_with(
-            "ghp_test_token_123", base_url="https://api.github.com"
-        )
+        mock_github_class.assert_called_once_with("ghp_test_token_123", base_url="https://api.github.com")
         mock_client.get_repo.assert_called_once_with("test-owner/test-repo")
         assert provider._client is mock_client
         assert provider._repo is mock_github_repo
@@ -226,14 +224,10 @@ class TestGitHubRestProviderIssues:
         mock_github_class.return_value = mock_client
 
         await provider.connect()
-        issue = await provider.create_issue(
-            title="New Issue", body="New description", labels=["bug"]
-        )
+        issue = await provider.create_issue(title="New Issue", body="New description", labels=["bug"])
 
         assert issue.number == 999
-        mock_repo.create_issue.assert_called_once_with(
-            title="New Issue", body="New description", labels=["bug"]
-        )
+        mock_repo.create_issue.assert_called_once_with(title="New Issue", body="New description", labels=["bug"])
 
     @pytest.mark.asyncio
     @patch("repo_sapiens.providers.github_rest.Github")
@@ -252,9 +246,7 @@ class TestGitHubRestProviderIssues:
         mock_github_class.return_value = mock_client
 
         await provider.connect()
-        updated = await provider.update_issue(
-            42, title="Updated Title", state="closed", labels=["resolved"]
-        )
+        updated = await provider.update_issue(42, title="Updated Title", state="closed", labels=["resolved"])
 
         assert updated.number == 42
         assert mock_gh_issue.edit.call_count >= 1
@@ -422,9 +414,7 @@ class TestGitHubRestProviderBranches:
         await provider.connect()
         await provider.merge_branches("feature", "main", "Merge feature into main")
 
-        mock_repo.merge.assert_called_once_with(
-            base="main", head="feature", commit_message="Merge feature into main"
-        )
+        mock_repo.merge.assert_called_once_with(base="main", head="feature", commit_message="Merge feature into main")
 
 
 # =============================================================================
@@ -906,9 +896,7 @@ class TestGitHubRestProviderExceptions:
         from github import GithubException
 
         mock_repo = Mock()
-        mock_repo.create_pull = Mock(
-            side_effect=GithubException(422, "No commits between base and head")
-        )
+        mock_repo.create_pull = Mock(side_effect=GithubException(422, "No commits between base and head"))
         mock_client = Mock()
         mock_client.get_repo = Mock(return_value=mock_repo)
         mock_github_class.return_value = mock_client

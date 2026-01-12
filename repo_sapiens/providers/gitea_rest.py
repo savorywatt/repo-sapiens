@@ -198,9 +198,7 @@ class GiteaRestProvider(GitProvider):
         """Get all comments for an issue."""
         log.info("get_comments", issue_number=issue_number)
 
-        response = await self._pool.get(
-            f"/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments"
-        )
+        response = await self._pool.get(f"/repos/{self.owner}/{self.repo}/issues/{issue_number}/comments")
         response.raise_for_status()
 
         comments_data = response.json()
@@ -212,9 +210,7 @@ class GiteaRestProvider(GitProvider):
         log.info("get_branch", branch=branch_name)
 
         try:
-            response = await self._pool.get(
-                f"/repos/{self.owner}/{self.repo}/branches/{branch_name}"
-            )
+            response = await self._pool.get(f"/repos/{self.owner}/{self.repo}/branches/{branch_name}")
             response.raise_for_status()
 
             branch_data = response.json()

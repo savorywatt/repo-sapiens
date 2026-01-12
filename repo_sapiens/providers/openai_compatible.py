@@ -267,9 +267,7 @@ class OpenAICompatibleProvider(AgentProvider):
                 try:
                     return self[key]
                 except KeyError as e:
-                    raise AttributeError(
-                        f"'{type(self).__name__}' object has no attribute '{key}'"
-                    ) from e
+                    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{key}'") from e
 
             def __setattr__(self, key: str, value: Any) -> None:
                 self[key] = value
