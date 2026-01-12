@@ -21,29 +21,25 @@ class AgentType(str, Enum):
 class ProviderType(str, Enum):
     """Types of agent providers supported by repo-sapiens.
 
-    These represent the configuration types that determine how
-    the agent is invoked and configured.
+    Supported configurations:
+    - claude-local: Claude Code CLI (local execution)
+    - goose-local: Goose CLI (supports multiple LLM backends)
+    - copilot-local: GitHub Copilot CLI
+    - ollama: Local Ollama server (runs llama3.1, qwen3, etc.)
+    - openai-compatible: Any OpenAI-compatible API endpoint
+      (OpenAI, Groq, OpenRouter, vLLM, LM Studio, Fireworks, etc.)
     """
 
-    # Claude providers
+    # External CLI agents
     CLAUDE_LOCAL = "claude-local"
-    CLAUDE_API = "claude-api"
-
-    # Goose provider (CLI only)
     GOOSE_LOCAL = "goose-local"
-
-    # Copilot provider
     COPILOT_LOCAL = "copilot-local"
 
-    # Cloud API providers
-    OPENAI = "openai"
-    OPENAI_COMPATIBLE = "openai-compatible"
-    ANTHROPIC = "anthropic"
-    GROQ = "groq"
-    OPENROUTER = "openrouter"
-
-    # Local model providers
+    # Local model server
     OLLAMA = "ollama"
+
+    # OpenAI-compatible API (covers all OpenAI API-compatible services)
+    OPENAI_COMPATIBLE = "openai-compatible"
 
     def __str__(self) -> str:
         return self.value
@@ -55,15 +51,15 @@ class ProviderType(str, Enum):
             AgentType if this provider maps to an external agent CLI,
             None for providers that use the builtin agent.
         """
-        if self in (ProviderType.CLAUDE_LOCAL, ProviderType.CLAUDE_API):
+        if self == ProviderType.CLAUDE_LOCAL:
             return AgentType.CLAUDE
         elif self == ProviderType.GOOSE_LOCAL:
             return AgentType.GOOSE
         elif self == ProviderType.COPILOT_LOCAL:
             return AgentType.COPILOT
         else:
-            # OPENAI, ANTHROPIC, OLLAMA, etc. use builtin or custom providers
-            return None
+            # OLLAMA, OPENAI_COMPATIBLE use builtin ReAct agent
+            return AgentType.BUILTIN
 
     @property
     def is_local(self) -> bool:
@@ -80,7 +76,6 @@ class ProviderType(str, Enum):
         """Check if this provider uses an external CLI tool."""
         return self in (
             ProviderType.CLAUDE_LOCAL,
-            ProviderType.CLAUDE_API,
             ProviderType.GOOSE_LOCAL,
             ProviderType.COPILOT_LOCAL,
         )

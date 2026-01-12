@@ -401,14 +401,21 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 )
                 all_passed = False
 
-        elif provider_type in (ProviderType.CLAUDE_API, ProviderType.GOOSE_API, ProviderType.OPENAI):
-            # For API-based providers, we already checked the API key
-            # A full connectivity test would require making an API call
-            _print_check(
-                f"{provider_type} provider",
-                True,
-                "API key configured" if verbose else None,
-            )
+        elif provider_type in (ProviderType.OPENAI_COMPATIBLE, ProviderType.OLLAMA):
+            # For API-based providers and Ollama, no CLI check needed
+            # API connectivity would require making an actual API call
+            if provider_type == ProviderType.OLLAMA:
+                _print_check(
+                    "Ollama provider",
+                    True,
+                    f"Configured at {settings.agent_provider.base_url or 'http://localhost:11434'}" if verbose else None,
+                )
+            else:
+                _print_check(
+                    "OpenAI-compatible API",
+                    True,
+                    "API key configured" if verbose else None,
+                )
 
     # -------------------------------------------------------------------------
     # Summary

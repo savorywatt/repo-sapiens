@@ -18,9 +18,12 @@ An AI-driven automation system for Git workflows with support for multiple AI ag
   - Platform-specific API integration (including GitLab merge requests)
 
 - **Multiple AI Agent Support**
-  - **Claude Code**: Anthropic's coding assistant
-  - **Goose AI**: Block's flexible agent with multiple LLM backends (OpenAI, Anthropic, Ollama, OpenRouter, Groq)
-  - **ReAct Agent**: Local AI agent using Ollama for autonomous coding tasks
+  - **Claude Code** (`claude-local`): Anthropic's coding assistant CLI
+  - **Goose** (`goose-local`): Block's flexible agent CLI with multiple LLM backends
+  - **Ollama** (`ollama`): Local models (llama3.1, qwen3, codellama, deepseek-coder, etc.)
+  - **OpenAI-Compatible API** (`openai-compatible`): Any OpenAI API-compatible service
+    - Supports: OpenAI, Groq, OpenRouter, vLLM, LM Studio, Fireworks AI, Together AI, Anyscale, etc.
+  - **ReAct Agent**: Built-in autonomous agent using any of the above backends
     - Interactive REPL mode with 9 built-in tools
     - Remote Ollama support for GPU servers
     - Path sandboxing for security
@@ -128,9 +131,10 @@ git_provider:
   api_token: ${GITEA_TOKEN}  # or GITHUB_TOKEN, GITLAB_TOKEN
 
 agent_provider:
-  provider_type: claude-local  # or 'claude-api', 'goose-local', 'goose-api', 'ollama', 'openai'
-  model: claude-sonnet-4.5
-  api_key: ${CLAUDE_API_KEY}
+  provider_type: ollama  # or 'claude-local', 'goose-local', 'openai-compatible'
+  model: qwen3:latest  # or 'claude-sonnet-4.5', 'gpt-4', etc.
+  base_url: http://localhost:11434  # for ollama or openai-compatible
+  # api_key: ${API_KEY}  # only for openai-compatible
 
 workflow:
   branching_strategy: per-agent
