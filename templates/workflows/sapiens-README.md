@@ -108,14 +108,38 @@ Labels can be added at any time and workflows will trigger automatically.
 **When to use:** Issues were found during review or QA that need to be addressed.
 
 **What it does:**
-- Analyzes the review feedback or QA failures
-- Implements fixes for the identified issues
-- Updates the existing PR with fixes
-- Re-triggers validation
+- Analyzes all review comments from reviewers and maintainers
+- Categorizes each comment as:
+  - **Simple fix**: Straightforward changes (implemented immediately)
+  - **Controversial fix**: Significant changes (require approval)
+  - **Question**: Needs an answer (posts answer)
+  - **Info**: Informational feedback (acknowledges)
+  - **Already done**: Already addressed in code
+  - **Won't fix**: Valid but not implementing
+- Replies to each comment with planned action
+- Executes simple fixes automatically and pushes to the PR
+- For controversial fixes:
+  - Posts the proposed action and reasoning
+  - Adds `needs-approval` label
+  - Waits for approval before implementing
+
+**How to approve controversial fixes:**
+When the agent identifies a controversial fix (significant change), it will:
+1. Reply to the review comment with the proposed action
+2. Add `needs-approval` label to the PR
+3. Wait for your approval
+
+To approve a controversial fix:
+- React with 👍 (thumbs up) to the agent's reply comment, OR
+- Reply to the comment with "approved"
+
+Once approved, the agent will implement the fix on the next run.
 
 **Use on:** Pull requests **only** (does nothing on regular issues)
 
-**Next step:** Re-add `needs-review` or `requires-qa` to re-validate.
+**Next step:**
+- If fixes implemented: Re-add `needs-review` or `requires-qa` to re-validate
+- If waiting for approval: Approve controversial fixes, then re-run by removing and re-adding `needs-fix` label
 
 ---
 
