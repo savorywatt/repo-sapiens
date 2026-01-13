@@ -18,7 +18,7 @@ jobs:
       - name: Mark stale items
         uses: actions/stale@v8
         with:
-          repo-token: ${{ '{{' }} secrets.GITEA_TOKEN {{ '}}' }}
+          repo-token: ${{ '{{' }} secrets.SAPIENS_GITEA_TOKEN {{ '}}' }}
           stale-issue-message: '{{ stale_message | default("This issue has been automatically marked as stale due to inactivity.") }}'
           stale-pr-message: '{{ stale_pr_message | default("This pull request has been automatically marked as stale due to inactivity.") }}'
           stale-issue-label: '{{ stale_label | default("stale") | safe_label }}'

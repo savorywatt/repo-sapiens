@@ -23,7 +23,7 @@ jobs:
 
       - name: Auto-label Issue
         env:
-          GITEA_TOKEN: ${{ '{{' }} secrets.GITEA_TOKEN {{ '}}' }}
+          GITEA_TOKEN: ${{ '{{' }} secrets.SAPIENS_GITEA_TOKEN {{ '}}' }}
         run: |
           repo-agent labels auto-issue \
             --url {{ gitea_url | safe_url }} \

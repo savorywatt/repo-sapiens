@@ -47,7 +47,7 @@ jobs:
       - name: Get untriaged issues
         id: issues
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
         run: |
           # Get issues without standard labels
           gh issue list --state open --json number,title,labels,createdAt \
@@ -61,8 +61,8 @@ jobs:
       - name: Triage issues
         if: steps.issues.outputs.untriaged_count != '0'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           sapiens task "Triage open issues in this GitHub repository.

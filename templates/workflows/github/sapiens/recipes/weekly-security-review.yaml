@@ -722,8 +722,8 @@ jobs:
       - name: Auto-fix security issues
         if: env.TOTAL_ISSUES != '0' && (github.event.inputs.auto_fix != 'false')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           pip install repo-sapiens || pip3 install repo-sapiens
@@ -769,7 +769,7 @@ jobs:
       - name: Create Pull Request
         if: env.TOTAL_ISSUES != '0'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
         run: |
           git add -A
           if git diff --staged --quiet; then

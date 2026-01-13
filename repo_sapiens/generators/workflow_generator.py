@@ -215,9 +215,10 @@ class WorkflowGenerator:
     def _build_env_block(self) -> dict[str, str]:
         """Build environment variables block."""
         if self.provider == "github":
+            # Note: GITHUB_ prefix is reserved for custom secrets, so we use SAPIENS_GITHUB_TOKEN
             return {
-                "GITHUB_TOKEN": "${{ secrets.GITHUB_TOKEN }}",
-                "AUTOMATION__GIT_PROVIDER__API_TOKEN": "${{ secrets.GITHUB_TOKEN }}",
+                "GITHUB_TOKEN": "${{ secrets.SAPIENS_GITHUB_TOKEN }}",
+                "AUTOMATION__GIT_PROVIDER__API_TOKEN": "${{ secrets.SAPIENS_GITHUB_TOKEN }}",
                 "AUTOMATION__GIT_PROVIDER__BASE_URL": "${{ github.server_url }}",
                 "AUTOMATION__REPOSITORY__OWNER": "${{ github.repository_owner }}",
                 "AUTOMATION__REPOSITORY__NAME": "${{ github.event.repository.name }}",

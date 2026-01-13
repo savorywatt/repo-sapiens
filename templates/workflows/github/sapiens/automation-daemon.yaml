@@ -57,7 +57,7 @@ jobs:
       - name: Process all pending issues
         env:
           # GitHub token (use PAT if needed for more permissions)
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
 
           # AI provider credentials (uncomment the one you use)
           # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

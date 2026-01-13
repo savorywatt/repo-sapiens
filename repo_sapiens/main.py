@@ -510,8 +510,10 @@ async def _run_task(
     elif provider_type in ("ollama", "openai-compatible"):
         await _run_react_agent(task, timeout, working_dir, verbose, settings, system_prompt)
     else:
-        raise ValueError(f"Unsupported provider type: {provider_type}. "
-                        f"Supported: claude-local, goose-local, ollama, openai-compatible")
+        raise ValueError(
+            f"Unsupported provider type: {provider_type}. "
+            f"Supported: claude-local, goose-local, ollama, openai-compatible"
+        )
 
 
 async def _run_claude_cli(task: str, timeout: int, working_dir: str, system_prompt: str | None = None) -> None:

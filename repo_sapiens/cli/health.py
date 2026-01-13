@@ -408,7 +408,9 @@ def health_check(config_path: str, verbose: bool, skip_connectivity: bool) -> No
                 _print_check(
                     "Ollama provider",
                     True,
-                    f"Configured at {settings.agent_provider.base_url or 'http://localhost:11434'}" if verbose else None,
+                    f"Configured at {settings.agent_provider.base_url or 'http://localhost:11434'}"
+                    if verbose
+                    else None,
                 )
             else:
                 _print_check(

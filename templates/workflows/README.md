@@ -55,11 +55,13 @@ Go to your repository settings and add these secrets:
 | Secret | Required | Description |
 |--------|----------|-------------|
 | `SAPIENS_GITEA_TOKEN` | Gitea only | Your Gitea API token (note: GITEA_ prefix is reserved) |
-| `GITHUB_TOKEN` | GitHub only | GitHub API token |
+| `SAPIENS_GITHUB_TOKEN` | GitHub only | GitHub PAT for full functionality (note: GITHUB_ prefix is reserved for custom secrets) |
 | `SAPIENS_CLAUDE_API_KEY` | If using API agents | API key for claude-api, openai, anthropic, etc. |
 | `OPENAI_API_KEY` | If using OpenAI models | OpenAI API key (for Goose or builtin agent) |
 | `CLAUDE_API_KEY` | If using Claude API | Anthropic API key (for claude-api agent) |
 | `ANTHROPIC_API_KEY` | If using Claude API | Alternative name for Claude API key |
+
+**Note on GitHub tokens:** GitHub provides an automatic `GITHUB_TOKEN` for basic operations, but you cannot create custom secrets with the `GITHUB_` prefix. Use `SAPIENS_GITHUB_TOKEN` for a PAT with elevated permissions.
 
 **Note:** API key secrets are only needed if your `.sapiens/config.yaml` uses an API-based agent provider. If using local agents like `claude-local`, `ollama`, or `goose-local`, these secrets are optional.
 

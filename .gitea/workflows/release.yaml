@@ -109,7 +109,7 @@ jobs:
       - name: Create Gitea Release
         if: success()
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           # Create release via Gitea API
           RELEASE_NAME="v${{ steps.version.outputs.version }}"
@@ -142,7 +142,7 @@ jobs:
       - name: Upload release artifacts
         if: success()
         env:
-          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
         run: |
           # Get release ID
           RELEASE_ID=$(curl -s \

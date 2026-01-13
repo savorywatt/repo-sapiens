@@ -619,13 +619,70 @@ class RepoInitializer:
 
         try:
             discovery = GitDiscovery(self.repo_path)
-            self.repo_info = discovery.parse_repository()
+            remotes = discovery.list_remotes()
 
-            # Detect provider type (GitHub or Gitea)
-            self.provider_type = discovery.detect_provider_type()
+            if not remotes:
+                raise click.ClickException("No Git remotes configured")
+
+            # Group remotes by provider type
+            remotes_by_provider: dict[str, list[tuple[str, str]]] = {}
+            for remote in remotes:
+                provider = self._detect_provider_from_url(remote.url)
+                if provider not in remotes_by_provider:
+                    remotes_by_provider[provider] = []
+                remotes_by_provider[provider].append((remote.name, remote.url))
+
+            # If multiple providers detected and interactive, ask user to choose
+            selected_remote_name = None
+            if len(remotes_by_provider) > 1 and not self.non_interactive:
+                click.echo()
+                click.echo(click.style("   Multiple Git providers detected:", fg="yellow"))
+                click.echo()
+
+                # Build choices with remote details
+                choices = []
+                choice_map = {}
+                idx = 1
+                for provider, provider_remotes in remotes_by_provider.items():
+                    for remote_name, remote_url in provider_remotes:
+                        label = f"{idx}. {provider.upper()} - {remote_name} ({remote_url})"
+                        click.echo(f"   {label}")
+                        choices.append(str(idx))
+                        choice_map[str(idx)] = (provider, remote_name)
+                        idx += 1
+
+                click.echo()
+                choice = click.prompt(
+                    "   Select which remote to use",
+                    type=click.Choice(choices),
+                    default="1",
+                    show_choices=False,
+                )
+                self.provider_type, selected_remote_name = choice_map[choice]
+                click.echo()
+            elif len(remotes) == 1:
+                # Single remote - use it
+                selected_remote_name = remotes[0].name
+                self.provider_type = list(remotes_by_provider.keys())[0]
+            else:
+                # Multiple remotes but same provider, or non-interactive
+                # Use preferred remote (origin > upstream > first)
+                self.provider_type = list(remotes_by_provider.keys())[0]
+                for preferred in ["origin", "upstream"]:
+                    for remote in remotes:
+                        if remote.name == preferred:
+                            selected_remote_name = remote.name
+                            break
+                    if selected_remote_name:
+                        break
+                if not selected_remote_name:
+                    selected_remote_name = remotes[0].name
+
+            # Parse the selected remote
+            self.repo_info = discovery.parse_repository(remote_name=selected_remote_name)
 
             click.echo(f"   ✓ Found Git repository: {self.repo_path}")
-            click.echo(f"   ✓ Detected remote: {self.repo_info.remote_name}")
+            click.echo(f"   ✓ Selected remote: {self.repo_info.remote_name}")
             click.echo(f"   ✓ Provider: {self.provider_type.upper()}")
             click.echo(f"   ✓ Parsed: owner={self.repo_info.owner}, repo={self.repo_info.repo}")
             click.echo(f"   ✓ Base URL: {self.repo_info.base_url}")
@@ -633,6 +690,28 @@ class RepoInitializer:
 
         except GitDiscoveryError as e:
             raise click.ClickException(f"Failed to discover repository: {e}") from e
+
+    def _detect_provider_from_url(self, url: str) -> str:
+        """Detect provider type from a Git URL.
+
+        Args:
+            url: Git remote URL
+
+        Returns:
+            Provider type: "github", "gitlab", or "gitea"
+        """
+        url_lower = url.lower()
+
+        if "github.com" in url_lower:
+            return "github"
+        if "github" in url_lower and ("enterprise" in url_lower or "ghe" in url_lower):
+            return "github"
+        if "gitlab.com" in url_lower:
+            return "gitlab"
+        if "gitlab" in url_lower:
+            return "gitlab"
+
+        return "gitea"
 
     def _collect_credentials(self) -> None:
         """Collect credentials from user or environment."""
@@ -719,7 +798,7 @@ class RepoInitializer:
         else:
             # No existing token - prompt for it
             click.echo(
-                "Gitea API Token is required. Get it from:\n" f"   {self.repo_info.base_url}/user/settings/applications"
+                f"Gitea API Token is required. Get it from:\n   {self.repo_info.base_url}/user/settings/applications"
             )
             click.echo()
             self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
@@ -764,7 +843,7 @@ class RepoInitializer:
         else:
             # No existing token - prompt for it
             pat_url = f"{self.repo_info.base_url}/-/user_settings/personal_access_tokens"
-            click.echo("GitLab Personal Access Token is required. Get it from:\n" f"   {pat_url}")
+            click.echo(f"GitLab Personal Access Token is required. Get it from:\n   {pat_url}")
             click.echo()
             click.echo("Required scopes: api, read_repository, write_repository")
             click.echo()
@@ -1478,7 +1557,8 @@ class RepoInitializer:
         asyncio.run(github.connect())
 
         # Set GitHub token secret (for workflows)
-        token_secret_name = "GITHUB_TOKEN" if self.provider_type == "github" else "SAPIENS_GITEA_TOKEN"
+        # Note: Both GitHub and Gitea reserve their respective prefixes for secrets
+        token_secret_name = "SAPIENS_GITHUB_TOKEN" if self.provider_type == "github" else "SAPIENS_GITEA_TOKEN"
         click.echo(f"   ⏳ Setting {token_secret_name} secret...")
         asyncio.run(github.set_repository_secret(token_secret_name, self.gitea_token))
         click.echo(f"   ✓ Set repository secret: {token_secret_name}")
@@ -1534,7 +1614,7 @@ class RepoInitializer:
         """
         # TODO: Use mcp__gitea__upsert_repo_action_secret when MCP integration is complete
         click.echo(click.style(f"   ℹ Please set {name} manually in Gitea UI for now", fg="yellow"))
-        secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/settings/secrets"
+        secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/settings/secrets"
         click.echo(f"   Navigate to: {secrets_url}")
 
     def _generate_config(self) -> None:
@@ -2125,98 +2205,220 @@ tags:
             click.echo(click.style(f"   ⚠ Warning: Validation failed: {e}", fg="yellow"))
             click.echo()
 
+    def _get_provider_urls(self) -> dict[str, str]:
+        """Generate provider-specific URLs for settings and tokens.
+
+        Returns:
+            Dictionary with URLs for various settings pages
+        """
+        base = str(self.repo_info.base_url).rstrip("/")
+        owner = self.repo_info.owner
+        repo = self.repo_info.repo
+
+        if self.provider_type == "github":
+            # GitHub URLs
+            if "github.com" in base:
+                token_url = "https://github.com/settings/tokens/new?scopes=repo,read:org,workflow"
+            else:
+                # GitHub Enterprise
+                token_url = f"{base}/settings/tokens/new?scopes=repo,read:org,workflow"
+
+            return {
+                "issues": f"{base}/{owner}/{repo}/issues",
+                "actions": f"{base}/{owner}/{repo}/actions",
+                "secrets": f"{base}/{owner}/{repo}/settings/secrets/actions",
+                "token": token_url,
+                "token_name": "Personal Access Token (Classic)",
+                "token_scopes": "repo, read:org, workflow",
+            }
+
+        elif self.provider_type == "gitlab":
+            return {
+                "issues": f"{base}/{owner}/{repo}/-/issues",
+                "pipelines": f"{base}/{owner}/{repo}/-/pipelines",
+                "variables": f"{base}/{owner}/{repo}/-/settings/ci_cd#js-cicd-variables-settings",
+                "token": f"{base}/-/user_settings/personal_access_tokens",
+                "token_name": "Personal Access Token",
+                "token_scopes": "api, read_repository, write_repository",
+            }
+
+        else:  # gitea
+            return {
+                "issues": f"{base}/{owner}/{repo}/issues",
+                "actions": f"{base}/{owner}/{repo}/actions",
+                "secrets": f"{base}/{owner}/{repo}/settings/secrets",
+                "token": f"{base}/user/settings/applications",
+                "token_name": "Access Token",
+                "token_scopes": "repo (read/write), issue (read/write)",
+            }
+
+    def _get_required_secrets(self) -> list[tuple[str, str, str | None]]:
+        """Get list of required secrets based on provider and agent configuration.
+
+        Returns:
+            List of tuples: (secret_name, description, optional_url_for_token)
+        """
+        secrets = []
+        urls = self._get_provider_urls()
+
+        # Git provider token
+        if self.provider_type == "github":
+            secrets.append(
+                (
+                    "GITHUB_TOKEN or SAPIENS_GITHUB_TOKEN",
+                    f"GitHub {urls['token_name']} with scopes: {urls['token_scopes']}",
+                    urls["token"],
+                )
+            )
+        elif self.provider_type == "gitlab":
+            secrets.append(
+                (
+                    "SAPIENS_GITLAB_TOKEN",
+                    f"GitLab {urls['token_name']} with scopes: {urls['token_scopes']}",
+                    urls["token"],
+                )
+            )
+        else:  # gitea
+            secrets.append(
+                (
+                    "SAPIENS_GITEA_TOKEN",
+                    f"Gitea {urls['token_name']} with permissions: {urls['token_scopes']}",
+                    urls["token"],
+                )
+            )
+
+        # Agent API key (if using API mode)
+        if self.agent_mode == "api":
+            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
+                secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
+                if self.goose_llm_provider == "anthropic":
+                    secrets.append(
+                        (
+                            secret_name,
+                            "Anthropic API key for Goose",
+                            "https://console.anthropic.com/settings/keys",
+                        )
+                    )
+                elif self.goose_llm_provider == "openai":
+                    secrets.append(
+                        (
+                            secret_name,
+                            "OpenAI API key for Goose",
+                            "https://platform.openai.com/api-keys",
+                        )
+                    )
+                else:
+                    secrets.append((secret_name, f"{self.goose_llm_provider.title()} API key for Goose", None))
+            elif self.agent_type == AgentType.CLAUDE:
+                secrets.append(
+                    (
+                        "CLAUDE_API_KEY or ANTHROPIC_API_KEY",
+                        "Anthropic API key for Claude",
+                        "https://console.anthropic.com/settings/keys",
+                    )
+                )
+            elif self.agent_type == AgentType.BUILTIN:
+                if self.builtin_provider == "anthropic":
+                    secrets.append(
+                        (
+                            "ANTHROPIC_API_KEY",
+                            "Anthropic API key",
+                            "https://console.anthropic.com/settings/keys",
+                        )
+                    )
+                elif self.builtin_provider == "openai":
+                    secrets.append(
+                        (
+                            "OPENAI_API_KEY",
+                            "OpenAI API key",
+                            "https://platform.openai.com/api-keys",
+                        )
+                    )
+
+        return secrets
+
     def _print_next_steps(self) -> None:
         """Print next steps for the user."""
         provider_name = self.provider_type.title()
+        urls = self._get_provider_urls()
 
         click.echo(click.style("📋 Next Steps:", bold=True))
         click.echo()
-        click.echo(f"1. Label an issue with 'needs-planning' in {provider_name}:")
 
-        # Build issues URL based on provider
-        if self.provider_type == "gitlab":
-            issues_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/-/issues"
-        else:
-            issues_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/{self.repo_info.repo}/issues"
-        click.echo(f"   {issues_url}")
+        # Step 1: Set up secrets/variables for CI/CD workflows
+        if self.setup_secrets and self.automation_mode in ("native", "hybrid"):
+            self._print_secrets_setup(urls)
+
+        # Step 2: Try the workflow
+        step_num = 2 if self.setup_secrets and self.automation_mode in ("native", "hybrid") else 1
+        click.echo(f"{step_num}. Label an issue with '{self.label_prefix}needs-planning' in {provider_name}:")
+        click.echo(f"   {urls['issues']}")
         click.echo()
 
         # Mode-specific instructions
+        step_num += 1
         if self.automation_mode == "native":
-            click.echo("2. Workflows will trigger automatically when you add labels!")
+            click.echo(f"{step_num}. Workflows will trigger automatically when you add labels!")
             click.echo()
             click.echo("   • Label triggers are active immediately")
             click.echo("   • No daemon process needed")
-            click.echo(f"   • Check workflows: {issues_url.rsplit('/', 1)[0]}/actions")
+            if self.provider_type == "gitlab":
+                click.echo(f"   • Check pipelines: {urls['pipelines']}")
+            else:
+                click.echo(f"   • Check workflows: {urls['actions']}")
         elif self.automation_mode == "daemon":
-            click.echo("2. Run the automation daemon:")
+            click.echo(f"{step_num}. Run the automation daemon:")
             click.echo(f"   sapiens --config {self.config_path} daemon --interval 60")
             click.echo()
-            click.echo("3. Watch the automation work!")
+            click.echo(f"{step_num + 1}. Watch the automation work!")
         else:  # hybrid
-            click.echo("2. Automation runs in hybrid mode:")
+            click.echo(f"{step_num}. Automation runs in hybrid mode:")
             click.echo("   • Label triggers work instantly via workflows")
-            click.echo(f"   • Check workflows: {issues_url.rsplit('/', 1)[0]}/actions")
+            if self.provider_type == "gitlab":
+                click.echo(f"   • Check pipelines: {urls['pipelines']}")
+            else:
+                click.echo(f"   • Check workflows: {urls['actions']}")
             click.echo()
             click.echo("   • Optional: Run daemon for additional automation:")
             click.echo(f"     sapiens --config {self.config_path} daemon --interval 60")
 
         click.echo()
-
-        # Print manual secret setup if needed (not for GitLab - uses CI/CD variables)
-        # Only needed for native/hybrid modes that use workflows
-        if self.setup_secrets and self.provider_type != "gitlab" and self.automation_mode in ("native", "hybrid"):
-            click.echo(
-                click.style(
-                    f"⚠ Important: Set {provider_name} Actions Secrets Manually",
-                    bold=True,
-                    fg="yellow",
-                )
-            )
-            click.echo("   (Required for workflow automation)")
-
-            click.echo()
-            secrets_url = f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/settings/secrets"
-            click.echo(f"Navigate to: {secrets_url}")
-            click.echo()
-            click.echo("Add the following secrets:")
-            if self.provider_type == "gitea":
-                click.echo("  - SAPIENS_GITEA_TOKEN (your Gitea API token)")
-            if self.agent_mode == "api":
-                if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
-                    secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
-                    provider_title = self.goose_llm_provider.title()
-                    click.echo(f"  - {secret_name} (your {provider_title} API key for Goose)")
-                elif self.agent_type == AgentType.CLAUDE:
-                    click.echo("  - CLAUDE_API_KEY (your Claude API key)")
-            click.echo()
-
-        # GitLab uses CI/CD variables instead of Actions secrets
-        # Only needed for native/hybrid modes that use workflows
-        if self.setup_secrets and self.provider_type == "gitlab" and self.automation_mode in ("native", "hybrid"):
-            click.echo(click.style("⚠ Important: Set GitLab CI/CD Variables Manually", bold=True, fg="yellow"))
-            click.echo("   (Required for workflow automation)")
-            click.echo()
-            variables_url = (
-                f"{self.repo_info.base_url}/{self.repo_info.owner}/" f"{self.repo_info.repo}/-/settings/ci_cd"
-            )
-            click.echo(f"Navigate to: {variables_url}")
-            click.echo("Expand 'Variables' section and add:")
-            click.echo()
-            click.echo("  - GITLAB_TOKEN (your GitLab Personal Access Token)")
-            if self.agent_mode == "api":
-                if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
-                    secret_name = f"{self.goose_llm_provider.upper()}_API_KEY"
-                    provider_title = self.goose_llm_provider.title()
-                    click.echo(f"  - {secret_name} (your {provider_title} API key for Goose)")
-                elif self.agent_type == AgentType.CLAUDE:
-                    click.echo("  - CLAUDE_API_KEY (your Claude API key)")
-            click.echo()
-
         click.echo("For more information, see:")
         click.echo("  - README.md")
         click.echo("  - QUICK_START.md")
         click.echo("  - docs/CREDENTIAL_QUICK_START.md")
+
+    def _print_secrets_setup(self, urls: dict[str, str]) -> None:
+        """Print instructions for setting up secrets/variables."""
+        provider_name = self.provider_type.title()
+        secrets = self._get_required_secrets()
+
+        if self.provider_type == "gitlab":
+            click.echo(click.style("1. Set GitLab CI/CD Variables", bold=True, fg="yellow"))
+            click.echo("   (Required for workflow automation)")
+            click.echo()
+            click.echo(f"   Navigate to: {urls['variables']}")
+            click.echo("   Expand 'Variables' section and add:")
+        else:
+            click.echo(click.style(f"1. Set {provider_name} Actions Secrets", bold=True, fg="yellow"))
+            click.echo("   (Required for workflow automation)")
+            click.echo()
+            click.echo(f"   Navigate to: {urls['secrets']}")
+            click.echo("   Add the following secrets:")
+
+        click.echo()
+
+        for secret_name, description, token_url in secrets:
+            click.echo(f"   • {click.style(secret_name, bold=True)}")
+            click.echo(f"     {description}")
+            if token_url:
+                click.echo(f"     Get it here: {token_url}")
+            click.echo()
+
+        # Add note about marking as protected/masked for GitLab
+        if self.provider_type == "gitlab":
+            click.echo(click.style("   Tip:", fg="cyan") + " Mark variables as 'Protected' and 'Masked' for security")
+            click.echo()
 
     def _offer_test_run(self) -> None:
         """Offer to test the setup by summarizing the README."""

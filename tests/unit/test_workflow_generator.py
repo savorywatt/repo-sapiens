@@ -514,14 +514,14 @@ class TestBuildEnvBlock:
         assert "SAPIENS_GITEA_TOKEN" in env["GITEA_TOKEN"]
 
     def test_github_env_block_has_github_token(self, tmp_path: Path):
-        """Test GitHub env block includes GITHUB_TOKEN."""
+        """Test GitHub env block includes GITHUB_TOKEN sourced from SAPIENS_GITHUB_TOKEN."""
         settings = MockSettings(provider_type="github")
         generator = WorkflowGenerator(settings, tmp_path)
 
         env = generator._build_env_block()
 
         assert "GITHUB_TOKEN" in env
-        assert "GITHUB_TOKEN" in env["GITHUB_TOKEN"]
+        assert "SAPIENS_GITHUB_TOKEN" in env["GITHUB_TOKEN"]
 
     def test_env_block_has_automation_vars(self, tmp_path: Path):
         """Test env block includes AUTOMATION__ prefixed vars."""

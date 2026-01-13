@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 10  # Get recent history for context
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -57,7 +57,7 @@ jobs:
 
       - name: Update documentation
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           sapiens task "Review the recent commits and update documentation if needed.

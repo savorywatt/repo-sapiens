@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITEA_TOKEN }}
+          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
 
       - name: Configure git
         run: |

@@ -51,7 +51,7 @@ jobs:
 
       - name: Process issue
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
           # Uncomment your AI provider:
           # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}

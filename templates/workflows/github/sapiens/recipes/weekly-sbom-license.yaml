@@ -403,7 +403,7 @@ jobs:
       - name: Create issue for critical findings
         if: (env.VULN_CRITICAL != '0' || env.VULN_HIGH != '0' || env.LICENSE_DENIED != '0') && (github.event.inputs.create_issues != 'false')
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
         run: |
           gh issue create \
             --title "SBOM Alert: $(date +%Y-%m-%d) - ${{ env.VULN_CRITICAL }} critical, ${{ env.LICENSE_DENIED }} license issues" \
