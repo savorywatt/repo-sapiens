@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Multi-Remote Support**: Interactive provider selection when multiple Git remotes detected
+  - Detects GitHub, GitLab, and Gitea from remote URLs during `sapiens init`
+  - Uses preferred remotes (origin > upstream > first) in non-interactive mode
+  - Prompts user to select provider when multiple are detected
 - **GitHub Copilot Integration**: Support for GitHub Copilot as an AI agent provider
   - New `copilot-local` provider type using the official `gh copilot` CLI
   - Automatic detection of GitHub CLI and Copilot extension during `sapiens init`
@@ -44,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Smart config update mode - prompts which sections to update on re-init
 
 ### Changed
+- **Secret Naming Standardization**: All secrets now use `SAPIENS_` prefix
+  - `SAPIENS_GITEA_TOKEN` for Gitea (GITEA_ prefix is reserved by Gitea)
+  - `SAPIENS_GITHUB_TOKEN` for GitHub (GITHUB_ prefix is reserved for custom secrets)
+  - Updated all workflow templates, documentation, and code
+- **Goose Agent Simplification**: Removed non-functional `goose-api` provider type
+  - Goose is CLI-only, so only `goose-local` is valid
+  - Updated documentation and configuration to reflect this
 - **Python Requirement**: Now requires Python 3.12+ (was 3.13+)
   - Updated all workflows, Docker images, and configs
   - Better compatibility with stable Python releases
