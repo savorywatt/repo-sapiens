@@ -4,14 +4,15 @@ This guide compares all AI agent options available in repo-sapiens, helping you 
 
 ## Overview
 
-repo-sapiens supports four agent options:
+repo-sapiens supports five agent options:
 
 | Agent | Type | LLM Providers | Best For |
 |-------|------|---------------|----------|
-| [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama, vLLM | Simple tasks, experimentation, local inference |
-| [Goose](#goose-ai) | External CLI | OpenAI, Anthropic, Ollama, OpenRouter, Groq | Flexibility, cloud providers |
 | [Claude Code](#claude-code) | External CLI | Anthropic only | Best coding performance, simplicity |
+| [Goose](#goose-ai) | External CLI | OpenAI, Anthropic, Ollama, OpenRouter, Groq | Flexibility, cloud providers |
+| [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama, vLLM | Simple tasks, experimentation, local inference |
 | [Ollama Provider](#ollama-provider) | Built-in | Ollama (local) | Automation workflows, local inference |
+| [GitHub Copilot](#github-copilot) | External CLI | GitHub's models | Simple tasks, existing subscribers |
 
 ---
 
@@ -269,20 +270,69 @@ agent_provider:
 
 ---
 
+## GitHub Copilot
+
+[GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) is GitHub's official AI assistant for the command line.
+
+### Pros
+- **No API key needed**: Uses GitHub authentication
+- **Familiar**: Same AI as Copilot in your IDE
+- **Subscription-based**: Predictable monthly cost
+- **Easy setup**: Just install the extension
+
+### Cons
+- **Limited capabilities**: Designed for command suggestions, not full code generation
+- **Subscription required**: $10-39/month
+- **Basic tool support**: Cannot do complex multi-file operations
+- **Less flexible**: No model choice
+
+### When to Use
+- You already have a GitHub Copilot subscription
+- Simple shell command suggestions
+- Lightweight automation tasks
+- Want to stay in the GitHub ecosystem
+
+### Quick Start
+
+```bash
+# Install GitHub CLI and Copilot extension
+brew install gh  # or apt install gh
+gh auth login
+gh extension install github/gh-copilot
+
+# Initialize with Copilot
+sapiens init
+# Select: copilot
+```
+
+### Configuration
+
+```yaml
+# sapiens_config.yaml
+agent_provider:
+  provider_type: copilot-local
+  model: gpt-4
+  api_key: null
+  local_mode: true
+```
+
+---
+
 ## Feature Comparison Matrix
 
-| Feature | ReAct Agent | Goose | Claude Code | Ollama Provider |
-|---------|-------------|-------|-------------|-----------------|
-| **Installation** | None | `pip install goose-ai` | `npm install -g @anthropic-ai/claude-code` | None |
-| **Cloud Providers** | - | OpenAI, Anthropic, OpenRouter, Groq | Anthropic | - |
-| **Local Models** | Ollama, vLLM | Ollama | - | Ollama |
-| **Tool Calling** | Custom | Native LLM | Native LLM | Prompt-based |
-| **REPL Mode** | Yes | Yes | Yes | - |
-| **Daemon Mode** | - | Yes | Yes | Yes |
-| **Issue Processing** | - | Yes | Yes | Yes |
-| **Verbose/Debug** | Yes | Yes | Yes | Yes |
-| **Custom Toolkits** | - | Yes | - | - |
-| **Cost** | Free (local) | Free-$0.30/1K | $0.15/1K | Free (local) |
+| Feature | Claude Code | Goose | ReAct Agent | Ollama Provider | Copilot |
+|---------|-------------|-------|-------------|-----------------|---------|
+| **Installation** | `curl ...` | `pip install goose-ai` | None | None | `gh extension install` |
+| **Cloud Providers** | Anthropic | OpenAI, Anthropic, OpenRouter, Groq | - | - | GitHub |
+| **Local Models** | - | Ollama | Ollama, vLLM | Ollama | - |
+| **Tool Calling** | Native LLM | Native LLM | Custom | Prompt-based | Limited |
+| **REPL Mode** | Yes | Yes | Yes | - | - |
+| **Daemon Mode** | Yes | Yes | - | Yes | Yes |
+| **Issue Processing** | Yes | Yes | - | Yes | Yes |
+| **Verbose/Debug** | Yes | Yes | Yes | Yes | - |
+| **Custom Toolkits** | - | Yes | - | - | - |
+| **Multi-file Edits** | Excellent | Excellent | Good | Fair | Limited |
+| **Cost** | $0.15/1K | Free-$0.30/1K | Free | Free | $10-39/mo |
 
 ---
 
