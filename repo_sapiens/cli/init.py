@@ -2174,6 +2174,175 @@ tags:
 
         click.echo()
 
+        # Ask about validation workflow (for CI/CD setups)
+        if not self.non_interactive:
+            click.echo(click.style("Validation Workflow", bold=True))
+            click.echo("A validation workflow tests provider connectivity in CI/CD:")
+            click.echo("  - Verifies API authentication works")
+            click.echo("  - Tests read/write operations (creates test issue/PR)")
+            click.echo("  - Produces diagnostic report")
+            click.echo()
+            if click.confirm("Deploy validation workflow?", default=True):
+                self._deploy_validation_workflow(workflows_dir, deploy_template)
+
+        click.echo()
+
+    def _deploy_validation_workflow(self, workflows_dir: Path, deploy_fn) -> None:
+        """Deploy the validation workflow template.
+
+        Args:
+            workflows_dir: Target workflows directory
+            deploy_fn: Function to deploy a template
+        """
+        # Create validation workflow content based on provider
+        if self.provider_type == "github":
+            workflow_content = self._generate_github_validation_workflow()
+            target_file = workflows_dir / "sapiens" / "validate.yaml"
+        elif self.provider_type == "gitlab":
+            workflow_content = self._generate_gitlab_validation_workflow()
+            target_file = self.repo_path / ".gitlab" / "sapiens" / "validate.yaml"
+        else:  # gitea
+            workflow_content = self._generate_gitea_validation_workflow()
+            target_file = workflows_dir / "sapiens" / "validate.yaml"
+
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            target_file.write_text(workflow_content)
+            click.echo(f"   ✓ Validation workflow → {target_file.relative_to(self.repo_path)}")
+        except Exception as e:
+            click.echo(click.style(f"   ⚠ Could not deploy validation workflow: {e}", fg="yellow"))
+
+    def _generate_github_validation_workflow(self) -> str:
+        """Generate GitHub Actions validation workflow."""
+        return """name: Sapiens Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 6am UTC
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install sapiens
+        run: |
+          pip install uv
+          uv pip install --system repo-sapiens
+
+      - name: Run validation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SAPIENS_GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          sapiens health-check --full --json > validation-report.json
+        continue-on-error: true
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation-report.json
+
+      - name: Check results
+        run: |
+          if grep -q '"failed": 0' validation-report.json; then
+            echo "All validation tests passed!"
+          else
+            echo "Some validation tests failed. Check the report."
+            exit 1
+          fi
+"""
+
+    def _generate_gitea_validation_workflow(self) -> str:
+        """Generate Gitea Actions validation workflow."""
+        return """name: Sapiens Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 6am UTC
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install sapiens
+        run: |
+          pip install uv
+          uv pip install --system repo-sapiens
+
+      - name: Run validation
+        env:
+          SAPIENS_GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          SAPIENS_CLAUDE_API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          sapiens health-check --full --json > validation-report.json
+        continue-on-error: true
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation-report.json
+
+      - name: Check results
+        run: |
+          if grep -q '"failed": 0' validation-report.json; then
+            echo "All validation tests passed!"
+          else
+            echo "Some validation tests failed. Check the report."
+            exit 1
+          fi
+"""
+
+    def _generate_gitlab_validation_workflow(self) -> str:
+        """Generate GitLab CI validation workflow."""
+        return """# Sapiens Validation Pipeline
+# Run manually or on schedule to validate sapiens configuration
+
+validate-sapiens:
+  stage: test
+  image: python:3.12
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  before_script:
+    - pip install uv
+    - uv pip install --system repo-sapiens
+  script:
+    - sapiens health-check --full --json > validation-report.json || true
+    - |
+      if grep -q '"failed": 0' validation-report.json; then
+        echo "All validation tests passed!"
+      else
+        echo "Some validation tests failed. Check the report."
+        cat validation-report.json
+        exit 1
+      fi
+  artifacts:
+    paths:
+      - validation-report.json
+    when: always
+    expire_in: 1 week
+"""
+
     def _validate_setup(self) -> None:
         """Validate the setup."""
         click.echo(click.style("✓ Validating setup...", bold=True))
