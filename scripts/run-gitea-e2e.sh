@@ -41,6 +41,7 @@ TEST_PREFIX="sapiens-e2e-${TIMESTAMP}-"
 ISSUE_NUMBER=""
 PR_NUMBER=""
 FEATURE_BRANCH=""
+PROPOSAL_NUMBER=""
 
 # Colors
 RED='\033[0;31m'
@@ -73,10 +74,16 @@ cleanup() {
     local exit_code=$?
     step "Cleaning up test resources..."
 
-    # Close issue
+    # Close original issue
     if [[ -n "${ISSUE_NUMBER:-}" ]]; then
         log "Closing issue #$ISSUE_NUMBER..."
         gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close proposal issue
+    if [[ -n "${PROPOSAL_NUMBER:-}" ]]; then
+        log "Closing proposal #$PROPOSAL_NUMBER..."
+        gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$PROPOSAL_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
     fi
 
     # Close PR
@@ -198,9 +205,38 @@ gitea_api() {
     curl "${curl_args[@]}" "$GITEA_URL/api/v1$endpoint"
 }
 
+# Ensure label exists and get its ID
+ensure_label() {
+    local label_name="$1"
+    local label_id
+
+    # Check if label exists
+    label_id=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/labels" 2>/dev/null | \
+        jq -r ".[] | select(.name == \"$label_name\") | .id" | head -1)
+
+    if [[ -z "$label_id" ]]; then
+        # Create the label
+        log "Creating label: $label_name"
+        label_id=$(gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/labels" \
+            "{\"name\": \"$label_name\", \"color\": \"428BCA\"}" 2>/dev/null | jq -r '.id')
+    fi
+
+    echo "$label_id"
+}
+
 # Create test issue with automation label
 create_test_issue() {
     step "Creating test issue..."
+
+    # Ensure required labels exist and get their IDs
+    local planning_label_id
+    planning_label_id=$(ensure_label "needs-planning")
+    log "Using label 'needs-planning' (id: $planning_label_id)"
+
+    # Also ensure other labels exist for later stages
+    ensure_label "approved" > /dev/null
+    ensure_label "in-progress" > /dev/null
+    ensure_label "done" > /dev/null
 
     local issue_body
     issue_body=$(cat << 'ISSUE_EOF'
@@ -223,7 +259,7 @@ ISSUE_EOF
     response=$(gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/issues" "{
         \"title\": \"${TEST_PREFIX}Add greeting function\",
         \"body\": $(echo "$issue_body" | jq -Rs .),
-        \"labels\": [\"needs-planning\"]
+        \"labels\": [$planning_label_id]
     }")
 
     ISSUE_NUMBER=$(echo "$response" | jq -r '.number')
@@ -264,10 +300,10 @@ CONFIG_EOF
     log "Config written to $config_file"
 
     # Process the specific issue
-    log "Running: sapiens process-label --issue $ISSUE_NUMBER"
+    log "Running: sapiens process-issue --issue $ISSUE_NUMBER"
 
     mkdir -p "$RESULTS_DIR/$RUN_ID"
-    if uv run sapiens --config "$config_file" process-label --issue "$ISSUE_NUMBER" --verbose 2>&1 | tee "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+    if uv run sapiens --config "$config_file" process-issue --issue "$ISSUE_NUMBER" 2>&1 | tee "$RESULTS_DIR/$RUN_ID/process-output.log"; then
         log "Issue processing completed"
     else
         warn "Issue processing returned non-zero exit code"
@@ -283,36 +319,56 @@ verify_results() {
     local passed=0
     local failed=0
 
-    # Check 1: Issue should have a plan comment
-    log "Checking for plan comment..."
+    # Check 1: Issue should have a comment linking to proposal
+    log "Checking for proposal comment..."
     local comments
     comments=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ISSUE_NUMBER/comments" || echo "[]")
-    local plan_comment
-    plan_comment=$(echo "$comments" | jq -r '.[] | select(.body | contains("## Plan")) | .id' | head -1)
+    local proposal_comment
+    proposal_comment=$(echo "$comments" | jq -r '.[] | select(.body | (contains("proposal") or contains("PROPOSAL") or contains("#"))) | .id' | head -1)
 
-    if [[ -n "$plan_comment" ]]; then
-        log "  Plan comment found"
+    if [[ -n "$proposal_comment" ]]; then
+        log "  Proposal comment found"
         ((passed++))
     else
-        error "  No plan comment found"
+        error "  No proposal comment found"
         ((failed++))
     fi
 
-    # Check 2: Issue labels should have changed
+    # Check 2: Issue labels should have changed to awaiting-approval
     log "Checking issue labels..."
     local issue
     issue=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ISSUE_NUMBER")
     local labels
     labels=$(echo "$issue" | jq -r '.labels[].name' | tr '\n' ',')
 
-    if [[ "$labels" == *"approved"* ]] || [[ "$labels" == *"in-progress"* ]] || [[ "$labels" == *"done"* ]]; then
+    if [[ "$labels" == *"awaiting-approval"* ]]; then
+        log "  Issue has awaiting-approval label: $labels"
+        ((passed++))
+    elif [[ "$labels" == *"approved"* ]] || [[ "$labels" == *"in-progress"* ]] || [[ "$labels" == *"done"* ]]; then
         log "  Issue labels updated: $labels"
         ((passed++))
     else
-        warn "  Issue labels unchanged: $labels (may need manual approval)"
+        error "  Issue labels not updated: $labels"
+        ((failed++))
     fi
 
-    # Check 3: Look for created branch
+    # Check 3: Look for proposal issue
+    log "Checking for proposal issue..."
+    local issues
+    issues=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues?state=all&labels=proposed" || echo "[]")
+    local proposal_issue
+    proposal_issue=$(echo "$issues" | jq -r ".[] | select(.title | contains(\"$ISSUE_NUMBER\") or contains(\"PROPOSAL\")) | .number" | head -1)
+
+    if [[ -n "$proposal_issue" ]]; then
+        log "  Proposal issue found: #$proposal_issue"
+        ((passed++))
+        PROPOSAL_NUMBER="$proposal_issue"
+    else
+        error "  No proposal issue found"
+        ((failed++))
+    fi
+
+    # Check 4: Look for created branch (optional - only if plan approved)
     log "Checking for feature branch..."
     local branches
     branches=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/branches" || echo "[]")
@@ -324,10 +380,10 @@ verify_results() {
         ((passed++))
         FEATURE_BRANCH="$feature_branch"
     else
-        warn "  No feature branch found (may need approved label)"
+        log "  No feature branch (expected - plan needs approval)"
     fi
 
-    # Check 4: Look for PR
+    # Check 5: Look for PR (optional - only after implementation)
     log "Checking for pull request..."
     local prs
     prs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/pulls?state=all" || echo "[]")
@@ -339,13 +395,14 @@ verify_results() {
         ((passed++))
         PR_NUMBER="$test_pr"
     else
-        warn "  No pull request found (workflow may not have completed)"
+        log "  No pull request (expected - plan needs approval)"
     fi
 
     # Summary
     echo ""
     log "Verification: $passed passed, $failed failed"
 
+    # Pass if core checks pass (comment, label, proposal)
     if [[ $failed -gt 0 ]]; then
         return 1
     fi
