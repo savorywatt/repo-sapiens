@@ -428,6 +428,59 @@ class GitHubRestProvider(GitProvider):
             log.error("github_set_secret_failed", name=name, error=str(e))
             raise
 
+    async def setup_automation_labels(
+        self,
+        labels: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Set up automation labels in the repository.
+
+        Creates the specified labels if they don't exist. Uses distinct colors
+        for each label type to make them visually distinguishable.
+
+        Args:
+            labels: List of label names. If None, creates default automation labels.
+
+        Returns:
+            Dict mapping label names to their IDs.
+        """
+        # Default automation labels with distinct colors
+        default_labels = {
+            "needs-planning": "5319e7",    # Purple - needs attention
+            "awaiting-approval": "fbca04",  # Yellow - waiting
+            "approved": "0e8a16",           # Green - ready to go
+            "in-progress": "1d76db",        # Blue - working on it
+            "done": "0e8a16",               # Green - complete
+            "proposed": "c5def5",           # Light blue - proposal
+        }
+
+        if labels is None:
+            labels = list(default_labels.keys())
+
+        # Get existing labels
+        existing_labels = {
+            label.name: label.id for label in await _run_sync(lambda: list(self._repo.get_labels()))
+        }
+
+        result: dict[str, int] = {}
+        for name in labels:
+            if name in existing_labels:
+                log.debug("label_exists", name=name)
+                result[name] = existing_labels[name]
+            else:
+                # Create new label with appropriate color
+                color = default_labels.get(name, "ededed")  # Default gray if not in defaults
+                log.info("creating_automation_label", name=name, color=color)
+                new_label = await _run_sync(
+                    lambda n=name, c=color: self._repo.create_label(
+                        name=n,
+                        color=c,
+                        description=f"Automation label: {n}",
+                    )
+                )
+                result[name] = new_label.id
+
+        return result
+
     def _convert_issue(self, gh_issue: GHIssue) -> Issue:
         """Convert GitHub Issue to our Issue model."""
         # Map GitHub state to our IssueState

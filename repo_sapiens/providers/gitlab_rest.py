@@ -534,6 +534,64 @@ class GitLabRestProvider(GitProvider):
                 return None
             raise
 
+    async def setup_automation_labels(
+        self,
+        labels: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Set up automation labels in the repository.
+
+        Creates the specified labels if they don't exist. Uses distinct colors
+        for each label type to make them visually distinguishable.
+
+        Args:
+            labels: List of label names. If None, creates default automation labels.
+
+        Returns:
+            Dict mapping label names to their IDs.
+        """
+        # Default automation labels with distinct colors
+        default_labels = {
+            "needs-planning": "5319e7",    # Purple - needs attention
+            "awaiting-approval": "fbca04",  # Yellow - waiting
+            "approved": "0e8a16",           # Green - ready to go
+            "in-progress": "1d76db",        # Blue - working on it
+            "done": "0e8a16",               # Green - complete
+            "proposed": "c5def5",           # Light blue - proposal
+        }
+
+        if labels is None:
+            labels = list(default_labels.keys())
+
+        labels_path = f"/projects/{self._project_path_encoded}/labels"
+
+        # Get existing labels
+        response = await self._pool.get(labels_path)
+        response.raise_for_status()
+        existing_labels = {label["name"]: label["id"] for label in response.json()}
+
+        result: dict[str, int] = {}
+        for name in labels:
+            if name in existing_labels:
+                log.debug("label_exists", name=name)
+                result[name] = existing_labels[name]
+            else:
+                # Create new label with appropriate color
+                color = default_labels.get(name, "ededed")  # Default gray if not in defaults
+                log.info("creating_automation_label", name=name, color=color)
+                create_response = await self._pool.post(
+                    labels_path,
+                    json={
+                        "name": name,
+                        "color": f"#{color}",  # GitLab requires # prefix
+                        "description": f"Automation label: {name}",
+                    },
+                )
+                create_response.raise_for_status()
+                new_label = create_response.json()
+                result[name] = new_label["id"]
+
+        return result
+
     def _parse_issue(self, data: dict[str, Any]) -> Issue:
         """Parse issue data from GitLab API response.
 

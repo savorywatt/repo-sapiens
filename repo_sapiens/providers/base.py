@@ -230,6 +230,31 @@ class GitProvider(ABC):
         """
         pass
 
+    async def setup_automation_labels(
+        self,
+        labels: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Set up automation labels in the repository.
+
+        Creates the specified labels if they don't exist. This is used during
+        init and bootstrap to ensure required labels are available.
+
+        Default labels (if none specified):
+            - needs-planning: Issues requiring AI planning
+            - awaiting-approval: Plans waiting for review
+            - approved: Plans approved for implementation
+            - in-progress: Implementation in progress
+            - done: Implementation complete
+
+        Args:
+            labels: List of label names to create. If None, creates defaults.
+
+        Returns:
+            Dict mapping label names to their IDs
+        """
+        # Default implementation does nothing - providers override as needed
+        return {}
+
 
 class AgentProvider(ABC):
     """Abstract base class for AI agent implementations."""
