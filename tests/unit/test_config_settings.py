@@ -252,28 +252,28 @@ class TestAgentProviderConfig:
         assert config.local_mode is True
         assert config.api_key is None
 
-    def test_claude_api_provider(self):
-        """Test Claude API provider requires api_key."""
+    def test_goose_local_provider(self):
+        """Test Goose local provider configuration."""
         config = AgentProviderConfig(
-            provider_type="claude-api",
-            model="claude-opus-4.5",
+            provider_type="goose-local",
+            model="gpt-4",
             api_key="test-api-key",
-            local_mode=False,
+            local_mode=True,
         )
 
-        assert config.provider_type == "claude-api"
-        assert config.local_mode is False
+        assert config.provider_type == "goose-local"
+        assert config.local_mode is True
 
-    def test_openai_provider(self):
-        """Test OpenAI provider configuration."""
+    def test_openai_compatible_provider(self):
+        """Test OpenAI-compatible provider configuration."""
         config = AgentProviderConfig(
-            provider_type="openai",
+            provider_type="openai-compatible",
             model="gpt-4-turbo",
             api_key="sk-abc123",
             local_mode=False,
         )
 
-        assert config.provider_type == "openai"
+        assert config.provider_type == "openai-compatible"
         assert config.model == "gpt-4-turbo"
 
     def test_ollama_provider(self):
@@ -317,12 +317,12 @@ class TestAgentProviderConfig:
 
     def test_valid_provider_types(self):
         """Test all valid provider types can be created."""
-        valid_types = ["claude-local", "claude-api", "openai", "ollama"]
+        valid_types = ["claude-local", "goose-local", "copilot-local", "ollama", "openai-compatible"]
 
         for provider_type in valid_types:
             config = AgentProviderConfig(
                 provider_type=provider_type,
-                api_key="test-key" if provider_type != "claude-local" else None,
+                api_key="test-key" if provider_type not in ("claude-local", "goose-local", "copilot-local") else None,
             )
             assert config.provider_type == provider_type
 
@@ -334,8 +334,8 @@ class TestAgentProviderConfig:
 
         try:
             config = AgentProviderConfig(
-                provider_type="claude-api",
-                api_key="${CLAUDE_API_KEY}",
+                provider_type="openai-compatible",
+                api_key="${OPENAI_API_KEY}",
                 local_mode=False,
             )
 
@@ -629,10 +629,9 @@ class TestAutomationSettingsFromYAML:
                 "default_branch": "develop",
             },
             "agent_provider": {
-                "provider_type": "claude-api",
-                "model": "claude-opus-4.5",
-                "api_key": "sk-abc123",
-                "local_mode": False,
+                "provider_type": "claude-local",
+                "model": "claude-sonnet-4.5",
+                "local_mode": True,
             },
             "workflow": {
                 "plans_directory": "project-plans",

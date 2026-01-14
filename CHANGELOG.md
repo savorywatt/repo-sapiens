@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deploys correct workflow templates based on selected mode
   - Mode-specific next steps guidance
   - Smart config update mode - prompts which sections to update on re-init
+- **Comprehensive Validation System**: `health-check --full` for end-to-end testing
+  - Tests read operations (list issues, branches, repository info)
+  - Tests write operations (create branch, issue, comment, PR with cleanup)
+  - Tests agent operations (connectivity, simple prompt execution)
+  - Structured diagnostic reports with `DiagnosticReport` and `ValidationResult` models
+  - JSON output with `--json` flag for CI/CD integration
+  - LLM-generated summaries when agent is available
+  - Validation workflow templates for GitHub Actions, Gitea Actions, GitLab CI
+  - Optional deployment during `sapiens init`
 
 ### Changed
 - **Secret Naming Standardization**: All secrets now use `SAPIENS_` prefix
@@ -68,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Daemon mode: deploys `automation-daemon.yaml` for polling
   - Hybrid mode: deploys both workflows
   - All modes: includes `process-issue.yaml` for manual triggers
+- **Test Coverage**: Improved from 70% to 75% overall
+  - Added comprehensive tests for diagnostics, async_subprocess, mcp_client modules (100%)
+  - Added tests for comment_analyzer, interactive, rendering modules (100%)
+  - Added tests for pr_fix (99%), webhook_server (97%), qa (87%) stages
+  - Fixed 16 failing tests across cli_init, config_settings, main_cli modules
 
 ### Fixed
 - API token whitespace stripping in all providers (Gitea, GitHub, GitLab)
