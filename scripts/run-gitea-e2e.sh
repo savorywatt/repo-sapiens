@@ -3,16 +3,24 @@
 #
 # Gitea-focused integration/e2e test.
 # Validates the complete repo-sapiens workflow:
-#   1. Create labeled issue
-#   2. Process issue (generate plan)
-#   3. Execute plan (make changes)
-#   4. Create PR
-#   5. Verify results
-#   6. Cleanup
+#
+# Phase 1: Actions Integration
+#   1. Deploy workflow file to repo
+#   2. Set up repository secrets
+#   3. Create issue with trigger label
+#   4. Wait for Action to run
+#   5. Verify Action completed
+#
+# Phase 2: Sapiens CLI
+#   1. Create test issue
+#   2. Run sapiens process-issue
+#   3. Verify proposal created
 #
 # Options:
-#   --bootstrap      Auto-bootstrap Gitea if not configured
-#   --docker NAME    Docker container name (default: gitea-test)
+#   --bootstrap       Auto-bootstrap Gitea if not configured
+#   --docker NAME     Docker container name (default: gitea-test)
+#   --skip-actions    Skip Actions integration test (just run CLI test)
+#   --actions-only    Only run Actions integration test
 #
 # Exit codes:
 #   0 - Test passed
@@ -23,11 +31,14 @@ set -euo pipefail
 
 # Script directory for sourcing other scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Configuration
 DOCKER_CONTEXT="${DOCKER_CONTEXT:-default}"
 DOCKER_CONTAINER="${DOCKER_CONTAINER:-gitea-test}"
 AUTO_BOOTSTRAP=false
+SKIP_ACTIONS=false
+ACTIONS_ONLY=false
 RESULTS_DIR="${RESULTS_DIR:-./validation-results}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RUN_ID="gitea-e2e-${TIMESTAMP}"
@@ -42,6 +53,8 @@ ISSUE_NUMBER=""
 PR_NUMBER=""
 FEATURE_BRANCH=""
 PROPOSAL_NUMBER=""
+ACTION_ISSUE_NUMBER=""
+WORKFLOW_RUN_ID=""
 
 # Colors
 RED='\033[0;31m'
@@ -61,8 +74,10 @@ while [[ $# -gt 0 ]]; do
         --bootstrap) AUTO_BOOTSTRAP=true; shift ;;
         --docker) DOCKER_CONTAINER="$2"; shift 2 ;;
         --url) GITEA_URL="$2"; shift 2 ;;
+        --skip-actions) SKIP_ACTIONS=true; shift ;;
+        --actions-only) ACTIONS_ONLY=true; shift ;;
         -h|--help)
-            head -20 "$0" | tail -15
+            head -30 "$0" | tail -25
             exit 0
             ;;
         *) error "Unknown option: $1"; exit 2 ;;
@@ -78,6 +93,12 @@ cleanup() {
     if [[ -n "${ISSUE_NUMBER:-}" ]]; then
         log "Closing issue #$ISSUE_NUMBER..."
         gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close Actions test issue
+    if [[ -n "${ACTION_ISSUE_NUMBER:-}" ]]; then
+        log "Closing Actions test issue #$ACTION_ISSUE_NUMBER..."
+        gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ACTION_ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
     fi
 
     # Close proposal issue
@@ -118,7 +139,7 @@ maybe_bootstrap_gitea() {
     fi
 
     local env_file="/tmp/.env.gitea-test-$$"
-    if "$bootstrap_script" --url "$GITEA_URL" --docker "$DOCKER_CONTAINER" --output "$env_file"; then
+    if "$bootstrap_script" --url "$GITEA_URL" --docker "$DOCKER_CONTAINER" --with-runner --output "$env_file"; then
         # Source the generated environment
         # shellcheck source=/dev/null
         source "$env_file"
@@ -170,11 +191,13 @@ check_prerequisites() {
     GITEA_OWNER="${GITEA_OWNER:-testadmin}"
     GITEA_REPO="${GITEA_REPO:-test-repo}"
 
-    # Check Ollama is running (for agent)
-    if ! curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
-        error "Ollama not running at localhost:11434"
-        error "Start with: ollama serve"
-        exit 2
+    # Check Ollama is running (for agent) - only needed for CLI test
+    if [[ "$ACTIONS_ONLY" != "true" ]]; then
+        if ! curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; then
+            error "Ollama not running at localhost:11434"
+            error "Start with: ollama serve"
+            exit 2
+        fi
     fi
 
     # Check uv is available
@@ -223,6 +246,318 @@ ensure_label() {
 
     echo "$label_id"
 }
+
+#############################################
+# Phase 1: Actions Integration Test
+#############################################
+
+# Deploy workflow file to repository
+deploy_workflow() {
+    step "Deploying test workflow to repository..."
+
+    # Create a simple workflow that posts a comment when triggered
+    # Note: We use GITEA_URL secret instead of github.server_url because
+    # Docker environments may have URL resolution issues (internal vs external URLs)
+    local workflow_content
+    workflow_content=$(cat << 'WORKFLOW_EOF'
+name: E2E Test Workflow
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  test-trigger:
+    name: Test Action Trigger
+    if: github.event.label.name == 'test-action-trigger'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Debug context
+        run: |
+          echo "Server URL: ${{ github.server_url }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Issue number: ${{ github.event.issue.number }}"
+          echo "Label name: ${{ github.event.label.name }}"
+          echo "GITEA_URL secret available: ${{ secrets.GITEA_URL != '' }}"
+
+      - name: Post confirmation comment
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          GITEA_URL: ${{ secrets.GITEA_URL }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUM: ${{ github.event.issue.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          # Use GITEA_URL secret if available, otherwise fall back to github.server_url
+          API_BASE="${GITEA_URL:-${{ github.server_url }}}"
+          echo "Using API base: $API_BASE"
+
+          COMMENT_BODY=$(cat << 'COMMENT'
+          ✅ **Action triggered successfully!**
+
+          This comment confirms that Gitea Actions are working correctly.
+
+          - Workflow: E2E Test Workflow
+          - Trigger: Issue labeled with test-action-trigger
+          - Run ID: RUN_ID_PLACEHOLDER
+          COMMENT
+          )
+          COMMENT_BODY="${COMMENT_BODY//RUN_ID_PLACEHOLDER/$RUN_ID}"
+
+          # Post the comment
+          HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/response.json -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"body\": $(echo "$COMMENT_BODY" | jq -Rs .)}" \
+            "${API_BASE}/api/v1/repos/${REPO}/issues/${ISSUE_NUM}/comments")
+
+          echo "Response code: $HTTP_CODE"
+          cat /tmp/response.json
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "Comment posted successfully!"
+          else
+            echo "Failed to post comment"
+            exit 1
+          fi
+WORKFLOW_EOF
+)
+
+    # Base64 encode the content
+    local encoded_content
+    encoded_content=$(echo -n "$workflow_content" | base64 -w 0)
+
+    # Check if file exists
+    local file_path=".gitea/workflows/e2e-test.yaml"
+    local existing_sha=""
+
+    existing_sha=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$file_path" 2>/dev/null | jq -r '.sha // empty' || echo "")
+
+    if [[ -n "$existing_sha" ]]; then
+        # Update existing file
+        log "Updating existing workflow file..."
+        gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$file_path" "{
+            \"message\": \"Update E2E test workflow\",
+            \"content\": \"$encoded_content\",
+            \"sha\": \"$existing_sha\"
+        }" > /dev/null
+    else
+        # Create new file
+        log "Creating workflow file..."
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$file_path" "{
+            \"message\": \"Add E2E test workflow\",
+            \"content\": \"$encoded_content\"
+        }" > /dev/null
+    fi
+
+    log "Workflow deployed: $file_path"
+}
+
+# Set up repository secrets
+setup_secrets() {
+    step "Setting up repository secrets..."
+
+    # Gitea Actions secrets API
+    # Note: This requires the token to have admin access
+
+    # Set SAPIENS_GITEA_TOKEN secret
+    log "Setting SAPIENS_GITEA_TOKEN secret..."
+    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/SAPIENS_GITEA_TOKEN" "{
+        \"data\": \"$SAPIENS_GITEA_TOKEN\"
+    }" > /dev/null 2>&1 || {
+        warn "Could not set SAPIENS_GITEA_TOKEN secret via API."
+    }
+
+    # Set GITEA_URL secret for the workflow to use
+    # This is needed because github.server_url may not work correctly in Docker
+    log "Setting GITEA_URL secret..."
+    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/GITEA_URL" "{
+        \"data\": \"$GITEA_URL\"
+    }" > /dev/null 2>&1 || {
+        warn "Could not set GITEA_URL secret via API."
+    }
+
+    # Verify secrets were set
+    local secrets_response
+    secrets_response=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets" 2>/dev/null || echo "[]")
+    local secret_count
+    secret_count=$(echo "$secrets_response" | jq 'length' 2>/dev/null || echo "0")
+
+    if [[ "$secret_count" -gt 0 ]]; then
+        log "Secrets configured ($secret_count secrets set)"
+    else
+        warn "Could not verify secrets. May need manual setup:"
+        warn "  $GITEA_URL/$GITEA_OWNER/$GITEA_REPO/settings/actions/secrets"
+    fi
+}
+
+# Create issue to trigger Action
+create_action_test_issue() {
+    step "Creating issue to trigger Action..."
+
+    # Ensure the trigger label exists
+    local label_id
+    label_id=$(ensure_label "test-action-trigger")
+    log "Using label 'test-action-trigger' (id: $label_id)"
+
+    # Create issue
+    local response
+    response=$(gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/issues" "{
+        \"title\": \"${TEST_PREFIX}Actions Integration Test\",
+        \"body\": \"This issue tests that Gitea Actions are properly configured.\\n\\nWhen the \`test-action-trigger\` label is added, the workflow should post a comment.\",
+        \"labels\": [$label_id]
+    }")
+
+    ACTION_ISSUE_NUMBER=$(echo "$response" | jq -r '.number')
+    log "Created issue #$ACTION_ISSUE_NUMBER with trigger label"
+}
+
+# Wait for Action to complete
+wait_for_action() {
+    step "Waiting for Action to complete..."
+
+    local timeout=180
+    local elapsed=0
+    local poll_interval=10
+
+    while [[ $elapsed -lt $timeout ]]; do
+        # Check for the confirmation comment
+        local comments
+        comments=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ACTION_ISSUE_NUMBER/comments" 2>/dev/null || echo "[]")
+
+        if echo "$comments" | jq -e '.[] | select(.body | contains("Action triggered successfully"))' > /dev/null 2>&1; then
+            log "Action completed successfully!"
+            return 0
+        fi
+
+        # Check workflow runs API
+        local runs
+        runs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs" 2>/dev/null || echo "{}")
+
+        # Try both possible JSON structures (Gitea may vary)
+        local latest_run
+        latest_run=$(echo "$runs" | jq -r '.workflow_runs[0] // .runs[0] // empty' 2>/dev/null)
+
+        if [[ -n "$latest_run" && "$latest_run" != "null" ]]; then
+            local status conclusion run_id
+            status=$(echo "$latest_run" | jq -r '.status // "unknown"')
+            conclusion=$(echo "$latest_run" | jq -r '.conclusion // "pending"')
+            run_id=$(echo "$latest_run" | jq -r '.id // "unknown"')
+
+            log "  Run #$run_id - status: $status, conclusion: $conclusion"
+
+            if [[ "$conclusion" == "success" ]]; then
+                log "Action completed with success!"
+                # Give a moment for the comment to be posted
+                sleep 3
+                return 0
+            elif [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" ]]; then
+                error "Action $conclusion!"
+                # Try to get logs
+                local logs
+                logs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs/$run_id/logs" 2>/dev/null || echo "")
+                if [[ -n "$logs" ]]; then
+                    log "Run logs:"
+                    echo "$logs" | head -50
+                fi
+                return 1
+            fi
+        else
+            # No runs found - check if workflow was triggered at all
+            local run_count
+            run_count=$(echo "$runs" | jq '.total_count // (.workflow_runs | length) // 0' 2>/dev/null || echo "0")
+            log "  No workflow runs found yet (count: $run_count)"
+        fi
+
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+        log "  Waiting... (${elapsed}s / ${timeout}s)"
+    done
+
+    # On timeout, dump debugging info
+    warn "Timeout waiting for Action to complete"
+    warn "Dumping debug info..."
+
+    # Check if workflow file exists
+    log "Checking workflow file..."
+    gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/.gitea/workflows/e2e-test.yaml" 2>/dev/null | jq -r '.name // "not found"'
+
+    # List all workflow runs
+    log "All workflow runs:"
+    gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs" 2>/dev/null | jq '.' || echo "Could not fetch runs"
+
+    # Check secrets
+    log "Repository secrets:"
+    gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets" 2>/dev/null | jq '.[].name // .' || echo "Could not fetch secrets"
+
+    return 1
+}
+
+# Verify Actions integration
+verify_actions() {
+    step "Verifying Actions integration..."
+
+    local passed=0
+    local failed=0
+
+    # Check 1: Workflow file exists
+    log "Checking workflow file..."
+    if gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/.gitea/workflows/e2e-test.yaml" > /dev/null 2>&1; then
+        log "  Workflow file exists"
+        ((passed++))
+    else
+        error "  Workflow file not found"
+        ((failed++))
+    fi
+
+    # Check 2: Action posted comment
+    log "Checking for Action comment..."
+    local comments
+    comments=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$ACTION_ISSUE_NUMBER/comments" 2>/dev/null || echo "[]")
+
+    if echo "$comments" | jq -e '.[] | select(.body | contains("Action triggered successfully"))' > /dev/null 2>&1; then
+        log "  Action comment found"
+        ((passed++))
+    else
+        error "  Action comment not found"
+        ((failed++))
+    fi
+
+    echo ""
+    log "Actions verification: $passed passed, $failed failed"
+
+    if [[ $failed -gt 0 ]]; then
+        return 1
+    fi
+    return 0
+}
+
+run_actions_test() {
+    step "=== Phase 1: Actions Integration Test ==="
+    echo ""
+
+    deploy_workflow
+    setup_secrets
+
+    # Give Gitea a moment to recognize the new workflow
+    sleep 2
+
+    create_action_test_issue
+
+    if wait_for_action; then
+        if verify_actions; then
+            log "Actions integration test PASSED"
+            return 0
+        fi
+    fi
+
+    error "Actions integration test FAILED"
+    return 1
+}
+
+#############################################
+# Phase 2: Sapiens CLI Test
+#############################################
 
 # Create test issue with automation label
 create_test_issue() {
@@ -409,15 +744,34 @@ verify_results() {
     return 0
 }
 
-# Generate report
+run_cli_test() {
+    step "=== Phase 2: Sapiens CLI Test ==="
+    echo ""
+
+    create_test_issue
+    process_issue
+
+    if verify_results; then
+        log "Sapiens CLI test PASSED"
+        return 0
+    fi
+
+    error "Sapiens CLI test FAILED"
+    return 1
+}
+
+#############################################
+# Report Generation
+#############################################
+
 generate_report() {
-    local status="$1"
+    local actions_status="$1"
+    local cli_status="$2"
 
     cat > "$RESULTS_DIR/$RUN_ID/e2e-report.md" << REPORT_EOF
 # Gitea E2E Test Report: $RUN_ID
 
 **Date**: $(date -Iseconds)
-**Status**: $status
 
 ## Test Configuration
 
@@ -427,20 +781,38 @@ generate_report() {
 | Repository | $GITEA_OWNER/$GITEA_REPO |
 | Test Prefix | $TEST_PREFIX |
 
-## Test Flow
+## Phase 1: Actions Integration
 
-1. **Create Issue**: #${ISSUE_NUMBER:-N/A}
-2. **Process with sapiens**: See process-output.log
-3. **Feature Branch**: ${FEATURE_BRANCH:-Not created}
-4. **Pull Request**: #${PR_NUMBER:-Not created}
+**Status**: $actions_status
 
-## Result
+- Workflow deployed: .gitea/workflows/e2e-test.yaml
+- Test issue: #${ACTION_ISSUE_NUMBER:-N/A}
+- Triggered by: \`test-action-trigger\` label
 
-**$status**
+## Phase 2: Sapiens CLI
+
+**Status**: $cli_status
+
+- Test issue: #${ISSUE_NUMBER:-N/A}
+- Proposal issue: #${PROPOSAL_NUMBER:-N/A}
+- Feature branch: ${FEATURE_BRANCH:-Not created}
+- Pull request: #${PR_NUMBER:-Not created}
+
+## Overall Result
+
+$(if [[ "$actions_status" == "PASSED" && "$cli_status" == "PASSED" ]]; then
+    echo "✅ **ALL TESTS PASSED**"
+elif [[ "$actions_status" == "SKIPPED" && "$cli_status" == "PASSED" ]]; then
+    echo "✅ **CLI TESTS PASSED** (Actions skipped)"
+elif [[ "$actions_status" == "PASSED" && "$cli_status" == "SKIPPED" ]]; then
+    echo "✅ **ACTIONS TESTS PASSED** (CLI skipped)"
+else
+    echo "❌ **TESTS FAILED**"
+fi)
 
 ## Logs
 
-- \`process-output.log\` - Full sapiens output
+- \`process-output.log\` - Sapiens CLI output
 REPORT_EOF
 
     log "Report saved to $RESULTS_DIR/$RUN_ID/e2e-report.md"
@@ -459,20 +831,49 @@ main() {
     echo ""
 
     check_prerequisites
-    create_test_issue
-    process_issue
 
-    if verify_results; then
-        generate_report "PASSED"
+    local actions_status="SKIPPED"
+    local cli_status="SKIPPED"
+    local overall_exit=0
+
+    # Phase 1: Actions Integration
+    if [[ "$SKIP_ACTIONS" != "true" ]]; then
+        if run_actions_test; then
+            actions_status="PASSED"
+        else
+            actions_status="FAILED"
+            overall_exit=1
+        fi
+    else
+        log "Skipping Actions integration test (--skip-actions)"
+    fi
+
+    echo ""
+
+    # Phase 2: Sapiens CLI
+    if [[ "$ACTIONS_ONLY" != "true" ]]; then
+        if run_cli_test; then
+            cli_status="PASSED"
+        else
+            cli_status="FAILED"
+            overall_exit=1
+        fi
+    else
+        log "Skipping CLI test (--actions-only)"
+    fi
+
+    echo ""
+    generate_report "$actions_status" "$cli_status"
+
+    if [[ $overall_exit -eq 0 ]]; then
         log ""
         log "=== E2E Test PASSED ==="
-        exit 0
     else
-        generate_report "FAILED"
         error ""
         error "=== E2E Test FAILED ==="
-        exit 1
     fi
+
+    exit $overall_exit
 }
 
 main "$@"
