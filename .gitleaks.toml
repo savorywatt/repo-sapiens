@@ -1,0 +1,46 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "repo-sapiens gitleaks config"
+
+[allowlist]
+description = "Global allowlist for false positives"
+
+# Files to completely ignore
+paths = [
+    # detect-secrets baseline contains hashed secrets (not actual secrets)
+    '''\.secrets\.baseline$''',
+    # Claude conversation logs may contain example/redacted content
+    '''claude/conversations/.*\.jsonl$''',
+    # Test files often contain fake API keys for testing
+    '''tests/.*\.py$''',
+    '''hello-python-test/.*''',
+]
+
+# Regex patterns that are known false positives
+regexes = [
+    # Placeholder tokens in documentation
+    '''YOUR_TOKEN''',
+    '''your-token-here''',
+    '''your-.*-token''',
+    # Example tokens in docs
+    '''ghp_1234567890abcdef''',
+    '''sk-ant-api03-example.*''',
+    '''pypi-AgEIcHlwaS5vcmc\.\.\.''',
+]
+
+# Specific commits to ignore (if needed)
+# commits = [
+#     "commit-sha-here",
+# ]
+
+# Stop words - strings that if found in the secret, ignore it
+stopwords = [
+    "example",
+    "placeholder",
+    "your-",
+    "fake",
+    "test",
+    "dummy",
+    "sample",
+]
