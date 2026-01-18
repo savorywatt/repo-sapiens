@@ -9,9 +9,8 @@
 # Setup:
 # 1. Copy this file to .gitlab-ci.yml (or include it via `include:`)
 # 2. Set required CI/CD variables in your project settings:
-#    - GITLAB_TOKEN: Your GitLab API token (or use CI_JOB_TOKEN for limited access)
-#    - OPENAI_API_KEY: (if using Goose with OpenAI)
-#    - ANTHROPIC_API_KEY or CLAUDE_API_KEY: (if using Claude)
+#    - SAPIENS_GITLAB_TOKEN: Your GitLab API token (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_CLAUDE_API_KEY: (if using claude-api agent)
 # 3. Set up a pipeline schedule in CI/CD > Schedules (e.g., every 5 minutes)
 # 4. Update CONFIG_FILE to match your config
 #
@@ -44,14 +43,15 @@ process-pending:
     # Allow API trigger
     - if: $CI_PIPELINE_SOURCE == "api"
   variables:
-    # Git provider credentials - use CI_JOB_TOKEN for limited access or set GITLAB_TOKEN
-    GITLAB_TOKEN: $GITLAB_TOKEN
+    # Git provider credentials (GITLAB_ prefix is reserved, so use SAPIENS_GITLAB_TOKEN)
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
     # Prevent pip from caching (reduces image size)
     PIP_NO_CACHE_DIR: "1"
-    # AI provider credentials (set in CI/CD variables as masked/protected)
-    # OPENAI_API_KEY: $OPENAI_API_KEY
-    # ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
-    # CLAUDE_API_KEY: $CLAUDE_API_KEY
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
     # If using Goose, also install it:

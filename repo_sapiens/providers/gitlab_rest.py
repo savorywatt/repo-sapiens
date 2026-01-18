@@ -581,7 +581,7 @@ class GitLabRestProvider(GitProvider):
         if labels is None:
             labels = list(default_labels.keys())
 
-        labels_path = f"/projects/{self._project_path_encoded}/labels"
+        labels_path = f"/projects/{self.project_path}/labels"
 
         # Get existing labels
         response = await self._pool.get(labels_path)

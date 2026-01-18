@@ -1,0 +1,52 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: needs-planning
+#
+# Triggered when 'sapiens/needs-planning' label is added.
+# Creates implementation plan for the issue.
+#
+# Required CI/CD Variables:
+#   - SAPIENS_GITLAB_TOKEN: GitLab API token with api scope
+#   - SAPIENS_CLAUDE_API_KEY: Claude API key (if using claude-api agent)
+
+stages:
+  - plan
+
+default:
+  interruptible: true
+
+create-plan:
+  stage: plan
+  image: python:3.12-slim
+  timeout: 30 minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $SAPIENS_LABEL == "sapiens/needs-planning"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  variables:
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
+  before_script:
+    - pip install --quiet --no-cache-dir repo-sapiens
+  script:
+    - |
+      ISSUE_NUM="${SAPIENS_ISSUE_NUMBER:-1}"
+      echo "📋 Creating plan for issue #${ISSUE_NUM}"
+      sapiens --config sapiens_config.ci.yaml process-issue \
+        --issue "${ISSUE_NUM}" \
+        --system-prompt .gitlab/workflows/sapiens/prompts/needs-planning.md
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" == "success" ]; then
+        curl -sS -X POST \
+          -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"body": "📋 **Plan created!**\n\nReview the plan and add `approved` label to proceed.\n\n🤖 Posted by Sapiens Automation"}' \
+          "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/issues/${SAPIENS_ISSUE_NUMBER}/notes"
+      fi
+  resource_group: sapiens-planning

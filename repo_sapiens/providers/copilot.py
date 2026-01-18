@@ -14,6 +14,7 @@ Uses composition pattern with OpenAICompatibleProvider for API delegation.
 """
 
 import asyncio
+import contextlib
 import os
 import shutil
 import signal
@@ -180,9 +181,7 @@ class CopilotProvider(AgentProvider):
         # Verify npx is available
         npx_path = shutil.which("npx")
         if npx_path is None:
-            raise CopilotProxyError(
-                "npx is not available. Install Node.js and npm to use managed proxy."
-            )
+            raise CopilotProxyError("npx is not available. Install Node.js and npm to use managed proxy.")
 
         # Resolve GitHub token and prepare environment
         resolver = CredentialResolver()
@@ -231,9 +230,7 @@ class CopilotProvider(AgentProvider):
         if self._proxy_process is None:
             return
 
-        async def drain_stream(
-            stream: asyncio.StreamReader | None, stream_name: str
-        ) -> None:
+        async def drain_stream(stream: asyncio.StreamReader | None, stream_name: str) -> None:
             """Drain a single stream."""
             if stream is None:
                 return
@@ -250,13 +247,11 @@ class CopilotProvider(AgentProvider):
             except asyncio.CancelledError:
                 pass
 
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await asyncio.gather(
                 drain_stream(self._proxy_process.stdout, "stdout"),
                 drain_stream(self._proxy_process.stderr, "stderr"),
             )
-        except asyncio.CancelledError:
-            pass
 
     async def _wait_for_proxy_ready(self) -> None:
         """Wait for proxy to become ready by polling the models endpoint.
@@ -275,15 +270,10 @@ class CopilotProvider(AgentProvider):
             while True:
                 elapsed = time.monotonic() - start_time
                 if elapsed > self.config.startup_timeout:
-                    raise CopilotProxyError(
-                        f"Proxy failed to become ready within {self.config.startup_timeout}s"
-                    )
+                    raise CopilotProxyError(f"Proxy failed to become ready within {self.config.startup_timeout}s")
 
                 # Check if process has died
-                if (
-                    self._proxy_process is not None
-                    and self._proxy_process.returncode is not None
-                ):
+                if self._proxy_process is not None and self._proxy_process.returncode is not None:
                     raise CopilotProxyError(
                         f"Proxy process exited unexpectedly with code {self._proxy_process.returncode}"
                     )
@@ -316,10 +306,8 @@ class CopilotProvider(AgentProvider):
         # Cancel drain task
         if self._drain_task is not None:
             self._drain_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._drain_task
-            except asyncio.CancelledError:
-                pass
             self._drain_task = None
 
         # Stop proxy process
@@ -339,7 +327,7 @@ class CopilotProvider(AgentProvider):
                         timeout=self.config.shutdown_timeout,
                     )
                     log.info("copilot_proxy_stopped_gracefully", pid=pid)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Force kill if graceful shutdown times out
                     log.warning("copilot_proxy_force_killing", pid=pid)
                     if pid is not None:
@@ -393,9 +381,7 @@ class CopilotProvider(AgentProvider):
             error_message = str(e)
 
         if status_code == 401:
-            raise CopilotAuthenticationError(
-                f"GitHub token is invalid or lacks Copilot access: {error_message}"
-            ) from e
+            raise CopilotAuthenticationError(f"GitHub token is invalid or lacks Copilot access: {error_message}") from e
 
         if status_code == 429:
             raise CopilotRateLimitError(

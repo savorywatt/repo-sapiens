@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **GitLab Workflow Templates**: Complete GitLab CI/CD workflow templates for all automation stages
+  - `approved.yaml`, `needs-planning.yaml`, `needs-review.yaml`, `needs-fix.yaml`, `requires-qa.yaml`, `execute-task.yaml`
+  - Recipe templates: `weekly-test-coverage.yaml`, `weekly-sbom-license.yaml`
+  - All templates follow SAPIENS_ prefix convention for CI/CD variables
 - **Multi-Remote Support**: Interactive provider selection when multiple Git remotes detected
   - Detects GitHub, GitLab, and Gitea from remote URLs during `sapiens init`
   - Uses preferred remotes (origin > upstream > first) in non-interactive mode
@@ -84,6 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed 16 failing tests across cli_init, config_settings, main_cli modules
 
 ### Fixed
+- **GitLab `setup_automation_labels`**: Fixed undefined attribute reference in gitlab_rest.py:584
+  - Was using `self._project_path_encoded` which doesn't exist
+  - Now correctly uses `self.project_path` like other methods
+- **GitLab Templates**: Updated all existing templates to use `SAPIENS_GITLAB_TOKEN` instead of `GITLAB_TOKEN`
+  - The `GITLAB_` prefix is reserved for GitLab's internal CI/CD variables
 - **GitProvider Protocol**: Added missing `get_pull_request` method to base class
   - Implemented in GitHubRestProvider and GitLabRestProvider
   - Added `add_comment_reply` method for threaded comment responses

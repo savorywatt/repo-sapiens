@@ -1,0 +1,48 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: execute-task
+#
+# Triggered to execute a specific task from a plan.
+#
+# Required CI/CD Variables:
+#   - SAPIENS_GITLAB_TOKEN: GitLab API token with api scope
+#   - SAPIENS_CLAUDE_API_KEY: Claude API key (if using claude-api agent)
+
+stages:
+  - execute
+
+default:
+  interruptible: true
+
+execute-task:
+  stage: execute
+  image: python:3.12-slim
+  timeout: 45 minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $SAPIENS_TASK_ID
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  variables:
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
+  before_script:
+    - pip install --quiet --no-cache-dir repo-sapiens
+    - git config --global user.email "sapiens@automation.local"
+    - git config --global user.name "Sapiens Automation"
+  script:
+    - |
+      echo "⚡ Executing task ${SAPIENS_TASK_ID} for issue #${SAPIENS_ISSUE_NUMBER}"
+      sapiens --config sapiens_config.ci.yaml execute-task \
+        --task-id "${SAPIENS_TASK_ID}" \
+        --issue "${SAPIENS_ISSUE_NUMBER}"
+  artifacts:
+    paths:
+      - .sapiens/state/
+    expire_in: 7 days
+    when: always
+  resource_group: sapiens-execute

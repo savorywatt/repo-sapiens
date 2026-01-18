@@ -19,7 +19,6 @@ from repo_sapiens.providers.copilot import (
     CopilotRateLimitError,
 )
 
-
 # -----------------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------------
@@ -262,9 +261,7 @@ class TestCopilotProvider:
         """External mode skips proxy start."""
         provider = CopilotProvider(copilot_config=external_config)
 
-        with patch(
-            "repo_sapiens.providers.copilot.CredentialResolver"
-        ) as mock_resolver_cls, patch(
+        with patch("repo_sapiens.providers.copilot.CredentialResolver") as mock_resolver_cls, patch(
             "repo_sapiens.providers.copilot.OpenAICompatibleProvider"
         ) as mock_openai_cls:
             mock_resolver = mock_resolver_cls.return_value
@@ -282,7 +279,7 @@ class TestCopilotProvider:
             mock_openai_cls.assert_called_once_with(
                 base_url="http://localhost:4141/v1",
                 model="gpt-4",
-                api_key="resolved_token",
+                api_key="resolved_token",  # pragma: allowlist secret
                 working_dir=None,
                 qa_handler=None,
                 timeout=300.0,
@@ -294,13 +291,9 @@ class TestCopilotProvider:
         """Managed mode starts proxy."""
         provider = CopilotProvider(copilot_config=managed_config)
 
-        with patch(
-            "repo_sapiens.providers.copilot.CredentialResolver"
-        ) as mock_resolver_cls, patch(
+        with patch("repo_sapiens.providers.copilot.CredentialResolver") as mock_resolver_cls, patch(
             "repo_sapiens.providers.copilot.OpenAICompatibleProvider"
-        ) as mock_openai_cls, patch.object(
-            provider, "_start_proxy", AsyncMock()
-        ) as mock_start, patch.object(
+        ) as mock_openai_cls, patch.object(provider, "_start_proxy", AsyncMock()) as mock_start, patch.object(
             provider, "_wait_for_proxy_ready", AsyncMock()
         ) as mock_wait:
             mock_resolver = mock_resolver_cls.return_value
@@ -351,9 +344,7 @@ class TestCopilotProvider:
         assert sleep_calls[0] >= 0.15, f"Expected sleep ~0.2s, got {sleep_calls[0]:.2f}s"
 
     @pytest.mark.asyncio
-    async def test_rate_limiting_no_delay_when_none(
-        self, connected_provider, sample_issue
-    ):
+    async def test_rate_limiting_no_delay_when_none(self, connected_provider, sample_issue):
         """No rate limiting when rate_limit is None."""
         # Ensure rate_limit is None (default in external_config fixture is 2.0)
         connected_provider.config = CopilotConfig(
@@ -364,9 +355,7 @@ class TestCopilotProvider:
         )
 
         mock_plan = MagicMock(spec=Plan)
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            return_value=mock_plan
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(return_value=mock_plan)
 
         start_time = time.monotonic()
         await connected_provider.generate_plan(sample_issue)
@@ -380,9 +369,7 @@ class TestCopilotProvider:
         """401 errors raise CopilotAuthenticationError."""
         mock_response = MagicMock()
         mock_response.status_code = 401
-        mock_response.json.return_value = {
-            "error": {"message": "Invalid authentication token"}
-        }
+        mock_response.json.return_value = {"error": {"message": "Invalid authentication token"}}
 
         http_error = httpx.HTTPStatusError(
             "Unauthorized",
@@ -390,9 +377,7 @@ class TestCopilotProvider:
             response=mock_response,
         )
 
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            side_effect=http_error
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(side_effect=http_error)
 
         with pytest.raises(CopilotAuthenticationError) as exc_info:
             await connected_provider.generate_plan(sample_issue)
@@ -404,9 +389,7 @@ class TestCopilotProvider:
         """429 errors raise CopilotRateLimitError."""
         mock_response = MagicMock()
         mock_response.status_code = 429
-        mock_response.json.return_value = {
-            "error": {"message": "Rate limit exceeded. Try again later."}
-        }
+        mock_response.json.return_value = {"error": {"message": "Rate limit exceeded. Try again later."}}
 
         http_error = httpx.HTTPStatusError(
             "Too Many Requests",
@@ -414,9 +397,7 @@ class TestCopilotProvider:
             response=mock_response,
         )
 
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            side_effect=http_error
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(side_effect=http_error)
 
         with pytest.raises(CopilotRateLimitError) as exc_info:
             await connected_provider.generate_plan(sample_issue)
@@ -424,15 +405,11 @@ class TestCopilotProvider:
         assert "Rate limit exceeded" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_abuse_detection_error_handling(
-        self, connected_provider, sample_issue
-    ):
+    async def test_abuse_detection_error_handling(self, connected_provider, sample_issue):
         """403 with 'abuse' raises CopilotAbuseDetectedError."""
         mock_response = MagicMock()
         mock_response.status_code = 403
-        mock_response.json.return_value = {
-            "error": {"message": "Abuse detection triggered. Slow down requests."}
-        }
+        mock_response.json.return_value = {"error": {"message": "Abuse detection triggered. Slow down requests."}}
 
         http_error = httpx.HTTPStatusError(
             "Forbidden",
@@ -440,9 +417,7 @@ class TestCopilotProvider:
             response=mock_response,
         )
 
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            side_effect=http_error
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(side_effect=http_error)
 
         with pytest.raises(CopilotAbuseDetectedError) as exc_info:
             await connected_provider.generate_plan(sample_issue)
@@ -454,9 +429,7 @@ class TestCopilotProvider:
         """403 without 'abuse' keyword re-raises original error."""
         mock_response = MagicMock()
         mock_response.status_code = 403
-        mock_response.json.return_value = {
-            "error": {"message": "Access denied to this resource."}
-        }
+        mock_response.json.return_value = {"error": {"message": "Access denied to this resource."}}
 
         http_error = httpx.HTTPStatusError(
             "Forbidden",
@@ -464,9 +437,7 @@ class TestCopilotProvider:
             response=mock_response,
         )
 
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            side_effect=http_error
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(side_effect=http_error)
 
         with pytest.raises(httpx.HTTPStatusError):
             await connected_provider.generate_plan(sample_issue)
@@ -480,9 +451,7 @@ class TestCopilotProvider:
         mock_openai.client = AsyncMock()
         mock_openai.client.aclose = AsyncMock()
 
-        with patch(
-            "repo_sapiens.providers.copilot.CredentialResolver"
-        ) as mock_resolver_cls, patch(
+        with patch("repo_sapiens.providers.copilot.CredentialResolver") as mock_resolver_cls, patch(
             "repo_sapiens.providers.copilot.OpenAICompatibleProvider"
         ) as mock_openai_cls:
             mock_resolver_cls.return_value.resolve.return_value = "resolved_token"
@@ -504,9 +473,7 @@ class TestCopilotProvider:
         mock_openai.client = AsyncMock()
         mock_openai.client.aclose = AsyncMock()
 
-        with patch(
-            "repo_sapiens.providers.copilot.CredentialResolver"
-        ) as mock_resolver_cls, patch(
+        with patch("repo_sapiens.providers.copilot.CredentialResolver") as mock_resolver_cls, patch(
             "repo_sapiens.providers.copilot.OpenAICompatibleProvider"
         ) as mock_openai_cls:
             mock_resolver_cls.return_value.resolve.return_value = "resolved_token"
@@ -529,17 +496,11 @@ class TestCopilotProvider:
         mock_openai.client = AsyncMock()
         mock_openai.client.aclose = AsyncMock()
 
-        with patch(
-            "repo_sapiens.providers.copilot.CredentialResolver"
-        ) as mock_resolver_cls, patch(
+        with patch("repo_sapiens.providers.copilot.CredentialResolver") as mock_resolver_cls, patch(
             "repo_sapiens.providers.copilot.OpenAICompatibleProvider"
-        ) as mock_openai_cls, patch.object(
-            provider, "_start_proxy", AsyncMock()
-        ), patch.object(
+        ) as mock_openai_cls, patch.object(provider, "_start_proxy", AsyncMock()), patch.object(
             provider, "_wait_for_proxy_ready", AsyncMock()
-        ), patch.object(
-            provider, "_stop_proxy", AsyncMock()
-        ) as mock_stop:
+        ), patch.object(provider, "_stop_proxy", AsyncMock()) as mock_stop:
             mock_resolver_cls.return_value.resolve.return_value = "resolved_token"
             mock_openai_cls.return_value = mock_openai
 
@@ -582,9 +543,7 @@ class TestCopilotProviderProxy:
             "repo_sapiens.providers.copilot.CredentialResolver"
         ) as mock_resolver_cls, patch(
             "asyncio.create_subprocess_exec", AsyncMock(return_value=mock_process)
-        ) as mock_exec, patch.object(
-            provider, "_drain_proxy_output", AsyncMock()
-        ):
+        ) as mock_exec, patch.object(provider, "_drain_proxy_output", AsyncMock()):
             mock_resolver_cls.return_value.resolve.return_value = "resolved_token"
 
             await provider._start_proxy()
@@ -722,12 +681,10 @@ class TestCopilotProviderProxy:
             await coro
             # If this is the first wait call (after SIGTERM), raise TimeoutError
             if len(wait_calls) == 1:
-                raise asyncio.TimeoutError()
+                raise TimeoutError()
             # Second call (after SIGKILL) completes normally
 
-        with patch("os.killpg") as mock_killpg, patch(
-            "asyncio.wait_for", mock_wait_for
-        ):
+        with patch("os.killpg") as mock_killpg, patch("asyncio.wait_for", mock_wait_for):
             await provider._stop_proxy()
 
             # Should have called killpg twice (SIGTERM then SIGKILL)
@@ -751,84 +708,60 @@ class TestCopilotProviderDelegation:
     async def test_generate_plan_delegates(self, connected_provider, sample_issue):
         """generate_plan delegates to OpenAI client."""
         expected_plan = MagicMock(spec=Plan)
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            return_value=expected_plan
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(return_value=expected_plan)
 
         result = await connected_provider.generate_plan(sample_issue)
 
         assert result is expected_plan
-        connected_provider._openai_client.generate_plan.assert_called_once_with(
-            sample_issue
-        )
+        connected_provider._openai_client.generate_plan.assert_called_once_with(sample_issue)
 
     @pytest.mark.asyncio
-    async def test_execute_task_delegates(
-        self, connected_provider, sample_task
-    ):
+    async def test_execute_task_delegates(self, connected_provider, sample_task):
         """execute_task delegates to OpenAI client."""
         expected_result = MagicMock(spec=TaskResult)
-        connected_provider._openai_client.execute_task = AsyncMock(
-            return_value=expected_result
-        )
+        connected_provider._openai_client.execute_task = AsyncMock(return_value=expected_result)
 
         context = {"branch": "feature/test", "workspace": "/workspace"}
         result = await connected_provider.execute_task(sample_task, context)
 
         assert result is expected_result
-        connected_provider._openai_client.execute_task.assert_called_once_with(
-            sample_task, context
-        )
+        connected_provider._openai_client.execute_task.assert_called_once_with(sample_task, context)
 
     @pytest.mark.asyncio
     async def test_review_code_delegates(self, connected_provider):
         """review_code delegates to OpenAI client."""
         expected_review = MagicMock(spec=Review)
-        connected_provider._openai_client.review_code = AsyncMock(
-            return_value=expected_review
-        )
+        connected_provider._openai_client.review_code = AsyncMock(return_value=expected_review)
 
         diff = "+def new_function():\n+    return True"
         context = {"description": "Add new function"}
         result = await connected_provider.review_code(diff, context)
 
         assert result is expected_review
-        connected_provider._openai_client.review_code.assert_called_once_with(
-            diff, context
-        )
+        connected_provider._openai_client.review_code.assert_called_once_with(diff, context)
 
     @pytest.mark.asyncio
-    async def test_generate_prompts_delegates(
-        self, connected_provider, sample_plan
-    ):
+    async def test_generate_prompts_delegates(self, connected_provider, sample_plan):
         """generate_prompts delegates to OpenAI client."""
         expected_tasks = [MagicMock(spec=Task), MagicMock(spec=Task)]
-        connected_provider._openai_client.generate_prompts = AsyncMock(
-            return_value=expected_tasks
-        )
+        connected_provider._openai_client.generate_prompts = AsyncMock(return_value=expected_tasks)
 
         result = await connected_provider.generate_prompts(sample_plan)
 
         assert result is expected_tasks
-        connected_provider._openai_client.generate_prompts.assert_called_once_with(
-            sample_plan
-        )
+        connected_provider._openai_client.generate_prompts.assert_called_once_with(sample_plan)
 
     @pytest.mark.asyncio
     async def test_resolve_conflict_delegates(self, connected_provider):
         """resolve_conflict delegates to OpenAI client."""
         expected_content = "resolved content"
-        connected_provider._openai_client.resolve_conflict = AsyncMock(
-            return_value=expected_content
-        )
+        connected_provider._openai_client.resolve_conflict = AsyncMock(return_value=expected_content)
 
         conflict_info = {"file": "test.py", "content": "conflict markers"}
         result = await connected_provider.resolve_conflict(conflict_info)
 
         assert result == expected_content
-        connected_provider._openai_client.resolve_conflict.assert_called_once_with(
-            conflict_info
-        )
+        connected_provider._openai_client.resolve_conflict.assert_called_once_with(conflict_info)
 
     @pytest.mark.asyncio
     async def test_methods_raise_if_not_connected(self, external_config):
@@ -855,9 +788,7 @@ class TestCopilotProviderDelegation:
         assert "not connected" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_execute_task_raises_if_not_connected(
-        self, external_config, sample_task
-    ):
+    async def test_execute_task_raises_if_not_connected(self, external_config, sample_task):
         """execute_task raises CopilotError if not connected."""
         provider = CopilotProvider(copilot_config=external_config)
 
@@ -877,9 +808,7 @@ class TestCopilotProviderDelegation:
         assert "not connected" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_generate_prompts_raises_if_not_connected(
-        self, external_config, sample_plan
-    ):
+    async def test_generate_prompts_raises_if_not_connected(self, external_config, sample_plan):
         """generate_prompts raises CopilotError if not connected."""
         provider = CopilotProvider(copilot_config=external_config)
 
@@ -908,9 +837,7 @@ class TestCopilotProviderErrorHandling:
     """Tests for error handling edge cases."""
 
     @pytest.mark.asyncio
-    async def test_handle_copilot_errors_json_parse_failure(
-        self, connected_provider, sample_issue
-    ):
+    async def test_handle_copilot_errors_json_parse_failure(self, connected_provider, sample_issue):
         """Error handler handles non-JSON response body."""
         mock_response = MagicMock()
         mock_response.status_code = 401
@@ -922,17 +849,13 @@ class TestCopilotProviderErrorHandling:
             response=mock_response,
         )
 
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            side_effect=http_error
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(side_effect=http_error)
 
         with pytest.raises(CopilotAuthenticationError):
             await connected_provider.generate_plan(sample_issue)
 
     @pytest.mark.asyncio
-    async def test_handle_copilot_errors_500_reraises(
-        self, connected_provider, sample_issue
-    ):
+    async def test_handle_copilot_errors_500_reraises(self, connected_provider, sample_issue):
         """500 errors are re-raised without conversion."""
         mock_response = MagicMock()
         mock_response.status_code = 500
@@ -944,17 +867,13 @@ class TestCopilotProviderErrorHandling:
             response=mock_response,
         )
 
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            side_effect=http_error
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(side_effect=http_error)
 
         with pytest.raises(httpx.HTTPStatusError):
             await connected_provider.generate_plan(sample_issue)
 
     @pytest.mark.asyncio
-    async def test_rate_limit_applies_before_each_request(
-        self, connected_provider, sample_issue
-    ):
+    async def test_rate_limit_applies_before_each_request(self, connected_provider, sample_issue):
         """Rate limit is applied before each delegated method."""
         connected_provider.config = CopilotConfig(
             github_token="gho_test_token",
@@ -964,9 +883,7 @@ class TestCopilotProviderErrorHandling:
         )
 
         mock_plan = MagicMock(spec=Plan)
-        connected_provider._openai_client.generate_plan = AsyncMock(
-            return_value=mock_plan
-        )
+        connected_provider._openai_client.generate_plan = AsyncMock(return_value=mock_plan)
 
         # First call - should update last_request_time
         await connected_provider.generate_plan(sample_issue)

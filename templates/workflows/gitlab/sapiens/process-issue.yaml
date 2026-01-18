@@ -15,8 +15,8 @@
 # Setup:
 # 1. Copy to .gitlab-ci.yml (or include via `include:`)
 # 2. Set required CI/CD variables:
-#    - GITLAB_TOKEN: Your GitLab API token
-#    - Your AI provider key (OPENAI_API_KEY or ANTHROPIC_API_KEY)
+#    - SAPIENS_GITLAB_TOKEN: Your GitLab API token (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_CLAUDE_API_KEY: (if using claude-api agent)
 # 3. Create the 'needs-planning' label in your project
 #
 # To trigger for a specific issue:
@@ -46,11 +46,14 @@ process-issue:
     # Only run when ISSUE_NUMBER is provided
     - if: $ISSUE_NUMBER != ""
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
     PIP_NO_CACHE_DIR: "1"
-    # AI provider credentials (set in CI/CD variables as masked/protected)
-    # OPENAI_API_KEY: $OPENAI_API_KEY
-    # ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
   script:
@@ -79,7 +82,13 @@ scan-labeled-issues:
     # Run on schedule to check for new labeled issues
     - if: $CI_PIPELINE_SOURCE == "schedule" && $ISSUE_NUMBER == ""
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
     PIP_NO_CACHE_DIR: "1"
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
