@@ -56,6 +56,9 @@ dev = [
     "types-aiofiles>=23.2",
 ]
 all = ["repo-sapiens[monitoring]"]
+integration = [
+    "python-on-whales>=0.70.0",
+]
 
 [project.scripts]
 repo-sapiens = "repo_sapiens.main:cli"
@@ -171,6 +174,9 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks integration tests",
     "needs_real_timing: tests that require actual wall-clock time (not patched asyncio.sleep)",
+    "gitea: requires Gitea service running",
+    "gitlab: requires GitLab service running",
+    "ollama: requires Ollama service running",
 ]
 
 [tool.coverage.run]

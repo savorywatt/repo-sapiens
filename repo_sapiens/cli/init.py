@@ -150,6 +150,15 @@ class RepoInitializer:
         self.goose_toolkit = "default"
         self.goose_temperature = 0.7
 
+        # Copilot API settings (for copilot-api proxy)
+        self.copilot_github_token = None
+        self.copilot_manage_proxy = True
+        self.copilot_proxy_port = 4141
+        self.copilot_proxy_url = None
+        self.copilot_account_type = "individual"
+        self.copilot_rate_limit = None
+        self.copilot_model = "gpt-4"
+
         # Builtin ReAct agent settings
         self.builtin_provider = None  # 'ollama', 'vllm', 'openai', 'anthropic', etc.
         self.builtin_model = None
@@ -897,7 +906,22 @@ class RepoInitializer:
         elif self.agent_type == AgentType.GOOSE:
             self._configure_goose()
         elif self.agent_type == AgentType.COPILOT:
-            self._configure_copilot()
+            # Offer choice between gh CLI and copilot-api
+            click.echo()
+            click.echo("GitHub Copilot integration options:")
+            click.echo("  cli - Use gh-copilot CLI (limited, command suggestions)")
+            click.echo("  api - Use copilot-api proxy (full code generation, unofficial)")
+            click.echo()
+            copilot_mode = click.prompt(
+                "Which integration?",
+                type=click.Choice(["cli", "api"]),
+                default="cli",
+            )
+            if copilot_mode == "api":
+                self._configure_copilot_api()
+                self.agent_type = AgentType.COPILOT  # Keep as COPILOT but use copilot_config
+            else:
+                self._configure_copilot()  # Existing gh CLI configuration
         elif self.agent_type == AgentType.BUILTIN:
             self._configure_builtin()
 
@@ -1158,6 +1182,151 @@ class RepoInitializer:
 
         self.agent_mode = "local"  # Copilot runs locally via gh CLI
         self.agent_api_key = None  # No separate API key needed - uses gh auth
+
+    def _configure_copilot_api(self) -> None:
+        """Configure GitHub Copilot API provider using copilot-api proxy.
+
+        This is the NEW Copilot provider using copilot-api proxy,
+        distinct from the existing gh-copilot CLI integration.
+        """
+        import shutil
+
+        click.echo()
+        click.echo(click.style("GitHub Copilot API Configuration", bold=True, fg="cyan"))
+        click.echo()
+
+        # Security warning
+        click.echo(click.style("WARNING:", bold=True, fg="red"))
+        click.echo("This integration uses an unofficial, reverse-engineered API.")
+        click.echo("  - Not endorsed or supported by GitHub")
+        click.echo("  - May violate GitHub Terms of Service")
+        click.echo("  - Could stop working at any time")
+        click.echo()
+        click.echo("You accept full responsibility for compliance with GitHub's ToS.")
+        click.echo()
+
+        if not click.confirm("Do you understand and accept these risks?", default=False):
+            raise click.ClickException("Setup cancelled - risks not accepted")
+
+        # Check for existing GitHub token
+        existing_token, source = self._detect_existing_github_copilot_token()
+
+        if existing_token:
+            use_existing = click.confirm(
+                click.style(f"GitHub token found in {source}. Use it?", fg="green"),
+                default=True,
+            )
+            if use_existing:
+                self.copilot_github_token = existing_token
+                click.echo(f"   Using GitHub token from {source}")
+            else:
+                self.copilot_github_token = self._prompt_github_copilot_token()
+        else:
+            self.copilot_github_token = self._prompt_github_copilot_token()
+
+        # Proxy mode selection
+        click.echo()
+        click.echo("Proxy Management Mode:")
+        click.echo("  managed  - Auto-start/stop copilot-api (requires Node.js/npm)")
+        click.echo("  external - Connect to existing copilot-api instance")
+        click.echo()
+
+        proxy_mode = click.prompt(
+            "Proxy mode",
+            type=click.Choice(["managed", "external"]),
+            default="managed",
+        )
+
+        self.copilot_manage_proxy = proxy_mode == "managed"
+
+        if self.copilot_manage_proxy:
+            # Check Node.js availability
+            npx_path = shutil.which("npx")
+            if npx_path:
+                click.echo(click.style(f"   npx found at {npx_path}", fg="green"))
+            else:
+                click.echo(click.style("   npx not found", fg="yellow"))
+                click.echo("   Install Node.js from: https://nodejs.org/")
+                if not click.confirm("   Continue anyway?", default=False):
+                    raise click.ClickException("Node.js required for managed proxy mode")
+
+            self.copilot_proxy_port = click.prompt(
+                "Proxy port",
+                type=int,
+                default=4141,
+            )
+            self.copilot_proxy_url = None
+        else:
+            self.copilot_proxy_url = click.prompt(
+                "Proxy URL",
+                type=str,
+                default="http://localhost:4141/v1",
+            )
+            self.copilot_proxy_port = 4141  # Not used, but set default
+
+        # Account type
+        click.echo()
+        self.copilot_account_type = click.prompt(
+            "Copilot account type",
+            type=click.Choice(["individual", "business", "enterprise"]),
+            default="individual",
+        )
+
+        # Rate limiting (recommended)
+        click.echo()
+        click.echo("Rate limiting helps avoid GitHub abuse detection.")
+        if click.confirm("Enable rate limiting?", default=True):
+            self.copilot_rate_limit = click.prompt(
+                "Seconds between requests",
+                type=float,
+                default=2.0,
+            )
+        else:
+            self.copilot_rate_limit = None
+
+        # Model selection
+        click.echo()
+        self.copilot_model = click.prompt(
+            "Model to use",
+            type=str,
+            default="gpt-4",
+        )
+
+        self.agent_mode = "local"  # Copilot API runs via local proxy
+
+        click.echo()
+        click.echo(click.style("Copilot API configuration complete", fg="green"))
+
+    def _detect_existing_github_copilot_token(self) -> tuple[str | None, str | None]:
+        """Check for existing GitHub Copilot token in keyring or environment."""
+        import os
+
+        # Check keyring
+        try:
+            keyring_backend = KeyringBackend()
+            if keyring_backend.available:
+                token = keyring_backend.get("github", "copilot_token")
+                if token:
+                    return token, "keyring (github/copilot_token)"
+        except Exception:
+            pass
+
+        # Check environment variables
+        for env_var in ("GITHUB_COPILOT_TOKEN", "GITHUB_TOKEN"):
+            token = os.getenv(env_var)
+            if token and token.startswith("gho_"):
+                return token, f"environment (${env_var})"
+
+        return None, None
+
+    def _prompt_github_copilot_token(self) -> str:
+        """Prompt user for GitHub Copilot OAuth token."""
+        click.echo()
+        click.echo("GitHub OAuth token (gho_xxx) required.")
+        click.echo("Generate one at: https://github.com/settings/tokens")
+        click.echo("Required scope: copilot")
+        click.echo()
+        return click.prompt("GitHub OAuth token", hide_input=True, type=str)
 
     def _configure_builtin(self) -> None:
         """Configure builtin ReAct agent with LLM provider selection."""
@@ -1486,6 +1655,11 @@ class RepoInitializer:
                 backend.set("claude", "api_key", self.agent_api_key)
                 click.echo("   ✓ Stored: claude/api_key")
 
+        # Store Copilot token if configured
+        if self.copilot_github_token:
+            backend.set("github", "copilot_token", self.copilot_github_token)
+            click.echo("   ✓ Stored: github/copilot_token")
+
     def _store_in_environment(self) -> None:
         """Store credentials in environment (for current session)."""
         backend = EnvironmentBackend()
@@ -1513,6 +1687,11 @@ class RepoInitializer:
             elif self.agent_type == AgentType.CLAUDE:
                 backend.set("CLAUDE_API_KEY", self.agent_api_key)
                 click.echo("   ✓ Set: CLAUDE_API_KEY")
+
+        # Store Copilot token if configured
+        if self.copilot_github_token:
+            backend.set("GITHUB_COPILOT_TOKEN", self.copilot_github_token)
+            click.echo("   ✓ Set: GITHUB_COPILOT_TOKEN")
 
         click.echo()
         click.echo(click.style("Note: Environment variables only persist in current session.", fg="yellow"))
@@ -1713,10 +1892,38 @@ class RepoInitializer:
   api_key: {agent_api_key_ref}
   local_mode: false"""
         elif self.agent_type == AgentType.COPILOT:
-            # Copilot configuration
-            provider_type = "copilot-local"
-            model = "gpt-4"  # Default model for Copilot
-            agent_config = f"""agent_provider:
+            # Check for Copilot API configuration (has copilot_github_token set)
+            if self.copilot_github_token is not None:
+                # Copilot API mode
+                if self.backend == "keyring":
+                    token_ref = "@keyring:github/copilot_token"
+                else:
+                    token_ref = "${GITHUB_COPILOT_TOKEN}"
+
+                rate_limit_line = (
+                    f"    rate_limit: {self.copilot_rate_limit}"
+                    if self.copilot_rate_limit
+                    else "    # rate_limit: 2.0  # Recommended"
+                )
+                if self.copilot_manage_proxy:
+                    proxy_line = f"    proxy_port: {self.copilot_proxy_port}"
+                else:
+                    proxy_line = f'    proxy_url: "{self.copilot_proxy_url}"'
+
+                agent_config = f'''agent_provider:
+  provider_type: copilot-local
+  copilot_config:
+    github_token: "{token_ref}"
+    manage_proxy: {str(self.copilot_manage_proxy).lower()}
+{proxy_line}
+    account_type: {self.copilot_account_type}
+{rate_limit_line}
+    model: "{self.copilot_model}"'''
+            else:
+                # Copilot CLI mode (existing gh-copilot)
+                provider_type = "copilot-local"
+                model = "gpt-4"  # Default model for Copilot
+                agent_config = f"""agent_provider:
   provider_type: {provider_type}
   model: {model}
   api_key: null

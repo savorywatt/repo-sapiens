@@ -1,13 +1,11 @@
 """Tests for repo_sapiens.utils.comment_analyzer module."""
 
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from repo_sapiens.models.review import CommentAnalysis, CommentCategory, ReviewAnalysisResult
 from repo_sapiens.utils.comment_analyzer import CommentAnalyzer
-
 
 # =============================================================================
 # Fixtures
@@ -263,9 +261,7 @@ class TestAnalyzeSingleComment:
     """Test _analyze_single_comment method."""
 
     @pytest.mark.asyncio
-    async def test_analyze_dict_comment_success(
-        self, analyzer, mock_agent_provider, sample_comment_dict
-    ):
+    async def test_analyze_dict_comment_success(self, analyzer, mock_agent_provider, sample_comment_dict):
         """Test successful analysis of a dict-style comment."""
         mock_agent_provider.execute_prompt.return_value = {
             "success": True,
@@ -282,13 +278,14 @@ class TestAnalyzeSingleComment:
         assert result.reasoning == "typo fix"
 
     @pytest.mark.asyncio
-    async def test_analyze_object_comment_success(
-        self, analyzer, mock_agent_provider, sample_comment_object
-    ):
+    async def test_analyze_object_comment_success(self, analyzer, mock_agent_provider, sample_comment_object):
         """Test successful analysis of an object-style comment."""
         mock_agent_provider.execute_prompt.return_value = {
             "success": True,
-            "output": '{"category": "question", "reasoning": "needs answer", "proposed_action": "respond", "answer": "Yes, use snake_case"}',
+            "output": (
+                '{"category": "question", "reasoning": "needs answer", '
+                '"proposed_action": "respond", "answer": "Yes, use snake_case"}'
+            ),
         }
 
         result = await analyzer._analyze_single_comment(sample_comment_object, pr_number=10)
@@ -300,9 +297,7 @@ class TestAnalyzeSingleComment:
         assert result.answer == "Yes, use snake_case"
 
     @pytest.mark.asyncio
-    async def test_analyze_comment_agent_failure(
-        self, analyzer, mock_agent_provider, sample_comment_dict
-    ):
+    async def test_analyze_comment_agent_failure(self, analyzer, mock_agent_provider, sample_comment_dict):
         """Test handling when agent returns failure."""
         mock_agent_provider.execute_prompt.return_value = {
             "success": False,
@@ -316,9 +311,7 @@ class TestAnalyzeSingleComment:
         mock_log.error.assert_called()
 
     @pytest.mark.asyncio
-    async def test_analyze_comment_invalid_ai_response(
-        self, analyzer, mock_agent_provider, sample_comment_dict
-    ):
+    async def test_analyze_comment_invalid_ai_response(self, analyzer, mock_agent_provider, sample_comment_dict):
         """Test handling when AI returns unparseable response."""
         mock_agent_provider.execute_prompt.return_value = {
             "success": True,
@@ -331,9 +324,7 @@ class TestAnalyzeSingleComment:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_analyze_comment_exception(
-        self, analyzer, mock_agent_provider, sample_comment_dict
-    ):
+    async def test_analyze_comment_exception(self, analyzer, mock_agent_provider, sample_comment_dict):
         """Test handling when an exception occurs during analysis."""
         mock_agent_provider.execute_prompt.side_effect = RuntimeError("API timeout")
 
@@ -344,13 +335,14 @@ class TestAnalyzeSingleComment:
         mock_log.error.assert_called()
 
     @pytest.mark.asyncio
-    async def test_analyze_comment_with_file_path_and_line(
-        self, analyzer, mock_agent_provider, sample_comment_dict
-    ):
+    async def test_analyze_comment_with_file_path_and_line(self, analyzer, mock_agent_provider, sample_comment_dict):
         """Test analysis result includes file_path and line_number."""
         mock_agent_provider.execute_prompt.return_value = {
             "success": True,
-            "output": '{"category": "simple_fix", "reasoning": "add comment", "proposed_action": "add docstring", "file_path": "src/utils.py", "line_number": 25}',
+            "output": (
+                '{"category": "simple_fix", "reasoning": "add comment", '
+                '"proposed_action": "add docstring", "file_path": "src/utils.py", "line_number": 25}'
+            ),
         }
 
         result = await analyzer._analyze_single_comment(sample_comment_dict, pr_number=42)
@@ -360,9 +352,7 @@ class TestAnalyzeSingleComment:
         assert result.line_number == 25
 
     @pytest.mark.asyncio
-    async def test_analyze_comment_prompt_includes_context(
-        self, analyzer, mock_agent_provider, sample_comment_dict
-    ):
+    async def test_analyze_comment_prompt_includes_context(self, analyzer, mock_agent_provider, sample_comment_dict):
         """Test that the AI prompt includes correct context."""
         mock_agent_provider.execute_prompt.return_value = {
             "success": True,
@@ -497,14 +487,15 @@ class TestAnalyzeComments:
 
         responses = [
             '{"category": "simple_fix", "reasoning": "typo", "proposed_action": "fix"}',
-            '{"category": "question", "reasoning": "needs answer", "proposed_action": "answer", "answer": "It processes data"}',
+            (
+                '{"category": "question", "reasoning": "needs answer", '
+                '"proposed_action": "answer", "answer": "It processes data"}'
+            ),
             '{"category": "info", "reasoning": "praise", "proposed_action": "acknowledge"}',
             '{"category": "controversial_fix", "reasoning": "big change", "proposed_action": "discuss"}',
         ]
 
-        mock_agent_provider.execute_prompt.side_effect = [
-            {"success": True, "output": r} for r in responses
-        ]
+        mock_agent_provider.execute_prompt.side_effect = [{"success": True, "output": r} for r in responses]
 
         result = await analyzer.analyze_comments(pr_number=42, comments=comments)
 
@@ -561,9 +552,7 @@ class TestAnalyzeComments:
         assert result.reviewer_comments == 1
 
     @pytest.mark.asyncio
-    async def test_analyze_comments_logs_progress(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_analyze_comments_logs_progress(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test that analysis progress is logged."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -604,9 +593,7 @@ class TestAnalyzeComments:
             '{"category": "wont_fix", "reasoning": "r", "proposed_action": "a"}',
         ]
 
-        mock_agent_provider.execute_prompt.side_effect = [
-            {"success": True, "output": r} for r in responses
-        ]
+        mock_agent_provider.execute_prompt.side_effect = [{"success": True, "output": r} for r in responses]
 
         result = await analyzer.analyze_comments(pr_number=1, comments=comments)
 
@@ -651,9 +638,7 @@ class TestCommentAnalyzerEdgeCases:
     """Test edge cases and error handling."""
 
     @pytest.mark.asyncio
-    async def test_comment_with_none_created_at(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_comment_with_none_created_at(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test handling comment with None created_at."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -692,9 +677,7 @@ class TestCommentAnalyzerEdgeCases:
         assert len(result.simple_fixes) == 1
 
     @pytest.mark.asyncio
-    async def test_analyze_with_unicode_content(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_analyze_with_unicode_content(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test handling Unicode content in comments."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -710,9 +693,7 @@ class TestCommentAnalyzerEdgeCases:
         assert len(result.info_comments) == 1
 
     @pytest.mark.asyncio
-    async def test_very_long_comment_body(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_very_long_comment_body(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test handling very long comment bodies."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -730,9 +711,7 @@ class TestCommentAnalyzerEdgeCases:
         assert result.info_comments[0].comment_body == long_body
 
     @pytest.mark.asyncio
-    async def test_invalid_category_in_ai_response(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_invalid_category_in_ai_response(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test handling invalid category from AI response."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -781,9 +760,7 @@ class TestReviewAnalysisResultHelpers:
     """Test ReviewAnalysisResult helper methods indirectly."""
 
     @pytest.mark.asyncio
-    async def test_result_has_executable_fixes(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_result_has_executable_fixes(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test that result correctly reports executable fixes."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -800,9 +777,7 @@ class TestReviewAnalysisResultHelpers:
         assert result.has_controversial_fixes() is False
 
     @pytest.mark.asyncio
-    async def test_result_has_controversial_fixes(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_result_has_controversial_fixes(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test that result correctly reports controversial fixes."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 
@@ -819,9 +794,7 @@ class TestReviewAnalysisResultHelpers:
         assert result.has_controversial_fixes() is True
 
     @pytest.mark.asyncio
-    async def test_result_get_all_analyses(
-        self, analyzer, mock_git_provider, mock_agent_provider, mock_pr
-    ):
+    async def test_result_get_all_analyses(self, analyzer, mock_git_provider, mock_agent_provider, mock_pr):
         """Test get_all_analyses returns all categorized comments."""
         mock_git_provider.get_pull_request.return_value = mock_pr
 

@@ -507,12 +507,12 @@ async def _run_task(
         await _run_claude_cli(task, timeout, working_dir, system_prompt)
     elif provider_type == "goose-local":
         await _run_goose_cli(task, timeout, working_dir, settings, system_prompt)
-    elif provider_type in ("ollama", "openai-compatible"):
+    elif provider_type in ("ollama", "openai-compatible", "copilot-local"):
         await _run_react_agent(task, timeout, working_dir, verbose, settings, system_prompt)
     else:
         raise ValueError(
             f"Unsupported provider type: {provider_type}. "
-            f"Supported: claude-local, goose-local, ollama, openai-compatible"
+            f"Supported: claude-local, goose-local, ollama, openai-compatible, copilot-local"
         )
 
 
@@ -713,6 +713,15 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
         agent = OllamaProvider(
             base_url=base_url,
             model=settings.agent_provider.model,
+            working_dir=str(Path.cwd()),
+            qa_handler=qa_handler,
+        )
+    elif provider_type == ProviderType.COPILOT_LOCAL and settings.agent_provider.copilot_config:
+        # Use CopilotProvider with copilot-api proxy
+        from repo_sapiens.providers.copilot import CopilotProvider
+
+        agent = CopilotProvider(
+            copilot_config=settings.agent_provider.copilot_config,
             working_dir=str(Path.cwd()),
             qa_handler=qa_handler,
         )

@@ -1,6 +1,5 @@
 """Tests for repo_sapiens/rendering/__init__.py - WorkflowRenderer and render_workflow."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -125,9 +124,7 @@ jobs:
         workflows_dir.mkdir(parents=True)
 
         template_file = workflows_dir / "defaults.yaml.j2"
-        template_file.write_text(
-            "name: {{ workflow_name | default('default-name') }}\n"
-        )
+        template_file.write_text("name: {{ workflow_name | default('default-name') }}\n")
 
         config = WorkflowConfig(
             gitea_url="https://gitea.example.com",
@@ -331,9 +328,7 @@ url: {{ gitea_url }}
 """
         )
 
-        with patch(
-            "repo_sapiens.rendering.WorkflowRenderer"
-        ) as MockRenderer:
+        with patch("repo_sapiens.rendering.WorkflowRenderer") as MockRenderer:
             mock_instance = MagicMock()
             mock_instance.render_workflow.return_value = "rendered content"
             MockRenderer.return_value = mock_instance
@@ -351,9 +346,7 @@ url: {{ gitea_url }}
 
     def test_render_workflow_with_extra_kwargs(self, tmp_path):
         """Should pass extra kwargs to WorkflowConfig."""
-        with patch(
-            "repo_sapiens.rendering.WorkflowRenderer"
-        ) as MockRenderer:
+        with patch("repo_sapiens.rendering.WorkflowRenderer") as MockRenderer:
             mock_instance = MagicMock()
             mock_instance.render_workflow.return_value = "content"
             MockRenderer.return_value = mock_instance

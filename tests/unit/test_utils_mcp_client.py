@@ -6,7 +6,6 @@ import pytest
 
 from repo_sapiens.utils.mcp_client import MCPClient, MCPError, MockMCPClient
 
-
 # =============================================================================
 # Tests for MCPError
 # =============================================================================
@@ -177,11 +176,7 @@ class TestMCPClientCallTool:
         """Test call_tool raises MCPError when response contains error."""
         client = MCPClient("test-server")
         client._connected = True
-        client._send_request = AsyncMock(
-            return_value={
-                "error": {"message": "Tool not found", "code": -32601}
-            }
-        )
+        client._send_request = AsyncMock(return_value={"error": {"message": "Tool not found", "code": -32601}})
 
         with pytest.raises(MCPError, match="MCP tool test_tool failed: Tool not found"):
             await client.call_tool("test_tool")
@@ -201,9 +196,7 @@ class TestMCPClientCallTool:
         """Test call_tool logs error details from response."""
         client = MCPClient("test-server")
         client._connected = True
-        client._send_request = AsyncMock(
-            return_value={"error": {"message": "Error msg", "code": -1}}
-        )
+        client._send_request = AsyncMock(return_value={"error": {"message": "Error msg", "code": -1}})
 
         with patch("repo_sapiens.utils.mcp_client.log") as mock_log:
             with pytest.raises(MCPError):
@@ -429,6 +422,7 @@ class TestMockMCPClientSendRequest:
     @pytest.mark.asyncio
     async def test_send_request_calls_callable_response(self):
         """Test _send_request calls callable response with arguments."""
+
         def dynamic_response(args):
             return {"computed": args.get("input", 0) * 2}
 
@@ -515,6 +509,7 @@ class TestMockMCPClientIntegration:
     @pytest.mark.asyncio
     async def test_call_tool_passes_arguments_to_callable(self):
         """Test call_tool passes arguments correctly to callable response."""
+
         def concat_response(args):
             return {"result": args.get("prefix", "") + args.get("suffix", "")}
 

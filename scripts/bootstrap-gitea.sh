@@ -79,7 +79,7 @@ wait_for_gitea() {
     log "Waiting for Gitea at $GITEA_URL..."
     local timeout=60
     local elapsed=0
-    
+
     while ! curl -sf "$GITEA_URL/api/healthz" > /dev/null 2>&1; do
         sleep 2
         elapsed=$((elapsed + 2))
@@ -98,7 +98,7 @@ wait_for_gitea() {
 check_installed() {
     local response
     response=$(curl -sf "$GITEA_URL/api/v1/version" 2>/dev/null || echo "")
-    
+
     if [[ -n "$response" ]] && echo "$response" | grep -q '"version"'; then
         log "Gitea already installed (version: $(echo "$response" | grep -oP '"version"\s*:\s*"\K[^"]+'))"
         return 0
@@ -114,15 +114,15 @@ create_config_via_docker() {
         warn "Skipping Docker config creation (--no-docker)"
         return 1
     fi
-    
+
     log "Creating Gitea config via Docker..."
-    
+
     # Check if container exists
     if ! docker ps -a --format '{{.Names}}' | grep -q "^${DOCKER_CONTAINER}$"; then
         warn "Container $DOCKER_CONTAINER not found"
         return 1
     fi
-    
+
     # Create app.ini (with Actions enabled)
     docker exec "$DOCKER_CONTAINER" sh -c "mkdir -p /data/gitea/conf && cat > /data/gitea/conf/app.ini << 'APPINI'
 APP_NAME = Gitea
@@ -162,11 +162,11 @@ LEVEL = info
 ROOT_PATH = /data/gitea/log
 APPINI
 chown -R git:git /data/gitea/conf" || return 1
-    
+
     log "Config created, restarting Gitea..."
     docker restart "$DOCKER_CONTAINER" > /dev/null
     sleep 5
-    
+
     return 0
 }
 
@@ -175,13 +175,13 @@ chown -R git:git /data/gitea/conf" || return 1
 #############################################
 register_admin_user() {
     log "Registering admin user: $ADMIN_USER"
-    
+
     local cookie_jar="/tmp/gitea_bootstrap_cookies.txt"
     rm -f "$cookie_jar"
-    
+
     # Get session cookie
     curl -s -c "$cookie_jar" "$GITEA_URL/user/sign_up" > /dev/null
-    
+
     # Register user (first user becomes admin automatically)
     local response
     response=$(curl -s -b "$cookie_jar" -c "$cookie_jar" \
@@ -192,23 +192,23 @@ register_admin_user() {
         -d "password=$ADMIN_PASS" \
         -d "retype=$ADMIN_PASS" \
         -w "\n%{http_code}" 2>&1)
-    
+
     local http_code
     http_code=$(echo "$response" | tail -1)
-    
+
     rm -f "$cookie_jar"
-    
+
     # Check if user already exists by trying to get token
     if curl -sf -u "$ADMIN_USER:$ADMIN_PASS" "$GITEA_URL/api/v1/user" > /dev/null 2>&1; then
         log "User $ADMIN_USER exists and credentials valid"
         return 0
     fi
-    
+
     if [[ "$http_code" == "200" ]] || [[ "$http_code" == "303" ]]; then
         log "User registered successfully"
         return 0
     fi
-    
+
     warn "Registration returned HTTP $http_code (may already exist)"
     return 0
 }
@@ -218,29 +218,29 @@ register_admin_user() {
 #############################################
 generate_api_token() {
     log "Generating API token..."
-    
+
     local token_name="sapiens-test-$(date +%s)"
     local response
-    
+
     response=$(curl -s -u "$ADMIN_USER:$ADMIN_PASS" \
         -X POST "$GITEA_URL/api/v1/users/$ADMIN_USER/tokens" \
         -H "Content-Type: application/json" \
         -d "{\"name\":\"$token_name\",\"scopes\":[\"all\"]}" 2>&1)
-    
+
     if echo "$response" | grep -q '"sha1"'; then
         GITEA_TOKEN=$(echo "$response" | grep -oP '"sha1"\s*:\s*"\K[^"]+')
         log "Token generated: ${GITEA_TOKEN:0:8}..."
         return 0
     fi
-    
+
     # Try to list existing tokens and use one if available
     response=$(curl -s -u "$ADMIN_USER:$ADMIN_PASS" \
         "$GITEA_URL/api/v1/users/$ADMIN_USER/tokens" 2>&1)
-    
+
     if echo "$response" | grep -q '"sha1"'; then
         warn "Could not create new token, but tokens exist. Re-create manually."
     fi
-    
+
     die "Failed to generate API token: $response"
 }
 
@@ -249,25 +249,25 @@ generate_api_token() {
 #############################################
 create_test_repo() {
     log "Creating test repository: $TEST_REPO"
-    
+
     # Check if repo exists
     if curl -sf -H "Authorization: token $GITEA_TOKEN" \
         "$GITEA_URL/api/v1/repos/$ADMIN_USER/$TEST_REPO" > /dev/null 2>&1; then
         log "Repository $TEST_REPO already exists"
         return 0
     fi
-    
+
     local response
     response=$(curl -s -X POST "$GITEA_URL/api/v1/user/repos" \
         -H "Authorization: token $GITEA_TOKEN" \
         -H "Content-Type: application/json" \
         -d "{\"name\":\"$TEST_REPO\",\"auto_init\":true,\"private\":false}" 2>&1)
-    
+
     if echo "$response" | grep -q "\"name\":\"$TEST_REPO\""; then
         log "Repository created successfully"
         return 0
     fi
-    
+
     die "Failed to create repository: $response"
 }
 

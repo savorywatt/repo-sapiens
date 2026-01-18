@@ -197,6 +197,34 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
+    async def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Get pull request by number.
+
+        Args:
+            pr_number: Pull request number
+
+        Returns:
+            PullRequest object
+        """
+        pass
+
+    async def add_comment_reply(self, comment_id: int, reply: str) -> Comment:
+        """Reply to a specific comment.
+
+        This is an optional method - not all providers support threaded replies.
+        Default implementation posts a regular comment.
+
+        Args:
+            comment_id: ID of the comment to reply to
+            reply: Reply text
+
+        Returns:
+            Created Comment object
+        """
+        # Default: fall back to regular comment (issue number not available here)
+        raise NotImplementedError("Provider does not support comment replies")
+
+    @abstractmethod
     async def get_file(self, path: str, ref: str = "main") -> str:
         """Read file contents from repository.
 
@@ -258,6 +286,31 @@ class GitProvider(ABC):
 
 class AgentProvider(ABC):
     """Abstract base class for AI agent implementations."""
+
+    # Working directory for agent operations (can be set by implementations)
+    working_dir: str | None = None
+
+    @abstractmethod
+    async def execute_prompt(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Execute a prompt and return the result.
+
+        This is the core method for running AI prompts. Used by comment analysis,
+        fix execution, and other interactive AI operations.
+
+        Args:
+            prompt: The prompt text to execute
+            context: Optional context dict (pr_number, comment_id, etc.)
+            task_id: Optional task identifier for tracking
+
+        Returns:
+            Dict with 'success' bool and either 'output' or 'error'
+        """
+        pass
 
     @abstractmethod
     async def generate_plan(self, issue: Issue) -> Plan:

@@ -25,7 +25,6 @@ from repo_sapiens.engine.state_manager import StateManager
 from repo_sapiens.models.domain import Comment, Issue, IssueState, PullRequest
 from repo_sapiens.models.review import CommentAnalysis, CommentCategory, ReviewAnalysisResult
 
-
 # ==============================================================================
 # Fixtures
 # ==============================================================================
@@ -122,7 +121,7 @@ def mock_settings(tmp_path):
         agent_provider={
             "provider_type": "claude-local",
             "model": "claude-sonnet-4.5",
-            "api_key": "test-key",
+            "api_key": "test-key",  # pragma: allowlist secret
             "local_mode": True,
         },
         workflow={
@@ -262,9 +261,7 @@ def sample_analysis():
 class TestPRFixStageInitialization:
     """Tests for PRFixStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly with all required providers."""
         stage = PRFixStage(
             git=mock_git_provider,
@@ -387,9 +384,7 @@ class TestPRFixStageExecute:
             info_comments=[sample_analysis.info_comments[0]],
         )
 
-        with patch(
-            "repo_sapiens.engine.stages.pr_fix.CommentAnalyzer"
-        ) as mock_analyzer_class:
+        with patch("repo_sapiens.engine.stages.pr_fix.CommentAnalyzer") as mock_analyzer_class:
             mock_analyzer = AsyncMock()
             mock_analyzer.analyze_comments.return_value = analysis_no_fixes
             mock_analyzer_class.return_value = mock_analyzer
@@ -905,23 +900,19 @@ class TestExecuteSimpleFixes:
 
         # Mock the playground path and run_command
         with patch.object(Path, "__truediv__", return_value=playground):
-            with patch(
-                "repo_sapiens.engine.stages.pr_fix.run_command"
-            ) as mock_run_command:
+            with patch("repo_sapiens.engine.stages.pr_fix.run_command") as mock_run_command:
                 # Set up run_command to return proper values
                 mock_run_command.return_value = ("", "", 0)
 
                 # Mock Path existence check
-                with patch.object(
-                    Path, "exists", return_value=True
-                ):
+                with patch.object(Path, "exists", return_value=True):
                     # We need to patch at module level
-                    with patch(
-                        "repo_sapiens.engine.stages.pr_fix.Path"
-                    ) as MockPath:
+                    with patch("repo_sapiens.engine.stages.pr_fix.Path") as MockPath:
                         mock_playground = MagicMock()
                         mock_playground.exists.return_value = True
-                        MockPath.return_value.parent.parent.parent.parent.parent.__truediv__.return_value = mock_playground
+                        MockPath.return_value.parent.parent.parent.parent.parent.__truediv__.return_value = (
+                            mock_playground
+                        )
 
                         await stage._execute_simple_fixes(10, analysis)
 
@@ -1047,9 +1038,7 @@ class TestCommitFixes:
             ("", "", 0),  # git status (empty = no changes)
         ]
 
-        with patch(
-            "repo_sapiens.engine.stages.pr_fix.run_command", mock_run_command
-        ):
+        with patch("repo_sapiens.engine.stages.pr_fix.run_command", mock_run_command):
             stage = PRFixStage(
                 git=mock_git_provider,
                 agent=mock_agent_provider,
@@ -1098,9 +1087,7 @@ class TestCommitFixes:
             ("", "", 0),  # git push
         ]
 
-        with patch(
-            "repo_sapiens.engine.stages.pr_fix.run_command", mock_run_command
-        ):
+        with patch("repo_sapiens.engine.stages.pr_fix.run_command", mock_run_command):
             stage = PRFixStage(
                 git=mock_git_provider,
                 agent=mock_agent_provider,
@@ -1300,9 +1287,7 @@ class TestPRFixStageIntegration:
             ],
         )
 
-        with patch(
-            "repo_sapiens.engine.stages.pr_fix.CommentAnalyzer"
-        ) as mock_analyzer_class:
+        with patch("repo_sapiens.engine.stages.pr_fix.CommentAnalyzer") as mock_analyzer_class:
             mock_analyzer = AsyncMock()
             mock_analyzer.analyze_comments.return_value = analysis
             mock_analyzer_class.return_value = mock_analyzer

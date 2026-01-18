@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -102,7 +102,7 @@ class TestDiagnosticReport:
     @pytest.fixture
     def sample_timestamp(self) -> datetime:
         """Return a fixed timestamp for testing."""
-        return datetime(2025, 6, 15, 10, 30, 45)
+        return datetime(2025, 6, 15, 10, 30, 45, tzinfo=UTC)
 
     @pytest.fixture
     def sample_results(self) -> list[ValidationResult]:
@@ -155,9 +155,7 @@ class TestDiagnosticReport:
         assert report.summary is None
         assert report.duration_ms == 0.0
 
-    def test_creation_full(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_creation_full(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test creating DiagnosticReport with all fields."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -174,9 +172,7 @@ class TestDiagnosticReport:
         assert report.duration_ms == 5000.0
         assert len(report.results) == 4
 
-    def test_passed_property(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_passed_property(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test passed property counts successful results."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -187,9 +183,7 @@ class TestDiagnosticReport:
 
         assert report.passed == 3
 
-    def test_failed_property(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_failed_property(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test failed property counts unsuccessful results."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -200,9 +194,7 @@ class TestDiagnosticReport:
 
         assert report.failed == 1
 
-    def test_total_property(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_total_property(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test total property returns result count."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -250,9 +242,7 @@ class TestDiagnosticReport:
 
         assert report.all_passed is True
 
-    def test_all_passed_false(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_all_passed_false(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test all_passed returns False when any test fails."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -273,9 +263,7 @@ class TestDiagnosticReport:
 
         assert report.all_passed is True
 
-    def test_results_by_category(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_results_by_category(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test results_by_category groups results correctly."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -305,9 +293,7 @@ class TestDiagnosticReport:
 
         assert grouped == {}
 
-    def test_results_by_category_multiple_same_category(
-        self, sample_timestamp: datetime
-    ) -> None:
+    def test_results_by_category_multiple_same_category(self, sample_timestamp: datetime) -> None:
         """Test results_by_category with multiple results in same category."""
         results = [
             ValidationResult(
@@ -344,9 +330,7 @@ class TestDiagnosticReport:
         assert len(grouped) == 1
         assert len(grouped["read"]) == 3
 
-    def test_to_dict(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_to_dict(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test to_dict() serialization."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,
@@ -385,9 +369,7 @@ class TestDiagnosticReport:
         assert data["agent_type"] is None
         assert data["summary"] is None
 
-    def test_to_json(
-        self, sample_timestamp: datetime, sample_results: list[ValidationResult]
-    ) -> None:
+    def test_to_json(self, sample_timestamp: datetime, sample_results: list[ValidationResult]) -> None:
         """Test to_json() produces valid JSON."""
         report = DiagnosticReport(
             timestamp=sample_timestamp,

@@ -26,7 +26,6 @@ from repo_sapiens.models.domain import (
     Task,
 )
 
-
 # ==============================================================================
 # Fixtures
 # ==============================================================================
@@ -131,7 +130,7 @@ def mock_settings(tmp_path):
         agent_provider={
             "provider_type": "claude-local",
             "model": "claude-sonnet-4.5",
-            "api_key": "test-key",
+            "api_key": "test-key",  # pragma: allowlist secret
             "local_mode": True,
         },
         workflow={
@@ -179,9 +178,7 @@ def open_issue():
 class TestProposalStageInitialization:
     """Tests for ProposalStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly with all required providers."""
         stage = ProposalStage(
             git=mock_git_provider,

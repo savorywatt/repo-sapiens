@@ -1,6 +1,7 @@
 """PR fix stage - dynamically responds to review comments."""
 
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -291,7 +292,7 @@ Implement the fix now.
 
         log.info("fix_executed", comment_id=fix.comment_id, success=result.get("success"))
 
-    async def _commit_fixes(self, playground_dir: Path, branch_name: str, fixes: list) -> None:
+    async def _commit_fixes(self, playground_dir: Path, branch_name: str, fixes: list[Any]) -> None:
         """Commit all fixes.
 
         Args:

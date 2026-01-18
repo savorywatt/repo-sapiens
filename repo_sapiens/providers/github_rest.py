@@ -341,6 +341,22 @@ class GitHubRestProvider(GitProvider):
             log.error("github_create_pr_failed", error=str(e))
             raise
 
+    async def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Get pull request by number."""
+        log.info("get_pull_request", number=pr_number)
+
+        try:
+
+            def _get_pr() -> GHPullRequest:
+                return self._repo.get_pull(pr_number)
+
+            gh_pr = await _run_sync(_get_pr)
+            return self._convert_pull_request(gh_pr)
+
+        except GithubException as e:
+            log.error("github_get_pr_failed", number=pr_number, error=str(e))
+            raise
+
     async def get_file(self, path: str, ref: str = "main") -> str:
         """Read file contents from repository."""
         log.info("get_file", path=path, ref=ref)
@@ -445,21 +461,19 @@ class GitHubRestProvider(GitProvider):
         """
         # Default automation labels with distinct colors
         default_labels = {
-            "needs-planning": "5319e7",    # Purple - needs attention
+            "needs-planning": "5319e7",  # Purple - needs attention
             "awaiting-approval": "fbca04",  # Yellow - waiting
-            "approved": "0e8a16",           # Green - ready to go
-            "in-progress": "1d76db",        # Blue - working on it
-            "done": "0e8a16",               # Green - complete
-            "proposed": "c5def5",           # Light blue - proposal
+            "approved": "0e8a16",  # Green - ready to go
+            "in-progress": "1d76db",  # Blue - working on it
+            "done": "0e8a16",  # Green - complete
+            "proposed": "c5def5",  # Light blue - proposal
         }
 
         if labels is None:
             labels = list(default_labels.keys())
 
         # Get existing labels
-        existing_labels = {
-            label.name: label.id for label in await _run_sync(lambda: list(self._repo.get_labels()))
-        }
+        existing_labels = {label.name: label.id for label in await _run_sync(lambda: list(self._repo.get_labels()))}
 
         result: dict[str, int] = {}
         for name in labels:
@@ -536,4 +550,5 @@ class GitHubRestProvider(GitProvider):
             base=gh_pr.base.ref,
             url=gh_pr.html_url,
             created_at=gh_pr.created_at,
+            author=gh_pr.user.login if gh_pr.user else "",
         )

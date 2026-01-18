@@ -223,7 +223,7 @@ Respond ONLY with the JSON, no other text.
             log.error("comment_analysis_exception", comment_id=comment_id, error=str(e), exc_info=True)
             return None
 
-    def _parse_ai_response(self, output: str) -> dict | None:
+    def _parse_ai_response(self, output: str) -> dict[str, Any] | None:
         """Parse AI JSON response.
 
         Args:
@@ -237,12 +237,14 @@ Respond ONLY with the JSON, no other text.
             import re
 
             json_match = re.search(r"\{.*\}", output, re.DOTALL)
+            parsed: dict[str, Any]
             if json_match:
                 json_str = json_match.group(0)
-                return json.loads(json_str)
+                parsed = json.loads(json_str)
             else:
                 # Try parsing entire output as JSON
-                return json.loads(output)
+                parsed = json.loads(output)
+            return parsed
 
         except json.JSONDecodeError as e:
             log.error("json_parse_failed", error=str(e), output=output[:200])

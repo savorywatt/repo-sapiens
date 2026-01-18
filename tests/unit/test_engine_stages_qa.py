@@ -14,7 +14,7 @@ Tested areas:
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -29,7 +29,6 @@ from repo_sapiens.models.domain import (
     PullRequest,
     Task,
 )
-
 
 # ==============================================================================
 # Fixtures
@@ -128,7 +127,7 @@ def mock_settings(tmp_path):
         agent_provider={
             "provider_type": "claude-local",
             "model": "claude-sonnet-4.5",
-            "api_key": "test-key",
+            "api_key": "test-key",  # pragma: allowlist secret
             "local_mode": True,
         },
         workflow={
@@ -176,9 +175,7 @@ def qa_issue():
 class TestQAStageInitialization:
     """Tests for QAStage initialization."""
 
-    def test_init_with_valid_providers(
-        self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings
-    ):
+    def test_init_with_valid_providers(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test stage initializes correctly with all required providers."""
         stage = QAStage(
             git=mock_git_provider,

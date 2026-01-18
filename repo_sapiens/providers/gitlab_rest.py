@@ -534,6 +534,25 @@ class GitLabRestProvider(GitProvider):
                 return None
             raise
 
+    async def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Get pull request (merge request) by number.
+
+        This is an alias for get_merge_request to satisfy the GitProvider interface.
+
+        Args:
+            pr_number: Pull request number (merge request iid)
+
+        Returns:
+            PullRequest object
+
+        Raises:
+            Exception: If the merge request is not found
+        """
+        result = await self.get_merge_request(pr_number)
+        if result is None:
+            raise ValueError(f"Merge request #{pr_number} not found")
+        return result
+
     async def setup_automation_labels(
         self,
         labels: list[str] | None = None,
@@ -551,12 +570,12 @@ class GitLabRestProvider(GitProvider):
         """
         # Default automation labels with distinct colors
         default_labels = {
-            "needs-planning": "5319e7",    # Purple - needs attention
+            "needs-planning": "5319e7",  # Purple - needs attention
             "awaiting-approval": "fbca04",  # Yellow - waiting
-            "approved": "0e8a16",           # Green - ready to go
-            "in-progress": "1d76db",        # Blue - working on it
-            "done": "0e8a16",               # Green - complete
-            "proposed": "c5def5",           # Light blue - proposal
+            "approved": "0e8a16",  # Green - ready to go
+            "in-progress": "1d76db",  # Blue - working on it
+            "done": "0e8a16",  # Green - complete
+            "proposed": "c5def5",  # Light blue - proposal
         }
 
         if labels is None:
@@ -654,6 +673,7 @@ class GitLabRestProvider(GitProvider):
         Returns:
             PullRequest domain object
         """
+        author = data.get("author", {})
         return PullRequest(
             id=data["id"],
             number=data["iid"],
@@ -664,4 +684,5 @@ class GitLabRestProvider(GitProvider):
             base=data["target_branch"],
             url=data["web_url"],
             created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
+            author=author.get("username", "") if author else "",
         )

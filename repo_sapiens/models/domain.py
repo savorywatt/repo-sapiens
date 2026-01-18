@@ -77,6 +77,7 @@ class PullRequest:
     state: str
     url: str
     created_at: datetime
+    author: str = ""
     mergeable: bool = True
     merged: bool = False
 

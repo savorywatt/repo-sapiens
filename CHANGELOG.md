@@ -84,6 +84,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed 16 failing tests across cli_init, config_settings, main_cli modules
 
 ### Fixed
+- **GitProvider Protocol**: Added missing `get_pull_request` method to base class
+  - Implemented in GitHubRestProvider and GitLabRestProvider
+  - Added `add_comment_reply` method for threaded comment responses
+- **AgentProvider Protocol**: Added missing `execute_prompt` method and `working_dir` attribute
+  - Enables interactive AI prompts for comment analysis and fix execution
+- **PullRequest Model**: Added `author` field for PR author identification
+- **Type Annotations**: Fixed MyPy errors across multiple files
+  - Added type parameters to generic `dict` and `list` types
+  - Fixed return type annotations in `comment_analyzer.py`
+- **Ruff Linting**: Fixed all linting errors
+  - Simplified nested if statement in `settings.py`
+  - Fixed line length issues in test files
+  - Added timezone info to datetime objects in tests
+- **Detect Secrets**: Updated baseline and added pragma comments for test API keys
 - API token whitespace stripping in all providers (Gitea, GitHub, GitLab)
 - Automation mode configuration test mocking
 - Automation field default in AutomationSettings (backward compatibility)

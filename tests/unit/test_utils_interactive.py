@@ -342,9 +342,7 @@ class TestAskUserQuestion:
         handler = InteractiveQAHandler(mock_git, poll_interval=0.01)
 
         # Use very short timeout for test
-        with patch(
-            "repo_sapiens.utils.interactive.datetime"
-        ) as mock_datetime:
+        with patch("repo_sapiens.utils.interactive.datetime") as mock_datetime:
             # First call: before timeout, subsequent calls: after timeout
             now = datetime.now(UTC)
             timeout = now + timedelta(minutes=1)
@@ -352,7 +350,7 @@ class TestAskUserQuestion:
                 now,  # Initial timeout calculation
                 timeout + timedelta(seconds=1),  # First while check - after timeout
             ]
-            mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+            mock_datetime.side_effect = datetime  # Passthrough to real datetime
 
             result = await handler.ask_user_question(42, "Color?", timeout_minutes=1)
 

@@ -459,12 +459,12 @@ class GiteaRestProvider(GitProvider):
         """
         # Default automation labels with distinct colors
         default_labels = {
-            "needs-planning": "5319e7",    # Purple - needs attention
+            "needs-planning": "5319e7",  # Purple - needs attention
             "awaiting-approval": "fbca04",  # Yellow - waiting
-            "approved": "0e8a16",           # Green - ready to go
-            "in-progress": "1d76db",        # Blue - working on it
-            "done": "0e8a16",               # Green - complete
-            "proposed": "c5def5",           # Light blue - proposal
+            "approved": "0e8a16",  # Green - ready to go
+            "in-progress": "1d76db",  # Blue - working on it
+            "done": "0e8a16",  # Green - complete
+            "proposed": "c5def5",  # Light blue - proposal
         }
 
         if labels is None:
