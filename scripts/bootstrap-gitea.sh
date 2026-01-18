@@ -332,7 +332,7 @@ setup_actions_runner() {
         -e GITEA_INSTANCE_URL="http://localhost:3000" \
         -e GITEA_RUNNER_REGISTRATION_TOKEN="$RUNNER_TOKEN" \
         -e GITEA_RUNNER_NAME="test-runner" \
-        -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://node:20-bookworm,ubuntu-22.04:docker://ubuntu:22.04,self-hosted:host" \
+        -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://catthehacker/ubuntu:act-latest" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         gitea/act_runner:latest > /dev/null 2>&1 || {
             warn "Failed to start runner with network mode, trying bridge..."
@@ -344,13 +344,20 @@ setup_actions_runner() {
                 -e GITEA_INSTANCE_URL="$GITEA_URL" \
                 -e GITEA_RUNNER_REGISTRATION_TOKEN="$RUNNER_TOKEN" \
                 -e GITEA_RUNNER_NAME="test-runner" \
-                -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://node:20-bookworm,ubuntu-22.04:docker://ubuntu:22.04,self-hosted:host" \
+                -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://catthehacker/ubuntu:act-latest" \
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 gitea/act_runner:latest > /dev/null 2>&1 || {
                     warn "Failed to start runner container"
                     return 1
                 }
         }
+
+    # Install Docker CLI in the runner (required for Docker-based jobs)
+    log "Installing Docker CLI in runner..."
+    sleep 2
+    docker exec "$RUNNER_CONTAINER" apk add --no-cache docker-cli > /dev/null 2>&1 || {
+        warn "Could not install Docker CLI in runner (job execution may fail)"
+    }
 
     # Wait for runner to register
     log "Waiting for runner to register..."
