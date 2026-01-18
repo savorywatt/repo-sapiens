@@ -1360,3 +1360,147 @@ class TestGitLabRestProviderErrorHandling:
 
         with pytest.raises(httpx.ConnectError):
             await provider.get_issues()
+
+
+# =============================================================================
+# Label Management Tests
+# =============================================================================
+
+
+class TestGitLabRestProviderLabels:
+    """Tests for setup_automation_labels method."""
+
+    @pytest.mark.asyncio
+    async def test_setup_automation_labels_creates_new_labels(
+        self, provider: GitLabRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should create labels that don't exist."""
+        # Mock getting existing labels - return empty list
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = []
+        mock_get_response.raise_for_status = MagicMock()
+
+        # Mock creating new labels
+        mock_post_response = MagicMock()
+        mock_post_response.json.return_value = {"id": 1, "name": "needs-planning"}
+        mock_post_response.raise_for_status = MagicMock()
+
+        mock_pool.get = AsyncMock(return_value=mock_get_response)
+        mock_pool.post = AsyncMock(return_value=mock_post_response)
+        provider._pool = mock_pool
+
+        result = await provider.setup_automation_labels(["needs-planning"])
+
+        assert "needs-planning" in result
+        assert result["needs-planning"] == 1
+        mock_pool.post.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_setup_automation_labels_skips_existing(
+        self, provider: GitLabRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should skip labels that already exist."""
+        # Mock getting existing labels - return label that exists
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = [
+            {"id": 42, "name": "needs-planning"},
+            {"id": 43, "name": "approved"},
+        ]
+        mock_get_response.raise_for_status = MagicMock()
+
+        mock_pool.get = AsyncMock(return_value=mock_get_response)
+        provider._pool = mock_pool
+
+        result = await provider.setup_automation_labels(["needs-planning", "approved"])
+
+        assert result["needs-planning"] == 42
+        assert result["approved"] == 43
+        # Should not have called post since labels exist
+        mock_pool.post.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_setup_automation_labels_uses_default_labels(
+        self, provider: GitLabRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should use default labels when none specified."""
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = []
+        mock_get_response.raise_for_status = MagicMock()
+
+        mock_post_response = MagicMock()
+        mock_post_response.json.return_value = {"id": 1, "name": "test"}
+        mock_post_response.raise_for_status = MagicMock()
+
+        mock_pool.get = AsyncMock(return_value=mock_get_response)
+        mock_pool.post = AsyncMock(return_value=mock_post_response)
+        provider._pool = mock_pool
+
+        result = await provider.setup_automation_labels()
+
+        # Should have created all default labels
+        assert mock_pool.post.call_count == 6  # 6 default labels
+        # Check that default labels are used
+        call_args_list = mock_pool.post.call_args_list
+        created_labels = [call.kwargs["json"]["name"] for call in call_args_list]
+        assert "needs-planning" in created_labels
+        assert "approved" in created_labels
+        assert "in-progress" in created_labels
+
+    @pytest.mark.asyncio
+    async def test_setup_automation_labels_uses_correct_colors(
+        self, provider: GitLabRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should use correct colors for default labels."""
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = []
+        mock_get_response.raise_for_status = MagicMock()
+
+        mock_post_response = MagicMock()
+        mock_post_response.json.return_value = {"id": 1, "name": "test"}
+        mock_post_response.raise_for_status = MagicMock()
+
+        mock_pool.get = AsyncMock(return_value=mock_get_response)
+        mock_pool.post = AsyncMock(return_value=mock_post_response)
+        provider._pool = mock_pool
+
+        await provider.setup_automation_labels(["needs-planning", "approved"])
+
+        # Check colors are applied correctly
+        call_args_list = mock_pool.post.call_args_list
+        for call in call_args_list:
+            json_data = call.kwargs["json"]
+            if json_data["name"] == "needs-planning":
+                assert json_data["color"] == "#5319e7"  # Purple
+            elif json_data["name"] == "approved":
+                assert json_data["color"] == "#0e8a16"  # Green
+
+    @pytest.mark.asyncio
+    async def test_setup_automation_labels_uses_project_path(
+        self, provider: GitLabRestProvider, mock_pool: AsyncMock
+    ) -> None:
+        """Should use correct project path in API calls."""
+        mock_get_response = MagicMock()
+        mock_get_response.json.return_value = []
+        mock_get_response.raise_for_status = MagicMock()
+
+        mock_post_response = MagicMock()
+        mock_post_response.json.return_value = {"id": 1, "name": "test"}
+        mock_post_response.raise_for_status = MagicMock()
+
+        mock_pool.get = AsyncMock(return_value=mock_get_response)
+        mock_pool.post = AsyncMock(return_value=mock_post_response)
+        provider._pool = mock_pool
+
+        await provider.setup_automation_labels(["needs-planning"])
+
+        # Check that the correct path is used (URL-encoded project path)
+        expected_path = f"/projects/{provider.project_path}/labels"
+        mock_pool.get.assert_called_with(expected_path)
+        mock_pool.post.assert_called_with(
+            expected_path,
+            json={
+                "name": "needs-planning",
+                "color": "#5319e7",
+                "description": "Automation label: needs-planning",
+            },
+        )

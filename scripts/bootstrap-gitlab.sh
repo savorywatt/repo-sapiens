@@ -218,8 +218,23 @@ create_api_token() {
     GITLAB_TOKEN=$(echo "$result" | grep -oP 'glpat-[A-Za-z0-9_-]+' | head -1 || echo "")
 
     if [[ -z "$GITLAB_TOKEN" ]]; then
-        error "Failed to create token. Rails output:"
-        echo "$result"
+        error "Failed to create token via Rails console."
+        error ""
+        error "Rails output:"
+        echo "$result" | sed 's/^/    /'
+        error ""
+
+        # Provide specific troubleshooting hints
+        if echo "$result" | grep -qi "root user not found"; then
+            error "Hint: GitLab may not have finished initializing. Wait a few minutes and retry."
+        elif echo "$result" | grep -qi "validation failed"; then
+            error "Hint: Token with same name may already exist. Try again."
+        elif echo "$result" | grep -qi "connection refused\|cannot connect"; then
+            error "Hint: GitLab services may not be fully started. Check: docker logs $DOCKER_CONTAINER"
+        else
+            error "Hint: Check GitLab container status: docker logs $DOCKER_CONTAINER | tail -50"
+        fi
+
         die "Token creation failed"
     fi
 

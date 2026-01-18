@@ -35,6 +35,9 @@ cleanup() {
     if [[ $exit_code -ne 0 && "${CLEANUP_AFTER:-true}" == "true" ]]; then
         log "Cleaning up after failure..."
         cleanup_gitea_test_resources 2>/dev/null || true
+        if [[ "${INCLUDE_GITLAB:-false}" == "true" ]]; then
+            cleanup_gitlab_test_resources 2>/dev/null || true
+        fi
     fi
     exit $exit_code
 }
@@ -177,9 +180,76 @@ cleanup_gitea_test_resources() {
     done
 }
 
+cleanup_gitlab_test_resources() {
+    local token="${SAPIENS_GITLAB_TOKEN:-${GITLAB_TOKEN:-}}"
+    local base_url="${GITLAB_URL:-http://localhost:8080}"
+    local project="${GITLAB_PROJECT:-root/test-repo}"
+    local project_encoded="${project//\//%2F}"
+
+    if [[ -z "$token" ]]; then
+        warn "No SAPIENS_GITLAB_TOKEN - skipping GitLab cleanup"
+        return 0
+    fi
+
+    # Check if GitLab is accessible
+    if ! curl -sf "$base_url/-/health" > /dev/null 2>&1; then
+        warn "GitLab not accessible - skipping cleanup"
+        return 0
+    fi
+
+    # Close test issues (those with "sapiens-" prefix in title)
+    log "Cleaning up GitLab test issues..."
+    local issues
+    issues=$(curl -sf -H "PRIVATE-TOKEN: $token" \
+        "$base_url/api/v4/projects/$project_encoded/issues?state=opened" 2>/dev/null || echo "[]")
+
+    echo "$issues" | jq -r '.[] | select(.title | startswith("sapiens-")) | .iid' 2>/dev/null | \
+    while read -r issue_iid; do
+        [[ -z "$issue_iid" ]] && continue
+        curl -sf -X PUT -H "PRIVATE-TOKEN: $token" \
+            -H "Content-Type: application/json" \
+            -d '{"state_event":"close"}' \
+            "$base_url/api/v4/projects/$project_encoded/issues/$issue_iid" > /dev/null 2>&1 || true
+    done
+
+    # Close test MRs
+    log "Cleaning up GitLab test merge requests..."
+    local mrs
+    mrs=$(curl -sf -H "PRIVATE-TOKEN: $token" \
+        "$base_url/api/v4/projects/$project_encoded/merge_requests?state=opened" 2>/dev/null || echo "[]")
+
+    echo "$mrs" | jq -r '.[] | select(.title | startswith("sapiens-")) | .iid' 2>/dev/null | \
+    while read -r mr_iid; do
+        [[ -z "$mr_iid" ]] && continue
+        curl -sf -X PUT -H "PRIVATE-TOKEN: $token" \
+            -H "Content-Type: application/json" \
+            -d '{"state_event":"close"}' \
+            "$base_url/api/v4/projects/$project_encoded/merge_requests/$mr_iid" > /dev/null 2>&1 || true
+    done
+
+    # Delete test branches (those with "sapiens-" or "auto/" prefix)
+    log "Cleaning up GitLab test branches..."
+    local branches
+    branches=$(curl -sf -H "PRIVATE-TOKEN: $token" \
+        "$base_url/api/v4/projects/$project_encoded/repository/branches" 2>/dev/null || echo "[]")
+
+    echo "$branches" | jq -r '.[] | select(.name | (startswith("sapiens-") or startswith("auto/"))) | .name' 2>/dev/null | \
+    while read -r branch; do
+        [[ -z "$branch" ]] && continue
+        local branch_encoded
+        branch_encoded=$(echo "$branch" | jq -Rr @uri)
+        curl -sf -X DELETE -H "PRIVATE-TOKEN: $token" \
+            "$base_url/api/v4/projects/$project_encoded/repository/branches/$branch_encoded" > /dev/null 2>&1 || true
+    done
+}
+
 reset_test_state() {
     log "Phase 2: Resetting test state..."
     cleanup_gitea_test_resources
+
+    if [[ "${INCLUDE_GITLAB:-false}" == "true" ]]; then
+        cleanup_gitlab_test_resources
+    fi
 }
 
 #############################################
@@ -239,6 +309,10 @@ cleanup_resources() {
     if [[ "${CLEANUP_AFTER:-true}" == "true" ]]; then
         log "Phase 4: Cleaning up test resources..."
         cleanup_gitea_test_resources
+
+        if [[ "${INCLUDE_GITLAB:-false}" == "true" ]]; then
+            cleanup_gitlab_test_resources
+        fi
     fi
 }
 
