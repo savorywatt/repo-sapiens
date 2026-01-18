@@ -8,7 +8,8 @@ on:
 jobs:
   create-fix-proposal:
     name: Generate Fix Proposal
-    if: gitea.event.label.name == 'needs-fix'
+    # Note: Gitea sets github.event.label to null, use labels array instead
+    if: contains(github.event.issue.labels.*.name, 'needs-fix')
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -30,14 +31,14 @@ jobs:
 
       - name: Create fix proposal
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          echo "🔧 Creating fix proposal for issue/PR #${{ gitea.event.issue.number }}"
-          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-fix.md
+          echo "🔧 Creating fix proposal for issue/PR #${{ github.event.issue.number }}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-fix.md
 
       - name: Post success comment
         if: success()
@@ -48,4 +49,4 @@ jobs:
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"body": "🔧 **Fix proposal created!**\n\nReview the proposed fixes and add the `approved` label to apply them.\n\n🤖 Posted by Sapiens Automation"}' \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

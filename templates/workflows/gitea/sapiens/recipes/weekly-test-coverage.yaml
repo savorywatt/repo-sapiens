@@ -65,7 +65,7 @@ jobs:
       - name: Create test improvement branch
         run: |
           git config user.name "repo-sapiens[bot]"
-          git config user.email "repo-sapiens[bot]@users.noreply.gitea.com"
+          git config user.email "repo-sapiens[bot]@users.noreply.github.com"
           BRANCH="auto/improve-coverage-$(date +%Y%m%d)"
           git checkout -b "$BRANCH"
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
@@ -73,10 +73,10 @@ jobs:
       - name: Improve test coverage
         env:
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          TARGET=${{ gitea.event.inputs.target_coverage || '60' }}
+          TARGET=${{ github.event.inputs.target_coverage || '60' }}
 
           sapiens task "Improve test coverage for this Python project.
 

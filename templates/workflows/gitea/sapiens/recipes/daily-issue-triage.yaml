@@ -44,14 +44,14 @@ jobs:
       - name: Triage issues
         env:
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
           sapiens task "Triage open issues in this repository.
 
-          Repository: ${{ gitea.repository }}
+          Repository: ${{ github.repository }}
 
           Tasks:
           1. Use the Gitea API to list open issues without labels (needs-triage or unlabeled)
@@ -75,5 +75,5 @@ jobs:
           - Flag unclear issues for human review
           - Note if issue is a duplicate (but don't close)
 
-          Gitea API base: ${{ gitea.server_url }}/api/v1
+          Gitea API base: ${{ github.server_url }}/api/v1
           Use token from AUTOMATION__GIT_PROVIDER__API_TOKEN for auth."

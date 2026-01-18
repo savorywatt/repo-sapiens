@@ -63,6 +63,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: workflow-state-${{ gitea.run_number }}
+          name: workflow-state-${{ github.run_number }}
           path: .automation/state/
           retention-days: 7

@@ -8,7 +8,9 @@ on:
 jobs:
   execute-task:
     name: Execute Task Implementation
-    if: gitea.event.label.name == 'execute' && contains(gitea.event.issue.labels.*.name, 'task')
+    # Note: Gitea sets github.event.label to null, use labels array instead
+    # Triggers when both 'execute' and 'task' labels are present
+    if: contains(github.event.issue.labels.*.name, 'execute') && contains(github.event.issue.labels.*.name, 'task')
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -50,19 +52,19 @@ jobs:
 
       - name: Execute task
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          echo "🚀 Executing task #${{ gitea.event.issue.number }}"
-          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/execute-task.md
+          echo "🚀 Executing task #${{ github.event.issue.number }}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/execute-task.md
 
       - name: Upload state
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: task-state-${{ gitea.event.issue.number }}
+          name: task-state-${{ github.event.issue.number }}
           path: .automation/state/
           retention-days: 7

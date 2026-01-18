@@ -399,7 +399,7 @@ jobs:
           Be practical - focus on actionable recommendations, not theoretical risks."
 
       - name: Create issue for critical findings
-        if: (env.VULN_CRITICAL != '0' || env.VULN_HIGH != '0' || env.LICENSE_DENIED != '0') && (gitea.event.inputs.create_issues != 'false')
+        if: (env.VULN_CRITICAL != '0' || env.VULN_HIGH != '0' || env.LICENSE_DENIED != '0') && (github.event.inputs.create_issues != 'false')
         run: |
           # Prepare issue body
           ISSUE_BODY=$(cat << 'ISSUE_EOF'
@@ -436,7 +436,7 @@ jobs:
           curl -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues" \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues" \
             -d "{
               \"title\": \"SBOM Alert: $(date +%Y-%m-%d) - ${{ env.VULN_CRITICAL }} critical, ${{ env.LICENSE_DENIED }} license issues\",
               \"body\": $(echo "$ISSUE_BODY" | jq -Rs .),
@@ -446,7 +446,7 @@ jobs:
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-${{ gitea.run_number }}
+          name: sbom-${{ github.run_number }}
           path: |
             sbom.cyclonedx.json
             sbom.spdx.json
@@ -467,7 +467,7 @@ jobs:
           cp sbom.spdx.json .sbom/
 
           git config user.name "repo-sapiens[bot]"
-          git config user.email "repo-sapiens[bot]@users.noreply.gitea.com"
+          git config user.email "repo-sapiens[bot]@users.noreply.github.com"
 
           git add .sbom/
           if ! git diff --staged --quiet; then
@@ -481,7 +481,7 @@ jobs:
           fi
 
       - name: Fail on critical vulnerabilities
-        if: gitea.event.inputs.fail_on_vulnerabilities == 'true'
+        if: github.event.inputs.fail_on_vulnerabilities == 'true'
         run: |
           if [ "${{ env.VULN_CRITICAL }}" != "0" ] || [ "${{ env.VULN_HIGH }}" != "0" ]; then
             echo "Critical or high vulnerabilities found!"

@@ -26,7 +26,8 @@ env:
 
 jobs:
   process:
-    if: gitea.event.label.name == 'needs-planning'
+    # Note: Gitea sets github.event.label to null, use labels array instead
+    if: contains(github.event.issue.labels.*.name, 'needs-planning')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -50,8 +51,8 @@ jobs:
           # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
         run: |
-          echo "Processing issue #${{ gitea.event.issue.number }}"
-          sapiens --config $CONFIG_FILE process-issue --issue ${{ gitea.event.issue.number }}
+          echo "Processing issue #${{ github.event.issue.number }}"
+          sapiens --config $CONFIG_FILE process-issue --issue ${{ github.event.issue.number }}
 
       - name: Post success comment
         if: success()
@@ -62,7 +63,7 @@ jobs:
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"body": "Plan generated successfully. Review the plan and add `approved` label to proceed."}' \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"
 
       - name: Post failure comment
         if: failure()
@@ -72,5 +73,5 @@ jobs:
           curl -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"body": "Failed to generate plan. Check the [workflow logs](${{ gitea.server_url }}/${{ gitea.repository }}/actions/runs/${{ gitea.run_id }})."}' \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+            -d '{"body": "Failed to generate plan. Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

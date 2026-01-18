@@ -10,7 +10,8 @@ on:
 jobs:
   process-approval:
     name: Process Approval
-    if: gitea.event.label.name == 'approved'
+    # Note: Gitea sets github.event.label to null, use labels array instead
+    if: contains(github.event.issue.labels.*.name, 'approved') || contains(github.event.pull_request.labels.*.name, 'approved')
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -31,12 +32,12 @@ jobs:
 
       - name: Process approval
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          ISSUE_NUM="${{ gitea.event.issue.number }}${{ gitea.event.pull_request.number }}"
+          ISSUE_NUM="${{ github.event.issue.number }}${{ github.event.pull_request.number }}"
           echo "✅ Processing approval for #${ISSUE_NUM}"
           sapiens --config sapiens_config.ci.yaml process-issue --issue ${ISSUE_NUM} --system-prompt .gitea/workflows/sapiens/prompts/approved.md

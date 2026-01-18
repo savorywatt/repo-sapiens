@@ -8,7 +8,8 @@ on:
 jobs:
   create-plan:
     name: Create Development Plan
-    if: gitea.event.label.name == 'needs-planning'
+    # Note: Gitea sets github.event.label to null, use labels array instead
+    if: contains(github.event.issue.labels.*.name, 'needs-planning')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -45,14 +46,14 @@ jobs:
 
       - name: Create plan proposal
         env:
-          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ gitea.server_url }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          AUTOMATION__REPOSITORY__OWNER: ${{ gitea.repository_owner }}
-          AUTOMATION__REPOSITORY__NAME: ${{ gitea.event.repository.name }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
         run: |
-          echo "🔍 Processing issue #${{ gitea.event.issue.number }} for planning"
-          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ gitea.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-planning.md
+          echo "🔍 Processing issue #${{ github.event.issue.number }} for planning"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-planning.md
 
       - name: Post success comment
         if: success()
@@ -63,7 +64,7 @@ jobs:
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"body": "✅ **Plan proposal created!**\n\nThe development plan has been generated. Review the plan and add the `approved` label to proceed with task creation.\n\n🤖 Posted by Sapiens Automation"}' \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"
 
       - name: Post failure comment
         if: failure()
@@ -74,4 +75,4 @@ jobs:
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"body": "❌ **Plan creation failed**\n\nThere was an error creating the development plan. Check the workflow logs for details.\n\n🤖 Posted by Sapiens Automation"}' \
-            "${{ gitea.server_url }}/api/v1/repos/${{ gitea.repository }}/issues/${{ gitea.event.issue.number }}/comments"
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"
