@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **GitLab Bootstrap Script**: Automated setup for GitLab integration testing
+  - `scripts/bootstrap-gitlab.sh` creates container, waits for health, generates API token
+  - Creates test project with automation labels via Rails console
+  - Optional GitLab Runner setup with `--with-runner` flag
+  - Outputs `.env.gitlab-test` for easy sourcing
 - **GitLab Workflow Templates**: Complete GitLab CI/CD workflow templates for all automation stages
   - `approved.yaml`, `needs-planning.yaml`, `needs-review.yaml`, `needs-fix.yaml`, `requires-qa.yaml`, `execute-task.yaml`
   - Recipe templates: `weekly-test-coverage.yaml`, `weekly-sbom-license.yaml`

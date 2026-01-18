@@ -86,8 +86,14 @@ trap cleanup EXIT
 check_prerequisites() {
     log "Checking prerequisites..."
 
+    # Support both SAPIENS_GITLAB_TOKEN (preferred) and GITLAB_TOKEN (legacy)
+    if [[ -n "${SAPIENS_GITLAB_TOKEN:-}" ]]; then
+        GITLAB_TOKEN="$SAPIENS_GITLAB_TOKEN"
+    fi
+
     if [[ -z "${GITLAB_TOKEN:-}" ]]; then
-        error "GITLAB_TOKEN is required"
+        error "SAPIENS_GITLAB_TOKEN (or GITLAB_TOKEN) is required"
+        error "Run: source .env.gitlab-test  (after bootstrap)"
         exit 2
     fi
 
@@ -191,11 +197,14 @@ process_issue() {
     # Create a temporary config for this test
     local config_file="/tmp/sapiens-gitlab-e2e-config-${TIMESTAMP}.yaml"
 
+    # Export for sapiens subprocess (use standard name)
+    export SAPIENS_GITLAB_TOKEN="$GITLAB_TOKEN"
+
     cat > "$config_file" << CONFIG_EOF
 git_provider:
   provider_type: gitlab
   base_url: "$GITLAB_URL"
-  api_token: "\${GITLAB_TOKEN}"
+  api_token: "\${SAPIENS_GITLAB_TOKEN}"
 
 repository:
   owner: $owner
