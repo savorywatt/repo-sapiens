@@ -256,8 +256,9 @@ deploy_workflow() {
     step "Deploying test workflow to repository..."
 
     # Create a simple workflow that posts a comment when triggered
-    # Note: We use GITEA_URL secret instead of github.server_url because
-    # Docker environments may have URL resolution issues (internal vs external URLs)
+    # Note: Gitea has different event context than GitHub:
+    # - github.event.label is null (use github.event.issue.labels instead)
+    # - github.event.action is 'label_updated' not 'labeled'
     local workflow_content
     workflow_content=$(cat << 'WORKFLOW_EOF'
 name: E2E Test Workflow
@@ -269,7 +270,8 @@ on:
 jobs:
   test-trigger:
     name: Test Action Trigger
-    if: github.event.label.name == 'test-action-trigger'
+    # Gitea uses issue.labels array, not event.label (which is null)
+    if: contains(github.event.issue.labels.*.name, 'test-action-trigger')
     runs-on: ubuntu-latest
     steps:
       - name: Debug context
@@ -277,39 +279,27 @@ jobs:
           echo "Server URL: ${{ github.server_url }}"
           echo "Repository: ${{ github.repository }}"
           echo "Issue number: ${{ github.event.issue.number }}"
-          echo "Label name: ${{ github.event.label.name }}"
-          echo "GITEA_URL secret available: ${{ secrets.GITEA_URL != '' }}"
+          echo "Event action: ${{ github.event.action }}"
 
       - name: Post confirmation comment
         env:
           GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-          GITEA_URL: ${{ secrets.GITEA_URL }}
           REPO: ${{ github.repository }}
           ISSUE_NUM: ${{ github.event.issue.number }}
           RUN_ID: ${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
         run: |
-          # Use GITEA_URL secret if available, otherwise fall back to github.server_url
-          API_BASE="${GITEA_URL:-${{ github.server_url }}}"
-          echo "Using API base: $API_BASE"
+          echo "Using API base: $SERVER_URL"
 
-          COMMENT_BODY=$(cat << 'COMMENT'
-          ✅ **Action triggered successfully!**
-
-          This comment confirms that Gitea Actions are working correctly.
-
-          - Workflow: E2E Test Workflow
-          - Trigger: Issue labeled with test-action-trigger
-          - Run ID: RUN_ID_PLACEHOLDER
-          COMMENT
-          )
-          COMMENT_BODY="${COMMENT_BODY//RUN_ID_PLACEHOLDER/$RUN_ID}"
+          # Build comment body - keep it simple to avoid YAML parsing issues
+          COMMENT_BODY="Action triggered successfully! Run ID: $RUN_ID"
 
           # Post the comment
           HTTP_CODE=$(curl -sS -w "%{http_code}" -o /tmp/response.json -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"body\": $(echo "$COMMENT_BODY" | jq -Rs .)}" \
-            "${API_BASE}/api/v1/repos/${REPO}/issues/${ISSUE_NUM}/comments")
+            -d "{\"body\": \"$COMMENT_BODY\"}" \
+            "${SERVER_URL}/api/v1/repos/${REPO}/issues/${ISSUE_NUM}/comments")
 
           echo "Response code: $HTTP_CODE"
           cat /tmp/response.json
@@ -360,21 +350,12 @@ setup_secrets() {
     # Gitea Actions secrets API
     # Note: This requires the token to have admin access
 
-    # Set SAPIENS_GITEA_TOKEN secret
+    # Set SAPIENS_GITEA_TOKEN secret (used by workflow to post comments)
     log "Setting SAPIENS_GITEA_TOKEN secret..."
     gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/SAPIENS_GITEA_TOKEN" "{
         \"data\": \"$SAPIENS_GITEA_TOKEN\"
     }" > /dev/null 2>&1 || {
         warn "Could not set SAPIENS_GITEA_TOKEN secret via API."
-    }
-
-    # Set GITEA_URL secret for the workflow to use
-    # This is needed because github.server_url may not work correctly in Docker
-    log "Setting GITEA_URL secret..."
-    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/GITEA_URL" "{
-        \"data\": \"$GITEA_URL\"
-    }" > /dev/null 2>&1 || {
-        warn "Could not set GITEA_URL secret via API."
     }
 
     # Verify secrets were set
