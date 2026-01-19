@@ -71,7 +71,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GIT_TOKEN }}
+          # Note: Don't pass custom token here - Gitea doesn't support it the same way as GitHub
+          # The default GITHUB_TOKEN/GITEA_TOKEN works for checkout
+          # Custom token is used later for API operations via sapiens CLI
           fetch-depth: 0
 
       - name: Set up Python
