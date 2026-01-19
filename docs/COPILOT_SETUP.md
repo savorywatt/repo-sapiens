@@ -1,228 +1,170 @@
 # GitHub Copilot Setup Guide
 
-This guide shows you how to use GitHub Copilot CLI as an agent for repo-sapiens automation.
-
-## What is GitHub Copilot CLI?
-
-GitHub Copilot CLI (`gh copilot`) is an official GitHub CLI extension that provides AI-powered command suggestions. It uses the same models that power GitHub Copilot in IDEs.
-
-**Important Limitations:**
-- Copilot CLI is designed for **command suggestions**, not full code generation
-- It has **limited capabilities** compared to Claude Code or Goose
-- Requires an active **GitHub Copilot subscription**
-- Best suited for simple automation tasks and shell command generation
-
-## When to Use Copilot
-
-**Use Copilot if you:**
-- Already have a GitHub Copilot subscription
-- Need simple shell command suggestions
-- Want to stay within the GitHub ecosystem
-- Are doing lightweight automation tasks
-
-**Use Claude Code or Goose instead if you:**
-- Need complex multi-file code generation
-- Want full agentic capabilities (planning, reasoning, tool use)
-- Require fine-grained control over the LLM
+> ⚠️ **IMPORTANT DISCLAIMER**
+>
+> This integration uses [`copilot-api`](https://github.com/nicepkg/copilot-api),
+> an **unofficial, reverse-engineered API**. By using this:
+>
+> - You acknowledge this is **NOT endorsed by GitHub**
+> - You understand it may **violate GitHub ToS**
+> - You accept it could **break at any time**
+> - You use it **at your own risk**
+>
+> For production use, consider Claude Code, Goose, or OpenAI-compatible providers.
 
 ## Prerequisites
 
-1. **GitHub CLI** installed
-2. **GitHub Copilot subscription** (Individual, Business, or Enterprise)
-3. **Authenticated** with GitHub CLI
+1. **GitHub Copilot subscription** (Individual, Business, or Enterprise)
+2. **GitHub OAuth token** with Copilot access
+3. **Node.js 18+** and npm (for copilot-api proxy)
+
+## How It Works
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│   Sapiens   │────▶│  copilot-api │────▶│  GitHub Copilot │
+│             │     │    proxy     │     │      API        │
+└─────────────┘     └──────────────┘     └─────────────────┘
+```
+
+The `copilot-api` package acts as a local proxy that:
+1. Accepts OpenAI-compatible API requests
+2. Translates them to GitHub Copilot's internal API
+3. Returns responses in OpenAI format
 
 ## Quick Start
 
-### 1. Install GitHub CLI
+### 1. Get GitHub OAuth Token
+
+You need a GitHub OAuth token (starts with `gho_`) with Copilot access:
 
 ```bash
-# macOS
-brew install gh
+# Option A: Extract from GitHub CLI (if already authenticated with Copilot)
+gh auth token
 
-# Ubuntu/Debian
-sudo apt install gh
-
-# Windows
-winget install GitHub.cli
-
-# Verify installation
-gh --version
+# Option B: Create via GitHub settings
+# Go to: Settings > Developer settings > Personal access tokens
+# Required scopes: copilot
 ```
 
-### 2. Authenticate with GitHub
+### 2. Store the Token
 
 ```bash
-gh auth login
-# Follow the prompts to authenticate via browser
+# Using keyring (recommended)
+sapiens credentials set github/copilot_token
+
+# Or via environment variable
+export COPILOT_GITHUB_TOKEN="gho_your_token_here"
 ```
 
-### 3. Install Copilot Extension
-
-```bash
-gh extension install github/gh-copilot
-
-# Verify installation
-gh copilot --version
-```
-
-### 4. Initialize repo-sapiens with Copilot
-
-```bash
-cd /path/to/your/repo
-sapiens init
-```
-
-When prompted, select **copilot** as your agent:
-
-```
-Available AI Agents:
-  - Claude Code (Anthropic)
-  - Goose AI (Block)
-  - GitHub Copilot (GitHub)
-
-Which agent do you want to use? [claude/goose/copilot]: copilot
-
-GitHub Copilot Configuration
-
- GitHub CLI found at /usr/bin/gh
- Copilot extension installed
- GitHub CLI authenticated
-
-Note:
-GitHub Copilot CLI has limited capabilities compared to Claude/Goose.
-It's primarily designed for command suggestions, not full code generation.
-A GitHub Copilot subscription is required.
-
-Continue with Copilot? [Y/n]: y
-```
-
-## Configuration
-
-### Generated Config
-
-After initialization, your config will look like:
+### 3. Configure Sapiens
 
 ```yaml
 # .sapiens/config.yaml
 agent_provider:
   provider_type: copilot-local
   model: gpt-4
-  api_key: null
-  local_mode: true
+  copilot_config:
+    github_token: "@keyring:github/copilot_token"  # or "${COPILOT_GITHUB_TOKEN}"
+    manage_proxy: true        # Auto-start copilot-api
+    proxy_port: 4141
+    rate_limit: 2.0          # Seconds between requests (recommended)
 ```
 
-### No API Key Required
-
-Copilot uses your GitHub CLI authentication. No separate API key is needed.
-
-## Health Check
-
-Verify your setup:
+### 4. Verify Setup
 
 ```bash
 sapiens health-check
 ```
 
-Expected output:
+## Configuration Options
+
+### Managed Proxy (Recommended)
+
+Sapiens automatically starts/stops the copilot-api proxy:
+
+```yaml
+copilot_config:
+  github_token: "@keyring:github/copilot_token"
+  manage_proxy: true
+  proxy_port: 4141
+  startup_timeout: 30.0
+  shutdown_timeout: 5.0
 ```
-Agent Provider:
-   GitHub CLI (gh)     Found at /usr/bin/gh
-   Copilot extension    Installed
-   GitHub auth          Authenticated
+
+### External Proxy
+
+Connect to an existing copilot-api instance:
+
+```yaml
+copilot_config:
+  github_token: "@keyring:github/copilot_token"
+  manage_proxy: false
+  proxy_url: "http://localhost:4141/v1"
 ```
 
-## How It Works
+### Rate Limiting
 
-When repo-sapiens uses Copilot, it:
+GitHub may detect abuse if requests are too frequent:
 
-1. Sends prompts to `gh copilot suggest -t shell`
-2. Receives shell command suggestions
-3. Parses and executes the suggested commands
-
-This is different from Claude/Goose which have full agentic capabilities with tool calling.
-
-## Limitations
-
-| Feature | Copilot | Claude/Goose |
-|---------|---------|--------------|
-| Shell commands | Yes | Yes |
-| Multi-file edits | Limited | Yes |
-| Complex reasoning | Limited | Yes |
-| Tool/function calling | No | Yes |
-| Context awareness | Limited | Extensive |
-| Cost | Subscription | Per-token |
+```yaml
+copilot_config:
+  rate_limit: 2.0  # Minimum 2 seconds between requests
+```
 
 ## Troubleshooting
 
-### GitHub CLI not found
+### "npx not found"
 
-```
-Error: GitHub CLI (gh) not found
-```
-
-**Solution:** Install GitHub CLI (see Quick Start above)
-
-### Copilot extension not installed
-
-```
-Warning: Copilot extension not installed
-```
-
-**Solution:**
+Install Node.js:
 ```bash
-gh extension install github/gh-copilot
+# macOS
+brew install node
+
+# Ubuntu
+sudo apt install nodejs npm
 ```
 
-### Not authenticated
+### "Rate limit exceeded" / "Abuse detected"
 
-```
-Warning: GitHub CLI not authenticated
+Add or increase `rate_limit`:
+```yaml
+copilot_config:
+  rate_limit: 5.0  # Increase delay between requests
 ```
 
-**Solution:**
+### "Invalid authentication token"
+
+Your GitHub token may be expired or lack Copilot access:
+1. Regenerate the token
+2. Ensure your GitHub account has an active Copilot subscription
+3. Update the stored credential
+
+### Proxy fails to start
+
+Check if the port is already in use:
 ```bash
-gh auth login
+lsof -i :4141
 ```
 
-### No Copilot subscription
-
+Use a different port:
+```yaml
+copilot_config:
+  proxy_port: 4142
 ```
-Error: GitHub Copilot is not enabled for your account
-```
 
-**Solution:** Subscribe to GitHub Copilot at https://github.com/features/copilot
+## Limitations
 
-## Comparison with Other Agents
-
-| Aspect | Copilot | Claude Code | Goose |
-|--------|---------|-------------|-------|
-| **Setup** | Easy (if you have subscription) | Easy | Medium |
-| **Cost** | $10-39/month subscription | Per-token (~$0.15/1K) | Per-token (varies) |
-| **Capabilities** | Basic | Excellent | Excellent |
-| **Best for** | Simple tasks | Complex coding | Flexibility |
-| **LLM choice** | GitHub's models | Anthropic only | Multiple providers |
-
-## When to Upgrade
-
-Consider switching to Claude Code or Goose if you need:
-
-- Complex multi-step tasks
-- Full code generation (not just commands)
-- Better reasoning and planning
-- Custom tool integrations
-
-```bash
-# Switch to Claude Code
-npm install -g @anthropic-ai/claude-code
-sapiens init --force
-
-# Or switch to Goose
-pip install goose-ai
-sapiens init --force
-```
+| Aspect | Copilot | Claude Code |
+|--------|---------|-------------|
+| Official support | No | Yes |
+| Reliability | May break | Stable |
+| Rate limits | Aggressive | Generous |
+| Model choice | gpt-4 only | Claude models |
+| ToS compliance | Uncertain | Yes |
 
 ## See Also
 
-- [AGENT_COMPARISON.md](./AGENT_COMPARISON.md) - Compare all agent options
-- [QUICK_REFERENCE.md](./QUICK_REFERENCE.md) - Copy-paste configurations
-- [GitHub Copilot CLI Docs](https://docs.github.com/en/copilot/github-copilot-in-the-cli)
+- [AGENT_COMPARISON.md](./AGENT_COMPARISON.md)
+- [CREDENTIALS.md](./CREDENTIALS.md)
+- [copilot-api GitHub](https://github.com/nicepkg/copilot-api)

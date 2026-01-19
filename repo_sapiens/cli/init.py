@@ -1273,6 +1273,18 @@ class RepoInitializer:
                 default=agent_choices[0] if agent_choices else "builtin",
             )
             self.agent_type = AgentType(selected)
+
+            # Show warning for Copilot selection
+            if selected == "copilot":
+                click.echo()
+                click.secho("WARNING: Unofficial Integration", fg="yellow", bold=True)
+                click.echo("The Copilot integration uses an unofficial, reverse-engineered API.")
+                click.echo("This is NOT endorsed by GitHub and may violate their ToS.")
+                click.echo("It could stop working at any time without notice.")
+                click.echo()
+                if not click.confirm("Do you understand and accept these risks?", default=False):
+                    click.echo("Copilot setup cancelled. Consider using Claude Code or Goose instead.")
+                    return
         else:
             click.echo(click.style("⚠ No AI agent CLIs detected", fg="yellow"))
             click.echo()

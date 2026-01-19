@@ -2,7 +2,7 @@
 # scripts/bootstrap-gitea.sh
 #
 # Bootstraps a fresh Gitea instance for integration testing.
-# Creates config, admin user, API token, test repository, and optionally an Actions runner.
+# Creates config, admin user, API token, test repository, and an Actions runner.
 #
 # Usage:
 #   ./scripts/bootstrap-gitea.sh [options]
@@ -14,7 +14,7 @@
 #   --pass PASS      Admin password (default: admin123)
 #   --repo NAME      Test repository name (default: test-repo)
 #   --no-docker      Skip Docker operations (Gitea already configured)
-#   --with-runner    Set up Gitea Actions runner for CI/CD testing
+#   --no-runner      Skip Gitea Actions runner setup
 #   --runner-name    Runner container name (default: gitea-act-runner)
 #   --cleanup        Remove all Gitea containers and reset environment
 #   --output FILE    Output file for credentials (default: .env.gitea-test)
@@ -34,7 +34,7 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-testadmin@localhost}"
 TEST_REPO="${TEST_REPO:-test-repo}"
 SKIP_DOCKER=false
 OUTPUT_FILE="${OUTPUT_FILE:-.env.gitea-test}"
-WITH_RUNNER=false
+WITH_RUNNER=true
 RUNNER_CONTAINER="${RUNNER_CONTAINER:-gitea-act-runner}"
 RUNNER_TOKEN=""
 CLEANUP_ONLY=false
@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
         --repo) TEST_REPO="$2"; shift 2 ;;
         --no-docker) SKIP_DOCKER=true; shift ;;
         --output) OUTPUT_FILE="$2"; shift 2 ;;
-        --with-runner) WITH_RUNNER=true; shift ;;
+        --no-runner) WITH_RUNNER=false; shift ;;
         --runner-name) RUNNER_CONTAINER="$2"; shift 2 ;;
         --cleanup) CLEANUP_ONLY=true; shift ;;
         -h|--help)
@@ -452,7 +452,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: https://github.com/savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -494,6 +494,48 @@ WORKFLOW_EOF
             -H "Content-Type: application/json" \
             -d "{\"message\":\"Add sapiens wrapper workflow\",\"content\":\"$encoded_content\"}" \
             > /dev/null 2>&1 && log "Workflow created: $workflow_path" || warn "Could not create workflow"
+    fi
+}
+
+#############################################
+# Step 6c: Configure repository secrets for Actions
+#############################################
+configure_repo_secrets() {
+    log "Configuring repository secrets for Actions..."
+
+    # Gitea Actions secrets API: PUT /repos/{owner}/{repo}/actions/secrets/{secretname}
+    # The secret value needs to be in the request body as {"data": "base64_encoded_value"}
+
+    # Set SAPIENS_GITEA_TOKEN (use the same token we generated)
+    local token_b64
+    token_b64=$(echo -n "$GITEA_TOKEN" | base64 -w 0)
+
+    local response
+    response=$(curl -s -X PUT "$GITEA_URL/api/v1/repos/$ADMIN_USER/$TEST_REPO/actions/secrets/SAPIENS_GITEA_TOKEN" \
+        -H "Authorization: token $GITEA_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"data\":\"$token_b64\"}" 2>&1)
+
+    if [[ $? -eq 0 ]]; then
+        log "Secret SAPIENS_GITEA_TOKEN configured"
+    else
+        warn "Could not configure SAPIENS_GITEA_TOKEN: $response"
+    fi
+
+    # Set SAPIENS_AI_API_KEY (use environment variable if available, otherwise placeholder)
+    local ai_key="${SAPIENS_AI_API_KEY:-${AI_API_KEY:-test-api-key-placeholder}}"
+    local ai_key_b64
+    ai_key_b64=$(echo -n "$ai_key" | base64 -w 0)
+
+    response=$(curl -s -X PUT "$GITEA_URL/api/v1/repos/$ADMIN_USER/$TEST_REPO/actions/secrets/SAPIENS_AI_API_KEY" \
+        -H "Authorization: token $GITEA_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"data\":\"$ai_key_b64\"}" 2>&1)
+
+    if [[ $? -eq 0 ]]; then
+        log "Secret SAPIENS_AI_API_KEY configured"
+    else
+        warn "Could not configure SAPIENS_AI_API_KEY: $response"
     fi
 }
 
@@ -566,26 +608,10 @@ setup_actions_runner() {
     gitea_ip=$(docker inspect "$DOCKER_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
     log "Gitea container IP: $gitea_ip"
 
-    # Create runner config file on host to mount into container
-    local runner_config_dir="/tmp/gitea-runner-config-$$"
-    mkdir -p "$runner_config_dir"
-    cat > "$runner_config_dir/config.yaml" << CONFIGYAML
-runner:
-  file: .runner
-  capacity: 1
-  timeout: 3h
-
-container:
-  network: $gitea_network
-  privileged: false
-
-host:
-  workdir_parent:
-CONFIGYAML
-
     log "Starting Actions runner container..."
     # Use the same network as Gitea so job containers can reach it
-    # Mount the config file so it's available at startup
+    # Note: We don't mount a config file as it doesn't work with remote Docker contexts
+    # The runner will use environment variables for configuration
     docker run -d \
         --name "$RUNNER_CONTAINER" \
         --restart unless-stopped \
@@ -594,13 +620,11 @@ CONFIGYAML
         -e GITEA_RUNNER_REGISTRATION_TOKEN="$RUNNER_TOKEN" \
         -e GITEA_RUNNER_NAME="test-runner" \
         -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://catthehacker/ubuntu:act-latest" \
-        -e CONFIG_FILE="/config/config.yaml" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -v "$runner_config_dir:/config:ro" \
         gitea/act_runner:latest > /dev/null 2>&1 || {
             warn "Failed to start runner with same network, trying bridge..."
 
-            # Fallback: use default bridge network (no config mount)
+            # Fallback: use default bridge network
             docker run -d \
                 --name "$RUNNER_CONTAINER" \
                 --restart unless-stopped \
@@ -611,7 +635,6 @@ CONFIGYAML
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 gitea/act_runner:latest > /dev/null 2>&1 || {
                     warn "Failed to start runner container"
-                    rm -rf "$runner_config_dir"
                     return 1
                 }
         }
@@ -701,6 +724,7 @@ main() {
     generate_api_token
     create_test_repo
     deploy_sapiens_workflow
+    configure_repo_secrets
     setup_actions_runner
     write_output
 

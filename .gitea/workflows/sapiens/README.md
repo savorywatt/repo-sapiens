@@ -22,7 +22,8 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    # Use absolute URL for Gitea compatibility
+    uses: https://github.com/savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}

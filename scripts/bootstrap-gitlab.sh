@@ -31,6 +31,7 @@
 #   --docker NAME       Docker container name (default: gitlab-test)
 #   --project NAME      Test project name (default: test-repo)
 #   --compose FILE      Docker compose file (default: plans/validation/docker/gitlab.yaml)
+#   --playground DIR    Playground directory for code changes (default: ~/Workspace/playground)
 #   --no-start          Skip starting container (already running)
 #   --with-runner       Set up GitLab Runner for CI/CD testing
 #   --timeout SECONDS   Max wait time for GitLab to start (default: 600)
@@ -49,6 +50,7 @@ RUNNER_CONTAINER="${RUNNER_CONTAINER:-gitlab-runner}"
 TEST_PROJECT="${TEST_PROJECT:-test-repo}"
 COMPOSE_FILE="${COMPOSE_FILE:-plans/validation/docker/gitlab.yaml}"
 OUTPUT_FILE="${OUTPUT_FILE:-.env.gitlab-test}"
+PLAYGROUND_DIR="${PLAYGROUND_DIR:-$HOME/Workspace/playground}"
 SKIP_START=false
 WITH_RUNNER=false
 TIMEOUT=600
@@ -79,6 +81,7 @@ while [[ $# -gt 0 ]]; do
         --project) TEST_PROJECT="$2"; shift 2 ;;
         --compose) COMPOSE_FILE="$2"; shift 2 ;;
         --output) OUTPUT_FILE="$2"; shift 2 ;;
+        --playground) PLAYGROUND_DIR="$2"; shift 2 ;;
         --no-start) SKIP_START=true; shift ;;
         --with-runner) WITH_RUNNER=true; shift ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
@@ -522,7 +525,73 @@ setup_runner() {
 }
 
 #############################################
-# Step 9: Write output file
+# Step 9: Setup playground repository
+#############################################
+setup_playground() {
+    step "Setting up playground repository at $PLAYGROUND_DIR"
+
+    # Create parent directory if needed
+    mkdir -p "$(dirname "$PLAYGROUND_DIR")"
+
+    # If playground exists, update it; otherwise clone fresh
+    if [[ -d "$PLAYGROUND_DIR/.git" ]]; then
+        log "Playground exists, updating..."
+        (
+            cd "$PLAYGROUND_DIR"
+            git fetch origin 2>/dev/null || true
+            git checkout main 2>/dev/null || git checkout master 2>/dev/null || true
+            git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
+        )
+    else
+        # Remove if exists but not a git repo
+        if [[ -d "$PLAYGROUND_DIR" ]]; then
+            log "Removing non-git directory at $PLAYGROUND_DIR"
+            rm -rf "$PLAYGROUND_DIR"
+        fi
+
+        # Clone via HTTP with embedded token
+        log "Cloning test repository..."
+        local clone_url
+        # Extract host from GITLAB_URL and construct clone URL with token
+        local gitlab_host
+        gitlab_host=$(echo "$GITLAB_URL" | sed 's|https\?://||' | sed 's|/.*||')
+        clone_url="http://oauth2:${GITLAB_TOKEN}@${gitlab_host}/root/${TEST_PROJECT}.git"
+
+        if git clone "$clone_url" "$PLAYGROUND_DIR" 2>/dev/null; then
+            log "Repository cloned successfully"
+        else
+            # Try without token for public repos
+            clone_url="${GITLAB_URL}/root/${TEST_PROJECT}.git"
+            if git clone "$clone_url" "$PLAYGROUND_DIR" 2>/dev/null; then
+                log "Repository cloned (public)"
+            else
+                warn "Could not clone repository"
+                warn "Clone manually: git clone $clone_url $PLAYGROUND_DIR"
+                return 1
+            fi
+        fi
+    fi
+
+    # Configure git user for commits
+    (
+        cd "$PLAYGROUND_DIR"
+        git config user.name "Sapiens Bot"
+        git config user.email "sapiens-bot@gitlab.local"
+
+        # Set up remote with token for push access
+        # Must set both fetch and push URLs in case a separate pushurl was previously configured
+        local gitlab_host
+        gitlab_host=$(echo "$GITLAB_URL" | sed 's|https\?://||' | sed 's|/.*||')
+        local remote_url="http://oauth2:${GITLAB_TOKEN}@${gitlab_host}/root/${TEST_PROJECT}.git"
+        git remote set-url origin "$remote_url"
+        git remote set-url --push origin "$remote_url"
+    )
+
+    log "Playground ready at $PLAYGROUND_DIR"
+}
+
+#############################################
+# Step 10: Write output file
 #############################################
 write_output() {
     step "Writing configuration to $OUTPUT_FILE"
@@ -537,6 +606,7 @@ export SAPIENS_GITLAB_TOKEN="$GITLAB_TOKEN"
 export GITLAB_TOKEN="$GITLAB_TOKEN"
 export GITLAB_URL="$GITLAB_URL"
 export GITLAB_PROJECT="root/$TEST_PROJECT"
+export PLAYGROUND_DIR="$PLAYGROUND_DIR"
 ENVFILE
 
     log "Configuration written to $OUTPUT_FILE"
@@ -572,6 +642,7 @@ main() {
     create_automation_labels
     deploy_sapiens_ci
     setup_runner
+    setup_playground
     write_output
 
     echo ""
@@ -581,6 +652,7 @@ main() {
     log "GitLab URL:  $GITLAB_URL"
     log "Project:     root/$TEST_PROJECT"
     log "Token:       ${GITLAB_TOKEN:0:12}..."
+    log "Playground:  $PLAYGROUND_DIR"
     if [[ "$WITH_RUNNER" == "true" ]]; then
         log "Runner:      $RUNNER_CONTAINER"
     fi
@@ -595,6 +667,7 @@ main() {
     export GITLAB_TOKEN="$GITLAB_TOKEN"
     export GITLAB_URL="$GITLAB_URL"
     export GITLAB_PROJECT="root/$TEST_PROJECT"
+    export PLAYGROUND_DIR="$PLAYGROUND_DIR"
 }
 
 main "$@"

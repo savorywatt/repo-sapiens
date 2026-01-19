@@ -14,8 +14,10 @@ from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
 from repo_sapiens.engine.state_manager import StateManager
 from repo_sapiens.enums import AgentType, ProviderType
 from repo_sapiens.providers.base import AgentProvider
+from repo_sapiens.providers.copilot import CopilotProvider
 from repo_sapiens.providers.external_agent import ExternalAgentProvider
 from repo_sapiens.providers.factory import create_git_provider
+from repo_sapiens.providers.openai_compatible import OpenAICompatibleProvider
 
 log = structlog.get_logger(__name__)
 
@@ -225,6 +227,28 @@ def _create_agent_provider(settings: AutomationSettings) -> AgentProvider:
         return OllamaProvider(
             base_url=settings.agent_provider.base_url or "http://localhost:11434",
             model=settings.agent_provider.model,
+            working_dir=str(Path.cwd()),
+            qa_handler=qa_handler,
+        )
+
+    # Copilot with copilot-api proxy (unofficial)
+    # Note: Settings validator ensures copilot_config is present for COPILOT_LOCAL
+    if provider_type == ProviderType.COPILOT_LOCAL and settings.agent_provider.copilot_config:
+        return CopilotProvider(
+            copilot_config=settings.agent_provider.copilot_config,
+            working_dir=str(Path.cwd()),
+            qa_handler=qa_handler,
+        )
+
+    # OpenAI-compatible API (OpenRouter, vLLM, etc.)
+    if provider_type == ProviderType.OPENAI_COMPATIBLE:
+        api_key = None
+        if settings.agent_provider.api_key:
+            api_key = settings.agent_provider.api_key.get_secret_value()
+        return OpenAICompatibleProvider(
+            base_url=settings.agent_provider.base_url or "http://localhost:8000/v1",
+            model=settings.agent_provider.model,
+            api_key=api_key,
             working_dir=str(Path.cwd()),
             qa_handler=qa_handler,
         )

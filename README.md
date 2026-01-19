@@ -23,10 +23,23 @@ An AI-driven automation system for Git workflows with support for multiple AI ag
   - **Ollama** (`ollama`): Local models (llama3.1, qwen3, codellama, deepseek-coder, etc.)
   - **OpenAI-Compatible API** (`openai-compatible`): Any OpenAI API-compatible service
     - Supports: OpenAI, Groq, OpenRouter, vLLM, LM Studio, Fireworks AI, Together AI, Anyscale, etc.
+  - **GitHub Copilot** (`copilot-local`): Via unofficial proxy - **see [disclaimer](#warning-github-copilot-disclaimer)**
   - **ReAct Agent**: Built-in autonomous agent using any of the above backends
     - Interactive REPL mode with 9 built-in tools
     - Remote Ollama support for GPU servers
     - Path sandboxing for security
+
+#### :warning: GitHub Copilot Disclaimer
+
+The Copilot integration uses [`copilot-api`](https://github.com/nicepkg/copilot-api),
+an **unofficial, reverse-engineered API proxy**. This integration:
+
+- Is **NOT endorsed or supported by GitHub**
+- May **violate GitHub's Terms of Service**
+- Could **stop working at any time** without notice
+- Should be used **at your own risk**
+
+If you need a reliable, supported solution, use Claude Code, Goose, or OpenAI-compatible providers instead.
 
 - **Workflow Automation**
   - Label-triggered workflows for issue processing
