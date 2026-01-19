@@ -1,0 +1,68 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Create GitHub Release') | safe_label }}
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create release for'
+        required: true
+        type: string
+
+{{ base.git_env_vars(provider_type | default('gitea'), git_url, git_owner, git_repo) }}
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    permissions:
+      contents: write
+
+    steps:
+      {{ base.checkout_step(fetch_depth=0) }}
+
+      {{ base.setup_python_step(version=python_version | default('3.11')) }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ "${{ '{{' }} github.event_name {{ '}}' }}" = "workflow_dispatch" ]; then
+            TAG="${{ '{{' }} inputs.tag {{ '}}' }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build package
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          {% if changelog_tool | default('git') == 'git' -%}
+          CHANGELOG=$(git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD)
+          {%- elif changelog_tool == 'towncrier' -%}
+          CHANGELOG=$(towncrier build --version ${{ '{{' }} steps.version.outputs.version {{ '}}' }} --draft)
+          {%- endif %}
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ '{{' }} steps.version.outputs.tag {{ '}}' }}
+          name: Release ${{ '{{' }} steps.version.outputs.version {{ '}}' }}
+          body: ${{ '{{' }} steps.changelog.outputs.changelog {{ '}}' }}
+          files: dist/*
+          draft: {{ draft_release | default(false) | lower }}
+          prerelease: {{ prerelease | default(false) | lower }}

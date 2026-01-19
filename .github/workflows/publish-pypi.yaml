@@ -1,0 +1,231 @@
+# .github/workflows/publish-pypi.yaml
+# Publishes to PyPI on release tags
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'  # Only stable versions (v1.0.0, v2.1.0, etc.)
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "publish" to confirm production release'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write  # For trusted publishing
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+
+    steps:
+      - name: Confirm manual publish
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.confirm }}" != "publish" ]; then
+            echo "::error::You must type 'publish' to confirm production release"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag or pyproject
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(grep -E "^version = " pyproject.toml | head -1 | cut -d'"' -f2)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Validate version matches pyproject.toml
+        run: |
+          PYPROJECT_VERSION=$(grep -E "^version = " pyproject.toml | head -1 | cut -d'"' -f2)
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+
+          if [ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch! pyproject.toml has $PYPROJECT_VERSION but tag is v$TAG_VERSION"
+            exit 1
+          fi
+          echo "Version validated: $TAG_VERSION"
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Extract changelog section for this version
+          CHANGELOG=$(awk -v ver="$VERSION" '
+            /^## \[?[0-9]+\.[0-9]+\.[0-9]+\]?/ {
+              if (found) exit
+              if (index($0, ver)) { found=1; next }
+            }
+            found && !/^## / { print }
+          ' CHANGELOG.md)
+
+          # Write to file for multi-line handling
+          echo "$CHANGELOG" > /tmp/changelog.md
+
+          # Also output for job
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/changelog.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: /tmp/changelog.md
+
+  build:
+    name: Build Package
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Build package
+        run: uv build
+
+      - name: Verify build
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          ls -la dist/
+
+          # Check wheel exists with correct version
+          if [ ! -f "dist/repo_sapiens-${VERSION}-py3-none-any.whl" ]; then
+            echo "::error::Expected wheel not found for version $VERSION"
+            ls dist/
+            exit 1
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  test-install:
+    name: Test Installation
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13']
+
+    steps:
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install package
+        run: pip install dist/*.whl
+
+      - name: Verify CLI
+        run: |
+          sapiens --version
+          sapiens --help
+
+  publish:
+    name: Publish to PyPI
+    needs: [validate, build, test-install]
+    runs-on: ubuntu-latest
+    environment: pypi
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Uses OIDC trusted publishing - no token needed if configured
+          # Fallback: set PYPI_API_TOKEN secret
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: [validate, publish]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+          path: /tmp/
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes-file /tmp/changelog.md \
+            dist/*
+
+  summary:
+    name: Release Summary
+    needs: [validate, publish, create-release]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+
+          echo "## PyPI Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "pip install repo-sapiens==$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [PyPI](https://pypi.org/project/repo-sapiens/$VERSION/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/v$VERSION)" >> $GITHUB_STEP_SUMMARY

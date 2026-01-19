@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+.env
+.env.*
+.venv/
+test_venv/
+
+# Validation results
+validation-results/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage_output.txt
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Documentation build
+docs/build/
+docs/source/.doctrees/
+docs/source/api/
+docs/source/_static/
+docs/source/_templates/
+
+# Type checking / Linting
+.mypy_cache/
+.ruff_cache/
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project state
+.automation/
+.sapiens/
+.benchmarks/
+.credentials
+plans/*
+.agents/reports
+
+# User config is now in .sapiens/ (already ignored above)
+
+# Secrets baseline (keep in repo for detect-secrets)
+# .secrets.baseline
+
+# Lock file managed by uv
+uv.lock

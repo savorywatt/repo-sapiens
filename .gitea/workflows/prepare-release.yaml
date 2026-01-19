@@ -1,0 +1,226 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.2.3 - without v prefix)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'patch'
+      changelog_added:
+        description: 'Added features (one per line, optional)'
+        required: false
+        type: string
+      changelog_changed:
+        description: 'Changes (one per line, optional)'
+        required: false
+        type: string
+      changelog_fixed:
+        description: 'Bug fixes (one per line, optional)'
+        required: false
+        type: string
+      changelog_deprecated:
+        description: 'Deprecations (one per line, optional)'
+        required: false
+        type: string
+      changelog_removed:
+        description: 'Removals (one per line, optional)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Pre-release (e.g., beta.1, rc.1 - leave empty for stable)'
+        required: false
+        type: string
+
+jobs:
+  prepare:
+    name: Prepare Release Files
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "Gitea Actions"
+          git config user.email "actions@gitea.local"
+
+      - name: Calculate version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          PRERELEASE="${{ github.event.inputs.prerelease }}"
+
+          if [ -n "$PRERELEASE" ]; then
+            FULL_VERSION="${VERSION}-${PRERELEASE}"
+          else
+            FULL_VERSION="${VERSION}"
+          fi
+
+          echo "version=${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${FULL_VERSION}" >> $GITHUB_OUTPUT
+          echo "📦 Version: ${FULL_VERSION}"
+
+      - name: Update pyproject.toml
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Update version in pyproject.toml
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" pyproject.toml
+
+          # Verify the update
+          NEW_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          echo "Updated pyproject.toml version to: ${NEW_VERSION}"
+
+          if [ "$NEW_VERSION" != "$VERSION" ]; then
+            echo "Error: Version update failed"
+            exit 1
+          fi
+
+      - name: Generate changelog entry
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+
+          # Start changelog entry
+          cat > new-changelog.md <<EOF
+          ## [${VERSION}] - ${DATE}
+
+          EOF
+
+          # Add sections based on inputs
+          ADDED="${{ github.event.inputs.changelog_added }}"
+          CHANGED="${{ github.event.inputs.changelog_changed }}"
+          FIXED="${{ github.event.inputs.changelog_fixed }}"
+          DEPRECATED="${{ github.event.inputs.changelog_deprecated }}"
+          REMOVED="${{ github.event.inputs.changelog_removed }}"
+
+          if [ -n "$ADDED" ]; then
+            echo "### Added" >> new-changelog.md
+            echo "" >> new-changelog.md
+            echo "$ADDED" | while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                echo "- $line" >> new-changelog.md
+              fi
+            done
+            echo "" >> new-changelog.md
+          fi
+
+          if [ -n "$CHANGED" ]; then
+            echo "### Changed" >> new-changelog.md
+            echo "" >> new-changelog.md
+            echo "$CHANGED" | while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                echo "- $line" >> new-changelog.md
+              fi
+            done
+            echo "" >> new-changelog.md
+          fi
+
+          if [ -n "$DEPRECATED" ]; then
+            echo "### Deprecated" >> new-changelog.md
+            echo "" >> new-changelog.md
+            echo "$DEPRECATED" | while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                echo "- $line" >> new-changelog.md
+              fi
+            done
+            echo "" >> new-changelog.md
+          fi
+
+          if [ -n "$REMOVED" ]; then
+            echo "### Removed" >> new-changelog.md
+            echo "" >> new-changelog.md
+            echo "$REMOVED" | while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                echo "- $line" >> new-changelog.md
+              fi
+            done
+            echo "" >> new-changelog.md
+          fi
+
+          if [ -n "$FIXED" ]; then
+            echo "### Fixed" >> new-changelog.md
+            echo "" >> new-changelog.md
+            echo "$FIXED" | while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                echo "- $line" >> new-changelog.md
+              fi
+            done
+            echo "" >> new-changelog.md
+          fi
+
+          echo "Generated changelog entry:"
+          cat new-changelog.md
+
+      - name: Update CHANGELOG.md
+        run: |
+          # Insert new changelog entry after the header
+          # Find the line number of the first ## heading
+          FIRST_RELEASE_LINE=$(grep -n "^## \[" CHANGELOG.md | head -1 | cut -d: -f1)
+
+          if [ -z "$FIRST_RELEASE_LINE" ]; then
+            # No existing releases, append after header
+            cat CHANGELOG.md new-changelog.md > CHANGELOG.tmp
+          else
+            # Insert before first release
+            head -n $((FIRST_RELEASE_LINE - 1)) CHANGELOG.md > CHANGELOG.tmp
+            cat new-changelog.md >> CHANGELOG.tmp
+            tail -n +${FIRST_RELEASE_LINE} CHANGELOG.md >> CHANGELOG.tmp
+          fi
+
+          mv CHANGELOG.tmp CHANGELOG.md
+
+          echo "✅ Updated CHANGELOG.md"
+          echo "First few lines:"
+          head -20 CHANGELOG.md
+
+      - name: Commit changes
+        run: |
+          git add pyproject.toml CHANGELOG.md
+          git commit -m "chore: Release ${{ steps.version.outputs.version }}"
+
+          echo "✅ Changes committed"
+
+      - name: Create and push tag
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Create annotated tag
+          git tag -a "$TAG" -m "Release $VERSION"
+
+          # Push commit and tag
+          git push origin main
+          git push origin "$TAG"
+
+          echo "✅ Tag created and pushed: $TAG"
+
+      - name: Summary
+        run: |
+          echo "### 🚀 Release Preparation Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Files updated and committed" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Tag pushed - release workflow will now run" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Monitor release progress at:" >> $GITHUB_STEP_SUMMARY
+          echo "${{ gitea.server_url }}/${{ gitea.repository }}/actions" >> $GITHUB_STEP_SUMMARY

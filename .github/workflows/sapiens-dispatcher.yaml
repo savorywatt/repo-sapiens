@@ -1,0 +1,144 @@
+# .github/workflows/sapiens-dispatcher.yaml
+name: "Sapiens Dispatcher"
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: 'Label that triggered the workflow'
+        required: true
+        type: string
+      issue_number:
+        description: 'Issue or PR number'
+        required: true
+        type: string
+      event_type:
+        description: 'Event type for sapiens CLI (e.g., issues.labeled, pull_request.labeled)'
+        required: false
+        type: string
+        default: 'issues.labeled'
+      # Git provider options (for Gitea compatibility)
+      git_provider_type:
+        description: 'Git provider (github, gitea)'
+        required: false
+        type: string
+        default: 'github'
+      git_provider_url:
+        description: 'Git provider API URL'
+        required: false
+        type: string
+        default: 'https://api.github.com'
+      # AI provider options
+      # Valid types: openai-compatible, ollama, claude-local (requires Claude CLI)
+      ai_provider_type:
+        description: 'AI provider type (openai-compatible, ollama, claude-local)'
+        required: false
+        type: string
+        default: 'openai-compatible'
+      ai_model:
+        description: 'AI model to use'
+        required: false
+        type: string
+        default: ''
+      ai_base_url:
+        description: 'AI provider base URL (for openai-compatible/ollama)'
+        required: false
+        type: string
+        default: ''
+    secrets:
+      GIT_TOKEN:
+        description: 'GitHub or Gitea token for API access'
+        required: true
+      AI_API_KEY:
+        description: 'AI provider API key (not required for ollama)'
+        required: false
+
+# Permissions required for the workflow
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  process:
+    name: "Sapiens: ${{ inputs.label }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # No label filter here - let sapiens process-label handle routing
+    # This allows custom label configurations to work
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GIT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          # Note: No pip caching - target repos may not have requirements.txt/pyproject.toml
+
+      - name: Install sapiens
+        run: pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
+
+      - name: Configure git
+        if: contains(fromJSON('["execute", "approved"]'), inputs.label)
+        run: |
+          git config --global user.name "Sapiens Bot"
+          git config --global user.email "sapiens-bot@users.noreply.github.com"
+
+      - name: Process label
+        env:
+          AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: ${{ inputs.git_provider_type }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ inputs.git_provider_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: ${{ inputs.ai_provider_type }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
+          AUTOMATION__AGENT_PROVIDER__MODEL: ${{ inputs.ai_model }}
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ inputs.ai_base_url }}
+        run: |
+          echo "Processing label '${{ inputs.label }}' on #${{ inputs.issue_number }}"
+          echo "   Provider: ${{ inputs.git_provider_type }}"
+          echo "   AI: ${{ inputs.ai_provider_type }}"
+          sapiens process-label \
+            --event-type "${{ inputs.event_type }}" \
+            --label "${{ inputs.label }}" \
+            --issue "${{ inputs.issue_number }}" \
+            --source "${{ inputs.git_provider_type }}"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sapiens-${{ inputs.label }}-${{ inputs.issue_number }}
+          path: .sapiens/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # Use gh CLI for failure comments on GitHub
+      - name: Post failure comment (GitHub)
+        if: failure() && inputs.git_provider_type == 'github'
+        env:
+          GH_TOKEN: ${{ secrets.GIT_TOKEN }}
+        run: |
+          gh issue comment ${{ inputs.issue_number }} \
+            --body "**Sapiens automation failed**
+
+          Label: \`${{ inputs.label }}\`
+          Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
+
+          Posted by Sapiens Automation"
+
+      # Use curl for failure comments on Gitea
+      - name: Post failure comment (Gitea)
+        if: failure() && inputs.git_provider_type == 'gitea'
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GIT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "**Sapiens automation failed**\n\nLabel: `${{ inputs.label }}`\nCheck the workflow logs for details.\n\nPosted by Sapiens Automation"}' \
+            "${{ inputs.git_provider_url }}/api/v1/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/issues/${{ inputs.issue_number }}/comments"

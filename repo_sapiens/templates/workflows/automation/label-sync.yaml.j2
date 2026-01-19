@@ -1,0 +1,48 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Sync Repository Labels') | safe_label }}
+
+on:
+  push:
+    branches:
+      - {{ main_branch | default('main') | safe_identifier }}
+    paths:
+      - '{{ labels_file | default('.github/labels.yaml') }}'
+  workflow_dispatch:
+
+{{ base.git_env_vars(provider_type | default('gitea'), git_url, git_owner, git_repo) }}
+
+jobs:
+  sync-labels:
+    name: Sync Labels
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step() }}
+
+      - name: Install repo-agent
+        run: pip install repo-agent
+
+      - name: Sync labels
+        env:
+          GITEA_TOKEN: ${{ '{{' }} secrets.SAPIENS_GITEA_TOKEN {{ '}}' }}
+        run: |
+          repo-agent labels sync \
+            --url {{ gitea_url | safe_url }} \
+            --owner {{ gitea_owner | safe_identifier }} \
+            --repo {{ gitea_repo | safe_identifier }} \
+            --file {{ labels_file | default('.github/labels.yaml') }} \
+            {% if dry_run | default(false) -%}
+            --dry-run
+            {%- endif %}
+
+      - name: Report results
+        if: always()
+        run: |
+          echo "Label sync completed"
+          repo-agent labels list \
+            --url {{ gitea_url | safe_url }} \
+            --owner {{ gitea_owner | safe_identifier }} \
+            --repo {{ gitea_repo | safe_identifier }}

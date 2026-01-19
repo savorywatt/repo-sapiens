@@ -1,0 +1,35 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Auto-label Issues') | safe_label }}
+
+on:
+  issues:
+    types: [opened, edited]
+
+{{ base.git_env_vars(provider_type | default('gitea'), git_url, git_owner, git_repo) }}
+
+jobs:
+  label-issue:
+    name: Label Issue
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step() }}
+
+      - name: Install repo-agent
+        run: pip install repo-agent
+
+      - name: Auto-label Issue
+        env:
+          GITEA_TOKEN: ${{ '{{' }} secrets.SAPIENS_GITEA_TOKEN {{ '}}' }}
+        run: |
+          repo-agent labels auto-issue \
+            --url {{ gitea_url | safe_url }} \
+            --owner {{ gitea_owner | safe_identifier }} \
+            --repo {{ gitea_repo | safe_identifier }} \
+            --issue ${{ '{{' }} github.event.issue.number {{ '}}' }} \
+            {% if label_rules -%}
+            --rules {{ label_rules }}
+            {%- endif %}

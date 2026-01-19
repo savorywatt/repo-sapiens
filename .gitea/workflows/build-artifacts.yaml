@@ -1,0 +1,138 @@
+name: Build Sapiens Artifacts
+
+# Build the repo-sapiens package and Docker image for reuse across workflows
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'repo_sapiens/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    # Allow manual trigger
+  schedule:
+    # Rebuild daily to keep artifacts fresh
+    - cron: '0 2 * * *'
+
+jobs:
+  # Build Python package
+  build-package:
+    name: Build Python Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: |
+          # Add small delay to avoid "Text file busy" error
+          sleep 1
+          uv python install 3.12
+
+      - name: Build package
+        run: |
+          uv build
+          ls -lh dist/
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v3
+        with:
+          name: sapiens-wheel
+          path: dist/*.whl
+          retention-days: 30
+
+      - name: Upload source dist
+        uses: actions/upload-artifact@v3
+        with:
+          name: sapiens-sdist
+          path: dist/*.tar.gz
+          retention-days: 30
+
+      - name: Create package metadata
+        run: |
+          cat > package-info.json <<EOF
+          {
+            "version": "$(grep '^version = ' pyproject.toml | cut -d'"' -f2)",
+            "python_version": "3.12",
+            "build_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "git_commit": "${{ gitea.sha }}",
+            "git_branch": "${{ gitea.ref_name }}"
+          }
+          EOF
+          cat package-info.json
+
+      - name: Upload metadata
+        uses: actions/upload-artifact@v3
+        with:
+          name: package-metadata
+          path: package-info.json
+          retention-days: 30
+
+  # Test the built artifacts
+  test-artifacts:
+    name: Test Built Artifacts
+    needs: [build-package]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: |
+          # Add small delay to avoid "Text file busy" error
+          sleep 1
+          uv python install 3.12
+
+      - name: Download wheel
+        uses: actions/download-artifact@v3
+        with:
+          name: sapiens-wheel
+          path: dist/
+
+      - name: Download package metadata
+        uses: actions/download-artifact@v3
+        with:
+          name: package-metadata
+
+      - name: Install from wheel
+        run: |
+          uv venv
+          uv pip install dist/*.whl
+          uv run sapiens --help
+
+      - name: Test package import
+        run: |
+          uv run python -c "
+          from repo_sapiens.config.settings import AutomationSettings
+          from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
+          from repo_sapiens.providers.gitea_rest import GiteaRestProvider
+          print('✅ Package imports work correctly')
+          "
+
+      - name: Report success
+        run: |
+          echo "### ✅ Artifact Build Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package Version:** $(cat package-info.json | grep version | cut -d'"' -f4)" >> $GITHUB_STEP_SUMMARY
+          echo "**Git Commit:** ${{ gitea.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Date:** $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts available for download:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sapiens-wheel\` (Python package)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sapiens-sdist\` (Source distribution)" >> $GITHUB_STEP_SUMMARY

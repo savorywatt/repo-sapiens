@@ -1,0 +1,45 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Lint Code') | safe_label }}
+
+on:
+  push:
+    branches:
+      {% for branch in trigger_branches | default(['main', 'develop']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+  pull_request:
+    branches:
+      {% for branch in pr_branches | default(['main']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+  workflow_dispatch:
+
+{{ base.git_env_vars(provider_type | default('gitea'), git_url, git_owner, git_repo) }}
+
+jobs:
+  lint:
+    name: Lint and Type Check
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step(version=python_version | default('3.11')) }}
+
+      - name: Install linting dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy black isort
+
+      - name: Run ruff
+        run: ruff check {{ source_dir | default('src/') }}
+
+      - name: Run mypy
+        run: mypy {{ source_dir | default('src/') }}
+
+      - name: Check formatting with black
+        run: black --check {{ source_dir | default('src/') }}
+
+      - name: Check import sorting with isort
+        run: isort --check-only {{ source_dir | default('src/') }}

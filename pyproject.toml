@@ -1,0 +1,223 @@
+[project]
+name = "repo-sapiens"
+version = "0.3.0"
+description = "Intelligent repository automation and management tool"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "savorywatt", email = "maintainer@savorywatt.com"}
+]
+keywords = ["automation", "repository", "build", "ci", "management", "gitea", "ai", "workflow"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+dependencies = [
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "httpx>=0.25.0",
+    "structlog>=23.2.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+    "aiofiles>=23.2.0",
+    "keyring>=24.0.0",
+    "cryptography>=41.0.0",
+    "gitpython>=3.1.40",
+    "jinja2>=3.1.3",
+    "pygithub>=2.1.1",  # GitHub API client (includes PyNaCl for secret encryption)
+    "h2>=4.3.0",
+]
+
+[project.optional-dependencies]
+monitoring = [
+    "prometheus-client>=0.19.0",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+]
+# analytics = ["plotly>=5.18.0"]  # Unused: dashboard uses CDN
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-benchmark>=4.0.0",
+    "black>=23.12.0",
+    "ruff>=0.1.8",
+    "mypy>=1.7.0",
+    "pre-commit>=3.6.0",
+    "bandit[toml]>=1.7.6",
+    "types-PyYAML>=6.0",
+    "types-aiofiles>=23.2",
+]
+all = ["repo-sapiens[monitoring]"]
+integration = [
+    "python-on-whales>=0.70.0",
+]
+
+[project.scripts]
+repo-sapiens = "repo_sapiens.main:cli"
+sapiens = "repo_sapiens.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/savorywatt/repo-sapiens"
+Documentation = "https://github.com/savorywatt/repo-sapiens#readme"
+Repository = "https://github.com/savorywatt/repo-sapiens"
+"Bug Tracker" = "https://github.com/savorywatt/repo-sapiens/issues"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["repo_sapiens*"]
+
+[tool.setuptools.package-data]
+repo_sapiens = [
+    "config/*.yaml",
+    "py.typed",
+    "templates/**/*.j2",
+    "templates/**/*.json",
+    "templates/**/*.yaml",
+    "templates/**/*.md",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+# Prevent wrapping lines that Ruff prefers unwrapped
+skip-string-normalization = false
+skip-magic-trailing-comma = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "SIM"]
+ignore = ["B904", "SIM108", "SIM300"]  # Exception chaining, ternary operators, and Yoda conditions - can be added later
+
+[tool.ruff.lint.per-file-ignores]
+"claude/**/*" = ["ALL"]  # Archived conversation data - skip all checks
+"docs/source/conf.py" = ["A001"]  # Sphinx requires copyright variable
+"hello-python-test/tests/**/*.py" = ["SIM117", "F841"]  # Nested with statements and unused vars acceptable in tests
+"hello-python-test/docs/source/conf.py" = ["A001"]  # Sphinx requires copyright variable
+"tests/**/*.py" = ["SIM117", "F841", "B007", "N806", "DTZ005", "SIM105", "E402", "A002", "B017"]  # Tests have relaxed rules
+"repo_sapiens/main.py" = ["SIM102"]  # Nested if for clarity
+"repo_sapiens/providers/github_rest.py" = ["UP"]  # Ignore all pyupgrade rules
+"repo_sapiens/agents/*.py" = ["E501"]  # Agent prompts have long strings
+"repo_sapiens/cli/health.py" = ["E501"]  # Health check output strings
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "repo_sapiens.templates.examples.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "repo_sapiens.providers.gitea_rest",
+    "repo_sapiens.providers.github_rest",
+    "repo_sapiens.providers.gitlab_rest",
+    "repo_sapiens.providers.ollama",
+    "repo_sapiens.providers.external_agent",
+    "repo_sapiens.providers.agent_provider",
+    "repo_sapiens.providers.git_provider",
+    "repo_sapiens.webhook_server",
+    "repo_sapiens.monitoring.dashboard",
+    "repo_sapiens.monitoring.metrics",
+    "repo_sapiens.cli.init",
+    "repo_sapiens.cli.credentials",
+    "repo_sapiens.cli.health",
+    "repo_sapiens.cli.process_label",
+    "repo_sapiens.engine.event_classifier",
+    "repo_sapiens.engine.stages.qa",
+    "repo_sapiens.engine.stages.approval",
+    "repo_sapiens.engine.stages.pr_review",
+    "repo_sapiens.engine.stages.implementation",
+    "repo_sapiens.engine.stages.execution",
+    "repo_sapiens.engine.stages.fix_execution",
+    "repo_sapiens.engine.stages.plan_review",
+    "repo_sapiens.engine.stages.merge",
+    "repo_sapiens.engine.stages.proposal",
+    "repo_sapiens.engine.stages.code_review",
+    "repo_sapiens.engine.multi_repo",
+    "repo_sapiens.engine.recovery",
+    "repo_sapiens.engine.parallel_executor",
+    "repo_sapiens.engine.checkpointing",
+    "repo_sapiens.engine.orchestrator",
+    "repo_sapiens.config.credential_fields",
+]
+# Complex provider/stage implementations - will be refactored for strict typing later
+ignore_errors = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+# Fast by default; use `make test-cov` for coverage
+addopts = "-n auto --dist loadgroup -q"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests",
+    "needs_real_timing: tests that require actual wall-clock time (not patched asyncio.sleep)",
+    "gitea: requires Gitea service running",
+    "gitlab: requires GitLab service running",
+    "ollama: requires Ollama service running",
+]
+
+[tool.coverage.run]
+# Support parallel test execution with pytest-xdist
+concurrency = ["thread", "multiprocessing"]
+parallel = true
+
+[tool.bandit]
+# Bandit security linter configuration
+exclude_dirs = [
+    "tests/",
+    ".venv/",
+    "venv/",
+    ".git/",
+    "dist/",
+    "build/",
+    "*.egg-info/",
+]
+
+# Exclude specific tests that are false positives for this project
+skips = [
+    "B101",  # assert_used - we use asserts in tests and validation
+    "B105",  # hardcoded_password_string - credential reference templates, not actual passwords
+    "B110",  # try_except_pass - acceptable for optional keyring fallback
+    "B404",  # import_subprocess - subprocess usage is safe and necessary
+    "B601",  # paramiko_calls - not using paramiko
+    "B602",  # subprocess_popen_with_shell_equals_true - reviewed usages are safe
+    "B603",  # subprocess_without_shell_equals_true - subprocess usage is reviewed and safe
+]
+
+# Severity levels: LOW, MEDIUM, HIGH
+# Confidence levels: LOW, MEDIUM, HIGH
+# Only report issues with MEDIUM or HIGH confidence
+severity = "MEDIUM"
+confidence = "MEDIUM"
+
+[tool.bandit.assert_used]
+# Allow asserts in test files and validation code
+skips = ["*/tests/*", "*/test_*.py"]
+
+[dependency-groups]
+dev = [
+    "pytest-xdist>=3.8.0",
+]

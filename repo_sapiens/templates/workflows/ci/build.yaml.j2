@@ -1,0 +1,65 @@
+{% import 'workflows/base.yaml.j2' as base %}
+
+name: {{ workflow_name | default('Build and Test') | safe_label }}
+
+on:
+  push:
+    branches:
+      {% for branch in trigger_branches | default(['main', 'develop']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+  pull_request:
+    branches:
+      {% for branch in pr_branches | default(['main']) -%}
+      - {{ branch | safe_identifier }}
+      {% endfor %}
+  workflow_dispatch:
+
+{{ base.git_env_vars(provider_type | default('gitea'), git_url, git_owner, git_repo) }}
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: {{ runner | default('ubuntu-latest') | safe_identifier }}
+
+    strategy:
+      matrix:
+        python-version:
+          {% for version in python_versions | default(['3.11', '3.12']) -%}
+          - '{{ version | safe_identifier }}'
+          {% endfor %}
+      fail-fast: {{ fail_fast | default(false) | lower }}
+
+    steps:
+      {{ base.checkout_step() }}
+
+      {{ base.setup_python_step(version='${{ matrix.python-version }}') }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip build wheel
+          pip install -e .[dev]
+
+      - name: Run linters
+        run: |
+          {% for linter in linters | default(['ruff', 'mypy']) -%}
+          {{ linter | safe_identifier }} .
+          {% endfor %}
+
+      - name: Run tests
+        run: |
+          pytest tests/ \
+            --cov={{ package_name | safe_identifier }} \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v
+
+      - name: Build package
+        run: python -m build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ '{{' }} matrix.python-version {{ '}}' }}
+          path: dist/
+          retention-days: {{ artifact_retention_days | default(7) | int }}

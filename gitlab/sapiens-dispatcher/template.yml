@@ -1,0 +1,69 @@
+# GitLab CI/CD Component: Sapiens Dispatcher
+# Reusable component for label-triggered sapiens automation
+#
+# Usage:
+#   include:
+#     - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
+#       inputs:
+#         label: $SAPIENS_LABEL
+#         issue_number: $SAPIENS_ISSUE
+#
+# Requires GitLab 16.0+
+# yaml-language-server: $schema=https://gitlab.com/gitlab-org/gitlab/-/raw/master/app/assets/javascripts/ci/ci_cd_component_schema.json
+
+spec:
+  inputs:
+    label:
+      description: 'Label that triggered the pipeline'
+      type: string
+    issue_number:
+      description: 'Issue or MR number'
+      type: number
+    event_type:
+      description: 'Event type for sapiens CLI'
+      type: string
+      default: 'issues.labeled'
+    ai_provider_type:
+      description: 'AI provider type (openai-compatible, ollama)'
+      type: string
+      default: 'openai-compatible'
+    ai_model:
+      description: 'AI model to use'
+      type: string
+      default: ''
+    ai_base_url:
+      description: 'AI provider base URL'
+      type: string
+      default: ''
+
+sapiens:
+  image: python:3.12
+  variables:
+    AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: gitlab
+    AUTOMATION__GIT_PROVIDER__BASE_URL: ${CI_API_V4_URL}
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: ${SAPIENS_GITLAB_TOKEN}
+    AUTOMATION__REPOSITORY__OWNER: ${CI_PROJECT_NAMESPACE}
+    AUTOMATION__REPOSITORY__NAME: ${CI_PROJECT_NAME}
+    AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: $[[ inputs.ai_provider_type ]]
+    AUTOMATION__AGENT_PROVIDER__API_KEY: ${SAPIENS_AI_API_KEY}
+    AUTOMATION__AGENT_PROVIDER__MODEL: $[[ inputs.ai_model ]]
+    AUTOMATION__AGENT_PROVIDER__BASE_URL: $[[ inputs.ai_base_url ]]
+  before_script:
+    - pip install repo-sapiens==2.1.0
+    - git config --global user.name "Sapiens Bot"
+    - git config --global user.email "sapiens-bot@gitlab.local"
+  script:
+    - echo "Processing label '$[[ inputs.label ]]' on #$[[ inputs.issue_number ]]"
+    - |
+      sapiens process-label \
+        --event-type "$[[ inputs.event_type ]]" \
+        --label "$[[ inputs.label ]]" \
+        --issue "$[[ inputs.issue_number ]]" \
+        --source gitlab
+  artifacts:
+    paths:
+      - .sapiens/
+    expire_in: 7 days
+    when: always
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger" || $CI_PIPELINE_SOURCE == "api"

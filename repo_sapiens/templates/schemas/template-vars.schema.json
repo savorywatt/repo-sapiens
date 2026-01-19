@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Template Variables Schema",
+  "description": "Extended validation schema for all workflow template variables",
+  "type": "object",
+  "required": ["gitea_url", "gitea_owner", "gitea_repo"],
+  "properties": {
+    "gitea_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Gitea instance URL"
+    },
+    "gitea_owner": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "description": "Repository owner/organization name"
+    },
+    "gitea_repo": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "description": "Repository name"
+    },
+    "workflow_name": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Custom workflow name"
+    },
+    "runner": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "default": "ubuntu-latest",
+      "description": "GitHub Actions runner"
+    },
+    "python_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "default": "3.11",
+      "description": "Python version"
+    },
+    "python_versions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+$"
+      },
+      "minItems": 1,
+      "default": ["3.11", "3.12"],
+      "description": "Python versions for matrix builds"
+    },
+    "trigger_branches": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "minItems": 1,
+      "default": ["main"],
+      "description": "Branches that trigger the workflow"
+    },
+    "pr_branches": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "minItems": 1,
+      "default": ["main"],
+      "description": "Branches for pull request triggers"
+    },
+    "main_branch": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._/-]+$",
+      "default": "main",
+      "description": "Main/default branch name"
+    },
+    "labels_file": {
+      "type": "string",
+      "default": ".github/labels.yaml",
+      "description": "Path to labels configuration file"
+    },
+    "package_name": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "description": "Python package name for PyPI"
+    },
+    "linters": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9._-]+$"
+      },
+      "default": ["ruff", "mypy"],
+      "description": "Linters to run in CI"
+    },
+    "fail_fast": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to fail fast in matrix builds"
+    },
+    "artifact_retention_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 90,
+      "default": 7,
+      "description": "Days to retain build artifacts"
+    },
+    "environment": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9._-]+$",
+      "default": "release",
+      "description": "GitHub environment for deployment"
+    },
+    "use_trusted_publishing": {
+      "type": "boolean",
+      "default": true,
+      "description": "Use PyPI trusted publishing"
+    },
+    "test_pypi": {
+      "type": "boolean",
+      "default": false,
+      "description": "Publish to Test PyPI instead of PyPI"
+    },
+    "dry_run": {
+      "type": "boolean",
+      "default": false,
+      "description": "Run in dry-run mode (no changes)"
+    },
+    "docs_tool": {
+      "type": "string",
+      "enum": ["mkdocs", "sphinx", "custom"],
+      "default": "mkdocs",
+      "description": "Documentation build tool"
+    },
+    "docs_requirements": {
+      "type": "string",
+      "default": "docs/requirements.txt",
+      "description": "Path to docs requirements file"
+    },
+    "use_github_pages": {
+      "type": "boolean",
+      "default": true,
+      "description": "Deploy to GitHub Pages"
+    },
+    "deploy_target": {
+      "type": "string",
+      "description": "Custom deployment target"
+    },
+    "deploy_command": {
+      "type": "string",
+      "description": "Custom deployment command"
+    }
+  },
+  "additionalProperties": true
+}

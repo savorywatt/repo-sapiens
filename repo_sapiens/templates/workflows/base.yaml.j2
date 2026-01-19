@@ -1,0 +1,57 @@
+{# Base template with common patterns and security #}
+
+{% macro checkout_step(ref='', fetch_depth=1) -%}
+- name: Checkout code
+  uses: actions/checkout@v4
+  with:
+    {%- if ref %}
+    ref: {{ ref | safe_identifier }}
+    {%- endif %}
+    fetch-depth: {{ fetch_depth | int }}
+{%- endmacro %}
+
+{% macro setup_python_step(version='3.11') -%}
+- name: Set up Python
+  uses: actions/setup-python@v5
+  with:
+    python-version: '{{ version | safe_identifier }}'
+    cache: 'pip'
+{%- endmacro %}
+
+{% macro install_dependencies_step(requirements_file='requirements.txt') -%}
+- name: Install dependencies
+  run: |
+    python -m pip install --upgrade pip
+    pip install -r {{ requirements_file | safe_identifier }}
+{%- endmacro %}
+
+{% macro security_check(value, validator) -%}
+{# Helper to validate values in templates #}
+{%- if value is not defined -%}
+  {{ raise("Required value not provided") }}
+{%- endif -%}
+{{ value }}
+{%- endmacro %}
+
+{# Common environment variables for all workflows #}
+{% macro gitea_env_vars(url, owner, repo) -%}
+env:
+  GITEA_URL: {{ url | safe_url }}
+  GITEA_OWNER: {{ owner | safe_identifier }}
+  GITEA_REPO: {{ repo | safe_identifier }}
+{%- endmacro %}
+
+{% macro github_env_vars(url, owner, repo) -%}
+env:
+  GITHUB_URL: {{ url | safe_url }}
+  GITHUB_OWNER: {{ owner | safe_identifier }}
+  GITHUB_REPO: {{ repo | safe_identifier }}
+{%- endmacro %}
+
+{% macro git_env_vars(provider_type, url, owner, repo) -%}
+{%- if provider_type == 'github' -%}
+{{ github_env_vars(url, owner, repo) }}
+{%- else -%}
+{{ gitea_env_vars(url, owner, repo) }}
+{%- endif -%}
+{%- endmacro %}
