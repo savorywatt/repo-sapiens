@@ -187,6 +187,16 @@ wait_for_gitlab() {
             return 0
         fi
 
+        # Fallback: Check via container exec (most reliable when external_url != actual URL)
+        local internal_check
+        internal_check=$(docker exec "$DOCKER_CONTAINER" curl -sf http://localhost/-/health 2>/dev/null || echo "")
+
+        if [[ "$internal_check" == "GitLab OK" ]]; then
+            echo ""
+            log "GitLab is healthy (internal check)!"
+            return 0
+        fi
+
         # Progress indicator
         if (( elapsed % 60 == 0 )) && (( elapsed > 0 )); then
             echo ""
