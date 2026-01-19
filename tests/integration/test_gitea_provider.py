@@ -226,44 +226,49 @@ class TestGiteaLabelManagement:
         owner = gitea_test_repo["owner"]
         name = gitea_test_repo["name"]
         headers = {"Authorization": f"token {gitea_test_repo['token']}"}
+        timestamp = int(time.time())
+        label_name = f"rm-label-{timestamp}"
 
         # Create a test issue
         response = httpx.post(
             f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/issues",
             headers=headers,
-            json={"title": "label-removal-test", "body": "Testing label removal"},
+            json={"title": f"label-removal-test-{timestamp}", "body": "Testing label removal"},
             timeout=10.0,
         )
         assert response.status_code == 201
         issue = response.json()
         issue_number = issue["number"]
 
+        label_id = None
         try:
-            # Ensure label exists
-            httpx.post(
+            # Create unique label for this test
+            response = httpx.post(
                 f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/labels",
                 headers=headers,
-                json={"name": "test-remove-label", "color": "0000ff"},
+                json={"name": label_name, "color": "0000ff"},
                 timeout=10.0,
             )
+            assert response.status_code == 201
+            label_id = response.json()["id"]
 
             # Add label to issue
             response = httpx.post(
                 f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/issues/{issue_number}/labels",
                 headers=headers,
-                json={"labels": ["test-remove-label"]},
+                json={"labels": [label_name]},
                 timeout=10.0,
             )
             assert response.status_code == 200
 
-            # Remove label from issue
+            # Remove label from issue using label ID
             response = httpx.delete(
-                f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/issues/{issue_number}/labels/test-remove-label",
+                f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/issues/{issue_number}/labels/{label_id}",
                 headers=headers,
                 timeout=10.0,
             )
-            # 204 on success, 404/422 if label wasn't on issue
-            assert response.status_code in [200, 204, 404, 422]
+            # 204 on success
+            assert response.status_code == 204
 
             # Verify label is gone
             response = httpx.get(
@@ -272,16 +277,23 @@ class TestGiteaLabelManagement:
                 timeout=10.0,
             )
             labels = [lbl["name"] for lbl in response.json().get("labels", [])]
-            assert "test-remove-label" not in labels
+            assert label_name not in labels
 
         finally:
-            # Cleanup
+            # Cleanup: close issue
             httpx.patch(
                 f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/issues/{issue_number}",
                 headers=headers,
                 json={"state": "closed"},
                 timeout=10.0,
             )
+            # Cleanup: delete label
+            if label_id:
+                httpx.delete(
+                    f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/labels/{label_id}",
+                    headers=headers,
+                    timeout=10.0,
+                )
 
     def test_replace_labels(self, gitea_test_repo: dict) -> None:
         """Verify labels can be replaced (used when transitioning workflow states)."""
@@ -939,7 +951,7 @@ class TestSapiensWorkflowReadiness:
                 )
                 results["get_diff"] = response.status_code == 200
 
-            # 10. Close PR
+            # 10. Close PR (Gitea returns 201 for PATCH operations)
             if pr_number:
                 response = httpx.patch(
                     f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/pulls/{pr_number}",
@@ -947,7 +959,7 @@ class TestSapiensWorkflowReadiness:
                     json={"state": "closed"},
                     timeout=10.0,
                 )
-                results["close_pr"] = response.status_code == 200
+                results["close_pr"] = response.status_code in [200, 201]
 
             # 11. Delete branch
             if results.get("create_branch"):
@@ -958,7 +970,7 @@ class TestSapiensWorkflowReadiness:
                 )
                 results["delete_branch"] = response.status_code == 204
 
-            # 12. Close issue
+            # 12. Close issue (Gitea returns 201 for PATCH operations)
             if issue_number:
                 response = httpx.patch(
                     f"{gitea_test_repo['api_base']}/repos/{owner}/{name}/issues/{issue_number}",
@@ -966,7 +978,7 @@ class TestSapiensWorkflowReadiness:
                     json={"state": "closed"},
                     timeout=10.0,
                 )
-                results["close_issue"] = response.status_code == 200
+                results["close_issue"] = response.status_code in [200, 201]
 
         finally:
             # Ensure cleanup even if tests fail
