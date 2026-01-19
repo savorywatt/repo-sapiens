@@ -608,11 +608,36 @@ setup_actions_runner() {
     gitea_ip=$(docker inspect "$DOCKER_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
     log "Gitea container IP: $gitea_ip"
 
-    log "Starting Actions runner container..."
-    # Use the same network as Gitea so job containers can reach it
-    # Note: We don't mount a config file as it doesn't work with remote Docker contexts
-    # The runner will use environment variables for configuration
-    docker run -d \
+    # Create runner config file locally first
+    log "Creating runner config for network: $gitea_network"
+    local config_tmp="/tmp/act_runner_config_$$.yaml"
+    cat > "$config_tmp" << EOF
+log:
+  level: info
+
+runner:
+  file: .runner
+  capacity: 1
+  timeout: 3h
+  insecure: false
+
+cache:
+  enabled: true
+
+container:
+  network: "$gitea_network"
+  privileged: false
+  options: --add-host=gitea:$gitea_ip
+  valid_volumes: []
+  docker_host: ""
+
+host:
+  workdir_parent:
+EOF
+
+    log "Creating Actions runner container..."
+    # Create container (but don't start yet) so we can copy config first
+    docker create \
         --name "$RUNNER_CONTAINER" \
         --restart unless-stopped \
         --network "$gitea_network" \
@@ -620,24 +645,60 @@ setup_actions_runner() {
         -e GITEA_RUNNER_REGISTRATION_TOKEN="$RUNNER_TOKEN" \
         -e GITEA_RUNNER_NAME="test-runner" \
         -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://catthehacker/ubuntu:act-latest" \
+        -e CONFIG_FILE="/data/config.yaml" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         gitea/act_runner:latest > /dev/null 2>&1 || {
-            warn "Failed to start runner with same network, trying bridge..."
-
-            # Fallback: use default bridge network
-            docker run -d \
-                --name "$RUNNER_CONTAINER" \
-                --restart unless-stopped \
-                -e GITEA_INSTANCE_URL="$GITEA_URL" \
-                -e GITEA_RUNNER_REGISTRATION_TOKEN="$RUNNER_TOKEN" \
-                -e GITEA_RUNNER_NAME="test-runner" \
-                -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://catthehacker/ubuntu:act-latest" \
-                -v /var/run/docker.sock:/var/run/docker.sock \
-                gitea/act_runner:latest > /dev/null 2>&1 || {
-                    warn "Failed to start runner container"
-                    return 1
-                }
+            warn "Failed to create runner container"
+            rm -f "$config_tmp"
+            return 1
         }
+
+    # Copy config into container before starting
+    docker cp "$config_tmp" "$RUNNER_CONTAINER:/data/config.yaml" 2>/dev/null || {
+        warn "Could not copy config, will create after start"
+    }
+    rm -f "$config_tmp"
+
+    # Start the runner
+    log "Starting runner container..."
+    docker start "$RUNNER_CONTAINER" > /dev/null 2>&1 || {
+        warn "Failed to start runner container"
+        return 1
+    }
+    sleep 2
+
+    # Verify config exists, create if not
+    docker exec "$RUNNER_CONTAINER" test -f /data/config.yaml || {
+        log "Creating config inside running container..."
+        docker exec -e "RUNNER_NETWORK=$gitea_network" -e "GITEA_CONTAINER_IP=$gitea_ip" "$RUNNER_CONTAINER" sh -c '
+            cat > /data/config.yaml << EOF
+log:
+  level: info
+
+runner:
+  file: .runner
+  capacity: 1
+  timeout: 3h
+  insecure: false
+
+cache:
+  enabled: true
+
+container:
+  network: "$RUNNER_NETWORK"
+  privileged: false
+  options: --add-host=gitea:$GITEA_CONTAINER_IP
+  valid_volumes: []
+  docker_host: ""
+
+host:
+  workdir_parent:
+EOF
+        '
+        # Restart to pick up new config
+        docker restart "$RUNNER_CONTAINER" > /dev/null 2>&1 || true
+        sleep 2
+    }
 
     # Install Docker CLI in the runner (required for Docker-based jobs)
     log "Installing Docker CLI in runner..."

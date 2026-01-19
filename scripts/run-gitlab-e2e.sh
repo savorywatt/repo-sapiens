@@ -37,7 +37,7 @@
 #   --ci-only           Only run CI integration test
 #   --test-component    Test the sapiens GitLab CI component
 #   --component-ref     Branch/tag for component (default: v2)
-#   --with-runner       Set up GitLab Runner for CI component tests
+#   --no-runner         Skip GitLab Runner setup (runner is set up by default)
 #   --ai-provider       AI provider for CI tests (ollama, openrouter) (default: openrouter)
 #   --no-cleanup        Don't cleanup test resources on exit
 #
@@ -81,7 +81,7 @@ AUTO_BOOTSTRAP=false
 SKIP_CI=false
 CI_ONLY=false
 TEST_COMPONENT=false
-WITH_RUNNER=false
+WITH_RUNNER=true
 NO_CLEANUP=false
 AI_PROVIDER="${AI_PROVIDER:-openrouter}"
 COMPONENT_REF="${COMPONENT_REF:-v2}"
@@ -133,7 +133,7 @@ while [[ $# -gt 0 ]]; do
         --ci-only) CI_ONLY=true; shift ;;
         --test-component) TEST_COMPONENT=true; shift ;;
         --component-ref) COMPONENT_REF="$2"; shift 2 ;;
-        --with-runner) WITH_RUNNER=true; shift ;;
+        --no-runner) WITH_RUNNER=false; shift ;;
         --ai-provider) AI_PROVIDER="$2"; shift 2 ;;
         --no-cleanup) NO_CLEANUP=true; shift ;;
         -h|--help)
