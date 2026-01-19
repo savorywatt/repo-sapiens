@@ -394,90 +394,153 @@ def health_check(
                 all_passed = False
 
         elif provider_type == ProviderType.COPILOT_LOCAL:
-            # Check if GitHub CLI is available
             import shutil
             import subprocess
 
-            gh_path = shutil.which("gh")
-            if gh_path:
-                _print_check(
-                    "GitHub CLI (gh)",
-                    True,
-                    f"Found at {gh_path}" if verbose else None,
+            # Check if using copilot-api proxy (unofficial) or gh copilot CLI
+            copilot_config = settings.agent_provider.copilot_config
+
+            if copilot_config:
+                # Using copilot-api proxy (unofficial integration)
+                # Check Node.js/npx availability
+                npx_path = shutil.which("npx")
+                if npx_path:
+                    _print_check(
+                        "Node.js (npx)",
+                        True,
+                        f"Found at {npx_path}" if verbose else None,
+                    )
+                else:
+                    _print_check(
+                        "Node.js (npx)",
+                        False,
+                        "Not found - install Node.js (https://nodejs.org/)",
+                    )
+                    all_passed = False
+
+                # Check GitHub token is configured
+                if copilot_config.github_token:
+                    try:
+                        # Trigger credential resolution to verify it's accessible
+                        token = copilot_config.github_token.get_secret_value()
+                        if token and token != "null":
+                            _print_check(
+                                "Copilot GitHub token",
+                                True,
+                                "Configured (credential reference stored)" if verbose else None,
+                            )
+                        else:
+                            _print_check(
+                                "Copilot GitHub token",
+                                False,
+                                "Token resolved to empty value",
+                            )
+                            all_passed = False
+                    except Exception as e:
+                        _print_check(
+                            "Copilot GitHub token",
+                            False,
+                            f"Failed to resolve: {e}",
+                        )
+                        all_passed = False
+                else:
+                    _print_check(
+                        "Copilot GitHub token",
+                        False,
+                        "Not configured in copilot_config.github_token",
+                    )
+                    all_passed = False
+
+                # Disclaimer warning about unofficial nature
+                click.echo()
+                click.echo(
+                    f"  {click.style('[WARN]', fg='yellow')} "
+                    "Using unofficial copilot-api proxy - NOT endorsed by GitHub"
                 )
+                click.echo("       This integration may violate GitHub ToS and could stop working at any time.")
 
-                # Check if Copilot extension is installed
-                try:
-                    result = subprocess.run(  # nosec B607
-                        ["gh", "extension", "list"],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                    )
-                    copilot_installed = "gh-copilot" in result.stdout or "copilot" in result.stdout
-                    if copilot_installed:
-                        _print_check(
-                            "Copilot extension",
-                            True,
-                            "Installed" if verbose else None,
-                        )
-                    else:
-                        _print_check(
-                            "Copilot extension",
-                            False,
-                            "Install with: gh extension install github/gh-copilot",
-                        )
-                        all_passed = False
-                except subprocess.TimeoutExpired:
-                    _print_check(
-                        "Copilot extension",
-                        False,
-                        "Timeout checking extensions",
-                    )
-                    all_passed = False
-                except Exception as e:
-                    _print_check(
-                        "Copilot extension",
-                        False,
-                        f"Error: {e}",
-                    )
-                    all_passed = False
-
-                # Check if gh is authenticated
-                try:
-                    result = subprocess.run(  # nosec B607
-                        ["gh", "auth", "status"],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                    )
-                    if result.returncode == 0:
-                        _print_check(
-                            "GitHub authentication",
-                            True,
-                            "Authenticated" if verbose else None,
-                        )
-                    else:
-                        _print_check(
-                            "GitHub authentication",
-                            False,
-                            "Run: gh auth login",
-                        )
-                        all_passed = False
-                except Exception as e:
-                    _print_check(
-                        "GitHub authentication",
-                        False,
-                        f"Error: {e}",
-                    )
-                    all_passed = False
             else:
-                _print_check(
-                    "GitHub CLI (gh)",
-                    False,
-                    "Not found. Install from: https://cli.github.com/",
-                )
-                all_passed = False
+                # Using gh copilot CLI (limited functionality)
+                gh_path = shutil.which("gh")
+                if gh_path:
+                    _print_check(
+                        "GitHub CLI (gh)",
+                        True,
+                        f"Found at {gh_path}" if verbose else None,
+                    )
+
+                    # Check if Copilot extension is installed
+                    try:
+                        result = subprocess.run(  # nosec B607
+                            ["gh", "extension", "list"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        copilot_installed = "gh-copilot" in result.stdout or "copilot" in result.stdout
+                        if copilot_installed:
+                            _print_check(
+                                "Copilot extension",
+                                True,
+                                "Installed" if verbose else None,
+                            )
+                        else:
+                            _print_check(
+                                "Copilot extension",
+                                False,
+                                "Install with: gh extension install github/gh-copilot",
+                            )
+                            all_passed = False
+                    except subprocess.TimeoutExpired:
+                        _print_check(
+                            "Copilot extension",
+                            False,
+                            "Timeout checking extensions",
+                        )
+                        all_passed = False
+                    except Exception as e:
+                        _print_check(
+                            "Copilot extension",
+                            False,
+                            f"Error: {e}",
+                        )
+                        all_passed = False
+
+                    # Check if gh is authenticated
+                    try:
+                        result = subprocess.run(  # nosec B607
+                            ["gh", "auth", "status"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if result.returncode == 0:
+                            _print_check(
+                                "GitHub authentication",
+                                True,
+                                "Authenticated" if verbose else None,
+                            )
+                        else:
+                            _print_check(
+                                "GitHub authentication",
+                                False,
+                                "Run: gh auth login",
+                            )
+                            all_passed = False
+                    except Exception as e:
+                        _print_check(
+                            "GitHub authentication",
+                            False,
+                            f"Error: {e}",
+                        )
+                        all_passed = False
+                else:
+                    _print_check(
+                        "GitHub CLI (gh)",
+                        False,
+                        "Not found. Install from: https://cli.github.com/",
+                    )
+                    all_passed = False
 
         elif provider_type in (ProviderType.OPENAI_COMPATIBLE, ProviderType.OLLAMA):
             # For API-based providers and Ollama, no CLI check needed

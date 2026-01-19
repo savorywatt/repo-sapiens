@@ -538,6 +538,37 @@ class CopilotProvider(AgentProvider):
             self._handle_copilot_errors(e)
             raise
 
+    async def execute_prompt(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Execute a prompt using the Copilot API.
+
+        Args:
+            prompt: The prompt to execute.
+            context: Optional execution context.
+            task_id: Optional task identifier.
+
+        Returns:
+            Dict with execution results.
+
+        Raises:
+            CopilotError: If not connected.
+            CopilotAuthenticationError: If token is invalid.
+            CopilotRateLimitError: If rate limited.
+            CopilotAbuseDetectedError: If abuse is detected.
+        """
+        client = self._ensure_connected()
+        await self._apply_rate_limit()
+
+        try:
+            return await client.execute_prompt(prompt, context, task_id)
+        except httpx.HTTPStatusError as e:
+            self._handle_copilot_errors(e)
+            raise
+
     # -------------------------------------------------------------------------
     # Async Context Manager
     # -------------------------------------------------------------------------

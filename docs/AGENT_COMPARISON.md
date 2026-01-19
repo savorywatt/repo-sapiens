@@ -12,7 +12,7 @@ repo-sapiens supports five agent options:
 | [Goose](#goose-ai) | External CLI | OpenAI, Anthropic, Ollama, OpenRouter, Groq | Flexibility, cloud providers |
 | [Built-in ReAct](#built-in-react-agent) | Built-in | Ollama, vLLM | Simple tasks, experimentation, local inference |
 | [Ollama Provider](#ollama-provider) | Built-in | Ollama (local) | Automation workflows, local inference |
-| [GitHub Copilot](#github-copilot) | External CLI | GitHub's models | Simple tasks, existing subscribers |
+| [GitHub Copilot](#github-copilot) | External Proxy | GitHub's models | Existing subscribers (unofficial) |
 
 ---
 
@@ -272,37 +272,55 @@ agent_provider:
 
 ## GitHub Copilot
 
-[GitHub Copilot CLI](https://docs.github.com/en/copilot/github-copilot-in-the-cli) is GitHub's official AI assistant for the command line.
+> **WARNING: Unofficial Integration**
+>
+> This integration uses [`copilot-api`](https://github.com/nicepkg/copilot-api),
+> an **unofficial, reverse-engineered API proxy**. This integration:
+>
+> - Is **NOT endorsed or supported by GitHub**
+> - May **violate GitHub's Terms of Service**
+> - Could **stop working at any time** without notice
+> - Requires aggressive rate limiting to avoid detection
+>
+> **Use at your own risk.** For production use, consider Claude Code, Goose, or
+> OpenAI-compatible providers instead.
+
+The Copilot integration uses a third-party proxy that translates OpenAI-compatible
+API requests to GitHub Copilot's internal API.
 
 ### Pros
-- **No API key needed**: Uses GitHub authentication
-- **Familiar**: Same AI as Copilot in your IDE
-- **Subscription-based**: Predictable monthly cost
-- **Easy setup**: Just install the extension
+- **Familiar models**: Uses the same models as Copilot in your IDE
+- **Subscription-based**: Predictable monthly cost if you already subscribe
+- **No separate API key**: Uses GitHub OAuth token
 
 ### Cons
-- **Limited capabilities**: Designed for command suggestions, not full code generation
+- **Unofficial**: Not endorsed by GitHub, may violate ToS
+- **Unreliable**: Could break at any time without notice
+- **Rate limited**: Requires aggressive rate limiting (`rate_limit: 2.0` or higher)
 - **Subscription required**: $10-39/month
-- **Basic tool support**: Cannot do complex multi-file operations
-- **Less flexible**: No model choice
+- **Limited model choice**: Restricted to Copilot's available models
 
 ### When to Use
 - You already have a GitHub Copilot subscription
-- Simple shell command suggestions
-- Lightweight automation tasks
-- Want to stay in the GitHub ecosystem
+- You understand and accept the risks of using an unofficial integration
+- You have configured appropriate rate limiting
+- Other providers are not an option for your use case
 
 ### Quick Start
 
 ```bash
-# Install GitHub CLI and Copilot extension
-brew install gh  # or apt install gh
-gh auth login
-gh extension install github/gh-copilot
+# Requires Node.js for the copilot-api proxy
+node --version  # Ensure Node.js 18+ is installed
+
+# Get a GitHub OAuth token with Copilot access
+gh auth token
+
+# Store the token
+sapiens credentials set github/copilot_token
 
 # Initialize with Copilot
 sapiens init
-# Select: copilot
+# Select: copilot (and accept the disclaimer)
 ```
 
 ### Configuration
@@ -312,9 +330,24 @@ sapiens init
 agent_provider:
   provider_type: copilot-local
   model: gpt-4
-  api_key: null
-  local_mode: true
+  copilot_config:
+    github_token: "@keyring:github/copilot_token"
+    manage_proxy: true        # Auto-start copilot-api
+    proxy_port: 4141
+    rate_limit: 2.0           # Seconds between requests (recommended)
 ```
+
+### Limitations
+
+| Aspect | Copilot | Claude Code |
+|--------|---------|-------------|
+| Official support | No | Yes |
+| Reliability | May break | Stable |
+| Rate limits | Aggressive | Generous |
+| Model choice | Limited | Multiple Claude models |
+| ToS compliance | Uncertain | Yes |
+
+For detailed setup instructions, see [COPILOT_SETUP.md](./COPILOT_SETUP.md).
 
 ---
 
@@ -322,8 +355,8 @@ agent_provider:
 
 | Feature | Claude Code | Goose | ReAct Agent | Ollama Provider | Copilot |
 |---------|-------------|-------|-------------|-----------------|---------|
-| **Installation** | `curl ...` | `pip install goose-ai` | None | None | `gh extension install` |
-| **Cloud Providers** | Anthropic | OpenAI, Anthropic, OpenRouter, Groq | - | - | GitHub |
+| **Installation** | `curl ...` | `pip install goose-ai` | None | None | Node.js + proxy |
+| **Cloud Providers** | Anthropic | OpenAI, Anthropic, OpenRouter, Groq | - | - | GitHub (unofficial) |
 | **Local Models** | - | Ollama | Ollama, vLLM | Ollama | - |
 | **Tool Calling** | Native LLM | Native LLM | Custom | Prompt-based | Limited |
 | **REPL Mode** | Yes | Yes | Yes | - | - |
@@ -332,6 +365,9 @@ agent_provider:
 | **Verbose/Debug** | Yes | Yes | Yes | Yes | - |
 | **Custom Toolkits** | - | Yes | - | - | - |
 | **Multi-file Edits** | Excellent | Excellent | Good | Fair | Limited |
+| **Official Support** | Yes | Yes | Yes | Yes | No |
+| **Reliability** | Stable | Stable | Stable | Stable | May break |
+| **ToS Compliance** | Yes | Yes | Yes | Yes | Uncertain |
 | **Cost** | $0.15/1K | Free-$0.30/1K | Free | Free | $10-39/mo |
 
 ---
@@ -424,6 +460,8 @@ sapiens init --force
 ## See Also
 
 - [GOOSE_SETUP.md](./GOOSE_SETUP.md) - Detailed Goose configuration guide
+- [COPILOT_SETUP.md](./COPILOT_SETUP.md) - Copilot setup (unofficial integration)
 - [Ollama Documentation](https://ollama.ai/docs) - Local model setup
 - [Claude Code](https://claude.ai/claude-code) - Official Claude CLI
 - [Goose AI](https://github.com/block/goose) - Goose repository
+- [copilot-api](https://github.com/nicepkg/copilot-api) - Unofficial Copilot proxy (third-party)

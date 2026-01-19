@@ -1,0 +1,136 @@
+# .github/workflows/publish-test.yaml
+# Publishes to TestPyPI for validation before production release
+name: Publish to TestPyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: 'Version suffix (e.g., rc1, beta1) - appended to version'
+        required: false
+        type: string
+        default: ''
+  push:
+    tags:
+      - 'v*-rc*'
+      - 'v*-beta*'
+      - 'v*-alpha*'
+
+permissions:
+  contents: read
+  id-token: write  # For trusted publishing
+
+jobs:
+  build:
+    name: Build Package
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep -E "^version = " pyproject.toml | head -1 | cut -d'"' -f2)
+          SUFFIX="${{ inputs.version_suffix }}"
+          if [ -n "$SUFFIX" ]; then
+            # For manual runs, append suffix
+            FULL_VERSION="${VERSION}.${SUFFIX}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # For tag pushes, extract version from tag
+            FULL_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            # Default: use version + dev + timestamp
+            FULL_VERSION="${VERSION}.dev$(date +%Y%m%d%H%M%S)"
+          fi
+          echo "version=$FULL_VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $FULL_VERSION"
+
+      - name: Update version for TestPyPI
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
+          echo "Updated pyproject.toml to version $VERSION"
+          grep "^version = " pyproject.toml
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  test-publish:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # Uses OIDC trusted publishing - no token needed if configured
+          # Fallback: set TEST_PYPI_API_TOKEN secret
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+
+  verify:
+    name: Verify Installation
+    needs: [build, test-publish]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Wait for TestPyPI to index
+        run: sleep 30
+
+      - name: Install from TestPyPI
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          pip install --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/ \
+            "repo-sapiens==$VERSION"
+
+      - name: Verify CLI
+        run: |
+          sapiens --version
+          sapiens --help
+
+      - name: Summary
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          echo "## TestPyPI Publish Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Install Command" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ repo-sapiens==$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View on TestPyPI](https://test.pypi.org/project/repo-sapiens/$VERSION/)" >> $GITHUB_STEP_SUMMARY

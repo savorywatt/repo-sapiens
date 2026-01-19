@@ -2,7 +2,7 @@
 # scripts/bootstrap-gitea.sh
 #
 # Bootstraps a fresh Gitea instance for integration testing.
-# Creates config, admin user, API token, test repository, and optionally an Actions runner.
+# Creates config, admin user, API token, test repository, and an Actions runner.
 #
 # Usage:
 #   ./scripts/bootstrap-gitea.sh [options]
@@ -14,7 +14,7 @@
 #   --pass PASS      Admin password (default: admin123)
 #   --repo NAME      Test repository name (default: test-repo)
 #   --no-docker      Skip Docker operations (Gitea already configured)
-#   --with-runner    Set up Gitea Actions runner for CI/CD testing
+#   --no-runner      Skip Gitea Actions runner setup
 #   --runner-name    Runner container name (default: gitea-act-runner)
 #   --cleanup        Remove all Gitea containers and reset environment
 #   --output FILE    Output file for credentials (default: .env.gitea-test)
@@ -34,7 +34,7 @@ ADMIN_EMAIL="${ADMIN_EMAIL:-testadmin@localhost}"
 TEST_REPO="${TEST_REPO:-test-repo}"
 SKIP_DOCKER=false
 OUTPUT_FILE="${OUTPUT_FILE:-.env.gitea-test}"
-WITH_RUNNER=false
+WITH_RUNNER=true
 RUNNER_CONTAINER="${RUNNER_CONTAINER:-gitea-act-runner}"
 RUNNER_TOKEN=""
 CLEANUP_ONLY=false
@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
         --repo) TEST_REPO="$2"; shift 2 ;;
         --no-docker) SKIP_DOCKER=true; shift ;;
         --output) OUTPUT_FILE="$2"; shift 2 ;;
-        --with-runner) WITH_RUNNER=true; shift ;;
+        --no-runner) WITH_RUNNER=false; shift ;;
         --runner-name) RUNNER_CONTAINER="$2"; shift 2 ;;
         --cleanup) CLEANUP_ONLY=true; shift ;;
         -h|--help)
@@ -452,7 +452,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: https://github.com/savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -566,26 +566,10 @@ setup_actions_runner() {
     gitea_ip=$(docker inspect "$DOCKER_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
     log "Gitea container IP: $gitea_ip"
 
-    # Create runner config file on host to mount into container
-    local runner_config_dir="/tmp/gitea-runner-config-$$"
-    mkdir -p "$runner_config_dir"
-    cat > "$runner_config_dir/config.yaml" << CONFIGYAML
-runner:
-  file: .runner
-  capacity: 1
-  timeout: 3h
-
-container:
-  network: $gitea_network
-  privileged: false
-
-host:
-  workdir_parent:
-CONFIGYAML
-
     log "Starting Actions runner container..."
     # Use the same network as Gitea so job containers can reach it
-    # Mount the config file so it's available at startup
+    # Note: We don't mount a config file as it doesn't work with remote Docker contexts
+    # The runner will use environment variables for configuration
     docker run -d \
         --name "$RUNNER_CONTAINER" \
         --restart unless-stopped \
@@ -594,13 +578,11 @@ CONFIGYAML
         -e GITEA_RUNNER_REGISTRATION_TOKEN="$RUNNER_TOKEN" \
         -e GITEA_RUNNER_NAME="test-runner" \
         -e GITEA_RUNNER_LABELS="ubuntu-latest:docker://catthehacker/ubuntu:act-latest" \
-        -e CONFIG_FILE="/config/config.yaml" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -v "$runner_config_dir:/config:ro" \
         gitea/act_runner:latest > /dev/null 2>&1 || {
             warn "Failed to start runner with same network, trying bridge..."
 
-            # Fallback: use default bridge network (no config mount)
+            # Fallback: use default bridge network
             docker run -d \
                 --name "$RUNNER_CONTAINER" \
                 --restart unless-stopped \
@@ -611,7 +593,6 @@ CONFIGYAML
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 gitea/act_runner:latest > /dev/null 2>&1 || {
                     warn "Failed to start runner container"
-                    rm -rf "$runner_config_dir"
                     return 1
                 }
         }
