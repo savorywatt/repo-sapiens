@@ -81,7 +81,7 @@ jobs:
           # Note: No pip caching - target repos may not have requirements.txt/pyproject.toml
 
       - name: Install sapiens
-        run: pip install repo-sapiens==2.1.0
+        run: pip install repo-sapiens==0.0.2
 
       - name: Configure git
         if: contains(fromJSON('["execute", "approved"]'), inputs.label)
