@@ -873,38 +873,66 @@ verify_component() {
     local passed=0
     local failed=0
 
-    # Check 1: CI config has component include
-    log "Checking component in CI config..."
+    # Check 1: CI config has sapiens job
+    log "Checking sapiens job in CI config..."
     local ci_file
     ci_file=$(gitlab_api GET "/projects/$PROJECT_ENCODED/repository/files/.gitlab-ci.yml?ref=main" 2>/dev/null || echo "")
 
-    if echo "$ci_file" | jq -r '.content' 2>/dev/null | base64 -d 2>/dev/null | grep -q "sapiens-dispatcher"; then
-        log "  Component reference found in CI config"
+    if echo "$ci_file" | jq -r '.content' 2>/dev/null | base64 -d 2>/dev/null | grep -q "sapiens-dispatch"; then
+        log "  Sapiens dispatch job found in CI config"
         ((passed++))
     else
-        error "  Component reference not found"
+        error "  Sapiens dispatch job not found"
         ((failed++))
     fi
 
-    # Check 2: Issue has activity (comments or label changes)
-    log "Checking for issue activity..."
+    # Check 2: Issue has comments (sapiens posts comments)
+    log "Checking for sapiens comments on issue..."
     local notes
     notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$COMPONENT_ISSUE_IID/notes" 2>/dev/null || echo "[]")
     local notes_count
     notes_count=$(echo "$notes" | jq 'length')
 
     if [[ "$notes_count" -gt 0 ]]; then
-        log "  Issue has $notes_count note(s)"
+        log "  Issue has $notes_count comment(s)"
         ((passed++))
     else
-        warn "  - No notes on issue (component may not have triggered)"
+        warn "  - No comments on issue (pipeline may not have run)"
+    fi
+
+    # Check 3: Check for proposal issue created by component
+    log "Checking for proposal issue..."
+    local proposals
+    proposals=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues?search=PROPOSAL&in=title" || echo "[]")
+    local component_proposal
+    component_proposal=$(echo "$proposals" | jq -r ".[] | select(.title | contains(\"#$COMPONENT_ISSUE_IID\")) | .iid" | head -1)
+
+    if [[ -n "$component_proposal" ]]; then
+        log "  Proposal issue created: #$component_proposal"
+        ((passed++))
+    else
+        warn "  - No proposal issue found (pipeline may have failed)"
+    fi
+
+    # Check 4: Check for label changes on issue
+    log "Checking for label changes..."
+    local issue
+    issue=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$COMPONENT_ISSUE_IID" 2>/dev/null || echo "{}")
+    local labels
+    labels=$(echo "$issue" | jq -r '.labels | join(",")' 2>/dev/null || echo "")
+
+    if [[ "$labels" == *"plan-ready"* ]]; then
+        log "  Plan-ready label added"
+        ((passed++))
+    else
+        warn "  - No plan-ready label (labels: $labels)"
     fi
 
     echo ""
     log "Component verification: $passed passed, $failed failed"
 
-    # Component test passes if config was deployed, even if component didn't fully run
-    [[ $failed -gt 1 ]] && return 1
+    # Component test passes if CI config was deployed
+    [[ $failed -gt 0 ]] && return 1
     return 0
 }
 

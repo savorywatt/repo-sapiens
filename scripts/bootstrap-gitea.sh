@@ -498,6 +498,48 @@ WORKFLOW_EOF
 }
 
 #############################################
+# Step 6c: Configure repository secrets for Actions
+#############################################
+configure_repo_secrets() {
+    log "Configuring repository secrets for Actions..."
+
+    # Gitea Actions secrets API: PUT /repos/{owner}/{repo}/actions/secrets/{secretname}
+    # The secret value needs to be in the request body as {"data": "base64_encoded_value"}
+
+    # Set SAPIENS_GITEA_TOKEN (use the same token we generated)
+    local token_b64
+    token_b64=$(echo -n "$GITEA_TOKEN" | base64 -w 0)
+
+    local response
+    response=$(curl -s -X PUT "$GITEA_URL/api/v1/repos/$ADMIN_USER/$TEST_REPO/actions/secrets/SAPIENS_GITEA_TOKEN" \
+        -H "Authorization: token $GITEA_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"data\":\"$token_b64\"}" 2>&1)
+
+    if [[ $? -eq 0 ]]; then
+        log "Secret SAPIENS_GITEA_TOKEN configured"
+    else
+        warn "Could not configure SAPIENS_GITEA_TOKEN: $response"
+    fi
+
+    # Set SAPIENS_AI_API_KEY (use environment variable if available, otherwise placeholder)
+    local ai_key="${SAPIENS_AI_API_KEY:-${AI_API_KEY:-test-api-key-placeholder}}"
+    local ai_key_b64
+    ai_key_b64=$(echo -n "$ai_key" | base64 -w 0)
+
+    response=$(curl -s -X PUT "$GITEA_URL/api/v1/repos/$ADMIN_USER/$TEST_REPO/actions/secrets/SAPIENS_AI_API_KEY" \
+        -H "Authorization: token $GITEA_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{\"data\":\"$ai_key_b64\"}" 2>&1)
+
+    if [[ $? -eq 0 ]]; then
+        log "Secret SAPIENS_AI_API_KEY configured"
+    else
+        warn "Could not configure SAPIENS_AI_API_KEY: $response"
+    fi
+}
+
+#############################################
 # Step 7: Set up Actions runner (optional)
 #############################################
 setup_actions_runner() {
@@ -682,6 +724,7 @@ main() {
     generate_api_token
     create_test_repo
     deploy_sapiens_workflow
+    configure_repo_secrets
     setup_actions_runner
     write_output
 
