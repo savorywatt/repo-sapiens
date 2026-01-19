@@ -5,16 +5,19 @@ This module provides configuration classes for all aspects of the automation sys
 including Git providers, agents, workflows, and tags.
 """
 
+from __future__ import annotations
+
 import os
 import re
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repo_sapiens.config.credential_fields import CredentialSecret
+from repo_sapiens.config.mcp import MCPConfig
 from repo_sapiens.config.triggers import AutomationConfig
 from repo_sapiens.enums import ProviderType
 from repo_sapiens.exceptions import ConfigurationError
@@ -54,6 +57,87 @@ class GooseConfig(BaseModel):
     llm_provider: str | None = Field(default=None, description="LLM provider (openai, anthropic, ollama, etc.)")
 
 
+class CopilotConfig(BaseModel):
+    """Configuration for GitHub Copilot provider using copilot-api proxy.
+
+    WARNING: This integration uses an unofficial, reverse-engineered API.
+    - Not endorsed or supported by GitHub
+    - May violate GitHub Terms of Service
+    - Could stop working at any time
+    - Use at your own risk
+
+    Supports two deployment modes:
+    - Managed: Auto-starts copilot-api proxy subprocess
+    - External: Connects to existing copilot-api instance
+    """
+
+    github_token: CredentialSecret = Field(
+        ...,
+        description="GitHub OAuth token (gho_xxx) with Copilot access. "
+        "Supports @keyring:, ${ENV}, @encrypted: references.",
+    )
+    manage_proxy: bool = Field(
+        default=True,
+        description="If true, auto-start/stop copilot-api subprocess. " "If false, connect to external proxy_url.",
+    )
+    proxy_port: int = Field(
+        default=4141,
+        ge=1024,
+        le=65535,
+        description="Port for managed proxy (only used when manage_proxy=true).",
+    )
+    proxy_url: str | None = Field(
+        default=None,
+        description="URL of external copilot-api instance "
+        "(required when manage_proxy=false, e.g., http://localhost:4141/v1).",
+    )
+    account_type: Literal["individual", "business", "enterprise"] = Field(
+        default="individual",
+        description="GitHub Copilot subscription type.",
+    )
+    rate_limit: float | None = Field(
+        default=None,
+        ge=0.1,
+        description="Seconds between API requests (recommended: 2.0 to avoid abuse detection).",
+    )
+    model: str = Field(
+        default="gpt-4",
+        description="Model to request from Copilot API.",
+    )
+    startup_timeout: float = Field(
+        default=30.0,
+        ge=5.0,
+        le=120.0,
+        description="Maximum seconds to wait for proxy startup.",
+    )
+    shutdown_timeout: float = Field(
+        default=5.0,
+        ge=1.0,
+        le=30.0,
+        description="Maximum seconds to wait for graceful proxy shutdown.",
+    )
+
+    @model_validator(mode="after")
+    def validate_proxy_config(self) -> CopilotConfig:
+        """Enforce mutually exclusive proxy configuration."""
+        if self.manage_proxy:
+            if self.proxy_url is not None:
+                raise ValueError("proxy_url must not be set when manage_proxy=true. " "Use proxy_port instead.")
+        else:
+            if self.proxy_url is None:
+                raise ValueError("proxy_url is required when manage_proxy=false. " "Example: http://localhost:4141/v1")
+            if not (self.proxy_url.startswith("http://") or self.proxy_url.startswith("https://")):
+                raise ValueError(f"proxy_url must start with http:// or https://, " f"got: {self.proxy_url}")
+        return self
+
+    @property
+    def effective_url(self) -> str:
+        """Get the effective proxy URL based on configuration."""
+        if self.manage_proxy:
+            return f"http://localhost:{self.proxy_port}/v1"
+        return self.proxy_url or ""
+
+
 class AgentProviderConfig(BaseModel):
     """AI agent configuration.
 
@@ -78,6 +162,17 @@ class AgentProviderConfig(BaseModel):
         default=None,
         description="Goose-specific configuration (only used with goose-local)",
     )
+    copilot_config: CopilotConfig | None = Field(
+        default=None,
+        description="Copilot-specific configuration (required for provider_type='copilot-local')",
+    )
+
+    @model_validator(mode="after")
+    def validate_provider_config(self) -> AgentProviderConfig:
+        """Ensure required configs are present for each provider type."""
+        if self.provider_type == ProviderType.COPILOT_LOCAL and self.copilot_config is None:
+            raise ValueError("copilot_config is required when provider_type='copilot-local'")
+        return self
 
 
 class WorkflowConfig(BaseModel):
@@ -126,6 +221,7 @@ class AutomationSettings(BaseSettings):
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     tags: TagsConfig = Field(default_factory=TagsConfig)
     automation: AutomationConfig = Field(default_factory=AutomationConfig)
+    mcp: MCPConfig = Field(default_factory=MCPConfig, description="MCP server configuration")
 
     @property
     def state_dir(self) -> Path:
@@ -138,7 +234,7 @@ class AutomationSettings(BaseSettings):
         return Path(self.workflow.plans_directory)
 
     @classmethod
-    def from_yaml(cls, config_path: str) -> "AutomationSettings":
+    def from_yaml(cls, config_path: str) -> AutomationSettings:
         """Load settings from YAML file with environment variable interpolation.
 
         Supports ${VAR_NAME} syntax for environment variable substitution.

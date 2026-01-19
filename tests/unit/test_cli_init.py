@@ -202,9 +202,14 @@ class TestRepoInitializerDiscoverRepository:
     @patch("repo_sapiens.cli.init.GitDiscovery")
     def test_discover_repository_success(self, mock_discovery_class, tmp_path, mock_repo_info):
         """Should successfully discover repository configuration."""
+        # Create mock remote with Gitea URL (non-GitHub/GitLab defaults to Gitea)
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitea.example.com/test-owner/test-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = mock_repo_info
-        mock_discovery.detect_provider_type.return_value = "gitea"
         mock_discovery_class.return_value = mock_discovery
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
@@ -221,13 +226,19 @@ class TestRepoInitializerDiscoverRepository:
         assert initializer.repo_info == mock_repo_info
         assert initializer.provider_type == "gitea"
         mock_discovery_class.assert_called_once_with(tmp_path)
+        mock_discovery.parse_repository.assert_called_once_with(remote_name="origin")
 
     @patch("repo_sapiens.cli.init.GitDiscovery")
     def test_discover_repository_github(self, mock_discovery_class, tmp_path, github_repo_info):
         """Should detect GitHub provider type."""
+        # Create mock remote with GitHub URL
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://github.com/github-owner/github-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = github_repo_info
-        mock_discovery.detect_provider_type.return_value = "github"
         mock_discovery_class.return_value = mock_discovery
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
@@ -247,9 +258,14 @@ class TestRepoInitializerDiscoverRepository:
     @patch("repo_sapiens.cli.init.GitDiscovery")
     def test_init_detects_gitlab_repository(self, mock_discovery_class, tmp_path, gitlab_repo_info):
         """Should detect GitLab provider type from gitlab.com URLs."""
+        # Create mock remote with GitLab URL
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitlab.com/gitlab-owner/gitlab-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = gitlab_repo_info
-        mock_discovery.detect_provider_type.return_value = "gitlab"
         mock_discovery_class.return_value = mock_discovery
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
@@ -271,7 +287,7 @@ class TestRepoInitializerDiscoverRepository:
     def test_discover_repository_git_discovery_error(self, mock_discovery_class, tmp_path):
         """Should raise ClickException on GitDiscoveryError."""
         mock_discovery = Mock()
-        mock_discovery.parse_repository.side_effect = GitDiscoveryError("No remote found")
+        mock_discovery.list_remotes.side_effect = GitDiscoveryError("No remote found")
         mock_discovery_class.return_value = mock_discovery
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
@@ -1377,9 +1393,14 @@ class TestRepoInitializerWorkflow:
         mock_repo_info,
     ):
         """Should execute all workflow steps in order."""
+        # Create mock remote with Gitea URL
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitea.example.com/test-owner/test-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = mock_repo_info
-        mock_discovery.detect_provider_type.return_value = "gitea"
         mock_discovery_class.return_value = mock_discovery
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
@@ -1419,9 +1440,14 @@ class TestRepoInitializerWorkflow:
         mock_repo_info,
     ):
         """Should skip secret setup when disabled."""
+        # Create mock remote with Gitea URL
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitea.example.com/test-owner/test-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = mock_repo_info
-        mock_discovery.detect_provider_type.return_value = "gitea"
         mock_discovery_class.return_value = mock_discovery
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
@@ -1705,13 +1731,13 @@ class TestRepoInitializerEdgeCases:
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.utils.agent_detector.detect_available_agents")
     @patch("repo_sapiens.utils.agent_detector.format_agent_list")
-    def test_configure_agent_api_choice_always_available(
+    def test_configure_agent_builtin_choice_always_available(
         self, mock_format, mock_detect, mock_confirm, mock_prompt, tmp_path, mock_repo_info
     ):
-        """Should always include 'api' as a choice even when agents are detected."""
+        """Should always include 'builtin' as a choice even when agents are detected."""
         mock_detect.return_value = ["claude"]
         mock_format.return_value = "Available AI Agents:\n  - Claude Code"
-        mock_prompt.return_value = "api"
+        mock_prompt.return_value = "builtin"
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="keyring"):
             initializer = RepoInitializer(
@@ -1724,12 +1750,13 @@ class TestRepoInitializerEdgeCases:
 
         initializer.repo_info = mock_repo_info
 
-        # The prompt should have 'api' as an option
-        with patch.object(initializer, "_configure_claude"):
+        # The prompt should have 'builtin' as an option
+        with patch.object(initializer, "_configure_builtin"):
             initializer._configure_ai_agent()
 
-        # Verify prompt was called and api was accepted
+        # Verify prompt was called and builtin was accepted
         mock_prompt.assert_called()
+        assert initializer.agent_type.value == "builtin"
 
 
 # =============================================================================
@@ -1755,9 +1782,14 @@ class TestRepoInitializerIntegration:
         mock_repo_info.repo = "test-repo"
         mock_repo_info.base_url = "https://gitea.example.com"
 
+        # Create mock remote with Gitea URL
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://gitea.example.com/test-owner/test-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = mock_repo_info
-        mock_discovery.detect_provider_type.return_value = "gitea"
         mock_discovery_class.return_value = mock_discovery
 
         mock_keyring = Mock()
@@ -1800,9 +1832,14 @@ class TestRepoInitializerIntegration:
         mock_repo_info.repo = "github-repo"
         mock_repo_info.base_url = "https://github.com"
 
+        # Create mock remote with GitHub URL
+        mock_remote = Mock()
+        mock_remote.name = "origin"
+        mock_remote.url = "https://github.com/github-owner/github-repo.git"
+
         mock_discovery = Mock()
+        mock_discovery.list_remotes.return_value = [mock_remote]
         mock_discovery.parse_repository.return_value = mock_repo_info
-        mock_discovery.detect_provider_type.return_value = "github"
         mock_discovery_class.return_value = mock_discovery
 
         mock_keyring = Mock()

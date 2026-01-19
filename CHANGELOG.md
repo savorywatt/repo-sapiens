@@ -8,6 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **MCP (Model Context Protocol) Support**: Unified MCP integration across all agent backends
+  - `repo_sapiens/mcp/` package with registry, client, adapter, and manager modules
+  - `MCPServerSpec` frozen dataclass for immutable server specifications
+  - `MCPServerRegistry` protocol with `DefaultMCPRegistry` implementation
+  - 9 built-in MCP servers: github, gitlab, jira, linear, taiga, git, filesystem, brave-search, fetch
+  - `StdioMCPClient` for JSON-RPC 2.0 communication over stdin/stdout
+  - `MCPToolAdapter` bridges MCP tools to sapiens `ToolRegistry`
+  - `MCPManager` async context manager for server lifecycle (install, configure, start, teardown)
+  - Process group management (`start_new_session=True`, `os.killpg()`) for reliable cleanup
+  - Agent-specific config generation: `.claude.json` for Claude, `goose.yaml` for Goose
+  - `MCPConfig` and `MCPServerConfig` Pydantic models with env var mapping
+  - `sapiens mcp` CLI command group: list, status, configure, install, test
+  - Exception hierarchy: `MCPError`, `MCPConfigError`, `MCPInstallError`, `MCPServerError`, `MCPTimeoutError`, `MCPProtocolError`
+  - 121 unit tests covering registry, client, adapter, manager, and exceptions
+  - Documentation: `docs/mcp-ticket-systems.md` for ticket system integration guide
+- **OpenAI Function Calling Support**: ReAct agent now supports native function calling
+  - `ChatResponse` and `ToolCall` dataclasses for structured tool call handling
+  - `to_openai_format()` method on `ToolRegistry` for OpenAI-compatible tool definitions
+  - Backend abstraction with `tools` parameter in `chat()` methods
+  - `ReActConfig` extended with `backend_type`, `base_url`, `api_key`, `use_native_tools`
+  - Automatic fallback to text-based parsing when native tools unavailable
+  - Works with Ollama models that support tool calling (qwen3, llama3.1, etc.)
+  - Works with OpenAI-compatible APIs (vLLM, llama.cpp, OpenAI)
+- **Reusable Workflow Architecture**: Single dispatcher workflow replaces copy-paste templates
+  - `.github/workflows/sapiens-dispatcher.yaml` - Reusable workflow for GitHub and Gitea
+  - `gitlab/sapiens-dispatcher/` - GitLab CI/CD Component (requires GitLab 16.0+)
+  - User repositories now need only ~20 lines instead of ~490 lines
+  - Version-locked via tag reference (e.g., `@v2.1.0` installs `repo-sapiens==2.1.0`)
+  - Supports all Git providers: GitHub, Gitea (uses GitHub workflow), GitLab
+  - Full documentation: `docs/WORKFLOW_REFERENCE.md`, `docs/GITLAB_SETUP.md`, `docs/MIGRATION.md`
+- **GitLab Bootstrap Script**: Automated setup for GitLab integration testing
+  - `scripts/bootstrap-gitlab.sh` creates container, waits for health, generates API token
+  - Creates test project with automation labels via Rails console
+  - Optional GitLab Runner setup with `--with-runner` flag
+  - Outputs `.env.gitlab-test` for easy sourcing
+- **GitLab Workflow Templates**: Complete GitLab CI/CD workflow templates for all automation stages
+  - `approved.yaml`, `needs-planning.yaml`, `needs-review.yaml`, `needs-fix.yaml`, `requires-qa.yaml`, `execute-task.yaml`
+  - Recipe templates: `weekly-test-coverage.yaml`, `weekly-sbom-license.yaml`
+  - All templates follow SAPIENS_ prefix convention for CI/CD variables
+- **Multi-Remote Support**: Interactive provider selection when multiple Git remotes detected
+  - Detects GitHub, GitLab, and Gitea from remote URLs during `sapiens init`
+  - Uses preferred remotes (origin > upstream > first) in non-interactive mode
+  - Prompts user to select provider when multiple are detected
 - **GitHub Copilot Integration**: Support for GitHub Copilot as an AI agent provider
   - New `copilot-local` provider type using the official `gh copilot` CLI
   - Automatic detection of GitHub CLI and Copilot extension during `sapiens init`
@@ -42,8 +85,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deploys correct workflow templates based on selected mode
   - Mode-specific next steps guidance
   - Smart config update mode - prompts which sections to update on re-init
+- **Comprehensive Validation System**: `health-check --full` for end-to-end testing
+  - Tests read operations (list issues, branches, repository info)
+  - Tests write operations (create branch, issue, comment, PR with cleanup)
+  - Tests agent operations (connectivity, simple prompt execution)
+  - Structured diagnostic reports with `DiagnosticReport` and `ValidationResult` models
+  - JSON output with `--json` flag for CI/CD integration
+  - LLM-generated summaries when agent is available
+  - Validation workflow templates for GitHub Actions, Gitea Actions, GitLab CI
+  - Optional deployment during `sapiens init`
 
 ### Changed
+- **WorkflowGenerator Thin Wrappers**: `WorkflowGenerator` now generates thin wrapper workflows
+  - GitHub/Gitea: ~20 line wrapper referencing `sapiens-dispatcher.yaml@vX.Y.Z`
+  - GitLab: Include directive referencing CI/CD component
+  - Output filename changed from `process-label.yaml` to `sapiens.yaml`
+- **Secret Naming Standardization**: All secrets now use `SAPIENS_` prefix
+  - `SAPIENS_GITEA_TOKEN` for Gitea (GITEA_ prefix is reserved by Gitea)
+  - `SAPIENS_GITHUB_TOKEN` for GitHub (GITHUB_ prefix is reserved for custom secrets)
+  - Updated all workflow templates, documentation, and code
+- **Goose Agent Simplification**: Removed non-functional `goose-api` provider type
+  - Goose is CLI-only, so only `goose-local` is valid
+  - Updated documentation and configuration to reflect this
 - **Python Requirement**: Now requires Python 3.12+ (was 3.13+)
   - Updated all workflows, Docker images, and configs
   - Better compatibility with stable Python releases
@@ -57,8 +120,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Daemon mode: deploys `automation-daemon.yaml` for polling
   - Hybrid mode: deploys both workflows
   - All modes: includes `process-issue.yaml` for manual triggers
+- **Test Coverage**: Improved from 70% to 75% overall
+  - Added comprehensive tests for diagnostics, async_subprocess, mcp_client modules (100%)
+  - Added tests for comment_analyzer, interactive, rendering modules (100%)
+  - Added tests for pr_fix (99%), webhook_server (97%), qa (87%) stages
+  - Fixed 16 failing tests across cli_init, config_settings, main_cli modules
 
 ### Fixed
+- **GitLab `setup_automation_labels`**: Fixed undefined attribute reference in gitlab_rest.py:584
+  - Was using `self._project_path_encoded` which doesn't exist
+  - Now correctly uses `self.project_path` like other methods
+- **GitLab Templates**: Updated all existing templates to use `SAPIENS_GITLAB_TOKEN` instead of `GITLAB_TOKEN`
+  - The `GITLAB_` prefix is reserved for GitLab's internal CI/CD variables
+- **GitProvider Protocol**: Added missing `get_pull_request` method to base class
+  - Implemented in GitHubRestProvider and GitLabRestProvider
+  - Added `add_comment_reply` method for threaded comment responses
+- **AgentProvider Protocol**: Added missing `execute_prompt` method and `working_dir` attribute
+  - Enables interactive AI prompts for comment analysis and fix execution
+- **PullRequest Model**: Added `author` field for PR author identification
+- **Type Annotations**: Fixed MyPy errors across multiple files
+  - Added type parameters to generic `dict` and `list` types
+  - Fixed return type annotations in `comment_analyzer.py`
+- **Ruff Linting**: Fixed all linting errors
+  - Simplified nested if statement in `settings.py`
+  - Fixed line length issues in test files
+  - Added timezone info to datetime objects in tests
+- **Detect Secrets**: Updated baseline and added pragma comments for test API keys
 - API token whitespace stripping in all providers (Gitea, GitHub, GitLab)
 - Automation mode configuration test mocking
 - Automation field default in AutomationSettings (backward compatibility)
@@ -69,6 +156,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI `--log-level` option position
 
 ### Removed
+- **`templates/` directory**: Copy-paste workflow templates replaced by reusable workflows
+  - Users who want customization should fork the repo and modify the dispatcher
+  - Reduces maintenance burden and ensures consistent behavior
 - Docker build from CI workflow (not used by any workflow)
 - Conversation history files from repository (moved to local storage)
 

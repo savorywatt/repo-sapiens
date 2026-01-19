@@ -130,6 +130,43 @@ class ToolRegistry:
             lines.append(f"  {tool.description}")
         return "\n".join(lines)
 
+    def to_openai_format(self) -> list[dict[str, Any]]:
+        """Convert tool definitions to OpenAI function calling format.
+
+        Returns:
+            List of tool definitions in OpenAI's function calling format.
+        """
+        tools = []
+        for tool in self.TOOLS.values():
+            properties = {}
+            required = []
+
+            for param_name, param_desc in tool.parameters.items():
+                properties[param_name] = {
+                    "type": "string",
+                    "description": param_desc,
+                }
+                # Parameters without "default" or "optional" in description are required
+                desc_lower = param_desc.lower()
+                if "default" not in desc_lower and "optional" not in desc_lower:
+                    required.append(param_name)
+
+            tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required,
+                        },
+                    },
+                }
+            )
+        return tools
+
     def _resolve_path(self, path: str) -> Path:
         """Resolve a path relative to working directory, with security checks."""
         resolved = (self.working_dir / path).resolve()

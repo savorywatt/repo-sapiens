@@ -3,11 +3,16 @@
 This module provides a unified interface for different LLM backends,
 allowing the ReAct agent to work with Ollama, OpenAI-compatible APIs,
 or other LLM providers through a consistent interface.
+
+Supports native function calling for models that support it.
 """
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
 
 import httpx
 import structlog
@@ -15,6 +20,35 @@ import structlog
 from repo_sapiens.exceptions import AgentError, ProviderConnectionError
 
 log = structlog.get_logger()
+
+
+@dataclass
+class ToolCall:
+    """Represents a tool call from the LLM."""
+
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass
+class ChatResponse:
+    """Unified response from chat completion.
+
+    Attributes:
+        content: Text content of the response (may be empty if tool_calls present)
+        tool_calls: List of tool calls requested by the model
+        raw: Raw response dict for debugging
+    """
+
+    content: str
+    tool_calls: list[ToolCall]
+    raw: dict[str, Any]
+
+    @property
+    def has_tool_calls(self) -> bool:
+        """Check if response contains tool calls."""
+        return len(self.tool_calls) > 0
 
 
 class LLMBackend(ABC):
@@ -54,23 +88,33 @@ class LLMBackend(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
         temperature: float = 0.7,
-    ) -> str:
+        tools: list[dict[str, Any]] | None = None,
+    ) -> ChatResponse:
         """Send chat messages and return the response.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys.
+                For tool results, include 'tool_call_id' and 'name' keys.
             model: The model identifier to use.
             temperature: Sampling temperature (0.0 to 1.0).
+            tools: Optional list of tool definitions in OpenAI format.
 
         Returns:
-            The assistant's response content as a string.
+            ChatResponse with content and/or tool_calls.
 
         Raises:
             httpx.HTTPError: On HTTP request failures.
             AgentError: On backend-specific errors.
+        """
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Close any open connections.
+
+        Implementations should clean up any resources (HTTP clients, etc.).
         """
 
 
@@ -159,38 +203,72 @@ class OllamaBackend(LLMBackend):
 
     async def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
         temperature: float = 0.7,
-    ) -> str:
+        tools: list[dict[str, Any]] | None = None,
+    ) -> ChatResponse:
         """Send chat messages to Ollama and return the response.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys.
             model: The Ollama model to use (e.g., "qwen3:latest").
             temperature: Sampling temperature (0.0 to 1.0).
+            tools: Optional list of tool definitions in OpenAI format.
 
         Returns:
-            The assistant's response content.
+            ChatResponse with content and/or tool_calls.
 
         Raises:
             httpx.HTTPError: On HTTP request failures.
         """
         try:
+            request_body: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": temperature,
+                },
+            }
+
+            # Add tools if provided (Ollama supports OpenAI-compatible tool format)
+            if tools:
+                request_body["tools"] = tools
+
             response = await self.client.post(
                 f"{self.base_url}/api/chat",
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": temperature,
-                    },
-                },
+                json=request_body,
             )
             response.raise_for_status()
             result = response.json()
-            return result.get("message", {}).get("content", "")
+
+            message = result.get("message", {})
+            content = message.get("content", "")
+
+            # Parse tool calls if present
+            tool_calls: list[ToolCall] = []
+            if raw_tool_calls := message.get("tool_calls"):
+                for i, tc in enumerate(raw_tool_calls):
+                    func = tc.get("function", {})
+                    # Parse arguments - Ollama may return string or dict
+                    args = func.get("arguments", {})
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except json.JSONDecodeError:
+                            args = {}
+
+                    tool_calls.append(
+                        ToolCall(
+                            id=tc.get("id", f"call_{i}"),
+                            name=func.get("name", ""),
+                            arguments=args,
+                        )
+                    )
+
+            return ChatResponse(content=content, tool_calls=tool_calls, raw=result)
+
         except Exception as e:
             log.error("ollama_chat_failed", error=str(e), model=model)
             raise
@@ -325,33 +403,43 @@ class OpenAIBackend(LLMBackend):
 
     async def chat(
         self,
-        messages: list[dict[str, str]],
+        messages: list[dict[str, Any]],
         model: str,
         temperature: float = 0.7,
-    ) -> str:
+        tools: list[dict[str, Any]] | None = None,
+    ) -> ChatResponse:
         """Send chat messages to the OpenAI-compatible server and return the response.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys.
+                For tool results, include 'tool_call_id' and 'name' keys.
             model: The model ID to use.
             temperature: Sampling temperature (0.0 to 1.0).
+            tools: Optional list of tool definitions in OpenAI format.
 
         Returns:
-            The assistant's response content.
+            ChatResponse with content and/or tool_calls.
 
         Raises:
             httpx.HTTPError: On HTTP request failures.
             AgentError: On OpenAI API errors.
         """
         try:
+            request_body: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+            }
+
+            # Add tools if provided
+            if tools:
+                request_body["tools"] = tools
+                request_body["tool_choice"] = "auto"
+
             response = await self.client.post(
                 f"{self.base_url}/chat/completions",
                 headers=self._get_headers(),
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": temperature,
-                },
+                json=request_body,
             )
             response.raise_for_status()
             result = response.json()
@@ -362,7 +450,32 @@ class OpenAIBackend(LLMBackend):
                 log.error("openai_chat_error", error=error_msg, model=model)
                 raise AgentError(f"OpenAI API error: {error_msg}", agent_type="openai")
 
-            return result["choices"][0]["message"]["content"]
+            message = result["choices"][0]["message"]
+            content = message.get("content") or ""
+
+            # Parse tool calls if present
+            tool_calls: list[ToolCall] = []
+            if raw_tool_calls := message.get("tool_calls"):
+                for tc in raw_tool_calls:
+                    func = tc.get("function", {})
+                    # Parse arguments - OpenAI returns string
+                    args = func.get("arguments", "{}")
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except json.JSONDecodeError:
+                            args = {}
+
+                    tool_calls.append(
+                        ToolCall(
+                            id=tc.get("id", ""),
+                            name=func.get("name", ""),
+                            arguments=args,
+                        )
+                    )
+
+            return ChatResponse(content=content, tool_calls=tool_calls, raw=result)
+
         except AgentError:
             # Re-raise AgentError (API errors)
             raise

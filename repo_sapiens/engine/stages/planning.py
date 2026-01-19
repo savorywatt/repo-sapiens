@@ -3,6 +3,40 @@ Planning stage implementation.
 
 This module implements the planning stage of the workflow, which generates
 a development plan from an issue and creates a review issue for approval.
+This is typically one of the first stages in the workflow after an issue
+is labeled for automation.
+
+Workflow Integration:
+    The planning stage is triggered by the ``needs-planning`` label (or its
+    configured equivalent). Upon completion, it:
+    1. Generates a plan file in the repository
+    2. Creates a review issue for human approval
+    3. Updates labels to move to the plan review stage
+
+    Label Flow: needs-planning -> plan-review
+
+Plan Generation:
+    The AI agent analyzes the issue and generates a structured plan containing:
+    - Description of the overall approach
+    - List of discrete tasks with dependencies
+    - Estimated effort and complexity
+
+Plan Storage:
+    Plans are stored as markdown files in the configured plans directory
+    (typically ``plans/``). The file is committed directly to the default
+    branch.
+
+Review Process:
+    A separate review issue is created with a checklist for human reviewers.
+    This allows stakeholders to approve, request changes, or reject the plan
+    before implementation begins.
+
+Example:
+    An issue titled "Add user authentication" with label "needs-planning"
+    will result in:
+    1. A plan file: ``plans/issue-42-add-user-authentication.md``
+    2. A review issue: "Plan Review: Add user authentication"
+    3. Label change: needs-planning -> plan-review
 """
 
 from pathlib import Path
@@ -16,24 +50,70 @@ log = structlog.get_logger(__name__)
 
 
 class PlanningStage(WorkflowStage):
-    """Planning stage: Generate development plan from issue.
+    """Generate a development plan from an issue using AI.
 
-    This stage:
-    1. Generates a plan using the AI agent
-    2. Commits the plan file to the repository
-    3. Creates a plan review issue
-    4. Adds a comment to the original issue
-    5. Updates workflow state
+    This stage takes an issue that has been marked for automation and
+    generates a comprehensive development plan. The plan is saved to the
+    repository and a review issue is created for human approval.
+
+    Execution Flow:
+        1. Notify user that planning has started (comment on issue)
+        2. Use AI agent to generate a structured plan
+        3. Format plan as markdown and commit to repository
+        4. Create a review issue with approval checklist
+        5. Add comment to original issue linking to plan and review
+        6. Update issue labels for next stage
+        7. Persist completion to state manager
+
+    Plan Contents:
+        The generated plan includes:
+        - Title and description
+        - List of tasks with descriptions
+        - Dependencies between tasks
+        - Created timestamp
+
+    Review Issue:
+        The review issue includes:
+        - Link to original issue
+        - Link to plan file
+        - Summary of the plan
+        - Approval checklist
+        - Instructions for approval/rejection
+
+    Attributes:
+        Inherited from WorkflowStage: git, agent, state, settings
+
+    Example:
+        >>> stage = PlanningStage(git, agent, state, settings)
+        >>> await stage.execute(issue)  # Creates plan and review issue
     """
 
     async def execute(self, issue: Issue) -> None:
-        """Execute planning stage.
+        """Generate a development plan for the given issue.
+
+        Orchestrates the complete plan generation workflow from AI generation
+        to file commit to review issue creation.
 
         Args:
-            issue: Issue to generate plan for
+            issue: The issue to generate a plan for. Should have the
+                ``needs-planning`` label (or configured equivalent).
 
         Raises:
-            Exception: If plan generation fails
+            Exception: If any step fails. The error is handled via
+                ``_handle_stage_error()`` before being re-raised.
+
+        Side Effects:
+            - Adds "starting" comment to the issue
+            - Generates a plan file and commits it to the repository
+            - Creates a review issue with approval checklist
+            - Adds comment to original issue with plan location
+            - Updates issue labels (removes needs-planning, adds plan-review)
+            - Persists stage completion to state manager
+
+        Example:
+            >>> await stage.execute(issue)
+            >>> # Plan file created at plans/issue-42-add-feature.md
+            >>> # Review issue created: "Plan Review: Add Feature"
         """
         log.info("planning_stage_start", issue=issue.number, title=issue.title)
 
@@ -105,14 +185,26 @@ class PlanningStage(WorkflowStage):
             raise
 
     def _format_plan(self, plan: Plan, issue: Issue) -> str:
-        """Convert Plan object to markdown format.
+        """Convert a Plan object to markdown format for storage.
+
+        Creates a well-structured markdown document from the plan data,
+        including metadata, description, and all tasks with their
+        dependencies.
 
         Args:
-            plan: Plan to format
-            issue: Original issue
+            plan: The Plan object to format. Contains title, description,
+                tasks, and timestamps.
+            issue: The original issue that spawned this plan. Used to
+                add the issue reference to the document.
 
         Returns:
-            Markdown formatted plan
+            A markdown-formatted string suitable for saving to a file.
+            Includes headers, metadata, description, and task list.
+
+        Example:
+            >>> markdown = self._format_plan(plan, issue)
+            >>> markdown.startswith("# ")  # Has title header
+            True
         """
         lines = [
             f"# {plan.title}",
@@ -145,15 +237,26 @@ class PlanningStage(WorkflowStage):
         return "\n".join(lines)
 
     def _create_review_body(self, issue: Issue, plan: Plan, plan_path: str) -> str:
-        """Create review issue body.
+        """Create the body text for the plan review issue.
+
+        Generates a structured review issue that includes links to the
+        original issue and plan file, a summary of the plan, a review
+        checklist, and instructions for approval or rejection.
 
         Args:
-            issue: Original issue
-            plan: Generated plan
-            plan_path: Path to plan file
+            issue: The original issue that spawned the plan. Used for
+                title and number references.
+            plan: The generated plan. Used for description summary.
+            plan_path: The repository path to the plan file. Displayed
+                as a clickable link in the review issue.
 
         Returns:
-            Review issue body text
+            Markdown-formatted text for the review issue body. Includes
+            headers, links, checklist, and action instructions.
+
+        Note:
+            The description is truncated to 500 characters with ellipsis
+            to keep the review issue concise.
         """
         return f"""# Plan Review
 

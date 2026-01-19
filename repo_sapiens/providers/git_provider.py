@@ -192,6 +192,22 @@ class GiteaProvider(GitProvider):
             log.warning("branch_not_found", branch=branch_name, error=str(e))
             return None
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch."""
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+            await self.mcp.call_tool(
+                "gitea_delete_branch",
+                owner=self.owner,
+                repo=self.repo,
+                branch=branch_name,
+            )
+            return True
+        except Exception as e:
+            log.warning("delete_branch_failed", branch=branch_name, error=str(e))
+            return False
+
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_diff(self, base: str, head: str) -> str:
         """Get diff between two branches."""

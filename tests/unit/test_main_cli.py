@@ -806,6 +806,7 @@ class TestOrchestratorCreation:
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_claude_provider(self):
         """Test _create_orchestrator with Claude provider."""
+        from repo_sapiens.enums import AgentType, ProviderType
         from repo_sapiens.main import _create_orchestrator
 
         mock_settings = MagicMock()
@@ -815,7 +816,7 @@ class TestOrchestratorCreation:
         mock_settings.git_provider.api_token.get_secret_value.return_value = "token"
         mock_settings.repository.owner = "owner"
         mock_settings.repository.name = "repo"
-        mock_settings.agent_provider.provider_type = "claude-local"
+        mock_settings.agent_provider.provider_type = ProviderType.CLAUDE_LOCAL
         mock_settings.agent_provider.model = "claude-sonnet-4.5"
         mock_settings.agent_provider.goose_config = None
         mock_settings.state_dir = "/tmp/state"
@@ -837,11 +838,12 @@ class TestOrchestratorCreation:
 
             mock_external.assert_called_once()
             call_kwargs = mock_external.call_args
-            assert call_kwargs[1]["agent_type"] == "claude"
+            assert call_kwargs[1]["agent_type"] == AgentType.CLAUDE
 
     @pytest.mark.asyncio
     async def test_create_orchestrator_with_goose_provider(self):
         """Test _create_orchestrator with Goose provider."""
+        from repo_sapiens.enums import AgentType, ProviderType
         from repo_sapiens.main import _create_orchestrator
 
         mock_settings = MagicMock()
@@ -851,7 +853,7 @@ class TestOrchestratorCreation:
         mock_settings.git_provider.api_token.get_secret_value.return_value = "token"
         mock_settings.repository.owner = "owner"
         mock_settings.repository.name = "repo"
-        mock_settings.agent_provider.provider_type = "goose-local"
+        mock_settings.agent_provider.provider_type = ProviderType.GOOSE_LOCAL
         mock_settings.agent_provider.model = "gpt-4"
         mock_settings.agent_provider.goose_config = MagicMock()
         mock_settings.agent_provider.goose_config.toolkit = "default"
@@ -877,7 +879,7 @@ class TestOrchestratorCreation:
 
             mock_external.assert_called_once()
             call_kwargs = mock_external.call_args
-            assert call_kwargs[1]["agent_type"] == "goose"
+            assert call_kwargs[1]["agent_type"] == AgentType.GOOSE
             assert call_kwargs[1]["goose_config"] is not None
 
 

@@ -220,6 +220,21 @@ class GiteaRestProvider(GitProvider):
                 return None
             raise
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch."""
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+            response = await self._pool.delete(f"/repos/{self.owner}/{self.repo}/branches/{branch_name}")
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                log.debug("gitea_branch_not_found", branch=branch_name)
+                return False
+            log.error("gitea_delete_branch_failed", branch=branch_name, error=str(e))
+            raise
+
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_diff(self, base: str, head: str, pr_number: int | None = None) -> str:
         """Get diff between two branches or for a PR.
@@ -403,13 +418,33 @@ class GiteaRestProvider(GitProvider):
             return None
 
     async def _get_or_create_label_ids(self, label_names: list[str]) -> list[int]:
-        """Get or create labels and return their IDs.
+        """Get or create labels and return their numeric IDs.
+
+        Gitea requires label IDs (not names) when creating or updating issues.
+        This method resolves label names to IDs, creating any labels that
+        don't already exist in the repository.
+
+        The workflow:
+            1. Fetch all existing labels from the repository
+            2. Build a name->ID mapping for quick lookup
+            3. For each requested label name:
+               - If exists: use existing ID
+               - If missing: create with default gray color, get new ID
 
         Args:
-            label_names: List of label names
+            label_names: List of label names to resolve. Order is preserved
+                in the returned ID list.
 
         Returns:
-            List of label IDs
+            List of label IDs in the same order as the input names.
+
+        Raises:
+            httpx.HTTPStatusError: If fetching labels or creating a new label fails.
+
+        Note:
+            Auto-created labels use a default gray color (#ededed) and a
+            description indicating they were auto-created. This differs from
+            setup_automation_labels which uses distinct colors per label type.
         """
         labels_path = f"/repos/{self.owner}/{self.repo}/labels"
 
@@ -442,8 +477,94 @@ class GiteaRestProvider(GitProvider):
 
         return label_ids
 
+    async def setup_automation_labels(
+        self,
+        labels: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Set up automation labels in the repository.
+
+        Creates the specified labels if they don't exist. Uses distinct colors
+        for each label type to make them visually distinguishable.
+
+        Args:
+            labels: List of label names. If None, creates default automation labels.
+
+        Returns:
+            Dict mapping label names to their IDs.
+        """
+        # Default automation labels with distinct colors
+        default_labels = {
+            "needs-planning": "5319e7",  # Purple - needs attention
+            "awaiting-approval": "fbca04",  # Yellow - waiting
+            "approved": "0e8a16",  # Green - ready to go
+            "in-progress": "1d76db",  # Blue - working on it
+            "done": "0e8a16",  # Green - complete
+            "proposed": "c5def5",  # Light blue - proposal
+        }
+
+        if labels is None:
+            labels = list(default_labels.keys())
+
+        labels_path = f"/repos/{self.owner}/{self.repo}/labels"
+
+        # Get existing labels
+        response = await self._pool.get(labels_path)
+        response.raise_for_status()
+        existing_labels = {label["name"]: label["id"] for label in response.json()}
+
+        result: dict[str, int] = {}
+        for name in labels:
+            if name in existing_labels:
+                log.debug("label_exists", name=name)
+                result[name] = existing_labels[name]
+            else:
+                # Create new label with appropriate color
+                color = default_labels.get(name, "ededed")  # Default gray if not in defaults
+                log.info("creating_automation_label", name=name, color=color)
+                create_response = await self._pool.post(
+                    labels_path,
+                    json={
+                        "name": name,
+                        "color": color,
+                        "description": f"Automation label: {name}",
+                    },
+                )
+                create_response.raise_for_status()
+                new_label = create_response.json()
+                result[name] = new_label["id"]
+
+        return result
+
     def _parse_issue(self, data: dict[str, Any]) -> Issue:
-        """Parse issue data from API response."""
+        """Parse issue data from Gitea REST API response to internal Issue model.
+
+        Transforms the raw JSON response from Gitea's /repos/{owner}/{repo}/issues
+        endpoint into our normalized Issue dataclass.
+
+        Field mappings:
+            - data["id"] -> id (Gitea's internal issue ID)
+            - data["number"] -> number (repository-scoped issue number)
+            - data["title"] -> title
+            - data["body"] -> body (empty string if None/missing)
+            - data["state"] -> state ("open" -> OPEN, anything else -> CLOSED)
+            - data["labels"] -> labels (list of label objects -> list of names)
+            - data["created_at"] -> created_at (ISO 8601 string -> datetime)
+            - data["updated_at"] -> updated_at (ISO 8601 string -> datetime)
+            - data["user"]["login"] -> author (issue creator's username)
+            - data["html_url"] -> url (web UI link)
+
+        Args:
+            data: Raw JSON dict from Gitea API response.
+
+        Returns:
+            Normalized Issue object for internal use.
+
+        Note:
+            Gitea timestamps use ISO 8601 format with 'Z' suffix for UTC.
+            The 'Z' is replaced with '+00:00' for Python's fromisoformat().
+            Labels are returned as objects with 'name', 'id', 'color' fields;
+            we extract only the names for the normalized model.
+        """
         return Issue(
             id=data["id"],
             number=data["number"],
@@ -458,7 +579,28 @@ class GiteaRestProvider(GitProvider):
         )
 
     def _parse_comment(self, data: dict[str, Any]) -> Comment:
-        """Parse comment data from API response."""
+        """Parse comment data from Gitea REST API response to internal Comment model.
+
+        Transforms the raw JSON response from Gitea's issue comments endpoint
+        into our normalized Comment dataclass.
+
+        Field mappings:
+            - data["id"] -> id (Gitea's internal comment ID)
+            - data["body"] -> body (Markdown content)
+            - data["user"]["login"] -> author (comment author's username)
+            - data["created_at"] -> created_at (ISO 8601 string -> datetime)
+
+        Args:
+            data: Raw JSON dict from Gitea API response for a single comment.
+
+        Returns:
+            Normalized Comment object for internal use.
+
+        Note:
+            Gitea also returns 'updated_at' and 'html_url' for comments, but
+            these are not included in our Comment model. The 'user' object
+            contains additional fields (id, email, avatar_url) not captured.
+        """
         return Comment(
             id=data["id"],
             body=data["body"],
@@ -467,7 +609,34 @@ class GiteaRestProvider(GitProvider):
         )
 
     def _parse_pull_request(self, data: dict[str, Any]) -> PullRequest:
-        """Parse pull request data from API response."""
+        """Parse pull request data from Gitea REST API response to internal PullRequest model.
+
+        Transforms the raw JSON response from Gitea's /repos/{owner}/{repo}/pulls
+        endpoint into our normalized PullRequest dataclass.
+
+        Field mappings:
+            - data["id"] -> id (Gitea's internal PR ID)
+            - data["number"] -> number (repository-scoped PR number)
+            - data["title"] -> title
+            - data["body"] -> body (empty string if None/missing)
+            - data["state"] -> state (string: "open", "closed", "merged")
+            - data["head"]["ref"] -> head (source branch name)
+            - data["base"]["ref"] -> base (target branch name)
+            - data["html_url"] -> url (web UI link)
+            - data["created_at"] -> created_at (ISO 8601 string -> datetime)
+
+        Args:
+            data: Raw JSON dict from Gitea API response for a pull request.
+
+        Returns:
+            Normalized PullRequest object for internal use.
+
+        Note:
+            Gitea's head/base objects contain additional fields (repo, sha, label)
+            that are not captured. The 'author' field is not populated in this
+            implementation but could be extracted from data["user"]["login"].
+            Gitea PRs also have 'mergeable', 'merged', 'merged_at' fields available.
+        """
         return PullRequest(
             id=data["id"],
             number=data["number"],

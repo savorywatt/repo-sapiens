@@ -9,8 +9,12 @@ __pycache__/
 venv/
 env/
 .env
+.env.*
 .venv/
 test_venv/
+
+# Validation results
+validation-results/
 
 # Testing
 .pytest_cache/

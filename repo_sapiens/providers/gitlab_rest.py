@@ -299,6 +299,29 @@ class GitLabRestProvider(GitProvider):
                 return None
             raise
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch.
+
+        Args:
+            branch_name: Branch name to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+            encoded_branch = urllib.parse.quote(branch_name, safe="")
+            response = await self._pool.delete(f"/projects/{self.project_path}/repository/branches/{encoded_branch}")
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                log.debug("gitlab_branch_not_found", branch=branch_name)
+                return False
+            log.error("gitlab_delete_branch_failed", branch=branch_name, error=str(e))
+            raise
+
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_diff(self, base: str, head: str, mr_number: int | None = None) -> str:
         """Get diff between two branches or for a MR.
@@ -534,20 +557,120 @@ class GitLabRestProvider(GitProvider):
                 return None
             raise
 
-    def _parse_issue(self, data: dict[str, Any]) -> Issue:
-        """Parse issue data from GitLab API response.
+    async def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Get pull request (merge request) by number.
 
-        Handles GitLab-specific field names:
-        - 'iid' -> number (project-scoped ID)
-        - 'description' -> body
-        - 'opened' state -> IssueState.OPEN
-        - 'labels' already a list of strings (not objects)
+        This is an alias for get_merge_request to satisfy the GitProvider interface.
 
         Args:
-            data: Raw API response data
+            pr_number: Pull request number (merge request iid)
 
         Returns:
-            Issue domain object
+            PullRequest object
+
+        Raises:
+            Exception: If the merge request is not found
+        """
+        result = await self.get_merge_request(pr_number)
+        if result is None:
+            raise ValueError(f"Merge request #{pr_number} not found")
+        return result
+
+    async def setup_automation_labels(
+        self,
+        labels: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Set up automation labels in the repository.
+
+        Creates the specified labels if they don't exist. Uses distinct colors
+        for each label type to make them visually distinguishable.
+
+        Args:
+            labels: List of label names. If None, creates default automation labels.
+
+        Returns:
+            Dict mapping label names to their IDs.
+        """
+        # Default automation labels with distinct colors
+        default_labels = {
+            "needs-planning": "5319e7",  # Purple - needs attention
+            "awaiting-approval": "fbca04",  # Yellow - waiting
+            "approved": "0e8a16",  # Green - ready to go
+            "in-progress": "1d76db",  # Blue - working on it
+            "done": "0e8a16",  # Green - complete
+            "proposed": "c5def5",  # Light blue - proposal
+        }
+
+        if labels is None:
+            labels = list(default_labels.keys())
+
+        labels_path = f"/projects/{self.project_path}/labels"
+
+        # Get existing labels
+        response = await self._pool.get(labels_path)
+        response.raise_for_status()
+        existing_labels = {label["name"]: label["id"] for label in response.json()}
+
+        result: dict[str, int] = {}
+        for name in labels:
+            if name in existing_labels:
+                log.debug("label_exists", name=name)
+                result[name] = existing_labels[name]
+            else:
+                # Create new label with appropriate color
+                color = default_labels.get(name, "ededed")  # Default gray if not in defaults
+                log.info("creating_automation_label", name=name, color=color)
+                create_response = await self._pool.post(
+                    labels_path,
+                    json={
+                        "name": name,
+                        "color": f"#{color}",  # GitLab requires # prefix
+                        "description": f"Automation label: {name}",
+                    },
+                )
+                create_response.raise_for_status()
+                new_label = create_response.json()
+                result[name] = new_label["id"]
+
+        return result
+
+    def _parse_issue(self, data: dict[str, Any]) -> Issue:
+        """Parse issue data from GitLab REST API response to internal Issue model.
+
+        Transforms the raw JSON response from GitLab's /projects/:id/issues endpoint
+        into our normalized Issue dataclass. Handles GitLab's unique field naming
+        conventions and state values.
+
+        GitLab-specific quirks handled:
+            - Uses 'iid' (internal ID) for project-scoped issue numbers, not 'number'
+            - Uses 'description' instead of 'body' for issue content
+            - Uses 'opened'/'closed' states instead of 'open'/'closed'
+            - Labels are already a list of strings (not objects like GitHub/Gitea)
+            - Uses 'web_url' instead of 'html_url'
+            - Author is nested under 'author.username' not 'user.login'
+
+        Field mappings:
+            - data["id"] -> id (globally unique GitLab issue ID)
+            - data["iid"] -> number (project-scoped issue number)
+            - data["title"] -> title
+            - data["description"] -> body (None converted to empty string)
+            - data["state"] -> state ("opened" -> OPEN, else -> CLOSED)
+            - data["labels"] -> labels (already string list)
+            - data["created_at"] -> created_at (ISO 8601 string -> datetime)
+            - data["updated_at"] -> updated_at (ISO 8601 string -> datetime)
+            - data["author"]["username"] -> author
+            - data["web_url"] -> url (web UI link)
+
+        Args:
+            data: Raw JSON dict from GitLab API response.
+
+        Returns:
+            Normalized Issue object for internal use.
+
+        Note:
+            GitLab timestamps use ISO 8601 format with 'Z' suffix for UTC.
+            The 'description' field may be None (not just missing), hence
+            the 'or ""' fallback after .get().
         """
         # GitLab uses "opened"/"closed" states
         state = IssueState.OPEN if data["state"] == "opened" else IssueState.CLOSED
@@ -566,13 +689,37 @@ class GitLabRestProvider(GitProvider):
         )
 
     def _parse_comment(self, data: dict[str, Any]) -> Comment:
-        """Parse note (comment) data from GitLab API response.
+        """Parse note (comment) data from GitLab REST API response to internal Comment model.
+
+        Transforms the raw JSON response from GitLab's issue notes endpoint
+        into our normalized Comment dataclass. GitLab calls comments "notes"
+        and includes both user comments and system-generated activity notes.
+
+        GitLab-specific quirks handled:
+            - GitLab calls comments "notes" in the API
+            - Author is under 'author.username' not 'user.login'
+            - System notes (labels changed, assigned, etc.) should be filtered
+              before calling this method (see get_comments)
+
+        Field mappings:
+            - data["id"] -> id (note ID, unique within the project)
+            - data["body"] -> body (Markdown content)
+            - data["author"]["username"] -> author
+            - data["created_at"] -> created_at (ISO 8601 string -> datetime)
 
         Args:
-            data: Raw note API response data
+            data: Raw JSON dict from GitLab API response for a single note.
+                Should be a user note, not a system note (system=false).
 
         Returns:
-            Comment domain object
+            Normalized Comment object for internal use.
+
+        Note:
+            GitLab notes have additional fields not captured here:
+            - 'noteable_type': The type of object the note is on (Issue, MergeRequest)
+            - 'noteable_iid': The iid of the noteable object
+            - 'system': Boolean indicating if this is a system-generated note
+            - 'resolvable': For MR discussions, whether the thread can be resolved
         """
         return Comment(
             id=data["id"],
@@ -582,20 +729,46 @@ class GitLabRestProvider(GitProvider):
         )
 
     def _parse_merge_request(self, data: dict[str, Any]) -> PullRequest:
-        """Parse merge request data from GitLab API response.
+        """Parse merge request data from GitLab REST API response to internal PullRequest model.
 
-        Maps GitLab MR fields to PullRequest model:
-        - 'iid' -> number
-        - 'description' -> body
-        - 'source_branch' -> head
-        - 'target_branch' -> base
+        Transforms the raw JSON response from GitLab's merge requests endpoint
+        into our normalized PullRequest dataclass. GitLab uses different
+        terminology than GitHub/Gitea (merge request vs pull request).
+
+        GitLab-specific quirks handled:
+            - Uses 'iid' for project-scoped MR numbers, not 'number'
+            - Uses 'description' instead of 'body'
+            - Uses 'source_branch'/'target_branch' instead of 'head'/'base'
+            - State values are "opened", "closed", "merged", "locked"
+            - Uses 'web_url' instead of 'html_url'
+            - Author may be None for MRs created by deleted users
+
+        Field mappings:
+            - data["id"] -> id (globally unique MR ID)
+            - data["iid"] -> number (project-scoped MR number)
+            - data["title"] -> title
+            - data["description"] -> body (None converted to empty string)
+            - data["state"] -> state (string, preserved as-is)
+            - data["source_branch"] -> head (branch with changes)
+            - data["target_branch"] -> base (branch to merge into)
+            - data["web_url"] -> url (web UI link)
+            - data["created_at"] -> created_at (ISO 8601 string -> datetime)
+            - data["author"]["username"] -> author (empty string if no author)
 
         Args:
-            data: Raw MR API response data
+            data: Raw JSON dict from GitLab API response for a merge request.
 
         Returns:
-            PullRequest domain object
+            Normalized PullRequest object for internal use.
+
+        Note:
+            GitLab MRs have many additional fields not captured:
+            - 'merge_status': Whether MR can be merged ("can_be_merged", etc.)
+            - 'merged_by', 'merged_at': Merge info if already merged
+            - 'approvals_before_merge': Required approval count
+            - 'draft': Whether MR is marked as work-in-progress
         """
+        author = data.get("author", {})
         return PullRequest(
             id=data["id"],
             number=data["iid"],
@@ -606,4 +779,5 @@ class GitLabRestProvider(GitProvider):
             base=data["target_branch"],
             url=data["web_url"],
             created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
+            author=author.get("username", "") if author else "",
         )

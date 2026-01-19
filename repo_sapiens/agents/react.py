@@ -1,4 +1,11 @@
-"""ReAct (Reasoning + Acting) agent using Ollama and local tools."""
+"""ReAct (Reasoning + Acting) agent using LLM backends and local tools.
+
+Supports multiple LLM backends:
+- Ollama (local inference)
+- OpenAI-compatible APIs (OpenAI, vLLM, llama.cpp, etc.)
+
+Can use native function calling when available, with text-based parsing as fallback.
+"""
 
 from __future__ import annotations
 
@@ -7,11 +14,11 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-import httpx
 import structlog
 
+from repo_sapiens.agents.backends import ChatResponse, LLMBackend, create_backend
 from repo_sapiens.agents.tools import ToolRegistry
 from repo_sapiens.models.domain import Issue, Plan, Review, Task, TaskResult
 from repo_sapiens.providers.base import AgentProvider
@@ -32,17 +39,41 @@ class TrajectoryStep:
 
 @dataclass
 class ReActConfig:
-    """Configuration for the ReAct agent."""
+    """Configuration for the ReAct agent.
+
+    Attributes:
+        model: Model name/identifier to use
+        backend_type: LLM backend type ("ollama" or "openai")
+        base_url: Backend API base URL (None uses backend default)
+        api_key: API key for authentication (OpenAI backend)
+        max_iterations: Maximum ReAct loop iterations
+        temperature: Sampling temperature (0.0 to 1.0)
+        timeout: Request timeout in seconds
+        use_native_tools: Use native function calling when available
+    """
 
     model: str = "qwen3:latest"
-    ollama_url: str = "http://localhost:11434"
+    backend_type: Literal["ollama", "openai"] = "ollama"
+    base_url: str | None = None
+    api_key: str | None = None
     max_iterations: int = 10
     temperature: float = 0.7
     timeout: int = 300
+    use_native_tools: bool = True
+
+    @property
+    def ollama_url(self) -> str:
+        """Legacy property for backwards compatibility."""
+        return self.base_url or "http://localhost:11434"
+
+    @ollama_url.setter
+    def ollama_url(self, value: str) -> None:
+        """Legacy setter for backwards compatibility."""
+        self.base_url = value
 
 
 class ReActAgentProvider(AgentProvider):
-    """ReAct agent using Ollama for reasoning and local tools for acting.
+    """ReAct agent using LLM backends for reasoning and local tools for acting.
 
     This agent implements the ReAct (Reasoning + Acting) pattern:
     1. Think about what to do next
@@ -50,8 +81,25 @@ class ReActAgentProvider(AgentProvider):
     3. Observe the result
     4. Repeat until task is complete
 
+    Supports multiple backends:
+    - Ollama (default): Local inference with models like qwen3, llama3, etc.
+    - OpenAI: OpenAI API or compatible servers (vLLM, llama.cpp, etc.)
+
+    When use_native_tools=True (default), uses native function calling for
+    backends that support it, falling back to text-based parsing otherwise.
+
     Example usage:
+        # Ollama backend (default)
         agent = ReActAgentProvider(working_dir="/path/to/project")
+
+        # OpenAI-compatible backend
+        config = ReActConfig(
+            backend_type="openai",
+            base_url="http://localhost:8000/v1",
+            model="gpt-4",
+        )
+        agent = ReActAgentProvider(working_dir="/path/to/project", config=config)
+
         result = await agent.execute_task(task, context={})
     """
 
@@ -104,12 +152,20 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             system_prompt: Custom system prompt (uses default if None)
         """
         self.config = config or ReActConfig()
-        self.working_dir = Path(working_dir or os.getcwd()).resolve()
+        self.working_dir = str(Path(working_dir or os.getcwd()).resolve())
         self.tools = ToolRegistry(
             self.working_dir,
             allowed_commands=allowed_commands,
         )
-        self.client = httpx.AsyncClient(timeout=self.config.timeout)
+
+        # Create the LLM backend
+        self.backend: LLMBackend = create_backend(
+            backend_type=self.config.backend_type,
+            base_url=self.config.base_url,
+            api_key=self.config.api_key,
+            timeout=self.config.timeout,
+        )
+
         self._trajectory: list[TrajectoryStep] = []
         self.system_prompt = system_prompt or self.SYSTEM_PROMPT
 
@@ -119,34 +175,25 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
 
     async def __aexit__(self, *args: Any) -> None:
         """Async context manager exit."""
-        await self.client.aclose()
+        await self.backend.close()
 
     async def list_models(self, raise_on_error: bool = False) -> list[str]:
-        """Get list of available models from Ollama server."""
-        try:
-            response = await self.client.get(f"{self.config.ollama_url}/api/tags")
-            response.raise_for_status()
-            models = response.json().get("models", [])
-            return [m.get("name", "") for m in models]
-        except httpx.ConnectError:
-            if raise_on_error:
-                raise
-            return []
+        """Get list of available models from the backend."""
+        return await self.backend.list_models(raise_on_error=raise_on_error)
 
     async def connect(self) -> None:
-        """Verify Ollama is running and model is available."""
-        try:
-            model_names = await self.list_models(raise_on_error=True)
+        """Verify the backend is running and model is available."""
+        await self.backend.connect()
 
-            if not any(self.config.model in name for name in model_names):
-                log.warning(
-                    "model_not_found",
-                    model=self.config.model,
-                    available=model_names[:5],
-                    hint=f"Run: ollama pull {self.config.model}",
-                )
-        except httpx.ConnectError as e:
-            raise RuntimeError(f"Ollama not running at {self.config.ollama_url}. " "Start it with: ollama serve") from e
+        # Check if our model is available
+        model_names = await self.backend.list_models()
+        if model_names and not any(self.config.model in name for name in model_names):
+            log.warning(
+                "model_not_found",
+                model=self.config.model,
+                available=model_names[:5],
+                hint=f"Pull or download model: {self.config.model}",
+            )
 
     def set_model(self, model: str) -> None:
         """Change the model to use."""
@@ -170,6 +217,8 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             task_id=task.id,
             title=task.title,
             max_iterations=self.config.max_iterations,
+            backend=self.config.backend_type,
+            native_tools=self.config.use_native_tools,
         )
 
         task_prompt = f"Task: {task.title}\n\nDescription: {task.description}"
@@ -180,11 +229,21 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             # Generate next step from LLM
             response = await self._generate_step(task_prompt)
 
-            # Parse the response
-            thought, action, action_input = self._parse_response(response)
+            # Handle native tool calls vs text-based parsing
+            if isinstance(response, ChatResponse) and response.has_tool_calls:
+                # Native function calling - extract tool call directly
+                tool_call = response.tool_calls[0]
+                thought = response.content or ""
+                action = tool_call.name
+                action_input = tool_call.arguments
+            else:
+                # Text-based parsing fallback
+                text_response = response.content if isinstance(response, ChatResponse) else response
+                thought, action, action_input = self._parse_response(text_response)
 
             if not action:
-                log.warning("react_no_action", response=response[:200])
+                response_preview = response.content[:200] if isinstance(response, ChatResponse) else str(response)[:200]
+                log.warning("react_no_action", response=response_preview)
                 continue
 
             # Check for completion
@@ -243,14 +302,14 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             files_changed=self.tools.get_files_written(),
         )
 
-    async def _generate_step(self, task_prompt: str) -> str:
-        """Generate the next ReAct step from Ollama.
+    async def _generate_step(self, task_prompt: str) -> ChatResponse | str:
+        """Generate the next ReAct step from the LLM backend.
 
         Args:
             task_prompt: The task description
 
         Returns:
-            Raw LLM response
+            ChatResponse with tool_calls (native mode) or raw string (text mode)
         """
         # Build the full prompt
         # If custom system prompt contains {tool_descriptions}, replace it
@@ -282,23 +341,33 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
                 }
             )
 
+        # Determine if we should use native tool calling
+        tools = None
+        if self.config.use_native_tools:
+            tools = self.tools.to_openai_format()
+
         try:
-            response = await self.client.post(
-                f"{self.config.ollama_url}/api/chat",
-                json={
-                    "model": self.config.model,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": self.config.temperature,
-                    },
-                },
+            response = await self.backend.chat(
+                messages=messages,
+                model=self.config.model,
+                temperature=self.config.temperature,
+                tools=tools,
             )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("message", {}).get("content", "")
+
+            # If we got tool calls back, return the full response for native handling
+            if response.has_tool_calls:
+                log.debug(
+                    "native_tool_call",
+                    tool=response.tool_calls[0].name,
+                    args=response.tool_calls[0].arguments,
+                )
+                return response
+
+            # Otherwise, return the text content for text-based parsing
+            return response.content
+
         except Exception as e:
-            log.error("ollama_request_failed", error=str(e))
+            log.error("backend_request_failed", error=str(e))
             raise
 
     def _parse_response(self, response: str) -> tuple[str, str, dict[str, Any]]:
@@ -352,6 +421,49 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
         return self._trajectory.copy()
 
     # --- AgentProvider interface implementation ---
+
+    async def execute_prompt(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Execute a prompt and return the result.
+
+        Uses the LLM backend directly without the ReAct loop. This is useful for
+        simple prompt-response interactions like analyzing comments or generating
+        quick responses.
+
+        Args:
+            prompt: The prompt text to execute.
+            context: Optional context dict (not used, for interface compatibility).
+            task_id: Optional task identifier for logging.
+
+        Returns:
+            Dict with 'success', 'output', and optionally 'error' keys.
+        """
+        log.info("execute_prompt", task_id=task_id, prompt_len=len(prompt))
+
+        try:
+            messages = [{"role": "user", "content": prompt}]
+            response = await self.backend.chat(
+                messages=messages,
+                model=self.config.model,
+                temperature=self.config.temperature,
+            )
+
+            return {
+                "success": True,
+                "output": response.content,
+                "error": None,
+            }
+        except Exception as e:
+            log.error("execute_prompt_failed", task_id=task_id, error=str(e))
+            return {
+                "success": False,
+                "output": "",
+                "error": str(e),
+            }
 
     async def generate_plan(self, issue: Issue) -> Plan:
         """Generate a plan from an issue using ReAct reasoning.

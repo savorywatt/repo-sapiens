@@ -251,6 +251,27 @@ class GitHubRestProvider(GitProvider):
             log.error("github_get_branch_failed", branch=branch_name, error=str(e))
             raise
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch."""
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+
+            def _delete_branch() -> bool:
+                # Delete the git ref for the branch
+                ref = self._repo.get_git_ref(f"heads/{branch_name}")
+                ref.delete()
+                return True
+
+            return await _run_sync(_delete_branch)
+
+        except GithubException as e:
+            if e.status == 404:
+                log.debug("github_branch_not_found", branch=branch_name)
+                return False
+            log.error("github_delete_branch_failed", branch=branch_name, error=str(e))
+            raise
+
     async def get_diff(self, base: str, head: str) -> str:
         """Get diff between two branches."""
         log.info("get_diff", base=base, head=head)
@@ -341,6 +362,22 @@ class GitHubRestProvider(GitProvider):
             log.error("github_create_pr_failed", error=str(e))
             raise
 
+    async def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Get pull request by number."""
+        log.info("get_pull_request", number=pr_number)
+
+        try:
+
+            def _get_pr() -> GHPullRequest:
+                return self._repo.get_pull(pr_number)
+
+            gh_pr = await _run_sync(_get_pr)
+            return self._convert_pull_request(gh_pr)
+
+        except GithubException as e:
+            log.error("github_get_pr_failed", number=pr_number, error=str(e))
+            raise
+
     async def get_file(self, path: str, ref: str = "main") -> str:
         """Read file contents from repository."""
         log.info("get_file", path=path, ref=ref)
@@ -428,8 +465,89 @@ class GitHubRestProvider(GitProvider):
             log.error("github_set_secret_failed", name=name, error=str(e))
             raise
 
+    async def setup_automation_labels(
+        self,
+        labels: list[str] | None = None,
+    ) -> dict[str, int]:
+        """Set up automation labels in the repository.
+
+        Creates the specified labels if they don't exist. Uses distinct colors
+        for each label type to make them visually distinguishable.
+
+        Args:
+            labels: List of label names. If None, creates default automation labels.
+
+        Returns:
+            Dict mapping label names to their IDs.
+        """
+        # Default automation labels with distinct colors
+        default_labels = {
+            "needs-planning": "5319e7",  # Purple - needs attention
+            "awaiting-approval": "fbca04",  # Yellow - waiting
+            "approved": "0e8a16",  # Green - ready to go
+            "in-progress": "1d76db",  # Blue - working on it
+            "done": "0e8a16",  # Green - complete
+            "proposed": "c5def5",  # Light blue - proposal
+        }
+
+        if labels is None:
+            labels = list(default_labels.keys())
+
+        # Get existing labels
+        existing_labels = {label.name: label.id for label in await _run_sync(lambda: list(self._repo.get_labels()))}
+
+        result: dict[str, int] = {}
+        for name in labels:
+            if name in existing_labels:
+                log.debug("label_exists", name=name)
+                result[name] = existing_labels[name]
+            else:
+                # Create new label with appropriate color
+                color = default_labels.get(name, "ededed")  # Default gray if not in defaults
+                log.info("creating_automation_label", name=name, color=color)
+                new_label = await _run_sync(
+                    lambda n=name, c=color: self._repo.create_label(
+                        name=n,
+                        color=c,
+                        description=f"Automation label: {n}",
+                    )
+                )
+                result[name] = new_label.id
+
+        return result
+
     def _convert_issue(self, gh_issue: GHIssue) -> Issue:
-        """Convert GitHub Issue to our Issue model."""
+        """Convert GitHub Issue object to internal Issue model.
+
+        Maps GitHub's issue representation to our normalized Issue dataclass.
+        Handles differences in state values and extracts label names from
+        GitHub's Label objects.
+
+        Field mappings:
+            - gh_issue.id -> id (globally unique GitHub ID)
+            - gh_issue.number -> number (repository-scoped issue number)
+            - gh_issue.title -> title
+            - gh_issue.body -> body (None converted to empty string)
+            - gh_issue.state -> state (mapped to IssueState enum)
+            - gh_issue.labels -> labels (Label objects -> list of name strings)
+            - gh_issue.created_at -> created_at (datetime)
+            - gh_issue.updated_at -> updated_at (datetime)
+            - gh_issue.user.login -> author (fallback to "unknown" if no user)
+            - gh_issue.html_url -> url (web UI link)
+
+        Args:
+            gh_issue: GitHub Issue object from PyGithub library. May represent
+                either an issue or a pull request (GitHub treats PRs as issues
+                in some API endpoints).
+
+        Returns:
+            Normalized Issue object for internal use.
+
+        Note:
+            GitHub's `id` is globally unique across all of GitHub, while `number`
+            is repository-specific. We preserve both for different lookup scenarios.
+            Unknown states default to OPEN to maintain safe defaults.
+        """
         # Map GitHub state to our IssueState
         if gh_issue.state == "open":
             state = IssueState.OPEN
@@ -455,7 +573,28 @@ class GitHubRestProvider(GitProvider):
         )
 
     def _convert_comment(self, gh_comment: GHComment) -> Comment:
-        """Convert GitHub Comment to our Comment model."""
+        """Convert GitHub IssueComment object to internal Comment model.
+
+        Maps GitHub's comment representation to our normalized Comment dataclass.
+        GitHub issue comments are simpler than PR review comments and don't
+        support threading.
+
+        Field mappings:
+            - gh_comment.id -> id (globally unique comment ID)
+            - gh_comment.body -> body (Markdown content)
+            - gh_comment.user.login -> author (fallback to "unknown")
+            - gh_comment.created_at -> created_at (datetime)
+
+        Args:
+            gh_comment: GitHub IssueComment object from PyGithub library.
+
+        Returns:
+            Normalized Comment object for internal use.
+
+        Note:
+            This handles issue comments only, not PR review comments which
+            have additional fields like diff_hunk and position.
+        """
         return Comment(
             id=gh_comment.id,
             body=gh_comment.body,
@@ -464,7 +603,27 @@ class GitHubRestProvider(GitProvider):
         )
 
     def _convert_branch(self, gh_branch: GHBranch) -> Branch:
-        """Convert GitHub Branch to our Branch model."""
+        """Convert GitHub Branch object to internal Branch model.
+
+        Maps GitHub's branch representation to our normalized Branch dataclass.
+        Includes branch protection status which is a GitHub-specific feature.
+
+        Field mappings:
+            - gh_branch.name -> name (branch name without refs/heads/)
+            - gh_branch.commit.sha -> sha (HEAD commit SHA)
+            - gh_branch.protected -> protected (branch protection rules active)
+
+        Args:
+            gh_branch: GitHub Branch object from PyGithub library.
+
+        Returns:
+            Normalized Branch object for internal use.
+
+        Note:
+            The 'protected' field indicates whether branch protection rules
+            are enabled (e.g., required reviews, status checks). This is
+            GitHub-specific; other providers may not populate this field.
+        """
         return Branch(
             name=gh_branch.name,
             sha=gh_branch.commit.sha,
@@ -472,7 +631,35 @@ class GitHubRestProvider(GitProvider):
         )
 
     def _convert_pull_request(self, gh_pr: GHPullRequest) -> PullRequest:
-        """Convert GitHub PullRequest to our PullRequest model."""
+        """Convert GitHub PullRequest object to internal PullRequest model.
+
+        Maps GitHub's PR representation to our normalized PullRequest dataclass.
+        Extracts branch refs from the nested head/base objects.
+
+        Field mappings:
+            - gh_pr.id -> id (globally unique GitHub ID)
+            - gh_pr.number -> number (repository-scoped PR number)
+            - gh_pr.title -> title
+            - gh_pr.body -> body (None converted to empty string)
+            - gh_pr.state -> state (string: "open", "closed", or "merged")
+            - gh_pr.head.ref -> head (source branch name)
+            - gh_pr.base.ref -> base (target branch name)
+            - gh_pr.html_url -> url (web UI link)
+            - gh_pr.created_at -> created_at (datetime)
+            - gh_pr.user.login -> author (PR creator, fallback to empty string)
+
+        Args:
+            gh_pr: GitHub PullRequest object from PyGithub library.
+
+        Returns:
+            Normalized PullRequest object for internal use.
+
+        Note:
+            GitHub PRs have additional fields not captured here (mergeable,
+            merged_at, merge_commit_sha, etc.) that could be added if needed.
+            The head/base refs are branch names only; the full ref paths and
+            repository info (for cross-fork PRs) are not preserved.
+        """
         return PullRequest(
             id=gh_pr.id,
             number=gh_pr.number,
@@ -483,4 +670,5 @@ class GitHubRestProvider(GitProvider):
             base=gh_pr.base.ref,
             url=gh_pr.html_url,
             created_at=gh_pr.created_at,
+            author=gh_pr.user.login if gh_pr.user else "",
         )

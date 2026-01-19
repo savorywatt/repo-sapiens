@@ -27,7 +27,7 @@ jobs:
 
       - name: Sync labels
         env:
-          GITEA_TOKEN: ${{ '{{' }} secrets.GITEA_TOKEN {{ '}}' }}
+          GITEA_TOKEN: ${{ '{{' }} secrets.SAPIENS_GITEA_TOKEN {{ '}}' }}
         run: |
           repo-agent labels sync \
             --url {{ gitea_url | safe_url }} \
