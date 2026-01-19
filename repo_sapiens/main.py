@@ -23,11 +23,13 @@ from repo_sapiens.providers.external_agent import ExternalAgentProvider
 from repo_sapiens.providers.factory import create_git_provider
 from repo_sapiens.utils.interactive import InteractiveQAHandler
 from repo_sapiens.utils.logging_config import configure_logging
+from repo_sapiens.__version__ import __version__
 
 log = structlog.get_logger(__name__)
 
 
 @click.group()
+@click.version_option(version=__version__, prog_name="sapiens")
 @click.option(
     "--config",
     default=".sapiens/config.yaml",
