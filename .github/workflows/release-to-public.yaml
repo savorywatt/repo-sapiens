@@ -1,0 +1,130 @@
+# .github/workflows/release-to-public.yaml
+# Releases from private repo to public repo with clean squashed history
+name: Release to Public
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 2.1.0)'
+        required: true
+        type: string
+      summary:
+        description: 'Release summary (used in squash commit)'
+        required: true
+        type: string
+        default: 'Release'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release to Public Repo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add public remote
+        run: |
+          git remote add public https://x-access-token:${{ secrets.RELEASE_TOKEN }}@github.com/savorywatt/repo-sapiens.git
+          git fetch public
+
+      - name: Extract changelog for version
+        id: changelog
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          # Extract changelog section for this version
+          # Looks for ## [X.Y.Z] or ## X.Y.Z headers
+          CHANGELOG=$(awk -v ver="$VERSION" '
+            /^## \[?[0-9]+\.[0-9]+\.[0-9]+\]?/ {
+              if (found) exit
+              if (index($0, ver)) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          # If no specific version found, get unreleased section
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG=$(awk '
+              /^## \[?Unreleased\]?/,/^## \[?[0-9]+\.[0-9]+\.[0-9]+\]?/ {
+                if (/^## \[?[0-9]+\.[0-9]+\.[0-9]+\]?/) exit
+                if (!/^## \[?Unreleased\]?/) print
+              }
+            ' CHANGELOG.md)
+          fi
+
+          # Fallback to summary if no changelog
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="${{ inputs.summary }}"
+          fi
+
+          # Write to file for multi-line handling
+          echo "$CHANGELOG" > /tmp/release-notes.md
+          echo "notes_file=/tmp/release-notes.md" >> $GITHUB_OUTPUT
+
+      - name: Checkout release branch
+        run: |
+          # Fetch and checkout release branch (tracks public/main)
+          git fetch origin release || true
+          git checkout release || git checkout -b release public/main
+
+      - name: Squash merge from main
+        run: |
+          git merge --squash origin/main
+
+          # Create clean commit with version and summary
+          git commit -m "v${{ inputs.version }}: ${{ inputs.summary }}
+
+          $(cat /tmp/release-notes.md | head -50)"
+
+      - name: Push to public repo
+        run: |
+          git push public release:main
+
+      - name: Create release on public repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          gh release create "v${{ inputs.version }}" \
+            --repo savorywatt/repo-sapiens \
+            --title "v${{ inputs.version }}: ${{ inputs.summary }}" \
+            --notes-file /tmp/release-notes.md
+
+      - name: Sync release branch back
+        run: |
+          git push origin release
+
+      - name: Merge release checkpoint to main
+        run: |
+          git checkout main
+          git merge release --no-ff -m "Merge release v${{ inputs.version }} checkpoint"
+          git push origin main
+
+      - name: Create tag on private repo
+        run: |
+          git tag "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Summary
+        run: |
+          echo "## Release Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Summary:** ${{ inputs.summary }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Public Release](https://github.com/savorywatt/repo-sapiens/releases/tag/v${{ inputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Public Repo](https://github.com/savorywatt/repo-sapiens)" >> $GITHUB_STEP_SUMMARY

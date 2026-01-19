@@ -40,6 +40,8 @@ TEST_PREFIX="sapiens-e2e-${TIMESTAMP}-"
 
 # State variables
 ISSUE_IID=""
+PROPOSAL_IID=""
+TASK_IID=""
 MR_IID=""
 FEATURE_BRANCH=""
 
@@ -63,10 +65,26 @@ cleanup() {
     local exit_code=$?
     step "Cleaning up test resources..."
 
-    # Close issue
+    # Close original issue
     if [[ -n "${ISSUE_IID:-}" ]]; then
         log "Closing issue #$ISSUE_IID..."
         gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close proposal issue
+    if [[ -n "${PROPOSAL_IID:-}" ]] && [[ "$PROPOSAL_IID" != "$ISSUE_IID" ]]; then
+        log "Closing proposal #$PROPOSAL_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$PROPOSAL_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close task issues (find and close all tasks related to this run)
+    if [[ -n "${TEST_PREFIX:-}" ]]; then
+        log "Closing task issues..."
+        local tasks
+        tasks=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues?search=TASK&in=title&state=opened" 2>/dev/null || echo "[]")
+        for task_iid in $(echo "$tasks" | jq -r '.[].iid' 2>/dev/null); do
+            gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$task_iid" '{"state_event":"close"}' > /dev/null 2>&1 || true
+        done
     fi
 
     # Close MR
@@ -243,6 +261,12 @@ automation:
       ai_enabled: true
       remove_on_complete: true
       success_label: implemented
+    "execute":
+      label_pattern: "execute"
+      handler: task_execution
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: review
 CONFIG_EOF
 
     log "Config written to $config_file"
@@ -277,12 +301,31 @@ EVENT_JSON
     export SAPIENS_CONFIG_FILE="$config_file"
 }
 
-# Phase 2: Process approval (adds approved label and processes)
+# Phase 2: Process approval (adds approved label to PROPOSAL issue and processes)
 process_approval() {
     step "Phase 2: Processing approval..."
 
-    # First, add the 'approved' label to the proposal issue (or original issue)
-    log "Adding 'approved' label to issue #$ISSUE_IID..."
+    # Find the proposal issue created in Phase 1
+    # The proposal has title like "[PROPOSAL] Plan for #1: ..."
+    log "Finding proposal issue..."
+    local proposals
+    proposals=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues?search=PROPOSAL&in=title" || echo "[]")
+    local proposal_iid
+    proposal_iid=$(echo "$proposals" | jq -r ".[] | select(.title | contains(\"#$ISSUE_IID\")) | .iid" | head -1)
+
+    if [[ -z "$proposal_iid" ]]; then
+        error "No proposal issue found for original issue #$ISSUE_IID"
+        warn "Falling back to original issue (approval handler will fail to parse)"
+        proposal_iid="$ISSUE_IID"
+    else
+        log "Found proposal issue #$proposal_iid"
+    fi
+
+    # Store for verification/cleanup
+    PROPOSAL_IID="$proposal_iid"
+
+    # Add the 'approved' label to the PROPOSAL issue (not the original)
+    log "Adding 'approved' label to proposal issue #$proposal_iid..."
 
     # Ensure the label exists
     gitlab_api POST "/projects/$PROJECT_ENCODED/labels" '{
@@ -290,19 +333,19 @@ process_approval() {
         "color": "#28A745"
     }' 2>/dev/null || true
 
-    # Update issue with approved label
+    # Update proposal issue with approved label
     local current_labels
-    current_labels=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID" | jq -r '.labels | join(",")')
-    gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID" "{\"labels\": \"$current_labels,approved\"}" > /dev/null
+    current_labels=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$proposal_iid" | jq -r '.labels | join(",")')
+    gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$proposal_iid" "{\"labels\": \"$current_labels,approved\"}" > /dev/null
 
-    log "Added 'approved' label"
+    log "Added 'approved' label to proposal #$proposal_iid"
 
-    # Build event data for approval
+    # Build event data for approval - use the PROPOSAL issue IID
     local event_json
     event_json=$(cat <<EVENT_JSON
 {
   "object_attributes": {
-    "iid": $ISSUE_IID
+    "iid": $proposal_iid
   },
   "changes": {
     "labels": {
@@ -313,12 +356,71 @@ process_approval() {
 }
 EVENT_JSON
 )
-    log "Running: sapiens process-label --event-type issues.labeled (approval)"
+    log "Running: sapiens process-label --event-type issues.labeled (approval on proposal #$proposal_iid)"
 
     if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label --event-type issues.labeled --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
         log "Approval processing completed"
     else
         warn "Approval processing returned non-zero exit code"
+    fi
+}
+
+# Phase 3: Execute first task (creates branch + MR)
+process_execution() {
+    step "Phase 3: Executing first task..."
+
+    # Find task issues created by approval stage
+    # Tasks have titles like "[TASK 1/3] ..."
+    log "Finding task issues..."
+    local tasks
+    tasks=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues?search=TASK&in=title&state=opened" || echo "[]")
+    local task_iid
+    task_iid=$(echo "$tasks" | jq -r ".[] | select(.title | contains(\"[TASK 1/\")) | .iid" | head -1)
+
+    if [[ -z "$task_iid" ]]; then
+        warn "No task issue found - skipping execution phase"
+        return 0
+    fi
+
+    log "Found task issue #$task_iid"
+    TASK_IID="$task_iid"
+
+    # Ensure execute label exists
+    gitlab_api POST "/projects/$PROJECT_ENCODED/labels" '{
+        "name": "execute",
+        "color": "#6610f2"
+    }' 2>/dev/null || true
+
+    # Add execute label to task issue
+    log "Adding 'execute' label to task #$task_iid..."
+    local current_labels
+    current_labels=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$task_iid" | jq -r '.labels | join(",")')
+    gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$task_iid" "{\"labels\": \"$current_labels,execute\"}" > /dev/null
+
+    log "Added 'execute' label to task #$task_iid"
+
+    # Build event data for task execution
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $task_iid
+  },
+  "changes": {
+    "labels": {
+      "previous": [{"title": "task"}, {"title": "ready"}],
+      "current": [{"title": "task"}, {"title": "ready"}, {"title": "execute"}]
+    }
+  }
+}
+EVENT_JSON
+)
+    log "Running: sapiens process-label --event-type issues.labeled (execution on task #$task_iid)"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label --event-type issues.labeled --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Task execution completed"
+    else
+        warn "Task execution returned non-zero exit code"
     fi
 }
 
@@ -490,6 +592,9 @@ main() {
 
     # Phase 2: Add approved label and process with approval handler
     process_approval
+
+    # Phase 3: Execute first task (creates branch + MR)
+    process_execution
 
     # Cleanup config file
     cleanup_config
