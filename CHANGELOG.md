@@ -54,12 +54,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Uses preferred remotes (origin > upstream > first) in non-interactive mode
   - Prompts user to select provider when multiple are detected
 - **GitHub Copilot Integration**: Support for GitHub Copilot as an AI agent provider
-  - New `copilot-local` provider type using the official `gh copilot` CLI
-  - Automatic detection of GitHub CLI and Copilot extension during `sapiens init`
-  - Interactive setup with extension installation prompt
-  - Health checks for GitHub CLI, Copilot extension, and authentication status
-  - Integration with ExternalAgentProvider for CLI-based execution
-  - Support in process-label workflow for label-triggered automation
+  - New `copilot-local` provider type using `copilot-api` proxy (unofficial)
+  - Full `CopilotProvider` class with OpenAI-compatible API delegation
+  - Managed proxy mode: auto-starts `npx copilot-api@latest` subprocess
+  - External proxy mode: connects to existing `copilot-api` instance
+  - Rate limiting support to avoid GitHub abuse detection
+  - Custom error handling: `CopilotAuthenticationError`, `CopilotRateLimitError`, `CopilotAbuseDetectedError`
+  - Health checks for Node.js/npx, GitHub token, and proxy status
+  - Prominent disclaimers: unofficial API, not endorsed by GitHub, may violate ToS
+  - Interactive warning during `sapiens init` requiring explicit risk acceptance
+  - Updated documentation: `docs/COPILOT_SETUP.md`, `docs/AGENT_COMPARISON.md`
 - **Native Label Trigger System**: Instant automation via CI/CD workflows instead of daemon polling
   - `sapiens process-label` command for handling label events in workflows
   - `sapiens migrate` commands for analyzing and generating native trigger workflows
