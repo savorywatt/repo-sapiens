@@ -221,7 +221,7 @@ class OpenAICompatibleProvider(AgentProvider):
 
         return files
 
-    def _parse_tasks_from_markdown(self, markdown: str) -> list:
+    def _parse_tasks_from_markdown(self, markdown: str) -> list[dict[str, Any]]:
         """Parse tasks from markdown output."""
         tasks = []
         lines = markdown.split("\n")
@@ -260,7 +260,7 @@ class OpenAICompatibleProvider(AgentProvider):
             tasks.append(current_task)
 
         # Convert to task objects with attribute access
-        class TaskDict(dict):
+        class TaskDict(dict[str, Any]):
             """Dict subclass that allows attribute access."""
 
             def __getattr__(self, key: str) -> Any:
@@ -353,7 +353,7 @@ IMPORTANT:
         """
         return plan.tasks if hasattr(plan, "tasks") else []
 
-    async def execute_task(self, task: Task, context: dict) -> TaskResult:
+    async def execute_task(self, task: Task, context: dict[str, Any]) -> TaskResult:
         """Execute a development task.
 
         Args:
@@ -412,7 +412,7 @@ Focus on making this task complete and working.
             error=result.get("error"),
         )
 
-    async def review_code(self, diff: str, context: dict) -> Review:
+    async def review_code(self, diff: str, context: dict[str, Any]) -> Review:
         """Review code changes.
 
         Args:
@@ -469,7 +469,7 @@ Then list specific comments, one per line starting with "- ".
             confidence_score=0.7,  # Conservative score for local models
         )
 
-    async def resolve_conflict(self, conflict_info: dict) -> str:
+    async def resolve_conflict(self, conflict_info: dict[str, Any]) -> str:
         """Resolve merge conflict.
 
         Args:
@@ -492,7 +492,7 @@ Output ONLY the resolved file content, no explanations.
 """
 
         result = await self.execute_prompt(prompt)
-        return result.get("output", "")
+        return str(result.get("output", ""))
 
     async def __aenter__(self) -> "OpenAICompatibleProvider":
         """Async context manager entry."""

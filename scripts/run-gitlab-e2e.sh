@@ -132,9 +132,11 @@ while [[ $# -gt 0 ]]; do
         --ci-only) CI_ONLY=true; shift ;;
         --test-component) TEST_COMPONENT=true; shift ;;
         --component-ref) COMPONENT_REF="$2"; shift 2 ;;
+        --with-runner) WITH_RUNNER=true; shift ;;
+        --ai-provider) AI_PROVIDER="$2"; shift 2 ;;
         --no-cleanup) NO_CLEANUP=true; shift ;;
         -h|--help)
-            head -50 "$0" | tail -45
+            head -55 "$0" | tail -50
             exit 0
             ;;
         *) error "Unknown option: $1"; exit 2 ;;
@@ -262,6 +264,116 @@ maybe_bootstrap_gitlab() {
     fi
 
     return 1
+}
+
+# Set up GitLab Runner
+setup_runner() {
+    if [[ "$WITH_RUNNER" != "true" ]]; then
+        return 0
+    fi
+
+    step "Setting up GitLab Runner..."
+
+    local compose_file="$PROJECT_ROOT/plans/validation/docker/gitlab.yaml"
+
+    # Start runner container
+    log "Starting runner container..."
+    docker compose -f "$compose_file" --profile runner up -d gitlab-runner || {
+        warn "Failed to start runner container"
+        return 1
+    }
+
+    # Wait for runner to be ready
+    sleep 5
+
+    # Check if runner is already registered
+    if docker exec gitlab-runner gitlab-runner list 2>/dev/null | grep -q "sapiens-test-runner"; then
+        log "Runner already registered"
+        return 0
+    fi
+
+    # Get runner registration token via Rails
+    log "Getting runner registration token..."
+    local runner_token
+    runner_token=$(docker exec "$DOCKER_CONTAINER" gitlab-rails runner "
+        # GitLab 16+ uses new runner authentication
+        token = Ci::Runner.generate_registration_token rescue nil
+        puts token if token
+    " 2>&1 | grep -v '^[[:space:]]*$' | tail -1 || echo "")
+
+    if [[ -z "$runner_token" ]]; then
+        # Try alternative method for newer GitLab versions
+        runner_token=$(docker exec "$DOCKER_CONTAINER" gitlab-rails runner "
+            settings = ApplicationSetting.current
+            puts settings.runners_registration_token
+        " 2>&1 | grep -v '^[[:space:]]*$' | tail -1 || echo "")
+    fi
+
+    if [[ -z "$runner_token" ]]; then
+        warn "Could not get runner registration token"
+        warn "Register manually via Admin → CI/CD → Runners"
+        return 1
+    fi
+
+    log "Registration token: ${runner_token:0:8}..."
+
+    # Register the runner
+    log "Registering runner..."
+    docker exec gitlab-runner gitlab-runner register \
+        --non-interactive \
+        --url "http://gitlab:80" \
+        --registration-token "$runner_token" \
+        --executor "docker" \
+        --docker-image "python:3.12-slim" \
+        --description "sapiens-test-runner" \
+        --docker-network-mode "sapiens-gitlab-network" \
+        --docker-privileged 2>/dev/null || {
+            warn "Runner registration failed. May need manual setup."
+            return 1
+        }
+
+    log "Runner registered successfully"
+}
+
+# Configure GitLab CI/CD secrets
+configure_ci_secrets() {
+    step "Configuring CI/CD secrets..."
+
+    # Set SAPIENS_GITLAB_TOKEN secret
+    log "Setting SAPIENS_GITLAB_TOKEN secret..."
+    gitlab_api POST "/projects/$PROJECT_ENCODED/variables" "{
+        \"key\": \"SAPIENS_GITLAB_TOKEN\",
+        \"value\": \"$GITLAB_TOKEN\",
+        \"protected\": false,
+        \"masked\": true
+    }" 2>/dev/null || gitlab_api PUT "/projects/$PROJECT_ENCODED/variables/SAPIENS_GITLAB_TOKEN" "{
+        \"value\": \"$GITLAB_TOKEN\",
+        \"protected\": false,
+        \"masked\": true
+    }" 2>/dev/null || true
+
+    # Set AI API key secret based on provider
+    if [[ "$AI_PROVIDER" == "openrouter" ]]; then
+        if [[ -z "$OPENROUTER_API_KEY" ]]; then
+            warn "OPENROUTER_API_KEY not set - CI component test will fail"
+            warn "Set it or use --ai-provider ollama with host network access"
+            return 1
+        fi
+
+        log "Setting SAPIENS_AI_API_KEY secret (OpenRouter)..."
+        gitlab_api POST "/projects/$PROJECT_ENCODED/variables" "{
+            \"key\": \"SAPIENS_AI_API_KEY\",
+            \"value\": \"$OPENROUTER_API_KEY\",
+            \"protected\": false,
+            \"masked\": true
+        }" 2>/dev/null || gitlab_api PUT "/projects/$PROJECT_ENCODED/variables/SAPIENS_AI_API_KEY" "{
+            \"value\": \"$OPENROUTER_API_KEY\",
+            \"protected\": false,
+            \"masked\": true
+        }" 2>/dev/null || true
+    fi
+
+    log "CI/CD secrets configured"
 }
 
 # Verify prerequisites
@@ -577,19 +689,19 @@ run_ci_test() {
 # Phase 1.5: Component Integration Test
 #############################################
 
-# Deploy sapiens component wrapper
-deploy_component_wrapper() {
-    step "Deploying sapiens component wrapper..."
+# Deploy the sapiens-dispatcher component CI configuration
+deploy_sapiens_component() {
+    step "Deploying sapiens-dispatcher component..."
 
     local ci_path=".gitlab-ci.yml"
 
-    # Check if component wrapper already exists
+    # Check if component config already exists
     local existing
     existing=$(gitlab_api GET "/projects/$PROJECT_ENCODED/repository/files/.gitlab-ci.yml?ref=main" 2>/dev/null || echo "")
 
     if echo "$existing" | jq -e '.content' > /dev/null 2>&1; then
         local current_content
-        current_content=$(echo "$existing" | jq -r '.content' | base64 -d)
+        current_content=$(echo "$existing" | jq -r '.content' | base64 -d 2>/dev/null || echo "")
 
         if echo "$current_content" | grep -q "sapiens-dispatcher"; then
             log "Sapiens component already in CI config"
@@ -597,46 +709,120 @@ deploy_component_wrapper() {
         fi
     fi
 
-    log "Creating component wrapper CI config referencing @${COMPONENT_REF}..."
+    # Determine AI provider config
+    local ai_provider_type ai_base_url ai_model
+    if [[ "$AI_PROVIDER" == "openrouter" ]]; then
+        ai_provider_type="openai-compatible"
+        ai_base_url="https://openrouter.ai/api/v1"
+        ai_model="${OPENROUTER_MODEL}"
+    else
+        ai_provider_type="ollama"
+        # Use Docker host IP for Ollama access from runner
+        ai_base_url="http://host.docker.internal:11434"
+        ai_model="qwen3:8b"
+    fi
 
-    # Note: GitLab CI components require the component to be in a public repo
-    # or the same GitLab instance. This creates a wrapper that would use it.
+    log "Creating sapiens component CI config..."
+    log "  AI Provider: $ai_provider_type"
+    log "  AI Model: $ai_model"
+
+    # Create CI config that uses the sapiens-dispatcher component
+    # The component is in this repo at gitlab/sapiens-dispatcher/template.yml
+    # For testing, we inline the component logic rather than using include:
+    # because the component isn't published to a public GitLab instance
     local ci_content
     ci_content=$(cat << COMPONENT_EOF
-# Sapiens Automation - GitLab CI Component Wrapper
+# Sapiens Automation - GitLab CI Component
 # Generated by E2E test for component validation
+# Tests the sapiens-dispatcher component functionality
 
-include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@${COMPONENT_REF}
-    inputs:
-      label: \$SAPIENS_LABEL
-      issue_number: \$SAPIENS_ISSUE
-      event_type: "issues.labeled"
-      ai_provider_type: ollama
-      ai_base_url: http://localhost:11434
-      ai_model: qwen3:8b
-    rules:
-      - if: \$CI_PIPELINE_SOURCE == "api" && \$SAPIENS_LABEL
+stages:
+  - sapiens
+
+variables:
+  GIT_STRATEGY: clone
+  GIT_DEPTH: 0
+
+# Sapiens label handler job
+# This implements the sapiens-dispatcher component logic
+sapiens-dispatch:
+  stage: sapiens
+  image: python:3.12-slim
+  variables:
+    SAPIENS_GIT_PROVIDER_TYPE: gitlab
+    SAPIENS_GIT_BASE_URL: \${CI_API_V4_URL}
+    SAPIENS_GIT_TOKEN: \${SAPIENS_GITLAB_TOKEN}
+    SAPIENS_REPO_OWNER: \${CI_PROJECT_NAMESPACE}
+    SAPIENS_REPO_NAME: \${CI_PROJECT_NAME}
+    SAPIENS_AI_PROVIDER_TYPE: ${ai_provider_type}
+    SAPIENS_AI_BASE_URL: ${ai_base_url}
+    SAPIENS_AI_MODEL: ${ai_model}
+    SAPIENS_AI_API_KEY: \${SAPIENS_AI_API_KEY}
+  before_script:
+    - apt-get update && apt-get install -y git
+    - pip install --quiet repo-sapiens>=2.0.0
+    - git config --global user.name "Sapiens Bot"
+    - git config --global user.email "sapiens-bot@gitlab.local"
+  script:
+    - echo "Sapiens Dispatcher - GitLab CI Component"
+    - echo "Processing label '\${SAPIENS_LABEL}' on issue #\${SAPIENS_ISSUE}"
+    - |
+      sapiens process-label \\
+        --event-type "\${SAPIENS_EVENT_TYPE:-issues.labeled}" \\
+        --label "\${SAPIENS_LABEL}" \\
+        --issue "\${SAPIENS_ISSUE}" \\
+        --source gitlab
+  artifacts:
+    paths:
+      - .sapiens/
+    expire_in: 7 days
+    when: always
+  rules:
+    - if: \$CI_PIPELINE_SOURCE == "api" && \$SAPIENS_LABEL && \$SAPIENS_ISSUE
+      when: always
+    - if: \$CI_PIPELINE_SOURCE == "trigger" && \$SAPIENS_LABEL && \$SAPIENS_ISSUE
+      when: always
+    - when: never
 COMPONENT_EOF
     )
 
-    # Update or create CI config
-    local method="POST"
-    if [[ -n "$existing" ]]; then
-        method="PUT"
+    # Get SHA of existing file for update
+    local file_sha=""
+    if echo "$existing" | jq -e '.content' > /dev/null 2>&1; then
+        # File exists - need to update
+        local encoded_content
+        encoded_content=$(echo -n "$ci_content" | base64 -w 0)
+
+        local response
+        response=$(gitlab_api PUT "/projects/$PROJECT_ENCODED/repository/files/.gitlab-ci.yml" "{
+            \"branch\": \"main\",
+            \"content\": \"$encoded_content\",
+            \"encoding\": \"base64\",
+            \"commit_message\": \"Update sapiens component CI config for E2E testing\"
+        }" 2>&1 || echo "")
+
+        if echo "$response" | jq -e '.file_path' > /dev/null 2>&1; then
+            log "Component CI config updated"
+            return 0
+        fi
     fi
 
+    # File doesn't exist - create it
+    local encoded_content
+    encoded_content=$(echo -n "$ci_content" | base64 -w 0)
+
     local response
-    response=$(gitlab_api "$method" "/projects/$PROJECT_ENCODED/repository/files/.gitlab-ci.yml" "{
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/repository/files/.gitlab-ci.yml" "{
         \"branch\": \"main\",
-        \"content\": $(echo "$ci_content" | jq -Rs .),
-        \"commit_message\": \"Add sapiens component wrapper for E2E testing\"
+        \"content\": \"$encoded_content\",
+        \"encoding\": \"base64\",
+        \"commit_message\": \"Add sapiens component CI config for E2E testing\"
     }" 2>&1 || echo "")
 
     if echo "$response" | jq -e '.file_path' > /dev/null 2>&1; then
-        log "Component wrapper deployed"
+        log "Component CI config created"
     else
-        warn "Could not deploy component wrapper: $response"
+        warn "Could not deploy component CI config: $response"
         return 1
     fi
 }
@@ -725,36 +911,101 @@ verify_component() {
 run_component_test() {
     step "=== Phase 1.5: Component Integration Test ==="
     echo ""
-    log "Testing GitLab CI component"
-    log "Component ref: $COMPONENT_REF"
+    log "Testing sapiens-dispatcher GitLab CI component"
+    log "AI Provider: $AI_PROVIDER"
     echo ""
 
-    deploy_component_wrapper || return 1
-    sleep 2
+    # Check for required secrets
+    if [[ "$AI_PROVIDER" == "openrouter" ]] && [[ -z "$OPENROUTER_API_KEY" ]]; then
+        error "OPENROUTER_API_KEY required for component test"
+        error "Set it or use: --ai-provider ollama"
+        return 1
+    fi
 
+    # Set up runner if requested
+    if [[ "$WITH_RUNNER" == "true" ]]; then
+        setup_runner || {
+            warn "Runner setup failed - component test may fail"
+        }
+    fi
+
+    # Configure CI/CD secrets
+    configure_ci_secrets || {
+        warn "Could not configure CI secrets"
+    }
+
+    # Deploy component CI config
+    deploy_sapiens_component || return 1
+    sleep 3
+
+    # Create test issue
     create_component_test_issue || return 1
 
     # Trigger pipeline with sapiens variables
-    log "Triggering pipeline with sapiens variables..."
+    step "Triggering sapiens pipeline..."
     local response
     response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/pipeline" "{
         \"ref\": \"main\",
         \"variables\": [
             {\"key\": \"SAPIENS_LABEL\", \"value\": \"needs-planning\"},
-            {\"key\": \"SAPIENS_ISSUE\", \"value\": \"$COMPONENT_ISSUE_IID\"}
+            {\"key\": \"SAPIENS_ISSUE\", \"value\": \"$COMPONENT_ISSUE_IID\"},
+            {\"key\": \"SAPIENS_EVENT_TYPE\", \"value\": \"issues.labeled\"}
         ]
     }" 2>&1 || echo "")
 
     local component_pipeline_id
     component_pipeline_id=$(echo "$response" | jq -r '.id // empty')
 
-    if [[ -n "$component_pipeline_id" ]]; then
-        log "Pipeline triggered: #$component_pipeline_id"
-        # Wait briefly for pipeline
-        sleep 30
-    else
-        warn "Could not trigger component pipeline"
+    if [[ -z "$component_pipeline_id" ]]; then
+        warn "Could not trigger component pipeline: $response"
+        warn "This is expected if no runner is available"
+        return 0
     fi
+
+    log "Pipeline triggered: #$component_pipeline_id"
+
+    # Wait for pipeline to complete
+    step "Waiting for component pipeline..."
+    local timeout=300
+    local elapsed=0
+    local poll_interval=15
+
+    while [[ $elapsed -lt $timeout ]]; do
+        local pipeline
+        pipeline=$(gitlab_api GET "/projects/$PROJECT_ENCODED/pipelines/$component_pipeline_id" 2>/dev/null || echo "{}")
+
+        local status
+        status=$(echo "$pipeline" | jq -r '.status // "unknown"')
+
+        log "  Pipeline status: $status (${elapsed}s / ${timeout}s)"
+
+        case "$status" in
+            success)
+                log "Pipeline completed successfully!"
+                break
+                ;;
+            failed)
+                warn "Pipeline failed"
+                # Get job logs for debugging
+                local jobs
+                jobs=$(gitlab_api GET "/projects/$PROJECT_ENCODED/pipelines/$component_pipeline_id/jobs" 2>/dev/null || echo "[]")
+                local job_id
+                job_id=$(echo "$jobs" | jq -r '.[0].id // empty')
+                if [[ -n "$job_id" ]]; then
+                    log "Job logs (last 50 lines):"
+                    gitlab_api GET "/projects/$PROJECT_ENCODED/jobs/$job_id/trace" 2>/dev/null | tail -50 || true
+                fi
+                break
+                ;;
+            canceled|skipped)
+                warn "Pipeline $status"
+                break
+                ;;
+        esac
+
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+    done
 
     if verify_component; then
         log "Component integration test PASSED"
@@ -762,7 +1013,7 @@ run_component_test() {
     fi
 
     warn "Component integration test had issues"
-    return 0  # Don't fail overall
+    return 0  # Don't fail overall for component issues
 }
 
 #############################################
