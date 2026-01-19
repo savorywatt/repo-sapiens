@@ -90,6 +90,7 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RUN_ID="gitlab-e2e-${TIMESTAMP}"
 
 DOCKER_CONTEXT="${DOCKER_CONTEXT:-default}"
+DOCKER_CONTAINER="${DOCKER_CONTAINER:-gitlab-test}"
 GITLAB_URL="${GITLAB_URL:-http://localhost:8080}"
 GITLAB_PROJECT="${GITLAB_PROJECT:-root/test-repo}"
 PLAYGROUND_DIR="${PLAYGROUND_DIR:-$HOME/Workspace/playground}"
