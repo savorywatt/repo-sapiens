@@ -10,6 +10,7 @@ import structlog
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.health import health_check
 from repo_sapiens.cli.init import init_command
+from repo_sapiens.cli.mcp import mcp_group
 from repo_sapiens.cli.process_label import process_label_command
 from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
@@ -42,7 +43,7 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
     # Skip config loading for commands that don't need it
     # (init creates the config, credentials manages credentials, update checks templates,
     # health-check handles its own config loading)
-    commands_without_config = ["init", "credentials", "update", "health-check"]
+    commands_without_config = ["init", "credentials", "update", "health-check", "mcp"]
     if ctx.invoked_subcommand in commands_without_config:
         ctx.obj = {"settings": None}
         return
@@ -682,6 +683,9 @@ async def _run_react_agent(
 
 # Add credentials management command group
 cli.add_command(credentials_group)
+
+# Add MCP management command group
+cli.add_command(mcp_group)
 
 # Add health-check command
 cli.add_command(health_check)

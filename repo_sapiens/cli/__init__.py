@@ -27,6 +27,10 @@ Key Commands:
     update (repo_sapiens.cli.update):
         Updates existing configuration or workflow templates.
 
+    mcp (repo_sapiens.cli.mcp):
+        Command group for managing MCP (Model Context Protocol) servers.
+        Includes listing, configuration, installation, and testing.
+
 Usage Examples:
     Initialize a repository::
 
@@ -49,10 +53,12 @@ Module Structure:
     - health.py: Health check and validation commands
     - credentials.py: Credential management command group
     - update.py: Configuration and template update commands
+    - mcp.py: MCP server management command group
 """
 
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.init import init_command
+from repo_sapiens.cli.mcp import mcp_group
 from repo_sapiens.cli.update import update_command
 
-__all__ = ["credentials_group", "init_command", "update_command"]
+__all__ = ["credentials_group", "init_command", "mcp_group", "update_command"]

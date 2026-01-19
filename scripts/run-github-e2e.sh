@@ -509,6 +509,12 @@ on:
   pull_request:
     types: [labeled]
 
+# Permissions required by the reusable workflow
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   sapiens:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@${DISPATCHER_REF}

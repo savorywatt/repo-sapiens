@@ -11,7 +11,7 @@ on:
       issue_number:
         description: 'Issue or PR number'
         required: true
-        type: number
+        type: string
       event_type:
         description: 'Event type for sapiens CLI (e.g., issues.labeled, pull_request.labeled)'
         required: false
@@ -78,7 +78,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
+          # Note: No pip caching - target repos may not have requirements.txt/pyproject.toml
 
       - name: Install sapiens
         run: pip install repo-sapiens==2.1.0

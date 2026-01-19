@@ -3,6 +3,14 @@
 This package contains agent implementations for automated task execution.
 """
 
+from repo_sapiens.agents.backends import (
+    ChatResponse,
+    LLMBackend,
+    OllamaBackend,
+    OpenAIBackend,
+    ToolCall,
+    create_backend,
+)
 from repo_sapiens.agents.react import (
     ReActAgentProvider,
     ReActConfig,
@@ -12,11 +20,20 @@ from repo_sapiens.agents.react import (
 from repo_sapiens.agents.tools import ToolDefinition, ToolExecutionError, ToolRegistry
 
 __all__ = [
+    # React agent
     "ReActAgentProvider",
     "ReActConfig",
     "TrajectoryStep",
+    "run_react_task",
+    # Tools
     "ToolRegistry",
     "ToolDefinition",
     "ToolExecutionError",
-    "run_react_task",
+    # Backends
+    "LLMBackend",
+    "OllamaBackend",
+    "OpenAIBackend",
+    "ChatResponse",
+    "ToolCall",
+    "create_backend",
 ]

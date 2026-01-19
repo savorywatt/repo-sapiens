@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, HttpUrl, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from repo_sapiens.config.credential_fields import CredentialSecret
+from repo_sapiens.config.mcp import MCPConfig
 from repo_sapiens.config.triggers import AutomationConfig
 from repo_sapiens.enums import ProviderType
 from repo_sapiens.exceptions import ConfigurationError
@@ -220,6 +221,7 @@ class AutomationSettings(BaseSettings):
     workflow: WorkflowConfig = Field(default_factory=WorkflowConfig)
     tags: TagsConfig = Field(default_factory=TagsConfig)
     automation: AutomationConfig = Field(default_factory=AutomationConfig)
+    mcp: MCPConfig = Field(default_factory=MCPConfig, description="MCP server configuration")
 
     @property
     def state_dir(self) -> Path:

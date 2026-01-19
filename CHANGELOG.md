@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **OpenAI Function Calling Support**: ReAct agent now supports native function calling
+  - `ChatResponse` and `ToolCall` dataclasses for structured tool call handling
+  - `to_openai_format()` method on `ToolRegistry` for OpenAI-compatible tool definitions
+  - Backend abstraction with `tools` parameter in `chat()` methods
+  - `ReActConfig` extended with `backend_type`, `base_url`, `api_key`, `use_native_tools`
+  - Automatic fallback to text-based parsing when native tools unavailable
+  - Works with Ollama models that support tool calling (qwen3, llama3.1, etc.)
+  - Works with OpenAI-compatible APIs (vLLM, llama.cpp, OpenAI)
 - **Reusable Workflow Architecture**: Single dispatcher workflow replaces copy-paste templates
   - `.github/workflows/sapiens-dispatcher.yaml` - Reusable workflow for GitHub and Gitea
   - `gitlab/sapiens-dispatcher/` - GitLab CI/CD Component (requires GitLab 16.0+)
