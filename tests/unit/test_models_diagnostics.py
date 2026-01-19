@@ -344,7 +344,7 @@ class TestDiagnosticReport:
 
         data = report.to_dict()
 
-        assert data["timestamp"] == "2025-06-15T10:30:45"
+        assert data["timestamp"] == "2025-06-15T10:30:45+00:00"
         assert data["provider_type"] == "gitea"
         assert data["repository"] == "org/project"
         assert data["agent_type"] == "claude-local"

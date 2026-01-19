@@ -1,4 +1,35 @@
-"""CLI commands for credential management."""
+"""CLI commands for credential management.
+
+This module provides the ``sapiens credentials`` command group for storing,
+retrieving, and managing credentials used by the automation system.
+
+The credential system supports three storage backends:
+    - keyring: OS-level secure credential storage (macOS Keychain, GNOME
+        Keyring, Windows Credential Manager). Recommended for workstations.
+    - environment: Environment variables. Recommended for CI/CD pipelines
+        where secrets are injected at runtime.
+    - encrypted: AES-256-GCM encrypted file storage with Argon2 key derivation.
+        Fallback for headless systems without keyring support.
+
+Credential References:
+    Configuration files use special prefixes to indicate credential sources:
+    - @keyring:service/key - Resolve from OS keyring
+    - ${VARIABLE_NAME} - Resolve from environment variable
+    - @encrypted:service/key - Resolve from encrypted file
+
+Commands:
+    - set: Store a credential in a backend
+    - get: Retrieve and display a credential (masked by default)
+    - delete: Remove a credential from a backend
+    - test: Check availability of credential backends
+
+Example:
+    Store and retrieve credentials::
+
+        $ sapiens credentials set gitea/api_token --backend keyring
+        $ sapiens credentials get @keyring:gitea/api_token
+        $ sapiens credentials test
+"""
 
 import sys
 from pathlib import Path
@@ -252,16 +283,26 @@ def test_credentials(master_password: str | None):
 
 
 def _parse_service_key(reference: str) -> tuple[str, str]:
-    """Parse service/key reference.
+    """Parse a service/key reference string into its components.
+
+    Credential references for keyring and encrypted backends use the format
+    "service/key" where service is typically the provider name and key is
+    the credential type.
 
     Args:
-        reference: Reference in format "service/key"
+        reference: Credential reference in "service/key" format.
+            Examples: "gitea/api_token", "claude/api_key", "gitlab/api_token"
 
     Returns:
-        Tuple of (service, key)
+        Tuple of (service, key) strings. The service is the part before
+        the first slash, and key is everything after.
 
     Raises:
-        ValueError: If format is invalid
+        ValueError: If reference doesn't contain a slash separator.
+
+    Example:
+        >>> _parse_service_key("gitea/api_token")
+        ("gitea", "api_token")
     """
     if "/" not in reference:
         raise ValueError(
@@ -273,7 +314,22 @@ def _parse_service_key(reference: str) -> tuple[str, str]:
 
 
 def _set_keyring(reference: str, value: str) -> None:
-    """Store credential in keyring."""
+    """Store a credential in the OS keyring.
+
+    Uses the system's native credential storage (macOS Keychain, GNOME
+    Keyring, Windows Credential Manager) via the keyring library.
+
+    Args:
+        reference: Credential path in "service/key" format.
+        value: The credential value to store.
+
+    Side Effects:
+        - Writes to OS keyring
+        - Prints storage confirmation and reference format to stdout
+
+    Raises:
+        CredentialError: If keyring is unavailable or storage fails.
+    """
     service, key = _parse_service_key(reference)
 
     backend = KeyringBackend()
@@ -284,7 +340,20 @@ def _set_keyring(reference: str, value: str) -> None:
 
 
 def _set_environment(var_name: str, value: str) -> None:
-    """Store credential in environment."""
+    """Store a credential as an environment variable.
+
+    Sets the environment variable for the current process. Note that this
+    only affects the current session; for persistence, users should add
+    the variable to their shell profile or CI/CD secrets configuration.
+
+    Args:
+        var_name: Environment variable name (e.g., "GITEA_TOKEN").
+        value: The credential value to store.
+
+    Side Effects:
+        - Sets os.environ[var_name] = value
+        - Prints confirmation and persistence warning to stdout
+    """
     backend = EnvironmentBackend()
     backend.set(var_name, value)
 
@@ -294,7 +363,25 @@ def _set_environment(var_name: str, value: str) -> None:
 
 
 def _set_encrypted(reference: str, value: str, master_password: str | None) -> None:
-    """Store credential in encrypted file."""
+    """Store a credential in the encrypted credentials file.
+
+    Uses AES-256-GCM encryption with Argon2id key derivation to securely
+    store credentials in .sapiens/credentials.enc. This backend is useful
+    for headless systems without keyring support.
+
+    Args:
+        reference: Credential path in "service/key" format.
+        value: The credential value to store.
+        master_password: Password for encryption. If None, prompts interactively.
+
+    Side Effects:
+        - Creates or updates .sapiens/credentials.enc file
+        - Prints storage confirmation and reference format to stdout
+        - May prompt for master password if not provided
+
+    Raises:
+        CredentialError: If cryptography library unavailable or encryption fails.
+    """
     service, key = _parse_service_key(reference)
 
     if not master_password:
@@ -308,7 +395,20 @@ def _set_encrypted(reference: str, value: str, master_password: str | None) -> N
 
 
 def _delete_keyring(reference: str) -> bool:
-    """Delete credential from keyring."""
+    """Delete a credential from the OS keyring.
+
+    Removes the specified credential from the system's native credential
+    storage. Silently returns False if the credential doesn't exist.
+
+    Args:
+        reference: Credential path in "service/key" format.
+
+    Returns:
+        True if the credential was found and deleted, False if not found.
+
+    Raises:
+        CredentialError: If keyring is unavailable or deletion fails.
+    """
     service, key = _parse_service_key(reference)
 
     backend = KeyringBackend()
@@ -316,13 +416,40 @@ def _delete_keyring(reference: str) -> bool:
 
 
 def _delete_environment(var_name: str) -> bool:
-    """Delete credential from environment."""
+    """Delete a credential from environment variables.
+
+    Removes the specified environment variable from os.environ for the
+    current process. Does not affect shell profile or CI/CD secrets.
+
+    Args:
+        var_name: Environment variable name to delete.
+
+    Returns:
+        True if the variable was found and deleted, False if not found.
+    """
     backend = EnvironmentBackend()
     return backend.delete(var_name)
 
 
 def _delete_encrypted(reference: str, master_password: str | None) -> bool:
-    """Delete credential from encrypted file."""
+    """Delete a credential from the encrypted credentials file.
+
+    Removes the specified credential from the encrypted file. Requires
+    the master password to decrypt the file for modification.
+
+    Args:
+        reference: Credential path in "service/key" format.
+        master_password: Password for decryption. If None, prompts interactively.
+
+    Returns:
+        True if the credential was found and deleted, False if not found.
+
+    Side Effects:
+        May prompt for master password if not provided.
+
+    Raises:
+        CredentialError: If decryption fails (wrong password) or file corrupt.
+    """
     service, key = _parse_service_key(reference)
 
     if not master_password:

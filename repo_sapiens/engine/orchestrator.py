@@ -1,4 +1,32 @@
-"""Workflow orchestrator for managing automation pipeline."""
+"""
+Workflow orchestrator for managing automation pipeline.
+
+This module provides the WorkflowOrchestrator class, which serves as the central
+coordination point for the entire automation workflow. The orchestrator manages:
+
+- Issue discovery and routing to appropriate stages
+- Stage lifecycle and execution
+- Parallel task execution with dependency management
+- Error handling and recovery across the workflow
+
+Architecture Overview:
+    The orchestrator follows a hub-and-spoke pattern where it sits at the center
+    and coordinates between multiple specialized stages. Each stage handles a
+    specific phase of the workflow (planning, execution, review, merge).
+
+Stage Lifecycle:
+    1. Issue arrives with specific labels indicating required action
+    2. Orchestrator determines appropriate stage via label matching
+    3. Stage executes its logic, updating issue labels and state
+    4. Control returns to orchestrator for next action
+
+Typical Workflow Flow:
+    needs-planning -> proposal -> approval -> task_execution -> pr_review -> merge
+
+Example:
+    >>> orchestrator = WorkflowOrchestrator(settings, git, agent, state)
+    >>> await orchestrator.process_all_issues(tag="automation")
+"""
 
 import asyncio
 
@@ -29,8 +57,48 @@ log = structlog.get_logger(__name__)
 class WorkflowOrchestrator:
     """Orchestrate the complete automation workflow.
 
-    Manages issue processing, stage routing, parallel task execution,
-    and error handling across the entire workflow pipeline.
+    The WorkflowOrchestrator is the central coordination point for the entire
+    automation system. It manages issue discovery, stage routing, parallel task
+    execution, and error handling across the workflow pipeline.
+
+    The orchestrator maintains a registry of all available stages and routes
+    issues to the appropriate stage based on their labels. It also handles
+    parallel task execution with dependency management for complex plans.
+
+    Attributes:
+        settings: Configuration for the automation system.
+        git: Git provider for repository operations (issues, PRs, branches).
+        agent: AI agent provider for code generation and review.
+        state: State manager for workflow persistence.
+        stages: Registry mapping stage names to their implementations.
+
+    Stage Registry:
+        The orchestrator initializes both the new granular workflow stages
+        and legacy stages for backward compatibility:
+
+        New Workflow Stages:
+            - proposal: Generate implementation proposals for issues
+            - approval: Handle proposal approval workflow
+            - task_execution: Execute individual tasks
+            - pr_review: AI-assisted pull request review
+            - pr_fix: Create fix proposals based on review feedback
+            - fix_execution: Execute approved fixes
+            - qa: Quality assurance (build and test verification)
+
+        Legacy Stages (for compatibility):
+            - planning: Generate development plans
+            - plan_review: Review generated plans
+            - implementation: Implement approved plans
+            - code_review: AI code review
+            - merge: Create and merge pull requests
+
+    Example:
+        >>> settings = AutomationSettings.load("config.yaml")
+        >>> git = GiteaProvider(settings.git_provider)
+        >>> agent = ClaudeProvider(settings.agent_provider)
+        >>> state = StateManager(".sapiens/state")
+        >>> orchestrator = WorkflowOrchestrator(settings, git, agent, state)
+        >>> await orchestrator.process_all_issues()
     """
 
     def __init__(
@@ -39,14 +107,26 @@ class WorkflowOrchestrator:
         git: GitProvider,
         agent: AgentProvider,
         state: StateManager,
-    ):
-        """Initialize orchestrator.
+    ) -> None:
+        """Initialize the workflow orchestrator with required dependencies.
+
+        Sets up the stage registry with all available workflow stages. Each stage
+        receives the same set of dependencies (git, agent, state, settings) to
+        ensure consistent access to system resources.
 
         Args:
-            settings: Automation settings
-            git: Git provider instance
-            agent: Agent provider instance
-            state: State manager instance
+            settings: Automation configuration including workflow settings,
+                repository configuration, and tag definitions.
+            git: Git provider instance for repository operations such as
+                creating issues, branches, and pull requests.
+            agent: AI agent provider for code generation, planning, and review
+                operations.
+            state: State manager for persisting workflow state across runs.
+
+        Note:
+            The stage registry is initialized eagerly, meaning all stages are
+            instantiated during orchestrator construction. This ensures any
+            configuration issues are caught early.
         """
         self.settings = settings
         self.git = git
@@ -74,8 +154,35 @@ class WorkflowOrchestrator:
     async def process_all_issues(self, tag: str | None = None) -> None:
         """Process all open issues, optionally filtered by tag.
 
+        Fetches all open issues from the git provider, optionally filtering
+        by a specific label/tag. Issues are processed in ascending order by
+        issue number to ensure deterministic behavior and respect for issue
+        creation order.
+
+        Each issue is processed independently with its own error handling,
+        allowing the workflow to continue even if individual issues fail.
+
         Args:
-            tag: Optional tag filter
+            tag: Optional label to filter issues. When provided, only issues
+                with this label will be processed. When None, all open issues
+                are considered for processing.
+
+        Raises:
+            No exceptions are raised directly. Individual issue failures are
+            logged and execution continues with remaining issues.
+
+        Side Effects:
+            - Issues may have labels added/removed based on stage execution
+            - Comments may be added to issues
+            - State files may be created/updated in the state directory
+            - Branches may be created in the repository
+            - Pull requests may be created
+
+        Example:
+            >>> # Process all issues with the 'automation' label
+            >>> await orchestrator.process_all_issues(tag="automation")
+            >>> # Process all open issues
+            >>> await orchestrator.process_all_issues()
         """
         log.info("processing_all_issues", tag=tag)
 
@@ -104,12 +211,34 @@ class WorkflowOrchestrator:
                 )
 
     async def process_issue(self, issue: Issue) -> None:
-        """Process a single issue.
+        """Process a single issue through the workflow pipeline.
 
-        Determines which stage to execute based on issue labels.
+        Examines the issue's labels to determine which workflow stage should
+        handle it, then delegates execution to that stage. If no matching
+        stage is found (i.e., the issue has no workflow-related labels),
+        the issue is skipped.
+
+        The stage determination uses a priority-based matching system where
+        certain label combinations take precedence over others. See
+        ``_determine_stage()`` for the full routing logic.
 
         Args:
-            issue: Issue to process
+            issue: Issue to process. Must have ``number``, ``labels``, and
+                ``title`` attributes populated.
+
+        Raises:
+            Exception: Re-raises any exception from stage execution after
+                logging. The caller (typically ``process_all_issues``)
+                handles error recovery.
+
+        Side Effects:
+            - Stage-specific side effects (varies by stage type)
+            - Error comment added to issue if stage execution fails
+            - ``needs-attention`` label added on failure
+
+        Example:
+            >>> issue = await git.get_issue(42)
+            >>> await orchestrator.process_issue(issue)
         """
         log.info("processing_issue", issue=issue.number, labels=issue.labels)
 
@@ -135,12 +264,38 @@ class WorkflowOrchestrator:
             raise
 
     async def process_plan(self, plan_id: str) -> None:
-        """Process entire plan end-to-end.
+        """Process an entire plan end-to-end with parallel task execution.
 
-        Executes all stages for a plan, including parallel task execution.
+        Loads the plan state from disk and executes all tasks within the plan.
+        Tasks are executed in parallel where dependencies allow, respecting
+        the ``max_concurrent_tasks`` setting.
+
+        The plan must have completed its planning stage before tasks can be
+        executed. If the planning stage is not complete, this method returns
+        early without error.
+
+        Workflow:
+            1. Load plan state from state manager
+            2. Verify planning stage is complete
+            3. Build Task objects from stored task state
+            4. Execute tasks in parallel via ``execute_parallel_tasks()``
 
         Args:
-            plan_id: Plan identifier
+            plan_id: Unique identifier for the plan. This corresponds to
+                the state file name (e.g., "plan-123" -> "plan-123.json").
+
+        Raises:
+            ValueError: If dependency validation fails during parallel execution.
+            RuntimeError: If a deadlock is detected in task dependencies.
+
+        Side Effects:
+            - State file updated with task execution results
+            - Implementation branches created
+            - Pull requests created
+            - Issue labels and comments updated
+
+        Example:
+            >>> await orchestrator.process_plan("plan-42")
         """
         log.info("processing_plan", plan_id=plan_id)
 
@@ -179,14 +334,51 @@ class WorkflowOrchestrator:
         log.info("plan_processing_completed", plan_id=plan_id)
 
     async def execute_parallel_tasks(self, tasks: list[Task], plan_id: str) -> None:
-        """Execute tasks in parallel respecting dependencies.
+        """Execute tasks in parallel while respecting dependency constraints.
 
-        Uses dependency tracker to determine execution order and runs
-        tasks concurrently when possible.
+        Uses a DependencyTracker to build a directed acyclic graph (DAG) of
+        task dependencies and executes tasks in topological order. Tasks
+        without dependencies or with satisfied dependencies run concurrently,
+        up to the ``max_concurrent_tasks`` limit.
+
+        Execution Algorithm:
+            1. Add all tasks to the dependency tracker
+            2. Validate the dependency graph (detect cycles, missing deps)
+            3. While tasks remain:
+               a. Get all tasks ready for execution (dependencies satisfied)
+               b. Execute ready tasks in batches up to max_concurrent_tasks
+               c. Mark completed/failed tasks in tracker
+               d. Repeat until no pending tasks
+
+        Error Handling:
+            - If a task fails, dependent tasks are blocked and marked as
+              failed due to dependency failure
+            - Execution continues for tasks not dependent on failed ones
+            - A summary is logged at completion showing success/failure counts
 
         Args:
-            tasks: List of tasks to execute
-            plan_id: Plan identifier
+            tasks: List of Task objects to execute. Each task must have an
+                ``id``, ``dependencies`` list, and ``prompt_issue_id``.
+            plan_id: Plan identifier for logging and state grouping.
+
+        Raises:
+            ValueError: If dependencies reference non-existent tasks or
+                contain cycles.
+            RuntimeError: If a deadlock is detected (no ready tasks but
+                tasks still pending, after validation passed).
+
+        Side Effects:
+            - Each task executes its implementation and code review stages
+            - State updated for each task (in_progress, completed, failed)
+            - Branches created for task implementations
+            - Comments added to task issues
+
+        Example:
+            >>> tasks = [
+            ...     Task(id="task-1", dependencies=[]),
+            ...     Task(id="task-2", dependencies=["task-1"]),
+            ... ]
+            >>> await orchestrator.execute_parallel_tasks(tasks, "plan-42")
         """
         log.info("executing_parallel_tasks", plan_id=plan_id, task_count=len(tasks))
 
@@ -262,11 +454,44 @@ class WorkflowOrchestrator:
         log.info("parallel_execution_completed", plan_id=plan_id, summary=summary)
 
     async def _execute_single_task(self, task: Task, plan_id: str) -> None:
-        """Execute a single task.
+        """Execute a single task through implementation and code review stages.
+
+        Runs the task through its full lifecycle: retrieving the associated
+        issue, executing the implementation stage, waiting for state updates,
+        and then running the code review stage.
+
+        This method is designed to be called concurrently via asyncio.gather()
+        and handles its own error propagation. Errors are not caught here;
+        they propagate to the caller (execute_parallel_tasks) for handling.
+
+        Execution Flow:
+            1. Validate task has an associated issue
+            2. Fetch the issue from the git provider
+            3. Execute the implementation stage
+            4. Brief pause for state synchronization (1 second)
+            5. Execute the code review stage
 
         Args:
-            task: Task to execute
-            plan_id: Plan identifier
+            task: Task object containing the task details. Must have a
+                ``prompt_issue_id`` referencing a valid issue number.
+            plan_id: Plan identifier for context and logging.
+
+        Raises:
+            ValueError: If the task has no associated issue (prompt_issue_id
+                is None or empty).
+            Exception: Any exception from stage execution propagates up.
+
+        Side Effects:
+            - Implementation branch created with task changes
+            - Code committed and pushed to the branch
+            - Pull request created or updated
+            - Issue labels updated (execute -> review)
+            - Review comments added to the issue
+
+        Note:
+            The 1-second sleep between stages is a workaround to ensure
+            state updates from the implementation stage are visible to the
+            code review stage. This may be improved in future versions.
         """
         if not task.prompt_issue_id:
             raise ValueError(f"Task {task.id} has no associated issue")
@@ -284,46 +509,88 @@ class WorkflowOrchestrator:
         await self.stages["code_review"].execute(issue)
 
     def _determine_stage(self, issue: Issue) -> str | None:
-        """Determine which stage to execute based on issue labels.
+        """Determine which workflow stage should handle this issue.
+
+        Examines the issue's labels and matches them against known workflow
+        triggers. The matching follows a priority order where more specific
+        label combinations are checked before general ones.
+
+        Label Matching Priority (checked in order):
+            1. New Granular Workflow:
+               - "proposed" -> approval (awaiting approval)
+               - "execute" + "task" -> task_execution
+               - needs_planning tag -> proposal
+
+            2. PR Review Workflow:
+               - "needs-review" -> pr_review
+               - "needs-fix" -> pr_fix
+               - "approved" + "fix-proposal" -> fix_execution
+
+            3. QA Workflow:
+               - "requires-qa" -> qa
+
+            4. Legacy Workflow (backward compatibility):
+               - plan_review tag -> plan_review
+               - code_review tag -> code_review
+               - merge_ready tag -> merge
 
         Args:
-            issue: Issue to check
+            issue: Issue to analyze. Must have ``labels`` attribute populated.
 
         Returns:
-            Stage name or None if no matching stage
+            The name of the stage that should handle this issue (e.g.,
+            "approval", "task_execution"), or None if no matching stage
+            is found.
+
+        Note:
+            This method is purely deterministic and has no side effects.
+            The tags used for matching are configured in ``settings.tags``.
+
+        Example:
+            >>> issue.labels = ["execute", "task", "plan-42"]
+            >>> orchestrator._determine_stage(issue)
+            'task_execution'
         """
         tags = self.settings.tags
 
         # New granular workflow routing
+        # Check for proposal waiting for approval
         if "proposed" in issue.labels:
-            # Proposal issue waiting for approval
             return "approval"
-        elif "execute" in issue.labels and "task" in issue.labels:
-            # Task ready for execution
+
+        # Check for task ready for execution (requires both labels)
+        if "execute" in issue.labels and "task" in issue.labels:
             return "task_execution"
-        elif tags.needs_planning in issue.labels:
-            # New issue needing plan proposal
+
+        # Check for new issue needing plan proposal
+        if tags.needs_planning in issue.labels:
             return "proposal"
+
         # PR review workflow
-        elif "needs-review" in issue.labels:
-            # PR needs code review
+        # Check for PR needing code review
+        if "needs-review" in issue.labels:
             return "pr_review"
-        elif "needs-fix" in issue.labels:
-            # PR review complete, create fix proposal
+
+        # Check for PR review complete, needs fix proposal
+        if "needs-fix" in issue.labels:
             return "pr_fix"
-        elif "approved" in issue.labels and "fix-proposal" in issue.labels:
-            # Fix proposal approved, execute fixes
+
+        # Check for approved fix proposal ready for execution
+        if "approved" in issue.labels and "fix-proposal" in issue.labels:
             return "fix_execution"
-        # QA workflow
-        elif "requires-qa" in issue.labels:
-            # PR/issue needs QA (build and test)
+
+        # QA workflow - check for QA requirement
+        if "requires-qa" in issue.labels:
             return "qa"
+
         # Legacy workflow routing (kept for compatibility)
-        elif tags.plan_review in issue.labels:
+        if tags.plan_review in issue.labels:
             return "plan_review"
-        elif tags.code_review in issue.labels:
+
+        if tags.code_review in issue.labels:
             return "code_review"
-        elif tags.merge_ready in issue.labels:
+
+        if tags.merge_ready in issue.labels:
             return "merge"
 
         return None

@@ -1,4 +1,33 @@
-"""Health check command for repo-sapiens."""
+"""Health check command for repo-sapiens.
+
+This module provides the ``sapiens health-check`` command which validates
+the configuration and tests connectivity to all configured providers.
+
+The health check performs several categories of validation:
+    - Configuration: File exists, valid YAML, schema validation
+    - Credentials: Token resolution from keyring/environment
+    - Connectivity: Git provider API access
+    - Agent: CLI availability or API connectivity
+
+With the --full flag, comprehensive validation includes write operations
+that create temporary test resources (branch, issue, PR) in the repository.
+
+Exit Codes:
+    0 (EXIT_SUCCESS): All checks passed
+    1 (EXIT_CONFIG_ERROR): Configuration file error
+    2 (EXIT_CREDENTIAL_ERROR): Credential resolution failed
+    3 (EXIT_GIT_PROVIDER_ERROR): Git provider connectivity failed
+    4 (EXIT_AGENT_PROVIDER_ERROR): Agent provider unavailable
+
+Example:
+    Basic health check::
+
+        $ sapiens health-check
+
+    Full validation with JSON output::
+
+        $ sapiens health-check --full --json
+"""
 
 from __future__ import annotations
 
@@ -30,10 +59,18 @@ EXIT_AGENT_PROVIDER_ERROR = 4
 def _print_check(name: str, status: bool, detail: str | None = None) -> None:
     """Print a check result with consistent formatting.
 
+    Displays a check result with colored status indicator ([OK] in green or
+    [FAIL] in red) followed by the check name and optional detail.
+
     Args:
-        name: Name of the check
-        status: True if passed, False if failed
-        detail: Optional detail message
+        name: Short descriptive name of the check (e.g., "Config file exists").
+        status: True if the check passed, False if it failed.
+        detail: Optional additional information to display indented below
+            the check line. Useful for showing resolved values, error messages,
+            or suggestions.
+
+    Side Effects:
+        Prints to stdout via click.echo().
     """
     if status:
         click.echo(f"  {click.style('[OK]', fg='green')} {name}")
@@ -518,16 +555,34 @@ async def _run_full_validation(
     verbose: bool,
     output_json: bool,
 ) -> DiagnosticReport:
-    """Run comprehensive validation suite.
+    """Run the comprehensive validation suite with read and write operations.
+
+    Performs extensive testing of the git provider and agent configuration
+    by executing actual API calls and creating temporary test resources.
+    This validates that the integration is fully functional, not just
+    configured correctly.
+
+    Validation Categories:
+        - Read Operations: list_issues, get_default_branch
+        - Write Operations: create_branch, create_issue, add_comment, create_pr
+        - Agent Operations: availability check, test prompt execution
+        - Cleanup: close_issue, close_pr, delete_branch
 
     Args:
-        settings: Validated automation settings
-        cleanup: Whether to clean up test resources after validation
-        verbose: Show detailed output
-        output_json: Suppress console output (JSON mode)
+        settings: Validated AutomationSettings loaded from config file.
+        cleanup: If True, delete test resources after validation. If False,
+            resources remain for manual inspection.
+        verbose: If True, show detailed output for each check.
+        output_json: If True, suppress console output (for JSON mode).
 
     Returns:
-        DiagnosticReport with all validation results
+        DiagnosticReport containing all ValidationResults, timing information,
+        and an LLM-generated summary (if available).
+
+    Side Effects:
+        - Creates temporary branch, issue, PR in the repository
+        - Prints progress to stdout (unless output_json=True)
+        - May modify repository state if cleanup fails
     """
     from repo_sapiens.providers.factory import create_git_provider
 
@@ -608,15 +663,26 @@ async def _test_read_operations(
     verbose: bool,
     output_json: bool,
 ) -> list[ValidationResult]:
-    """Test read operations on the git provider.
+    """Test read-only operations against the git provider API.
+
+    Validates that the provider connection works for basic read operations
+    without modifying any repository state. These tests are safe to run
+    repeatedly.
+
+    Tests Performed:
+        - list_issues: Fetch open issues, verify API access
+        - get_default_branch: Retrieve main/master branch info
 
     Args:
-        git: Connected git provider
-        verbose: Show detailed output
-        output_json: Suppress console output
+        git: Connected GitProvider instance (must be already connected).
+        verbose: If True, include details in output (issue count, branch name).
+        output_json: If True, suppress console output.
 
     Returns:
-        List of validation results
+        List of ValidationResult objects, one per test performed.
+
+    Side Effects:
+        Prints test results to stdout (unless output_json=True).
     """
     results = []
 
@@ -698,19 +764,41 @@ async def _test_write_operations(
     verbose: bool,
     output_json: bool,
 ) -> list[ValidationResult]:
-    """Test write operations on the git provider.
+    """Test write operations by creating temporary resources.
 
-    Creates test resources and optionally cleans them up.
+    Creates test branch, issue, comment, and PR to verify full API access.
+    Resources are named with timestamps and tagged with 'sapiens-validation'
+    label for identification.
+
+    Tests Performed:
+        - create_branch: Create a new branch from main/master
+        - create_issue: Create a test issue with validation label
+        - add_comment: Add a comment to the test issue
+        - create_pr: Create a PR from test branch (requires branch creation)
+
+    Cleanup Operations (if enabled):
+        - close_issue: Close the test issue
+        - close_pr: Close the test PR
+        - delete_branch: Delete the test branch
 
     Args:
-        git: Connected git provider
-        settings: Automation settings
-        cleanup: Whether to clean up test resources
-        verbose: Show detailed output
-        output_json: Suppress console output
+        git: Connected GitProvider instance.
+        settings: AutomationSettings for repository info.
+        cleanup: If True, delete created resources after testing.
+        verbose: If True, show details (branch names, issue numbers).
+        output_json: If True, suppress console output.
 
     Returns:
-        List of validation results
+        List of ValidationResult objects for all operations performed.
+
+    Side Effects:
+        - Creates branch named 'sapiens/validation-test-{timestamp}'
+        - Creates issue and PR with '[Validation] Test' prefix
+        - Modifies repository state (cleanup removes most changes)
+        - Prints progress to stdout (unless output_json=True)
+
+    Warning:
+        If cleanup fails, manual removal of test resources may be required.
     """
     results = []
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
@@ -990,15 +1078,33 @@ async def _test_agent_operations(
     verbose: bool,
     output_json: bool,
 ) -> list[ValidationResult]:
-    """Test agent provider operations.
+    """Test AI agent provider availability and basic functionality.
+
+    Verifies the configured agent is reachable and functional. For Ollama,
+    performs an actual model inference test. For CLI-based agents (Claude,
+    Goose), checks PATH availability.
+
+    Tests Performed:
+        - agent_available: Check agent connectivity/availability
+        - test_prompt (Ollama only): Execute simple "respond OK" prompt
+
+    Provider-Specific Behavior:
+        - OLLAMA: HTTP health check + model list + inference test
+        - CLAUDE_LOCAL/GOOSE_LOCAL: Check if CLI in PATH
+        - COPILOT_LOCAL: Check gh CLI + extension + auth
+        - OPENAI_COMPATIBLE: API key configured check only
 
     Args:
-        settings: Automation settings
-        verbose: Show detailed output
-        output_json: Suppress console output
+        settings: AutomationSettings with agent provider configuration.
+        verbose: If True, show details (model lists, CLI paths).
+        output_json: If True, suppress console output.
 
     Returns:
-        List of validation results
+        List of ValidationResult objects for agent tests.
+
+    Side Effects:
+        - May make HTTP requests to Ollama server
+        - Prints test results to stdout (unless output_json=True)
     """
     results = []
     provider_type = settings.agent_provider.provider_type
@@ -1138,15 +1244,24 @@ async def _generate_llm_summary(
     report: DiagnosticReport,
     output_json: bool,
 ) -> str | None:
-    """Generate a human-readable summary using the configured LLM.
+    """Generate a human-readable summary of the validation report using LLM.
+
+    Attempts to use the configured LLM to produce a concise natural language
+    summary of the validation results. Currently only implemented for Ollama;
+    other providers receive a template-based summary.
 
     Args:
-        settings: Automation settings
-        report: The diagnostic report to summarize
-        output_json: Suppress console output
+        settings: AutomationSettings with agent provider configuration.
+        report: DiagnosticReport containing all validation results.
+        output_json: If True, suppress any console output during generation.
 
     Returns:
-        Summary string or None if LLM is not available
+        Summary string (max 200 chars) if LLM is available and responds,
+        or a template-based fallback summary if LLM is unavailable.
+
+    Note:
+        Failures are logged at debug level and do not raise exceptions.
+        The function always returns a summary string, using fallback if needed.
     """
     provider_type = settings.agent_provider.provider_type
 

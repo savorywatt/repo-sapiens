@@ -1,4 +1,47 @@
-"""Task execution stage - implements individual tasks."""
+"""
+Task execution stage - implements individual tasks from an approved plan.
+
+This module implements the TaskExecutionStage, which handles the actual
+implementation of individual tasks created from an approved plan. When a
+task issue receives the "execute" label, this stage:
+
+1. Validates the task issue and extracts metadata
+2. Creates or checks out the implementation branch
+3. Executes the AI agent with task context
+4. Commits and pushes the changes
+5. Creates or updates the pull request
+6. Updates labels to move to the review stage
+
+Workflow Integration:
+    This stage is triggered by issues with both "execute" and "task" labels.
+    Upon successful completion, it replaces "execute" with "review" to
+    trigger the next workflow stage.
+
+    Label Flow: execute + task -> review + task
+
+Branch Strategy:
+    All tasks in the same plan share a single implementation branch named
+    ``{plan-label}-implementation`` (e.g., "plan-42-implementation"). This
+    allows multiple tasks to build on each other's work.
+
+Playground Repository:
+    The stage operates on a "playground" repository separate from the builder
+    repository. This is located at ``../playground`` relative to the builder
+    installation.
+
+Error Handling:
+    If execution fails, an error comment is added to the task issue and the
+    exception is re-raised. The orchestrator handles final error logging.
+
+Example:
+    A task issue titled "[TASK 1/5] Implement user authentication" with
+    labels ["task", "execute", "plan-42"] will:
+    1. Create/checkout branch "plan-42-implementation"
+    2. Execute the agent to implement the task
+    3. Commit changes with message "feat: Implement user authentication..."
+    4. Create/update PR for the plan
+    5. Update labels to ["task", "review", "plan-42"]
+"""
 
 import re
 
@@ -12,21 +55,77 @@ log = structlog.get_logger(__name__)
 
 
 class TaskExecutionStage(WorkflowStage):
-    """Execute individual task when label changes to 'execute'.
+    """Execute individual tasks by delegating to an AI agent.
 
-    This stage:
-    1. Detects tasks with 'execute' label
-    2. Creates feature branch for the task
-    3. Executes agent with task context
-    4. Creates pull request
-    5. Updates task label to 'review'
+    This stage handles the actual implementation of tasks within the workflow.
+    When a task issue is labeled with "execute" and "task", this stage takes
+    over and orchestrates the implementation process.
+
+    Execution Flow:
+        1. Validate the issue is a task and not already in review
+        2. Parse task metadata from title (task number, total tasks)
+        3. Extract original issue number and plan label from body/labels
+        4. Create or checkout the shared implementation branch
+        5. Fetch the original issue for context
+        6. Execute the AI agent with full context
+        7. Commit and push changes with conventional commit format
+        8. Update issue labels: remove "execute", add "review"
+        9. Create or update the plan's pull request
+        10. Add completion comment to the task issue
+
+    Branch Management:
+        All tasks in a plan share a single branch named after the plan
+        (e.g., "plan-42-implementation"). This allows tasks to build on
+        each other's changes and produces a single cohesive PR.
+
+    Commit Format:
+        Commits use conventional commit format with type detection:
+        - "feat:" for new features, implementations
+        - "fix:" for bug fixes
+        - "refactor:" for refactoring
+        - "test:" for test changes
+        - "docs:" for documentation
+
+    Attributes:
+        Inherited from WorkflowStage: git, agent, state, settings
+
+    Example:
+        >>> stage = TaskExecutionStage(git, agent, state, settings)
+        >>> await stage.execute(task_issue)  # Implements the task
     """
 
     async def execute(self, issue: Issue) -> None:
-        """Execute task implementation.
+        """Execute a task by running the AI agent and committing changes.
+
+        This is the main entry point for task execution. It orchestrates
+        the entire implementation process from branch creation to PR update.
+
+        The method performs extensive validation before execution to ensure
+        the issue is appropriate for this stage, and provides detailed
+        logging throughout the process.
 
         Args:
-            issue: Task issue with 'execute' label
+            issue: Task issue with "execute" and "task" labels. The issue
+                title must follow the format "[TASK N/M] Description" and
+                the body must contain the original issue reference.
+
+        Raises:
+            WorkflowError: If the playground repository is not found.
+            TaskExecutionError: If the agent fails to complete the task.
+            Exception: Any other exception during execution (after adding
+                an error comment to the issue).
+
+        Side Effects:
+            - Creates or checks out the implementation branch
+            - Executes AI agent in the playground directory
+            - Commits and pushes changes to the branch
+            - Creates or updates the plan's pull request
+            - Updates issue labels (execute -> review)
+            - Adds comments to the task issue
+
+        Note:
+            This method is not idempotent. Re-running on a completed task
+            (one with "review" label) will skip execution silently.
         """
         log.info("task_execution_start", issue=issue.number)
 
@@ -320,27 +419,79 @@ class TaskExecutionStage(WorkflowStage):
             raise
 
     def _extract_original_issue(self, body: str) -> int | None:
-        """Extract original issue number from task body."""
+        """Extract the original issue number from the task issue body.
+
+        Task issues contain a reference to the original issue that spawned
+        the plan. This method parses that reference from the markdown body.
+
+        Args:
+            body: The task issue body text in markdown format.
+
+        Returns:
+            The original issue number as an integer, or None if not found.
+            The pattern matched is "**Original Issue**: #123".
+
+        Example:
+            >>> body = "**Original Issue**: #42\\n\\n## Description..."
+            >>> self._extract_original_issue(body)
+            42
+        """
         match = re.search(r"\*\*Original Issue\*\*: #(\d+)", body)
         if match:
             return int(match.group(1))
         return None
 
     def _extract_description(self, body: str) -> str:
-        """Extract task description from body."""
-        # Find "## Description" section
+        """Extract the task description from the issue body.
+
+        Parses the "## Description" section from the markdown-formatted
+        task issue body. If no description section is found, returns the
+        entire body as a fallback.
+
+        Args:
+            body: The task issue body text in markdown format.
+
+        Returns:
+            The description text with surrounding whitespace stripped.
+            Falls back to the entire body if no "## Description" section
+            is found.
+
+        Example:
+            >>> body = "## Description\\n\\nImplement the login form.\\n\\n## Dependencies"
+            >>> self._extract_description(body)
+            'Implement the login form.'
+        """
+        # Find "## Description" section, stopping at next section or end
         match = re.search(r"## Description\s+(.+?)(?=\s+##|\Z)", body, re.DOTALL)
         if match:
             return match.group(1).strip()
         return body
 
     def _extract_dependencies(self, body: str) -> list:
-        """Extract dependencies from task body."""
+        """Extract task dependencies from the issue body.
+
+        Parses the "## Dependencies" section from the markdown-formatted
+        task issue body. Dependencies are expected to be listed as bullet
+        points (lines starting with "-").
+
+        Args:
+            body: The task issue body text in markdown format.
+
+        Returns:
+            List of dependency strings. Each string is the text after the
+            bullet point, with whitespace stripped. Returns an empty list
+            if no dependencies section is found.
+
+        Example:
+            >>> body = "## Dependencies\\n\\n- Task 1 complete\\n- Database setup"
+            >>> self._extract_dependencies(body)
+            ['Task 1 complete', 'Database setup']
+        """
         dependencies = []
         match = re.search(r"## Dependencies\s+(.+?)(?=\s+##|\Z)", body, re.DOTALL)
         if match:
             dep_section = match.group(1)
-            # Find all lines starting with "-"
+            # Find all lines starting with "-" and extract the text
             for line in dep_section.split("\n"):
                 line = line.strip()
                 if line.startswith("-"):
@@ -348,21 +499,68 @@ class TaskExecutionStage(WorkflowStage):
         return dependencies
 
     def _slugify(self, text: str) -> str:
-        """Convert text to slug format."""
+        """Convert text to a URL-safe slug format.
+
+        Creates a lowercase, hyphenated version of the text suitable for
+        use in branch names, file names, or URLs. Removes the "[TASK N/M]"
+        prefix if present and limits output to 50 characters.
+
+        Args:
+            text: The text to convert to slug format.
+
+        Returns:
+            A lowercase string with spaces and special characters replaced
+            by hyphens, limited to 50 characters.
+
+        Example:
+            >>> self._slugify("[TASK 1/5] Implement User Authentication!")
+            'implement-user-authentication'
+        """
         # Remove [TASK N/M] prefix if present
         text = re.sub(r"\[TASK \d+/\d+\]\s*", "", text)
         # Convert to lowercase and replace spaces/special chars with hyphens
         text = text.lower()
         text = re.sub(r"[^\w\s-]", "", text)
         text = re.sub(r"[-\s]+", "-", text)
-        return text[:50]  # Limit length
+        return text[:50]  # Limit length for branch name safety
 
     async def _format_plan_pr_body(
         self, plan_label: str, original_issue: Issue, current_task_num: str, total_tasks: str
     ) -> str:
-        """Format pull request body for plan implementation.
+        """Format the pull request body for a plan implementation.
 
-        Shows all tasks and their completion status.
+        Generates a comprehensive PR description that includes all tasks
+        in the plan with their completion status shown as checkboxes. This
+        allows reviewers to see progress at a glance.
+
+        The PR body is updated each time a task completes, so the checkbox
+        list reflects current progress.
+
+        Args:
+            plan_label: The plan label (e.g., "plan-42") used to find
+                related task issues.
+            original_issue: The original issue that spawned this plan.
+                Used for title and reference information.
+            current_task_num: The number of the task currently being
+                executed (e.g., "3").
+            total_tasks: The total number of tasks in the plan (e.g., "5").
+
+        Returns:
+            Markdown-formatted PR body containing:
+            - Plan header with original issue reference
+            - Task checklist with completion status
+            - Implementation notes
+            - Related issue references
+
+        Side Effects:
+            Fetches all task issues for this plan from the git provider.
+
+        Example:
+            >>> body = await self._format_plan_pr_body(
+            ...     "plan-42", original_issue, "2", "5"
+            ... )
+            >>> "- [x] Task 1:" in body  # Completed task
+            True
         """
         # Get all task issues for this plan
         all_issues = await self.git.get_issues(labels=[plan_label, "task"], state="all")
@@ -411,7 +609,20 @@ class TaskExecutionStage(WorkflowStage):
         return "\n".join(lines)
 
     def _format_pr_body(self, task_issue: Issue, original_issue: Issue, result) -> str:
-        """Format pull request body."""
+        """Format a simple pull request body for a single task.
+
+        This is an alternative to ``_format_plan_pr_body`` for cases where
+        a single task needs its own PR (not currently used in the standard
+        workflow, but available for customization).
+
+        Args:
+            task_issue: The task issue being implemented.
+            original_issue: The original issue that spawned the task.
+            result: The execution result from the agent (currently unused).
+
+        Returns:
+            Markdown-formatted PR body with task details and references.
+        """
         lines = [
             "# Task Implementation",
             "",

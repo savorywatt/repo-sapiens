@@ -1,4 +1,28 @@
-"""Comment analyzer for dynamic PR review response."""
+"""Comment analyzer for dynamic PR review response.
+
+This module provides AI-powered analysis of pull request review comments,
+categorizing them by type (simple fix, controversial change, question, etc.)
+to enable automated or semi-automated response workflows.
+
+The analyzer uses an AI agent to classify comments and determine appropriate
+actions, which can then be used to drive automated fix applications or
+human-in-the-loop review processes.
+
+Key Exports:
+    CommentAnalyzer: Main class for analyzing PR review comments.
+
+Example:
+    >>> from repo_sapiens.utils.comment_analyzer import CommentAnalyzer
+    >>> analyzer = CommentAnalyzer(git_provider, agent_provider)
+    >>> result = await analyzer.analyze_comments(pr_number=42, comments=comments)
+    >>> for fix in result.simple_fixes:
+    ...     print(f"Simple fix needed: {fix.proposed_action}")
+
+Note:
+    This module is not thread-safe. Each instance should be used within
+    a single async context. The analyzer makes API calls to both the git
+    provider (for PR details) and the AI agent (for comment classification).
+"""
 
 import json
 from typing import Any
@@ -12,27 +36,71 @@ log = structlog.get_logger(__name__)
 
 
 class CommentAnalyzer:
-    """Analyzes PR review comments and categorizes them for action."""
+    """Analyzes PR review comments and categorizes them for action.
 
-    def __init__(self, git: GitProvider, agent: AgentProvider):
-        """Initialize analyzer.
+    This class coordinates between a git provider (for accessing PR data)
+    and an AI agent (for intelligent comment classification) to produce
+    structured analysis results that can drive automated workflows.
+
+    The analyzer categorizes comments into:
+        - simple_fix: Straightforward code changes (typos, formatting)
+        - controversial_fix: Complex changes with trade-offs
+        - question: Reviewer questions requiring answers
+        - info: Informational comments, no action needed
+        - already_done: Concerns already addressed in current code
+        - wont_fix: Valid but intentionally not implemented
+
+    Attributes:
+        git: Git provider instance for accessing repository data.
+        agent: AI agent provider for comment analysis.
+
+    Example:
+        >>> analyzer = CommentAnalyzer(git_provider, agent_provider)
+        >>> result = await analyzer.analyze_comments(pr_number=42, comments=comments)
+        >>> print(f"Found {len(result.simple_fixes)} simple fixes")
+        >>> print(f"Found {len(result.questions)} questions to answer")
+    """
+
+    def __init__(self, git: GitProvider, agent: AgentProvider) -> None:
+        """Initialize the comment analyzer.
 
         Args:
-            git: Git provider for accessing repo data
-            agent: AI agent for analyzing comments
+            git: Git provider for accessing repository data (PRs, comments).
+            agent: AI agent provider for analyzing and categorizing comments.
+
+        Example:
+            >>> from repo_sapiens.providers.gitea import GiteaProvider
+            >>> from repo_sapiens.providers.claude import ClaudeProvider
+            >>> git = GiteaProvider(base_url="https://gitea.example.com", token="...")
+            >>> agent = ClaudeProvider(api_key="...")
+            >>> analyzer = CommentAnalyzer(git, agent)
         """
         self.git = git
         self.agent = agent
 
     async def is_reviewer_or_maintainer(self, username: str, pr_number: int) -> bool:
-        """Check if user is a reviewer or maintainer.
+        """Check if a user has reviewer or maintainer privileges.
+
+        Determines whether a comment author should be treated as an
+        authoritative reviewer whose feedback requires action.
 
         Args:
-            username: Username to check
-            pr_number: PR number
+            username: The username to check for privileges.
+            pr_number: The PR number to check against.
 
         Returns:
-            True if user has reviewer/maintainer privileges
+            True if the user has reviewer/maintainer privileges, False otherwise.
+            Currently returns True for all users as a permissive default.
+
+        Note:
+            The current implementation is permissive and returns True for all
+            users. TODO: Implement proper permission checking per provider
+            (check write access, maintainer lists, CODEOWNERS, etc.).
+
+        Example:
+            >>> is_reviewer = await analyzer.is_reviewer_or_maintainer("alice", 42)
+            >>> if is_reviewer:
+            ...     print("Alice's feedback should be addressed")
         """
         try:
             # Get PR details
@@ -62,12 +130,35 @@ class CommentAnalyzer:
     ) -> ReviewAnalysisResult:
         """Analyze all comments on a PR and categorize them.
 
+        Processes a list of comments, filters for reviewer/maintainer comments,
+        and uses AI to categorize each comment into actionable categories.
+
         Args:
-            pr_number: PR number
-            comments: List of comment objects from git provider
+            pr_number: The PR number being analyzed.
+            comments: List of comment objects from the git provider. Each comment
+                should have 'author', 'body', 'id', and optionally 'created_at'
+                attributes or dict keys.
 
         Returns:
-            Structured analysis with categorized comments
+            A ReviewAnalysisResult containing categorized comments:
+                - simple_fixes: Comments requesting straightforward changes
+                - controversial_fixes: Comments requesting complex changes
+                - questions: Questions from reviewers
+                - info_comments: Informational/praise comments
+                - already_done: Issues already addressed
+                - wont_fix: Intentionally declined suggestions
+
+        Raises:
+            No exceptions are raised; individual comment analysis failures
+            are logged and skipped.
+
+        Example:
+            >>> comments = await git.get_review_comments(pr_number=42)
+            >>> result = await analyzer.analyze_comments(42, comments)
+            >>> print(f"Total: {result.total_comments}")
+            >>> print(f"From reviewers: {result.reviewer_comments}")
+            >>> for fix in result.simple_fixes:
+            ...     print(f"Fix: {fix.proposed_action} in {fix.file_path}")
         """
         log.info("analyzing_comments", pr_number=pr_number, total=len(comments))
 
@@ -128,14 +219,24 @@ class CommentAnalyzer:
         comment: Any,
         pr_number: int,
     ) -> CommentAnalysis | None:
-        """Analyze a single comment with AI.
+        """Analyze a single comment using AI classification.
+
+        Sends the comment to the AI agent with a structured prompt to determine
+        the comment category and appropriate action.
 
         Args:
-            comment: Comment object
-            pr_number: PR number
+            comment: A comment object with 'id', 'author', 'body', and optionally
+                'created_at' attributes or dict keys.
+            pr_number: The PR number this comment belongs to.
 
         Returns:
-            CommentAnalysis or None if analysis failed
+            A CommentAnalysis object containing the categorization and proposed
+            action, or None if analysis failed (e.g., API error, parse failure).
+
+        Note:
+            This is a private method. Use analyze_comments() for the public API.
+            Failures are logged but not raised to allow batch processing to
+            continue despite individual failures.
         """
         comment_id = comment.id if hasattr(comment, "id") else comment.get("id")
         comment_author = comment.author if hasattr(comment, "author") else comment.get("author", "unknown")
@@ -224,13 +325,21 @@ Respond ONLY with the JSON, no other text.
             return None
 
     def _parse_ai_response(self, output: str) -> dict[str, Any] | None:
-        """Parse AI JSON response.
+        """Parse JSON response from AI agent.
+
+        Extracts JSON from the AI output, handling cases where the AI may
+        include explanatory text before or after the JSON object.
 
         Args:
-            output: AI output text
+            output: Raw text output from the AI agent.
 
         Returns:
-            Parsed dict or None if parsing failed
+            Parsed dictionary containing the analysis fields, or None if
+            parsing failed.
+
+        Note:
+            This method uses regex to find JSON objects within the text,
+            allowing for some flexibility in AI output formatting.
         """
         try:
             # Try to find JSON in output (AI might add text before/after)

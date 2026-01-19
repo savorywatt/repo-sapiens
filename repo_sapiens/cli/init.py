@@ -1,4 +1,40 @@
-"""CLI command for initializing repo-sapiens in a repository."""
+"""CLI command for initializing repo-sapiens in a repository.
+
+This module provides the ``sapiens init`` command which guides users through
+the complete setup process for integrating repo-sapiens into a Git repository.
+
+The initialization process handles:
+    - Git repository discovery and provider detection (GitHub, GitLab, Gitea)
+    - Credential collection and secure storage (keyring, environment, encrypted)
+    - AI agent configuration (Claude, Goose, Copilot, builtin ReAct)
+    - Automation mode selection (native CI/CD, daemon, or hybrid)
+    - Configuration file generation
+    - Optional workflow template deployment
+
+User Interaction Flow:
+    1. Configuration target selection (local, CI/CD, or both)
+    2. Repository discovery (auto-detect remotes and provider type)
+    3. Credential collection (interactive prompts or environment variables)
+    4. AI agent configuration (provider selection, model choice, API keys)
+    5. Automation mode configuration (native triggers, daemon polling, hybrid)
+    6. Credential storage (write to keyring or environment)
+    7. Actions secrets setup (optional, provider-specific)
+    8. Configuration file generation
+    9. Composite action deployment (optional)
+    10. Workflow template deployment (optional)
+    11. Setup validation
+    12. Next steps guidance
+
+Example:
+    Interactive setup::
+
+        $ sapiens init
+
+    Non-interactive CI/CD setup::
+
+        $ export SAPIENS_GITEA_TOKEN="your-token"
+        $ sapiens init --non-interactive --backend environment
+"""
 
 import sys
 from pathlib import Path
@@ -117,7 +153,42 @@ def init_command(
 
 
 class RepoInitializer:
-    """Handles repository initialization workflow."""
+    """Orchestrates the complete repository initialization workflow.
+
+    This class encapsulates all the logic for setting up repo-sapiens in a
+    Git repository, handling everything from repository discovery to workflow
+    deployment. It supports both interactive and non-interactive modes.
+
+    The initialization is stateful - instance attributes are populated
+    progressively as the user provides input or as values are auto-detected.
+
+    Attributes:
+        repo_path: Path to the Git repository root.
+        config_path: Relative path for the configuration file.
+        backend: Credential storage backend ('keyring', 'environment', 'encrypted').
+        non_interactive: If True, skip prompts and use environment variables.
+        setup_secrets: If True, configure repository Actions secrets.
+        deploy_actions: If True, deploy the reusable composite action.
+        deploy_workflows: If True, deploy CI/CD workflow templates.
+        repo_info: Discovered repository information (owner, name, URL).
+        provider_type: Detected Git provider ('github', 'gitlab', 'gitea').
+        gitea_token: Git provider API token (used for all providers despite name).
+        agent_type: Selected AI agent type (CLAUDE, GOOSE, COPILOT, BUILTIN).
+        agent_mode: Agent execution mode ('local' or 'api').
+        agent_api_key: API key for cloud-based agent providers.
+        automation_mode: Workflow trigger mode ('native', 'daemon', 'hybrid').
+        label_prefix: Prefix for automation trigger labels (e.g., 'sapiens/').
+
+    Example:
+        >>> initializer = RepoInitializer(
+        ...     repo_path=Path("."),
+        ...     config_path=Path(".sapiens/config.yaml"),
+        ...     backend="keyring",
+        ...     non_interactive=False,
+        ...     setup_secrets=True,
+        ... )
+        >>> initializer.run()
+    """
 
     def __init__(
         self,
@@ -128,7 +199,26 @@ class RepoInitializer:
         setup_secrets: bool,
         deploy_actions: bool = True,
         deploy_workflows: bool = False,
-    ):
+    ) -> None:
+        """Initialize the repository initializer with configuration options.
+
+        Sets up the initial state for the initialization workflow. Most attributes
+        start as None and are populated during the run() execution.
+
+        Args:
+            repo_path: Path to the Git repository root directory.
+            config_path: Relative path where the config file will be created.
+            backend: Credential backend to use. If None, auto-detects based on
+                system capabilities (prefers keyring if available).
+            non_interactive: If True, skip all interactive prompts and require
+                credentials via environment variables.
+            setup_secrets: If True, attempt to configure repository Actions
+                secrets via the provider's API.
+            deploy_actions: If True, deploy the reusable sapiens-task composite
+                action to the repository.
+            deploy_workflows: If True, deploy CI/CD workflow templates. In
+                interactive mode, this is just the default; user is still prompted.
+        """
         self.repo_path = repo_path
         self.config_path = config_path
         self.backend = backend or self._detect_backend()
@@ -182,9 +272,18 @@ class RepoInitializer:
         self.update_automation = True
 
     def _load_existing_config(self) -> bool:
-        """Load existing configuration if present.
+        """Load existing configuration file if present.
 
-        Returns True if config exists and was loaded.
+        Attempts to read and parse the YAML configuration file. For CI/CD mode,
+        uses the CI/CD-specific config path if set. The loaded configuration is
+        stored in self.existing_config for use by other methods.
+
+        Updates:
+            self.existing_config: Populated with parsed YAML dict if file exists.
+
+        Returns:
+            True if a valid configuration file was found and loaded,
+            False if file doesn't exist or couldn't be parsed.
         """
         import yaml
 
@@ -205,7 +304,19 @@ class RepoInitializer:
             return False
 
     def _show_existing_config(self) -> None:
-        """Display current configuration summary."""
+        """Display a summary of the current configuration to the user.
+
+        Prints a formatted overview of the existing configuration including
+        git provider details, repository information, and agent provider settings.
+        This helps users understand what's already configured before deciding
+        what to update.
+
+        Side Effects:
+            Prints configuration summary to stdout via click.echo().
+
+        Note:
+            Returns early without output if self.existing_config is not set.
+        """
         if not self.existing_config:
             return
 
@@ -238,7 +349,27 @@ class RepoInitializer:
             click.echo()
 
     def _prompt_update_sections(self) -> None:
-        """Ask user which sections to update."""
+        """Prompt the user to select which configuration sections to update.
+
+        When an existing configuration is found, this method asks the user which
+        parts they want to modify. This enables partial updates without requiring
+        a complete reconfiguration.
+
+        In non-interactive mode, all sections are updated by default.
+
+        Updates:
+            self.update_git_provider: True if user wants to update git settings.
+            self.update_agent_provider: True if user wants to update agent settings.
+            self.update_credentials: True if user wants to update stored credentials.
+            self.update_automation: True if user wants to update automation mode.
+            self.existing_config: Set to None if user chooses to start fresh.
+
+        Raises:
+            SystemExit: If user selects nothing and declines to start fresh.
+
+        Side Effects:
+            Prints prompts and reads user input via click.confirm().
+        """
         if self.non_interactive:
             # In non-interactive mode, update everything
             return
@@ -270,7 +401,25 @@ class RepoInitializer:
         click.echo()
 
     def _load_agent_type_from_config(self) -> None:
-        """Load agent type from existing config for downstream steps."""
+        """Load agent configuration from existing config file.
+
+        Parses the agent_provider section of the existing configuration and
+        populates the corresponding instance attributes. This is used when the
+        user opts not to update the agent provider settings, but downstream
+        steps still need to know which agent is configured.
+
+        Updates:
+            self.agent_type: The AgentType enum value.
+            self.agent_mode: 'local' or 'api' based on provider_type suffix.
+            self.goose_llm_provider: LLM provider if using Goose.
+            self.goose_model: Model name if using Goose.
+            self.builtin_provider: Backend provider if using builtin agent.
+            self.builtin_model: Model name if using builtin agent.
+            self.builtin_base_url: Base URL for local LLM servers.
+
+        Note:
+            Returns early without changes if self.existing_config is not set.
+        """
         if not self.existing_config:
             return
 
@@ -300,7 +449,19 @@ class RepoInitializer:
             self.builtin_model = agent.get("model")
 
     def _load_automation_from_config(self) -> None:
-        """Load automation settings from existing config."""
+        """Load automation mode settings from existing configuration.
+
+        Reads the automation.mode section from the existing config and populates
+        the corresponding instance attributes. Used when the user opts not to
+        update automation settings.
+
+        Updates:
+            self.automation_mode: 'native', 'daemon', or 'hybrid'.
+            self.label_prefix: Prefix string for automation trigger labels.
+
+        Note:
+            Returns early without changes if self.existing_config is not set.
+        """
         if not self.existing_config:
             return
 
@@ -311,7 +472,22 @@ class RepoInitializer:
         self.label_prefix = mode_config.get("label_prefix", "sapiens/")
 
     def _prompt_configuration_mode(self) -> None:
-        """Ask user whether to configure for local, CI/CD, or both."""
+        """Prompt the user to select the configuration target environment.
+
+        Displays options for where sapiens will run:
+        1. Local only - for development/testing on the developer's machine
+        2. CI/CD only - for Gitea/GitHub/GitLab Actions environments
+        3. Both - creates separate configuration files for each environment
+
+        In non-interactive mode, defaults to 'local' configuration.
+
+        Updates:
+            self.run_mode: 'local', 'cicd', or 'both'.
+            self.config_target: Current pass target ('local' or 'cicd').
+
+        Side Effects:
+            Prints menu options and reads user selection via click.prompt().
+        """
         if self.non_interactive:
             # In non-interactive mode, use command-line specified config path
             self.run_mode = "local"  # Default to local
@@ -346,7 +522,20 @@ class RepoInitializer:
         click.echo()
 
     def _prompt_cicd_config_path(self) -> None:
-        """Ask for CI/CD config file path."""
+        """Prompt the user for the CI/CD configuration file path.
+
+        Asks where to save the CI/CD-specific configuration file. The default
+        location is 'sapiens_config.ci.yaml' in the project root, which keeps
+        it separate from the local development configuration.
+
+        In non-interactive mode, uses the default path without prompting.
+
+        Updates:
+            self.cicd_config_path: Path object for the CI/CD config file.
+
+        Side Effects:
+            Prints prompt and reads user input via click.prompt().
+        """
         if self.non_interactive:
             self.cicd_config_path = Path("sapiens_config.ci.yaml")
             return
@@ -368,7 +557,29 @@ class RepoInitializer:
         click.echo()
 
     def run(self) -> None:
-        """Run the initialization workflow."""
+        """Execute the complete initialization workflow.
+
+        This is the main entry point that orchestrates the entire setup process.
+        Handles both single-pass (local or CI/CD only) and dual-pass (both)
+        configuration modes.
+
+        User Interaction Flow:
+            1. Prompt for configuration target (local/cicd/both)
+            2. For 'both' mode, run two configuration passes sequentially
+            3. For single mode, run one configuration pass
+            4. Display completion message and next steps
+            5. Optionally offer a test run of the configured agent
+
+        Side Effects:
+            - Creates configuration file(s) in the repository
+            - Stores credentials in the selected backend
+            - May deploy workflow files to .github/, .gitea/, or .gitlab/
+            - Prints progress and instructions to stdout
+
+        Raises:
+            click.ClickException: On configuration or validation errors.
+            SystemExit: If user cancels during interactive prompts.
+        """
         click.echo(click.style("🚀 Initializing repo-sapiens", bold=True, fg="cyan"))
         click.echo()
 
@@ -414,7 +625,30 @@ class RepoInitializer:
             self._offer_test_run()
 
     def _run_configuration_pass(self) -> None:
-        """Run a single configuration pass (local or CI/CD)."""
+        """Execute a single configuration pass for the current target.
+
+        Performs all configuration steps for either local or CI/CD setup.
+        The behavior varies based on self.config_target:
+        - 'local': Uses selected backend, stores credentials, deploys actions
+        - 'cicd': Forces environment backend, skips local credential storage
+
+        Configuration Steps:
+            1. Load existing config (if any) and prompt for update selections
+            2. Discover Git repository and detect provider type
+            3. Collect credentials (from user prompts or environment)
+            4. Store credentials locally (local mode only)
+            5. Set up Actions secrets (if enabled, local mode only)
+            6. Generate the configuration YAML file
+            7. Deploy composite action (if enabled, local mode only)
+            8. Deploy workflow templates (if requested, local mode only)
+            9. Validate the completed setup
+
+        Side Effects:
+            - Modifies self.backend and self.is_cicd_setup for CI/CD mode
+            - Creates files in the repository
+            - Stores credentials
+            - Prints progress to stdout
+        """
         # For CI/CD config, force environment backend and set is_cicd_setup flag
         if self.config_target == "cicd":
             self.backend = "environment"
@@ -465,7 +699,19 @@ class RepoInitializer:
         self._validate_setup()
 
     def _detect_backend(self) -> str:
-        """Detect best credential backend for current environment."""
+        """Auto-detect the best credential backend for the current environment.
+
+        Checks system capabilities to determine the most suitable credential
+        storage backend. Prefers keyring (OS-level secure storage) when available,
+        falls back to environment variables otherwise.
+
+        Returns:
+            Backend identifier string: 'keyring' or 'environment'.
+
+        Note:
+            The encrypted file backend requires explicit selection and is not
+            auto-detected since it needs a master password.
+        """
         # Check if keyring is available
         keyring_backend = KeyringBackend()
         if keyring_backend.available:
@@ -567,11 +813,18 @@ class RepoInitializer:
     def _detect_existing_gitea_token(self) -> tuple[str | None, str | None]:
         """Check for existing Gitea token in keyring or environment.
 
-        Checks in order:
-        1. Keyring (gitea/api_token)
-        2. Environment (GITEA_TOKEN, SAPIENS_GITEA_TOKEN)
+        Searches common locations for a previously stored Gitea API token.
+        Used to offer reuse of existing credentials during interactive setup.
 
-        Returns (token, source) tuple where source describes where it was found.
+        Search Order:
+            1. Keyring (gitea/api_token)
+            2. Environment (GITEA_TOKEN, SAPIENS_GITEA_TOKEN)
+
+        Returns:
+            Tuple of (token, source) where:
+            - token: The token string or None if not found.
+            - source: Description of where token was found (e.g.,
+                "keyring (gitea/api_token)") or None if not found.
         """
         import os
 
@@ -596,11 +849,18 @@ class RepoInitializer:
     def _detect_existing_gitlab_token(self) -> tuple[str | None, str | None]:
         """Check for existing GitLab token in keyring or environment.
 
-        Checks in order:
-        1. Keyring (gitlab/api_token)
-        2. Environment (GITLAB_TOKEN, SAPIENS_GITLAB_TOKEN, CI_JOB_TOKEN)
+        Searches common locations for a previously stored GitLab API token.
+        Used to offer reuse of existing credentials during interactive setup.
 
-        Returns (token, source) tuple where source describes where it was found.
+        Search Order:
+            1. Keyring (gitlab/api_token)
+            2. Environment (GITLAB_TOKEN, SAPIENS_GITLAB_TOKEN, CI_JOB_TOKEN)
+
+        Returns:
+            Tuple of (token, source) where:
+            - token: The token string or None if not found.
+            - source: Description of where token was found (e.g.,
+                "keyring (gitlab/api_token)") or None if not found.
         """
         import os
 
@@ -623,7 +883,24 @@ class RepoInitializer:
         return None, None
 
     def _discover_repository(self) -> None:
-        """Discover Git repository configuration."""
+        """Discover and configure Git repository settings.
+
+        Scans the repository for Git remotes, detects the provider type
+        (GitHub, GitLab, Gitea) from URLs, and prompts the user to select
+        which remote to use if multiple providers are found.
+
+        Updates:
+            self.repo_info: Populated with GitRepoInfo (owner, repo, URL).
+            self.provider_type: Set to 'github', 'gitlab', or 'gitea'.
+
+        Raises:
+            click.ClickException: If no Git repository found, no remotes
+                configured, or repository parsing fails.
+
+        Side Effects:
+            Prints discovery progress and results to stdout.
+            May prompt user to select a remote in interactive mode.
+        """
         click.echo(click.style("🔍 Discovering repository configuration...", bold=True))
 
         try:
@@ -723,7 +1000,17 @@ class RepoInitializer:
         return "gitea"
 
     def _collect_credentials(self) -> None:
-        """Collect credentials from user or environment."""
+        """Collect all required credentials for the configuration.
+
+        Dispatches to the appropriate collection method based on whether
+        we're in interactive or non-interactive mode. Handles collection
+        of git provider tokens, AI agent API keys, and automation settings.
+
+        Side Effects:
+            - Calls _collect_from_environment() or _collect_interactively()
+            - Populates credential-related instance attributes
+            - Prints progress and prompts to stdout
+        """
         click.echo(click.style("🔑 Setting up credentials...", bold=True))
         click.echo()
 
@@ -733,7 +1020,26 @@ class RepoInitializer:
             self._collect_interactively()
 
     def _collect_from_environment(self) -> None:
-        """Collect credentials from environment variables."""
+        """Collect credentials from environment variables for non-interactive mode.
+
+        Reads required credentials from standard environment variables. This is
+        the primary method for CI/CD pipeline setup where interactive prompts
+        are not available.
+
+        Environment Variables Checked:
+            - SAPIENS_GITEA_TOKEN or GITEA_TOKEN: Git provider API token (required)
+            - CLAUDE_API_KEY: Claude API key (optional, for API mode)
+
+        Updates:
+            self.gitea_token: Set from environment variable.
+            self.claude_api_key: Set from environment if present.
+
+        Raises:
+            click.ClickException: If SAPIENS_GITEA_TOKEN is not set.
+
+        Side Effects:
+            Prints confirmation message to stdout.
+        """
         import os
 
         self.gitea_token = os.getenv("SAPIENS_GITEA_TOKEN") or os.getenv("GITEA_TOKEN")
@@ -746,7 +1052,23 @@ class RepoInitializer:
         click.echo("   ✓ Using credentials from environment variables")
 
     def _collect_interactively(self) -> None:
-        """Collect credentials interactively from user."""
+        """Collect credentials through interactive user prompts.
+
+        Guides the user through credential collection with prompts, validation,
+        and helpful information. Handles different paths based on which
+        configuration sections the user chose to update.
+
+        Collection Sequence:
+            1. Git provider token (Gitea/GitLab/GitHub) if updating git/credentials
+            2. AI agent configuration (type, mode, API key) if updating agent
+            3. Automation mode settings if updating automation
+
+        Side Effects:
+            - Calls provider-specific token collection methods
+            - Calls _configure_ai_agent() for agent setup
+            - Calls _configure_automation_mode() for automation settings
+            - Prints prompts and reads user input
+        """
         # Only collect git provider token if updating git provider or credentials
         if self.update_git_provider or self.update_credentials:
             if self.provider_type == "gitlab":
@@ -770,7 +1092,27 @@ class RepoInitializer:
             self._load_automation_from_config()
 
     def _collect_gitea_token_interactively(self) -> None:
-        """Collect Gitea token interactively."""
+        """Collect Gitea API token through interactive prompts.
+
+        For CI/CD mode, guides the user to set up repository secrets and confirms
+        they've done so. For local mode, checks for existing tokens in keyring
+        or environment before prompting for a new one.
+
+        Token Discovery Order:
+            1. Keyring (gitea/api_token)
+            2. Environment (GITEA_TOKEN, SAPIENS_GITEA_TOKEN)
+            3. Interactive prompt
+
+        Updates:
+            self.gitea_token: Set to the collected or discovered token,
+                or None for CI/CD mode.
+
+        Raises:
+            click.ClickException: If user cancels CI/CD secret setup.
+
+        Side Effects:
+            Prints instructions and prompts, reads user input.
+        """
         # CI/CD mode: just confirm env var is set
         if self.is_cicd_setup:
             click.echo("For CI/CD workflows, you need to set repository secrets:")
@@ -813,7 +1155,31 @@ class RepoInitializer:
             self.gitea_token = click.prompt("Enter your Gitea API token", hide_input=True, type=str)
 
     def _collect_gitlab_token_interactively(self) -> None:
-        """Collect GitLab token interactively."""
+        """Collect GitLab Personal Access Token through interactive prompts.
+
+        Similar to _collect_gitea_token_interactively but for GitLab. For CI/CD
+        mode, guides the user to set up CI/CD variables. For local mode, checks
+        for existing tokens before prompting.
+
+        Required GitLab Token Scopes:
+            - api
+            - read_repository
+            - write_repository
+
+        Token Discovery Order:
+            1. Keyring (gitlab/api_token)
+            2. Environment (GITLAB_TOKEN, SAPIENS_GITLAB_TOKEN, CI_JOB_TOKEN)
+            3. Interactive prompt
+
+        Updates:
+            self.gitea_token: Set to the collected token (reuses field name).
+
+        Raises:
+            click.ClickException: If user cancels CI/CD secret setup.
+
+        Side Effects:
+            Prints instructions and prompts, reads user input.
+        """
         # CI/CD mode: just confirm env var is set
         if self.is_cicd_setup:
             click.echo("For CI/CD workflows, you need to set repository secrets:")
@@ -859,7 +1225,27 @@ class RepoInitializer:
             self.gitea_token = click.prompt("Enter your GitLab Personal Access Token", hide_input=True, type=str)
 
     def _configure_ai_agent(self) -> None:
-        """Configure AI agent (Claude or Goose) interactively."""
+        """Configure the AI agent provider through interactive prompts.
+
+        Detects available AI agent CLIs on the system and prompts the user to
+        select one. Then delegates to the appropriate configuration method
+        based on the selected agent type.
+
+        Supported Agents:
+            - Claude (local CLI or API)
+            - Goose (local CLI with various LLM backends)
+            - Copilot (GitHub CLI extension or copilot-api proxy)
+            - Builtin (ReAct agent with Ollama, vLLM, or cloud LLMs)
+
+        Updates:
+            self.agent_type: Set to the selected AgentType enum value.
+            Additional attributes set by delegated configuration methods.
+
+        Side Effects:
+            - Prints agent detection results and selection menu
+            - Calls agent-specific configuration methods
+            - Reads user selections via click.prompt()
+        """
         from repo_sapiens.utils.agent_detector import detect_available_agents, format_agent_list
 
         click.echo(click.style("🤖 AI Agent Configuration", bold=True, fg="cyan"))
@@ -926,7 +1312,22 @@ class RepoInitializer:
             self._configure_builtin()
 
     def _configure_claude(self) -> None:
-        """Configure Claude agent."""
+        """Configure Claude agent settings.
+
+        Prompts the user to choose between local Claude CLI or Claude API mode.
+        For API mode, collects the API key. For CI/CD setups, only API mode is
+        available (local CLI cannot run in CI/CD environment).
+
+        Updates:
+            self.agent_mode: Set to 'local' or 'api'.
+            self.agent_api_key: Set if API mode selected (local mode only).
+
+        Raises:
+            click.ClickException: If user cancels CI/CD API key setup.
+
+        Side Effects:
+            Prints configuration options and reads user input.
+        """
         click.echo()
 
         # CI/CD mode: Force API mode and confirm env var
@@ -964,7 +1365,35 @@ class RepoInitializer:
             self.agent_api_key = click.prompt("Enter your Claude API key", hide_input=True, type=str)
 
     def _configure_goose(self) -> None:
-        """Configure Goose agent with LLM provider selection."""
+        """Configure Goose agent with LLM provider and model selection.
+
+        Goose is a local CLI that uses various LLM backends. This method guides
+        the user through selecting an LLM provider (OpenAI, Anthropic, Ollama,
+        etc.) and model, then collects any required API keys.
+
+        For CI/CD mode, only API-based providers are supported.
+
+        Supported LLM Providers:
+            - openai: GPT-4, GPT-3.5 (requires API key)
+            - anthropic: Claude models (requires API key)
+            - ollama: Local models (no API key needed)
+            - openrouter: Various models via router (requires API key)
+            - groq: Fast inference (requires API key)
+
+        Updates:
+            self.goose_llm_provider: Selected LLM provider name.
+            self.goose_model: Selected model identifier.
+            self.goose_temperature: Temperature setting (default 0.7).
+            self.goose_toolkit: Toolkit name (default 'default').
+            self.agent_api_key: Provider API key if required.
+            self.agent_mode: Always 'local' (Goose runs locally).
+
+        Raises:
+            click.ClickException: If user cancels CI/CD API key setup.
+
+        Side Effects:
+            Prints provider comparison, recommendations, and prompts.
+        """
         from repo_sapiens.utils.agent_detector import (
             format_provider_comparison,
             get_provider_info,
@@ -1095,7 +1524,34 @@ class RepoInitializer:
         self.agent_mode = "local"  # Goose runs locally
 
     def _configure_copilot(self) -> None:
-        """Configure GitHub Copilot agent."""
+        """Configure GitHub Copilot CLI integration.
+
+        Sets up the gh-copilot extension for GitHub CLI. Checks for gh CLI
+        availability, Copilot extension installation, and GitHub authentication.
+        Offers to install the Copilot extension if not present.
+
+        Note:
+            GitHub Copilot CLI has limited capabilities compared to other agents.
+            It's primarily designed for command suggestions, not full code
+            generation. Requires an active GitHub Copilot subscription.
+
+        Dependency Checks:
+            1. GitHub CLI (gh) installed and in PATH
+            2. gh-copilot extension installed
+            3. gh authenticated with GitHub
+
+        Updates:
+            self.agent_mode: Set to 'local'.
+            self.agent_api_key: Set to None (uses gh auth).
+
+        Raises:
+            click.ClickException: If user declines to continue without gh CLI
+                or declines to use Copilot after warnings.
+
+        Side Effects:
+            - May install gh-copilot extension via subprocess
+            - Prints status checks and warnings
+        """
         import shutil
         import subprocess
 
@@ -1186,8 +1642,38 @@ class RepoInitializer:
     def _configure_copilot_api(self) -> None:
         """Configure GitHub Copilot API provider using copilot-api proxy.
 
-        This is the NEW Copilot provider using copilot-api proxy,
-        distinct from the existing gh-copilot CLI integration.
+        This is an alternative Copilot integration that uses the unofficial
+        copilot-api proxy to access Copilot's full code generation capabilities.
+        Requires a GitHub OAuth token with Copilot scope.
+
+        Warning:
+            This uses an unofficial, reverse-engineered API that:
+            - Is not endorsed or supported by GitHub
+            - May violate GitHub's Terms of Service
+            - Could stop working at any time
+
+        Configuration Options:
+            - Proxy mode: 'managed' (auto-start npx) or 'external' (connect to existing)
+            - Account type: 'individual', 'business', or 'enterprise'
+            - Rate limiting: Optional delay between requests
+            - Model: GPT-4 or other available models
+
+        Updates:
+            self.copilot_github_token: GitHub OAuth token (gho_xxx).
+            self.copilot_manage_proxy: True for managed mode.
+            self.copilot_proxy_port: Port for managed proxy.
+            self.copilot_proxy_url: URL for external proxy.
+            self.copilot_account_type: Subscription type.
+            self.copilot_rate_limit: Seconds between requests.
+            self.copilot_model: Model to use.
+            self.agent_mode: Set to 'local'.
+
+        Raises:
+            click.ClickException: If user declines risk acceptance or
+                declines to continue without Node.js for managed mode.
+
+        Side Effects:
+            Prints warnings, configuration options, and prompts.
         """
         import shutil
 
@@ -1298,7 +1784,21 @@ class RepoInitializer:
         click.echo(click.style("Copilot API configuration complete", fg="green"))
 
     def _detect_existing_github_copilot_token(self) -> tuple[str | None, str | None]:
-        """Check for existing GitHub Copilot token in keyring or environment."""
+        """Check for existing GitHub Copilot OAuth token.
+
+        Searches keyring and environment variables for a GitHub OAuth token
+        suitable for Copilot API access.
+
+        Search Order:
+            1. Keyring (github/copilot_token)
+            2. Environment (GITHUB_COPILOT_TOKEN, GITHUB_TOKEN with gho_ prefix)
+
+        Returns:
+            Tuple of (token, source) where:
+            - token: The OAuth token string or None if not found.
+            - source: Description of where token was found (e.g.,
+                "keyring (github/copilot_token)") or None if not found.
+        """
         import os
 
         # Check keyring
@@ -1320,7 +1820,17 @@ class RepoInitializer:
         return None, None
 
     def _prompt_github_copilot_token(self) -> str:
-        """Prompt user for GitHub Copilot OAuth token."""
+        """Prompt the user to enter a GitHub Copilot OAuth token.
+
+        Displays instructions for obtaining a token and prompts for input
+        with hidden echo (for security).
+
+        Returns:
+            The OAuth token string entered by the user.
+
+        Side Effects:
+            Prints instructions and reads user input.
+        """
         click.echo()
         click.echo("GitHub OAuth token (gho_xxx) required.")
         click.echo("Generate one at: https://github.com/settings/tokens")
@@ -1329,7 +1839,34 @@ class RepoInitializer:
         return click.prompt("GitHub OAuth token", hide_input=True, type=str)
 
     def _configure_builtin(self) -> None:
-        """Configure builtin ReAct agent with LLM provider selection."""
+        """Configure the builtin ReAct agent with LLM provider selection.
+
+        The builtin agent uses a ReAct (Reasoning + Acting) loop with an LLM
+        for reasoning and local tool execution. Supports both local LLM servers
+        (Ollama, vLLM) and cloud providers (OpenAI, Anthropic, etc.).
+
+        For CI/CD mode, only API-based cloud providers are supported.
+
+        Supported Providers:
+            - ollama: Local Ollama server (free, requires GPU for best performance)
+            - vllm: Local vLLM server (free, optimized for production)
+            - openai: OpenAI API (requires API key)
+            - anthropic: Anthropic Claude API (requires API key)
+            - openrouter: Multi-provider router (requires API key)
+            - groq: Groq inference (requires API key)
+
+        Updates:
+            self.builtin_provider: Selected provider name.
+            self.builtin_model: Selected model identifier.
+            self.builtin_base_url: Server URL for local providers.
+            self.agent_api_key: API key for cloud providers.
+            self.agent_mode: Always 'local' (agent runs locally).
+
+        Side Effects:
+            - Prints provider comparison and recommendations
+            - Calls provider-specific configuration methods
+            - Reads user selections via click.prompt()
+        """
         from repo_sapiens.utils.agent_detector import (
             format_provider_comparison,
             get_provider_info,
@@ -1394,7 +1931,24 @@ class RepoInitializer:
         self.agent_mode = "local"
 
     def _configure_builtin_ollama(self, provider_info: dict) -> None:
-        """Configure Ollama for builtin agent."""
+        """Configure Ollama as the LLM backend for the builtin agent.
+
+        Prompts for Ollama server URL, checks server availability, lists
+        available models, and prompts for model selection. Recommends
+        qwen3:8b for tool-calling tasks.
+
+        Args:
+            provider_info: Dictionary with provider metadata from agent_detector.
+
+        Updates:
+            self.builtin_base_url: Set to Ollama server URL.
+            self.builtin_model: Set to selected model name.
+
+        Side Effects:
+            - Tests Ollama server connectivity via HTTP
+            - Lists available models from server
+            - Prints recommendations and prompts
+        """
         import httpx
 
         click.echo()
@@ -1451,7 +2005,24 @@ class RepoInitializer:
         self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
 
     def _configure_builtin_vllm(self, provider_info: dict) -> None:
-        """Configure vLLM for builtin agent."""
+        """Configure vLLM as the LLM backend for the builtin agent.
+
+        Prompts for vLLM server URL, checks server availability via the
+        OpenAI-compatible API, lists available models, and prompts for
+        model selection.
+
+        Args:
+            provider_info: Dictionary with provider metadata from agent_detector.
+
+        Updates:
+            self.builtin_base_url: Set to vLLM server URL.
+            self.builtin_model: Set to selected model name.
+
+        Side Effects:
+            - Tests vLLM server connectivity via HTTP (/v1/models)
+            - Lists available models from server
+            - Prints recommendations and prompts
+        """
         import httpx
 
         click.echo()
@@ -1496,7 +2067,30 @@ class RepoInitializer:
         self.builtin_model = click.prompt("Which model?", type=str, default=default_model)
 
     def _configure_builtin_cloud(self, provider_info: dict) -> None:
-        """Configure cloud LLM provider for builtin agent."""
+        """Configure a cloud LLM provider for the builtin agent.
+
+        Handles model selection and API key collection for cloud-based LLM
+        providers like OpenAI, Anthropic, OpenRouter, and Groq.
+
+        Args:
+            provider_info: Dictionary with provider metadata including:
+                - name: Display name
+                - models: List of available model identifiers
+                - default_model: Recommended model
+                - api_key_env: Environment variable name for API key
+                - website: URL for obtaining API keys
+
+        Updates:
+            self.builtin_model: Set to selected model name.
+            self.agent_api_key: Set to collected API key (local mode only).
+
+        Raises:
+            click.ClickException: If user cancels CI/CD API key setup.
+
+        Side Effects:
+            - Prints model options and prompts
+            - Checks for existing API key in environment
+        """
         import os
 
         click.echo()
@@ -1559,7 +2153,27 @@ class RepoInitializer:
                 )
 
     def _configure_automation_mode(self) -> None:
-        """Configure automation mode (native/daemon/hybrid) interactively."""
+        """Configure the automation trigger mode through interactive prompts.
+
+        Presents the three automation modes with explanations and prompts the
+        user to select one. For native/hybrid modes, also configures the label
+        prefix used to trigger workflows.
+
+        Automation Modes:
+            - native: Instant response via CI/CD workflows triggered by labels.
+                No daemon process needed. Uses Gitea/GitHub/GitLab Actions.
+            - daemon: Polling-based processing at configurable intervals.
+                Requires a continuously running process. Works without CI/CD.
+            - hybrid: Combines native triggers with daemon fallback.
+                Best reliability, more complex setup.
+
+        Updates:
+            self.automation_mode: Set to 'native', 'daemon', or 'hybrid'.
+            self.label_prefix: Set to user-specified prefix (e.g., 'sapiens/').
+
+        Side Effects:
+            Prints mode descriptions and prompts for selection.
+        """
         click.echo()
         click.echo(click.style("🔧 Automation Mode Configuration", bold=True, fg="cyan"))
         click.echo()
@@ -1613,7 +2227,19 @@ class RepoInitializer:
             click.echo(f"   ✓ Label prefix: {self.label_prefix}")
 
     def _store_credentials(self) -> None:
-        """Store credentials in selected backend."""
+        """Store collected credentials in the selected backend.
+
+        Dispatches to the appropriate storage method (keyring or environment)
+        based on self.backend setting. This persists the credentials for
+        later use by sapiens commands.
+
+        Side Effects:
+            - Calls _store_in_keyring() or _store_in_environment()
+            - Prints progress messages to stdout
+
+        Raises:
+            click.ClickException: If credential storage fails.
+        """
         click.echo()
         click.echo(f"📦 Storing credentials in {self.backend} backend...")
 
@@ -1630,7 +2256,21 @@ class RepoInitializer:
             raise click.ClickException(f"Failed to store credentials: {e}") from e
 
     def _store_in_keyring(self) -> None:
-        """Store credentials in OS keyring."""
+        """Store credentials in the OS keyring for secure persistence.
+
+        Stores git provider tokens and agent API keys in the system keyring
+        using the KeyringBackend. Keys are stored under service/key paths
+        that match the credential reference format used in config files.
+
+        Storage Locations:
+            - gitea/api_token or gitlab/api_token: Git provider token
+            - claude/api_key: Claude API key (if using Claude)
+            - {provider}/api_key: LLM provider API key (for Goose/builtin)
+            - github/copilot_token: Copilot OAuth token (if using Copilot API)
+
+        Side Effects:
+            Writes to system keyring, prints confirmation messages.
+        """
         backend = KeyringBackend()
 
         # Store git provider token (Gitea, GitLab, or GitHub)
@@ -1661,7 +2301,21 @@ class RepoInitializer:
             click.echo("   ✓ Stored: github/copilot_token")
 
     def _store_in_environment(self) -> None:
-        """Store credentials in environment (for current session)."""
+        """Store credentials as environment variables for the current session.
+
+        Sets environment variables for the current process. Note that these
+        variables only persist for the current shell session. Users should
+        add them to their shell profile for persistence.
+
+        Environment Variables Set:
+            - SAPIENS_GITEA_TOKEN or GITLAB_TOKEN: Git provider token
+            - CLAUDE_API_KEY: Claude API key (if using Claude)
+            - {PROVIDER}_API_KEY: LLM provider API key (for Goose/builtin)
+            - GITHUB_COPILOT_TOKEN: Copilot OAuth token (if using Copilot API)
+
+        Side Effects:
+            Modifies os.environ, prints confirmation and persistence warning.
+        """
         backend = EnvironmentBackend()
 
         # Store git provider token (Gitea, GitLab, or GitHub)
@@ -1703,7 +2357,24 @@ class RepoInitializer:
         )
 
     def _setup_gitea_secrets(self) -> None:
-        """Set up repository Actions secrets (GitHub Actions or Gitea Actions)."""
+        """Set up repository Actions secrets via the provider's API.
+
+        Configures secrets in the repository's CI/CD system for use by
+        workflow files. Dispatches to provider-specific methods based on
+        self.provider_type.
+
+        Secrets Configured:
+            - SAPIENS_GITEA_TOKEN or SAPIENS_GITHUB_TOKEN: Git provider token
+            - CLAUDE_API_KEY or {PROVIDER}_API_KEY: Agent API key (API mode)
+
+        Side Effects:
+            - Makes API calls to create/update repository secrets
+            - Prints progress and status messages
+
+        Note:
+            Failures are caught and logged as warnings. Secret setup is not
+            critical to the init process and can be done manually later.
+        """
         provider_name = self.provider_type.upper()
         click.echo(click.style(f"🔐 Setting up {provider_name} Actions secrets...", bold=True))
 
@@ -1719,7 +2390,19 @@ class RepoInitializer:
             click.echo()
 
     def _setup_github_secrets(self) -> None:
-        """Set up GitHub Actions secrets using GitHub API."""
+        """Set up GitHub Actions secrets using the GitHub REST API.
+
+        Creates repository secrets for GitHub Actions workflows. Uses the
+        GitHubRestProvider to handle the encrypted secret upload process
+        required by GitHub's API.
+
+        Side Effects:
+            - Creates/updates repository secrets via GitHub API
+            - Prints progress messages
+
+        Note:
+            Requires the git provider token to have 'repo' scope for secrets access.
+        """
         from repo_sapiens.providers.github_rest import GitHubRestProvider
 
         # Initialize GitHub provider
@@ -1760,7 +2443,18 @@ class RepoInitializer:
         click.echo()
 
     def _setup_gitea_secrets_mcp(self) -> None:
-        """Set up Gitea Actions secrets via MCP."""
+        """Set up Gitea Actions secrets via MCP server integration.
+
+        Attempts to configure Gitea repository secrets. Currently delegates
+        to _set_gitea_secret_via_mcp which displays manual setup instructions.
+
+        Side Effects:
+            Prints instructions for manual secret setup.
+
+        Note:
+            Full MCP integration for secret management is pending. For now,
+            users must configure secrets manually in the Gitea web UI.
+        """
         # Set SAPIENS_GITEA_TOKEN secret (note: GITEA_ prefix is reserved by Gitea)
         click.echo("   ⏳ Setting SAPIENS_GITEA_TOKEN secret...")
         # Note: We'll need to use the MCP server directly since GiteaRestProvider
@@ -1786,10 +2480,21 @@ class RepoInitializer:
         click.echo()
 
     def _set_gitea_secret_via_mcp(self, name: str, value: str) -> None:
-        """Set Gitea Actions secret using MCP server.
+        """Set a Gitea Actions secret (placeholder for MCP integration).
 
-        This is a placeholder - we'll need to call the actual MCP function.
-        For now, we'll document that this needs manual setup.
+        Currently displays manual setup instructions since full MCP integration
+        for secret management is not yet implemented.
+
+        Args:
+            name: Secret name (e.g., 'SAPIENS_GITEA_TOKEN').
+            value: Secret value to store (unused in current implementation).
+
+        Side Effects:
+            Prints manual setup instructions with URL to Gitea secrets page.
+
+        Todo:
+            Implement actual MCP call to upsert_repo_action_secret when
+            MCP integration is complete.
         """
         # TODO: Use mcp__gitea__upsert_repo_action_secret when MCP integration is complete
         click.echo(click.style(f"   ℹ Please set {name} manually in Gitea UI for now", fg="yellow"))
@@ -1797,7 +2502,29 @@ class RepoInitializer:
         click.echo(f"   Navigate to: {secrets_url}")
 
     def _generate_config(self) -> None:
-        """Generate configuration file."""
+        """Generate the YAML configuration file.
+
+        Creates or updates the sapiens configuration file based on collected
+        settings. Handles credential references, agent provider configuration,
+        and automation mode settings.
+
+        Configuration Sections Generated:
+            - git_provider: Provider type, base URL, API token reference
+            - repository: Owner, name, default branch
+            - agent_provider: Agent type, model, API key reference, mode settings
+            - automation: Mode, label triggers, workflow configuration
+            - workflow: Plans directory, state directory, branching strategy
+            - tags: Label names for workflow states
+
+        File Locations:
+            - Local mode: self.repo_path / self.config_path
+            - CI/CD mode: self.repo_path / self.cicd_config_path
+
+        Side Effects:
+            - Creates parent directories if they don't exist
+            - Writes YAML configuration file
+            - Prints confirmation message
+        """
         click.echo(
             click.style(
                 "📝 Updating configuration file..." if self.existing_config else "📝 Creating configuration file...",
@@ -2047,7 +2774,21 @@ tags:
         click.echo()
 
     def _generate_automation_section(self) -> str:
-        """Generate automation section based on selected mode."""
+        """Generate the automation section of the configuration file.
+
+        Creates YAML content for the automation configuration based on the
+        selected mode. Includes mode flags and, for native/hybrid modes,
+        predefined label trigger definitions.
+
+        Returns:
+            YAML string for the automation section, ready to be included
+            in the full configuration file.
+
+        Label Triggers Generated (native/hybrid modes):
+            - sapiens/triage: AI-powered issue triage
+            - needs-planning: Generate implementation proposals
+            - execute: Execute approved plans
+        """
         # Determine enabled flags based on mode
         if self.automation_mode == "native":
             native_enabled = "true"
@@ -2096,7 +2837,26 @@ tags:
         return automation_section
 
     def _deploy_composite_action(self) -> None:
-        """Deploy reusable composite action for AI tasks."""
+        """Deploy the reusable sapiens-task composite action to the repository.
+
+        Copies the appropriate composite action template (GitHub, GitLab, or
+        Gitea) to the repository's actions directory. This action is used by
+        the workflow templates to run sapiens tasks.
+
+        Target Directories:
+            - GitHub: .github/actions/sapiens-task/action.yaml
+            - GitLab: .gitlab/actions/sapiens-task/action.yaml
+            - Gitea: .gitea/actions/sapiens-task/action.yaml
+
+        Template Sources (in order of precedence):
+            1. importlib.resources (installed package)
+            2. Package directory (development)
+            3. Repository root templates/ (development)
+
+        Side Effects:
+            - Creates action directory and file
+            - Prints confirmation or warning message
+        """
         import importlib.resources
 
         click.echo(click.style("📦 Deploying reusable composite action...", bold=True))
@@ -2150,7 +2910,28 @@ tags:
         click.echo()
 
     def _deploy_workflows(self) -> None:
-        """Deploy CI/CD workflow templates."""
+        """Deploy CI/CD workflow templates to the repository.
+
+        Interactively deploys workflow files based on user selections. Includes
+        core workflows, label-specific workflows, and optional recipe workflows.
+
+        Workflow Categories:
+            - Core: process-label.yaml, automation-daemon.yaml, process-issue.yaml
+            - Label-specific: needs-planning, approved, execute-task, needs-review,
+                requires-qa, needs-fix
+            - Recipes: daily-issue-triage, weekly reports, post-merge docs
+
+        Target Directories:
+            - GitHub: .github/workflows/sapiens/
+            - GitLab: .gitlab-ci.yml (core) and .gitlab/sapiens/recipes/
+            - Gitea: .gitea/workflows/sapiens/
+
+        Side Effects:
+            - Creates workflow directories and files
+            - Copies prompt templates to sapiens/prompts/
+            - Prints progress and confirmation messages
+            - Prompts user for deployment selections (interactive mode)
+        """
         import importlib.resources
 
         click.echo(click.style("📋 Deploying workflow templates...", bold=True))
@@ -2395,11 +3176,20 @@ tags:
         click.echo()
 
     def _deploy_validation_workflow(self, workflows_dir: Path, deploy_fn) -> None:
-        """Deploy the validation workflow template.
+        """Deploy a validation workflow for testing sapiens configuration.
+
+        Creates a provider-specific validation workflow that can be run
+        manually or on a schedule to verify the sapiens setup is working
+        correctly. The workflow runs health-check and produces a diagnostic
+        report.
 
         Args:
-            workflows_dir: Target workflows directory
-            deploy_fn: Function to deploy a template
+            workflows_dir: Target directory for workflow files.
+            deploy_fn: Deployment function (unused, content is generated).
+
+        Side Effects:
+            - Creates validation workflow file
+            - Prints confirmation or error message
         """
         # Create validation workflow content based on provider
         if self.provider_type == "github":
@@ -2421,7 +3211,15 @@ tags:
             click.echo(click.style(f"   ⚠ Could not deploy validation workflow: {e}", fg="yellow"))
 
     def _generate_github_validation_workflow(self) -> str:
-        """Generate GitHub Actions validation workflow."""
+        """Generate GitHub Actions validation workflow YAML content.
+
+        Creates a workflow that runs sapiens health-check with full validation,
+        produces a JSON report, and uploads it as an artifact. Runs weekly
+        and can be triggered manually.
+
+        Returns:
+            Complete YAML content for the GitHub Actions workflow file.
+        """
         return """name: Sapiens Validation
 
 on:
@@ -2471,7 +3269,15 @@ jobs:
 """
 
     def _generate_gitea_validation_workflow(self) -> str:
-        """Generate Gitea Actions validation workflow."""
+        """Generate Gitea Actions validation workflow YAML content.
+
+        Creates a workflow compatible with Gitea Actions that runs sapiens
+        health-check with full validation. Similar to the GitHub version but
+        uses Gitea-specific secret names.
+
+        Returns:
+            Complete YAML content for the Gitea Actions workflow file.
+        """
         return """name: Sapiens Validation
 
 on:
@@ -2520,7 +3326,15 @@ jobs:
 """
 
     def _generate_gitlab_validation_workflow(self) -> str:
-        """Generate GitLab CI validation workflow."""
+        """Generate GitLab CI validation workflow YAML content.
+
+        Creates a GitLab CI job that runs sapiens health-check with full
+        validation. Uses GitLab's pipeline source rules for scheduling
+        and manual triggering.
+
+        Returns:
+            Complete YAML content for the GitLab CI validation job.
+        """
         return """# Sapiens Validation Pipeline
 # Run manually or on schedule to validate sapiens configuration
 
@@ -2551,7 +3365,16 @@ validate-sapiens:
 """
 
     def _validate_setup(self) -> None:
-        """Validate the setup."""
+        """Validate the completed setup by testing credential resolution.
+
+        Performs a basic validation by attempting to resolve the git provider
+        token using the configured credential reference. This confirms that
+        credentials are properly stored and accessible.
+
+        Side Effects:
+            - Prints validation status messages
+            - Logs warning if validation fails (non-fatal)
+        """
         click.echo(click.style("✓ Validating setup...", bold=True))
 
         try:
@@ -2582,10 +3405,20 @@ validate-sapiens:
             click.echo()
 
     def _get_provider_urls(self) -> dict[str, str]:
-        """Generate provider-specific URLs for settings and tokens.
+        """Generate provider-specific URLs for settings and documentation.
+
+        Builds URLs for various provider-specific pages based on the detected
+        provider type and repository information. Used by _print_next_steps
+        and _print_secrets_setup for user guidance.
 
         Returns:
-            Dictionary with URLs for various settings pages
+            Dictionary containing URLs for:
+            - issues: Issue tracker page
+            - actions/pipelines: Workflow/pipeline runs
+            - secrets/variables: Secret configuration page
+            - token: Token generation page
+            - token_name: Display name for token type
+            - token_scopes: Required token scopes/permissions
         """
         base = str(self.repo_info.base_url).rstrip("/")
         owner = self.repo_info.owner
@@ -2629,10 +3462,17 @@ validate-sapiens:
             }
 
     def _get_required_secrets(self) -> list[tuple[str, str, str | None]]:
-        """Get list of required secrets based on provider and agent configuration.
+        """Get the list of secrets required for the configured setup.
+
+        Builds a list of required CI/CD secrets based on the git provider
+        and agent configuration. Used by _print_secrets_setup to show
+        users what secrets they need to configure.
 
         Returns:
-            List of tuples: (secret_name, description, optional_url_for_token)
+            List of tuples, each containing:
+            - secret_name: Name of the required secret
+            - description: Human-readable description of what it's for
+            - token_url: URL where the token can be obtained (or None)
         """
         secrets = []
         urls = self._get_provider_urls()
@@ -2714,7 +3554,15 @@ validate-sapiens:
         return secrets
 
     def _print_next_steps(self) -> None:
-        """Print next steps for the user."""
+        """Print post-initialization guidance for the user.
+
+        Displays a summary of next steps the user should take to complete
+        their setup and start using sapiens. Includes secrets setup
+        instructions, workflow testing guidance, and mode-specific tips.
+
+        Side Effects:
+            Prints formatted guidance to stdout with URLs and commands.
+        """
         provider_name = self.provider_type.title()
         urls = self._get_provider_urls()
 
@@ -2765,7 +3613,17 @@ validate-sapiens:
         click.echo("  - docs/CREDENTIAL_QUICK_START.md")
 
     def _print_secrets_setup(self, urls: dict[str, str]) -> None:
-        """Print instructions for setting up secrets/variables."""
+        """Print detailed instructions for setting up CI/CD secrets.
+
+        Displays provider-specific instructions for configuring repository
+        secrets or CI/CD variables. Includes URLs and required values.
+
+        Args:
+            urls: Dictionary of provider URLs from _get_provider_urls().
+
+        Side Effects:
+            Prints formatted secret setup instructions to stdout.
+        """
         provider_name = self.provider_type.title()
         secrets = self._get_required_secrets()
 
@@ -2797,7 +3655,25 @@ validate-sapiens:
             click.echo()
 
     def _offer_test_run(self) -> None:
-        """Offer to test the setup by summarizing the README."""
+        """Offer to run a test command to verify the agent setup.
+
+        Prompts the user to run a simple test that uses the configured agent
+        to summarize the repository's README file. This helps verify the
+        agent is working correctly.
+
+        Test Commands by Agent Type:
+            - Claude: claude -p "Summarize..."
+            - Goose: goose session start --prompt "Summarize..."
+            - Builtin: sapiens task "Summarize..."
+
+        Side Effects:
+            - Prompts user for confirmation
+            - Runs test command via subprocess (if confirmed)
+            - Prints test results and REPL suggestion
+
+        Note:
+            Only offered if README.md exists and agent type has a test command.
+        """
         import subprocess
 
         # Check if README exists
