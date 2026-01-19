@@ -911,8 +911,52 @@ async def _test_write_operations(
                 _print_check("Add comment", False, str(e))
         results.append(result)
 
-    # Test: Create PR (only if branch was created)
+    # Test: Commit a file to the branch (required for PR creation)
+    committed_file = False
+    test_file_path = f".sapiens/validation-test-{timestamp}.txt"
     if created_branch:
+        start = time.time()
+        try:
+            file_content = f"""# Sapiens Validation Test File
+# Created: {timestamp}
+# This file was created by `sapiens health-check --full`
+# It will be deleted automatically after the test completes.
+
+Validation successful!
+"""
+            await git.commit_file(
+                path=test_file_path,
+                content=file_content,
+                message=f"test: Add validation test file ({timestamp})",
+                branch=branch_name,
+            )
+            duration = (time.time() - start) * 1000
+            committed_file = True
+            result = ValidationResult(
+                name="commit_file",
+                category="write",
+                success=True,
+                message=f"Committed: {test_file_path}",
+                duration_ms=duration,
+                details={"path": test_file_path, "branch": branch_name},
+            )
+            if not output_json:
+                _print_check("Commit file", True, f"Committed: {test_file_path}" if verbose else None)
+        except Exception as e:
+            duration = (time.time() - start) * 1000
+            result = ValidationResult(
+                name="commit_file",
+                category="write",
+                success=False,
+                message=str(e),
+                duration_ms=duration,
+            )
+            if not output_json:
+                _print_check("Commit file", False, str(e))
+        results.append(result)
+
+    # Test: Create PR (only if branch was created and has commits)
+    if created_branch and committed_file:
         start = time.time()
         try:
             pr = await git.create_pull_request(
@@ -1024,51 +1068,33 @@ async def _test_write_operations(
                     _print_check("Close PR", False, str(e))
             results.append(result)
 
-        # Delete branch (if method is available)
+        # Delete branch
         if created_branch:
             start = time.time()
-            if hasattr(git, "delete_branch"):
-                try:
-                    await git.delete_branch(branch_name)
-                    duration = (time.time() - start) * 1000
-                    result = ValidationResult(
-                        name="delete_branch",
-                        category="write",
-                        success=True,
-                        message=f"Deleted: {branch_name}",
-                        duration_ms=duration,
-                    )
-                    if not output_json:
-                        _print_check("Delete branch", True, f"Deleted: {branch_name}" if verbose else None)
-                except Exception as e:
-                    duration = (time.time() - start) * 1000
-                    result = ValidationResult(
-                        name="delete_branch",
-                        category="write",
-                        success=False,
-                        message=str(e),
-                        duration_ms=duration,
-                    )
-                    if not output_json:
-                        _print_check("Delete branch", False, str(e))
-                results.append(result)
-            else:
-                # Branch deletion not supported - note in output
+            try:
+                await git.delete_branch(branch_name)
                 duration = (time.time() - start) * 1000
                 result = ValidationResult(
                     name="delete_branch",
                     category="write",
                     success=True,
-                    message=f"Skipped (manual cleanup needed): {branch_name}",
+                    message=f"Deleted: {branch_name}",
                     duration_ms=duration,
                 )
                 if not output_json:
-                    _print_check(
-                        "Delete branch",
-                        True,
-                        f"Skipped - manually delete: {branch_name}" if verbose else None,
-                    )
-                results.append(result)
+                    _print_check("Delete branch", True, f"Deleted: {branch_name}" if verbose else None)
+            except Exception as e:
+                duration = (time.time() - start) * 1000
+                result = ValidationResult(
+                    name="delete_branch",
+                    category="write",
+                    success=False,
+                    message=str(e),
+                    duration_ms=duration,
+                )
+                if not output_json:
+                    _print_check("Delete branch", False, str(e))
+            results.append(result)
 
     return results
 

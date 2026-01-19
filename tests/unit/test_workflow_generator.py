@@ -2,12 +2,9 @@
 
 Tests cover:
 - WorkflowGenerator initialization
-- Label workflow generation for Gitea/GitHub/GitLab
+- Label workflow generation for Gitea/GitHub/GitLab (thin wrapper approach)
 - Schedule workflow generation
-- Label condition building
-- Environment variable block generation
-- Run command generation
-- GitLab CI merging with existing config
+- Wrapper workflow structure verification
 """
 
 from pathlib import Path
@@ -15,7 +12,11 @@ from unittest.mock import MagicMock
 
 import yaml
 
-from repo_sapiens.generators.workflow_generator import WorkflowGenerator
+from repo_sapiens.generators.workflow_generator import (
+    DISPATCHER_REF,
+    GITLAB_COMPONENT_REF,
+    WorkflowGenerator,
+)
 
 
 class MockAutomationConfig:
@@ -133,7 +134,7 @@ class TestGenerateAll:
         generated = generator.generate_all()
 
         assert len(generated) == 1
-        assert generated[0].name == "process-label.yaml"
+        assert generated[0].name == "sapiens.yaml"
 
     def test_generate_all_with_no_triggers(self, tmp_path: Path):
         """Test generate_all returns empty list when no triggers."""
@@ -188,7 +189,7 @@ class TestGenerateAll:
 
 
 class TestGiteaLabelWorkflow:
-    """Test Gitea Actions label workflow generation."""
+    """Test Gitea Actions label workflow generation (thin wrapper)."""
 
     def test_generates_gitea_workflow_directory(self, tmp_path: Path):
         """Test that .gitea/workflows directory is created."""
@@ -202,8 +203,8 @@ class TestGiteaLabelWorkflow:
 
         assert (tmp_path / ".gitea" / "workflows").exists()
 
-    def test_generates_process_label_yaml(self, tmp_path: Path):
-        """Test that process-label.yaml is created."""
+    def test_generates_sapiens_yaml(self, tmp_path: Path):
+        """Test that sapiens.yaml is created (not nested in sapiens/ subdirectory)."""
         settings = MockSettings(
             provider_type="gitea",
             label_triggers={"test-label": MockLabelTriggerConfig("test-label", "handler")},
@@ -212,7 +213,7 @@ class TestGiteaLabelWorkflow:
 
         path = generator.generate_label_workflow()
 
-        assert path == tmp_path / ".gitea" / "workflows" / "sapiens" / "process-label.yaml"
+        assert path == tmp_path / ".gitea" / "workflows" / "sapiens.yaml"
         assert path.exists()
 
     def test_workflow_has_correct_name(self, tmp_path: Path):
@@ -226,11 +227,10 @@ class TestGiteaLabelWorkflow:
         path = generator.generate_label_workflow()
 
         with open(path) as f:
-            # Skip comment lines
             content = f.read()
             workflow = yaml.safe_load(content)
 
-        assert workflow["name"] == "Process Label"
+        assert workflow["name"] == "Sapiens Automation"
 
     def test_workflow_triggers_on_issues_labeled(self, tmp_path: Path):
         """Test workflow triggers on issues.labeled event."""
@@ -264,8 +264,8 @@ class TestGiteaLabelWorkflow:
         assert "pull_request" in workflow["on"]
         assert "labeled" in workflow["on"]["pull_request"]["types"]
 
-    def test_workflow_uses_gitea_env_vars(self, tmp_path: Path):
-        """Test Gitea workflow uses gitea-specific environment variables."""
+    def test_workflow_passes_gitea_specific_inputs(self, tmp_path: Path):
+        """Test Gitea wrapper passes git_provider_type and git_provider_url inputs."""
         settings = MockSettings(
             provider_type="gitea",
             label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
@@ -277,30 +277,13 @@ class TestGiteaLabelWorkflow:
         with open(path) as f:
             workflow = yaml.safe_load(f.read())
 
-        env = workflow["jobs"]["process"]["steps"][-1]["env"]
-        assert "GITEA_TOKEN" in env
-        assert "gitea.server_url" in env["AUTOMATION__GIT_PROVIDER__BASE_URL"]
-
-    def test_workflow_uses_gitea_event_context(self, tmp_path: Path):
-        """Test Gitea workflow uses gitea event context in run command."""
-        settings = MockSettings(
-            provider_type="gitea",
-            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
-        )
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        path = generator.generate_label_workflow()
-
-        with open(path) as f:
-            workflow = yaml.safe_load(f.read())
-
-        run_cmd = workflow["jobs"]["process"]["steps"][-1]["run"]
-        assert "gitea.event.label.name" in run_cmd
-        assert "gitea.event.issue.number" in run_cmd
+        inputs = workflow["jobs"]["sapiens"]["with"]
+        assert inputs["git_provider_type"] == "gitea"
+        assert "server_url" in inputs["git_provider_url"]
 
 
 class TestGitHubLabelWorkflow:
-    """Test GitHub Actions label workflow generation."""
+    """Test GitHub Actions label workflow generation (thin wrapper)."""
 
     def test_generates_github_workflow_directory(self, tmp_path: Path):
         """Test that .github/workflows directory is created."""
@@ -314,8 +297,8 @@ class TestGitHubLabelWorkflow:
 
         assert (tmp_path / ".github" / "workflows").exists()
 
-    def test_generates_process_label_yaml_for_github(self, tmp_path: Path):
-        """Test that process-label.yaml is created in .github directory."""
+    def test_generates_sapiens_yaml_for_github(self, tmp_path: Path):
+        """Test that sapiens.yaml is created in .github/workflows (not nested)."""
         settings = MockSettings(
             provider_type="github",
             label_triggers={"test-label": MockLabelTriggerConfig("test-label", "handler")},
@@ -324,10 +307,10 @@ class TestGitHubLabelWorkflow:
 
         path = generator.generate_label_workflow()
 
-        assert path == tmp_path / ".github" / "workflows" / "sapiens" / "process-label.yaml"
+        assert path == tmp_path / ".github" / "workflows" / "sapiens.yaml"
 
-    def test_workflow_uses_github_env_vars(self, tmp_path: Path):
-        """Test GitHub workflow uses github-specific environment variables."""
+    def test_workflow_references_dispatcher(self, tmp_path: Path):
+        """Test GitHub workflow references the sapiens-dispatcher workflow."""
         settings = MockSettings(
             provider_type="github",
             label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
@@ -339,12 +322,10 @@ class TestGitHubLabelWorkflow:
         with open(path) as f:
             workflow = yaml.safe_load(f.read())
 
-        env = workflow["jobs"]["process"]["steps"][-1]["env"]
-        assert "GITHUB_TOKEN" in env
-        assert "github.server_url" in env["AUTOMATION__GIT_PROVIDER__BASE_URL"]
+        assert workflow["jobs"]["sapiens"]["uses"] == DISPATCHER_REF
 
-    def test_workflow_uses_github_event_context(self, tmp_path: Path):
-        """Test GitHub workflow uses github event context."""
+    def test_workflow_passes_secrets(self, tmp_path: Path):
+        """Test GitHub workflow passes GIT_TOKEN and AI_API_KEY secrets."""
         settings = MockSettings(
             provider_type="github",
             label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
@@ -356,16 +337,18 @@ class TestGitHubLabelWorkflow:
         with open(path) as f:
             workflow = yaml.safe_load(f.read())
 
-        run_cmd = workflow["jobs"]["process"]["steps"][-1]["run"]
-        assert "github.event.label.name" in run_cmd
-        assert "github.event.issue.number" in run_cmd
+        secrets = workflow["jobs"]["sapiens"]["secrets"]
+        assert "GIT_TOKEN" in secrets
+        assert "SAPIENS_GITHUB_TOKEN" in secrets["GIT_TOKEN"]
+        assert "AI_API_KEY" in secrets
+        assert "SAPIENS_AI_API_KEY" in secrets["AI_API_KEY"]
 
 
 class TestGitLabLabelWorkflow:
-    """Test GitLab CI label workflow generation."""
+    """Test GitLab CI label workflow generation (CI/CD component include)."""
 
     def test_generates_gitlab_ci_yml(self, tmp_path: Path):
-        """Test that .gitlab-ci.yml is created."""
+        """Test that .gitlab-ci.yml is created with include syntax."""
         settings = MockSettings(
             provider_type="gitlab",
             label_triggers={"test-label": MockLabelTriggerConfig("test-label", "handler")},
@@ -377,8 +360,17 @@ class TestGitLabLabelWorkflow:
         assert path == tmp_path / ".gitlab-ci.yml"
         assert path.exists()
 
-    def test_gitlab_ci_has_stages(self, tmp_path: Path):
-        """Test GitLab CI has stages section."""
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
+
+        # Should have include section with component
+        assert "include" in workflow
+        assert len(workflow["include"]) == 1
+        assert "component" in workflow["include"][0]
+        assert workflow["include"][0]["component"] == GITLAB_COMPONENT_REF
+
+    def test_gitlab_ci_has_inputs(self, tmp_path: Path):
+        """Test GitLab CI include has inputs block."""
         settings = MockSettings(
             provider_type="gitlab",
             label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
@@ -390,23 +382,10 @@ class TestGitLabLabelWorkflow:
         with open(path) as f:
             workflow = yaml.safe_load(f.read())
 
-        assert "stages" in workflow
-        assert "process" in workflow["stages"]
-
-    def test_gitlab_ci_has_process_label_job(self, tmp_path: Path):
-        """Test GitLab CI has process-label job."""
-        settings = MockSettings(
-            provider_type="gitlab",
-            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
-        )
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        path = generator.generate_label_workflow()
-
-        with open(path) as f:
-            workflow = yaml.safe_load(f.read())
-
-        assert "process-label" in workflow
+        inputs = workflow["include"][0]["inputs"]
+        assert inputs["label"] == "$SAPIENS_LABEL"
+        assert inputs["issue_number"] == "$SAPIENS_ISSUE"
+        assert inputs["event_type"] == "issues.labeled"
 
     def test_gitlab_ci_merges_with_existing(self, tmp_path: Path):
         """Test GitLab CI merges with existing .gitlab-ci.yml."""
@@ -433,142 +412,136 @@ class TestGitLabLabelWorkflow:
         with open(path) as f:
             workflow = yaml.safe_load(f.read())
 
-        # Should have both existing and new jobs
+        # Should have both existing jobs and new include
         assert "build-job" in workflow
-        assert "process-label" in workflow
-        assert "process" in workflow["stages"]
+        assert "include" in workflow
+        # Verify component is in includes
+        component_included = any(
+            inc.get("component", "").startswith("gitlab.com/savorywatt/repo-sapiens")
+            for inc in workflow["include"]
+            if isinstance(inc, dict)
+        )
+        assert component_included
 
 
-class TestBuildLabelCondition:
-    """Test _build_label_condition method."""
+class TestWrapperWorkflowStructure:
+    """Test wrapper workflow structure for GitHub/Gitea."""
 
-    def test_exact_match_condition(self, tmp_path: Path):
-        """Test exact label match condition."""
-        settings = MockSettings(provider_type="gitea")
+    def test_wrapper_has_uses_directive(self, tmp_path: Path):
+        """Test wrapper has 'uses:' key in job."""
+        settings = MockSettings(
+            provider_type="github",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        condition = generator._build_label_condition(["needs-planning"])
+        path = generator.generate_label_workflow()
 
-        assert "gitea.event.label.name == 'needs-planning'" in condition
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
-    def test_glob_pattern_condition(self, tmp_path: Path):
-        """Test glob pattern uses startsWith."""
-        settings = MockSettings(provider_type="gitea")
+        assert "uses" in workflow["jobs"]["sapiens"]
+
+    def test_wrapper_passes_required_inputs(self, tmp_path: Path):
+        """Test wrapper passes label, issue_number, and event_type inputs."""
+        settings = MockSettings(
+            provider_type="github",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        condition = generator._build_label_condition(["sapiens/*"])
+        path = generator.generate_label_workflow()
 
-        assert "startsWith(gitea.event.label.name, 'sapiens/')" in condition
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
-    def test_multiple_patterns_joined_with_or(self, tmp_path: Path):
-        """Test multiple patterns are joined with OR."""
-        settings = MockSettings(provider_type="gitea")
+        inputs = workflow["jobs"]["sapiens"]["with"]
+        assert "label" in inputs
+        assert "github.event.label.name" in inputs["label"]
+        assert "issue_number" in inputs
+        assert "github.event.issue.number" in inputs["issue_number"]
+        assert "event_type" in inputs
+
+    def test_wrapper_passes_secrets(self, tmp_path: Path):
+        """Test wrapper passes GIT_TOKEN and AI_API_KEY secrets."""
+        settings = MockSettings(
+            provider_type="gitea",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        condition = generator._build_label_condition(["label1", "label2"])
+        path = generator.generate_label_workflow()
 
-        assert "||" in condition
-        assert "label1" in condition
-        assert "label2" in condition
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
-    def test_github_uses_github_event_var(self, tmp_path: Path):
-        """Test GitHub provider uses github.event.label.name."""
-        settings = MockSettings(provider_type="github")
+        secrets = workflow["jobs"]["sapiens"]["secrets"]
+        assert "GIT_TOKEN" in secrets
+        assert "AI_API_KEY" in secrets
+
+    def test_wrapper_passes_gitea_specific_inputs(self, tmp_path: Path):
+        """Test Gitea wrapper includes git_provider_type and git_provider_url."""
+        settings = MockSettings(
+            provider_type="gitea",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        condition = generator._build_label_condition(["test"])
+        path = generator.generate_label_workflow()
 
-        assert "github.event.label.name" in condition
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
-    def test_gitea_uses_gitea_event_var(self, tmp_path: Path):
-        """Test Gitea provider uses gitea.event.label.name."""
-        settings = MockSettings(provider_type="gitea")
+        inputs = workflow["jobs"]["sapiens"]["with"]
+        assert inputs["git_provider_type"] == "gitea"
+        assert "git_provider_url" in inputs
+
+    def test_wrapper_references_correct_dispatcher(self, tmp_path: Path):
+        """Test wrapper uses: value matches expected dispatcher reference."""
+        settings = MockSettings(
+            provider_type="github",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        condition = generator._build_label_condition(["test"])
+        path = generator.generate_label_workflow()
 
-        assert "gitea.event.label.name" in condition
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
-    def test_mixed_exact_and_glob_patterns(self, tmp_path: Path):
-        """Test mixture of exact and glob patterns."""
-        settings = MockSettings(provider_type="gitea")
+        assert workflow["jobs"]["sapiens"]["uses"] == DISPATCHER_REF
+
+    def test_github_wrapper_uses_github_secrets(self, tmp_path: Path):
+        """Test GitHub wrapper uses SAPIENS_GITHUB_TOKEN for GIT_TOKEN."""
+        settings = MockSettings(
+            provider_type="github",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        condition = generator._build_label_condition(["exact-label", "prefix/*"])
+        path = generator.generate_label_workflow()
 
-        assert "gitea.event.label.name == 'exact-label'" in condition
-        assert "startsWith(gitea.event.label.name, 'prefix/')" in condition
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
+        secrets = workflow["jobs"]["sapiens"]["secrets"]
+        assert "SAPIENS_GITHUB_TOKEN" in secrets["GIT_TOKEN"]
 
-class TestBuildEnvBlock:
-    """Test _build_env_block method."""
-
-    def test_gitea_env_block_has_gitea_token(self, tmp_path: Path):
-        """Test Gitea env block includes GITEA_TOKEN."""
-        settings = MockSettings(provider_type="gitea")
+    def test_gitea_wrapper_uses_gitea_secrets(self, tmp_path: Path):
+        """Test Gitea wrapper uses SAPIENS_GITEA_TOKEN for GIT_TOKEN."""
+        settings = MockSettings(
+            provider_type="gitea",
+            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+        )
         generator = WorkflowGenerator(settings, tmp_path)
 
-        env = generator._build_env_block()
+        path = generator.generate_label_workflow()
 
-        assert "GITEA_TOKEN" in env
-        assert "SAPIENS_GITEA_TOKEN" in env["GITEA_TOKEN"]
+        with open(path) as f:
+            workflow = yaml.safe_load(f.read())
 
-    def test_github_env_block_has_github_token(self, tmp_path: Path):
-        """Test GitHub env block includes GITHUB_TOKEN sourced from SAPIENS_GITHUB_TOKEN."""
-        settings = MockSettings(provider_type="github")
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        env = generator._build_env_block()
-
-        assert "GITHUB_TOKEN" in env
-        assert "SAPIENS_GITHUB_TOKEN" in env["GITHUB_TOKEN"]
-
-    def test_env_block_has_automation_vars(self, tmp_path: Path):
-        """Test env block includes AUTOMATION__ prefixed vars."""
-        settings = MockSettings(provider_type="gitea")
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        env = generator._build_env_block()
-
-        assert "AUTOMATION__GIT_PROVIDER__API_TOKEN" in env
-        assert "AUTOMATION__GIT_PROVIDER__BASE_URL" in env
-        assert "AUTOMATION__REPOSITORY__OWNER" in env
-        assert "AUTOMATION__REPOSITORY__NAME" in env
-
-
-class TestBuildRunCommand:
-    """Test _build_run_command method."""
-
-    def test_gitea_run_command(self, tmp_path: Path):
-        """Test Gitea run command format."""
-        settings = MockSettings(provider_type="gitea")
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        cmd = generator._build_run_command()
-
-        assert "sapiens process-label" in cmd
-        assert "--source gitea" in cmd
-        assert "gitea.event.label.name" in cmd
-
-    def test_github_run_command(self, tmp_path: Path):
-        """Test GitHub run command format."""
-        settings = MockSettings(provider_type="github")
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        cmd = generator._build_run_command()
-
-        assert "sapiens process-label" in cmd
-        assert "--source github" in cmd
-        assert "github.event.label.name" in cmd
-
-    def test_run_command_includes_event_type(self, tmp_path: Path):
-        """Test run command includes event type flag."""
-        settings = MockSettings(provider_type="gitea")
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        cmd = generator._build_run_command()
-
-        assert '--event-type "issues.labeled"' in cmd
+        secrets = workflow["jobs"]["sapiens"]["secrets"]
+        assert "SAPIENS_GITEA_TOKEN" in secrets["GIT_TOKEN"]
 
 
 class TestScheduleWorkflow:
@@ -701,72 +674,23 @@ class TestScheduleWorkflow:
 class TestWorkflowContent:
     """Test generated workflow content details."""
 
-    def test_workflow_has_checkout_step(self, tmp_path: Path):
-        """Test workflow includes checkout step."""
-        settings = MockSettings(
-            provider_type="gitea",
-            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
-        )
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        path = generator.generate_label_workflow()
-
-        with open(path) as f:
-            workflow = yaml.safe_load(f.read())
-
-        steps = workflow["jobs"]["process"]["steps"]
-        checkout_step = next(s for s in steps if "Checkout" in s.get("name", ""))
-        assert checkout_step["uses"] == "actions/checkout@v4"
-
-    def test_workflow_has_python_setup_step(self, tmp_path: Path):
-        """Test workflow includes Python setup step."""
-        settings = MockSettings(
-            provider_type="gitea",
-            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
-        )
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        path = generator.generate_label_workflow()
-
-        with open(path) as f:
-            workflow = yaml.safe_load(f.read())
-
-        steps = workflow["jobs"]["process"]["steps"]
-        python_step = next(s for s in steps if "Python" in s.get("name", ""))
-        assert "actions/setup-python" in python_step["uses"]
-        assert python_step["with"]["python-version"] == "3.12"
-
-    def test_workflow_has_install_step(self, tmp_path: Path):
-        """Test workflow includes repo-sapiens install step."""
-        settings = MockSettings(
-            provider_type="gitea",
-            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
-        )
-        generator = WorkflowGenerator(settings, tmp_path)
-
-        path = generator.generate_label_workflow()
-
-        with open(path) as f:
-            workflow = yaml.safe_load(f.read())
-
-        steps = workflow["jobs"]["process"]["steps"]
-        install_step = next(s for s in steps if "Install" in s.get("name", ""))
-        assert "pip install repo-sapiens" in install_step["run"]
-
     def test_workflow_runs_on_ubuntu(self, tmp_path: Path):
-        """Test workflow runs on ubuntu-latest."""
+        """Test schedule workflow runs on ubuntu-latest."""
         settings = MockSettings(
             provider_type="gitea",
-            label_triggers={"test": MockLabelTriggerConfig("test", "handler")},
+            schedule_triggers=[
+                MockScheduleTriggerConfig(cron="0 8 * * *", handler="test"),
+            ],
         )
         generator = WorkflowGenerator(settings, tmp_path)
+        schedule = MockScheduleTriggerConfig(cron="0 8 * * *", handler="test")
 
-        path = generator.generate_label_workflow()
+        path = generator.generate_schedule_workflow(schedule)
 
         with open(path) as f:
             workflow = yaml.safe_load(f.read())
 
-        assert workflow["jobs"]["process"]["runs-on"] == "ubuntu-latest"
+        assert workflow["jobs"]["run"]["runs-on"] == "ubuntu-latest"
 
     def test_workflow_file_has_header_comment(self, tmp_path: Path):
         """Test generated workflow file has header comment."""
@@ -782,4 +706,3 @@ class TestWorkflowContent:
             content = f.read()
 
         assert "Generated by repo-sapiens" in content
-        assert "Do not edit manually" in content

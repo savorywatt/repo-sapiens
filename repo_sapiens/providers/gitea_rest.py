@@ -220,6 +220,21 @@ class GiteaRestProvider(GitProvider):
                 return None
             raise
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch."""
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+            response = await self._pool.delete(f"/repos/{self.owner}/{self.repo}/branches/{branch_name}")
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                log.debug("gitea_branch_not_found", branch=branch_name)
+                return False
+            log.error("gitea_delete_branch_failed", branch=branch_name, error=str(e))
+            raise
+
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_diff(self, base: str, head: str, pr_number: int | None = None) -> str:
         """Get diff between two branches or for a PR.

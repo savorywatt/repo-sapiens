@@ -1,5 +1,7 @@
 """Ollama provider for local AI inference."""
 
+import re
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -133,14 +135,20 @@ class OllamaProvider(AgentProvider):
         """
         files = []
 
-        # Look for file operation indicators
+        # Look for FILE: pattern (our main format)
+        file_pattern = re.findall(r"FILE:\s*([^\n`]+)", output)
+        for filepath in file_pattern:
+            filepath = filepath.strip().strip("`'\"")
+            if filepath and filepath not in files:
+                files.append(filepath)
+
+        # Look for other file operation indicators
         patterns = [
             "Created file:",
             "Modified file:",
             "Updated file:",
             "Writing to:",
             "Saved:",
-            "File:",
         ]
 
         for line in output.split("\n"):
@@ -150,10 +158,85 @@ class OllamaProvider(AgentProvider):
                     parts = line.split(pattern)
                     if len(parts) > 1:
                         filename = parts[1].strip().split()[0]
-                        if filename:
+                        if filename and filename not in files:
                             files.append(filename)
 
         return files
+
+    def _extract_files_from_output(self, output: str) -> dict[str, str]:
+        """Extract file contents from model output using FILE: format.
+
+        Parses output looking for patterns like:
+        FILE: path/to/file.ext
+        ```language
+        [file contents]
+        ```
+
+        Args:
+            output: Model output text
+
+        Returns:
+            Dict mapping file paths to their contents
+        """
+        files: dict[str, str] = {}
+
+        # Pattern to match FILE: path followed by code block
+        # Handles both with and without language specifier
+        pattern = r"FILE:\s*([^\n`]+)\s*\n```(?:\w+)?\n(.*?)```"
+
+        matches = re.findall(pattern, output, re.DOTALL)
+
+        for filepath, content in matches:
+            filepath = filepath.strip()
+            # Clean up the filepath - remove backticks, quotes, etc.
+            filepath = filepath.strip("`'\"")
+            if filepath:
+                files[filepath] = content.rstrip("\n")
+                log.debug("extracted_file", path=filepath, size=len(content))
+
+        return files
+
+    def _write_extracted_files(self, files: dict[str, str], workspace: str) -> list[str]:
+        """Write extracted files to the workspace directory.
+
+        Args:
+            files: Dict mapping file paths to contents
+            workspace: Base workspace directory
+
+        Returns:
+            List of files successfully written
+        """
+        written: list[str] = []
+        workspace_path = Path(workspace)
+
+        for filepath, content in files.items():
+            try:
+                # Resolve the full path within workspace
+                full_path = workspace_path / filepath
+
+                # Security check: ensure path doesn't escape workspace
+                try:
+                    full_path.resolve().relative_to(workspace_path.resolve())
+                except ValueError:
+                    log.warning(
+                        "path_escape_attempt",
+                        filepath=filepath,
+                        workspace=workspace,
+                    )
+                    continue
+
+                # Create parent directories
+                full_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Write the file
+                full_path.write_text(content)
+                written.append(filepath)
+                log.info("file_written", path=str(full_path), size=len(content))
+
+            except Exception as e:
+                log.error("file_write_failed", path=filepath, error=str(e))
+
+        return written
 
     async def generate_plan(self, issue: Issue) -> Plan:
         """Generate development plan from issue.
@@ -325,15 +408,36 @@ Focus on making this task complete and working.
 
         result = await self.execute_prompt(prompt, context, task.id)
 
-        # Note: With Ollama, we're getting guidance/instructions rather than
-        # executing the changes directly. The user or another system would
-        # apply the changes based on the output.
+        files_changed: list[str] = []
+
+        if result["success"] and result.get("output"):
+            # Extract files from the model output
+            extracted_files = self._extract_files_from_output(result["output"])
+
+            if extracted_files:
+                # Write extracted files to workspace
+                workspace = context.get("workspace", self.working_dir)
+                files_changed = self._write_extracted_files(extracted_files, workspace)
+                log.info(
+                    "task_files_written",
+                    task_id=task.id,
+                    extracted=len(extracted_files),
+                    written=len(files_changed),
+                )
+            else:
+                log.warning(
+                    "no_files_extracted",
+                    task_id=task.id,
+                    message="Model output didn't contain parseable FILE: blocks",
+                )
+                # Fall back to heuristic detection for reporting
+                files_changed = result.get("files_changed", [])
 
         return TaskResult(
             success=result["success"],
             branch=context.get("branch"),
             commits=[],
-            files_changed=result.get("files_changed", []),
+            files_changed=files_changed,
             error=result.get("error"),
         )
 

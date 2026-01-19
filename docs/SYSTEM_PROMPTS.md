@@ -599,7 +599,7 @@ sapiens task "Sample task description" \
 
 ## Additional Resources
 
-- [Workflow Templates](../templates/workflows/)
-- [CI/CD Usage Guide](./ci-cd-usage.md)
+- [Deployment Guide](./DEPLOYMENT_GUIDE.md)
+- [Workflow Reference](./WORKFLOW_REFERENCE.md)
 - [OpenAI Prompt Engineering Guide](https://platform.openai.com/docs/guides/prompt-engineering)
 - [Anthropic Claude Prompt Guide](https://docs.anthropic.com/claude/docs/prompt-engineering)

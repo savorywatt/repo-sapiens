@@ -11,6 +11,8 @@ Run with: uv run pytest tests/integration/test_gitea_provider.py -v -m integrati
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import httpx
 import pytest
 
@@ -90,7 +92,7 @@ class TestGiteaIssueWorkflow:
     """Test Gitea issue create/update/close workflow."""
 
     @pytest.fixture
-    def test_issue(self, gitea_test_repo: dict) -> dict:
+    def test_issue(self, gitea_test_repo: dict) -> Generator[dict, None, None]:
         """Create a test issue and clean up after."""
         owner = gitea_test_repo["owner"]
         name = gitea_test_repo["name"]

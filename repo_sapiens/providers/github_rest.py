@@ -251,6 +251,27 @@ class GitHubRestProvider(GitProvider):
             log.error("github_get_branch_failed", branch=branch_name, error=str(e))
             raise
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch."""
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+
+            def _delete_branch() -> bool:
+                # Delete the git ref for the branch
+                ref = self._repo.get_git_ref(f"heads/{branch_name}")
+                ref.delete()
+                return True
+
+            return await _run_sync(_delete_branch)
+
+        except GithubException as e:
+            if e.status == 404:
+                log.debug("github_branch_not_found", branch=branch_name)
+                return False
+            log.error("github_delete_branch_failed", branch=branch_name, error=str(e))
+            raise
+
     async def get_diff(self, base: str, head: str) -> str:
         """Get diff between two branches."""
         log.info("get_diff", base=base, head=head)

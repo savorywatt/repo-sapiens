@@ -10,6 +10,12 @@
 #   5. Verify results
 #   6. Cleanup
 #
+# Environment Variables:
+#   DOCKER_CONTEXT   Docker context to use (default: "default" for local docker)
+#   GITLAB_URL       GitLab URL (default: http://localhost:8080)
+#   GITLAB_PROJECT   GitLab project path (default: root/test-repo)
+#   RESULTS_DIR      Directory for test results (default: ./validation-results)
+#
 # Note: GitLab uses different API patterns than Gitea/GitHub:
 #   - Issues use `iid` (project-scoped) not global `id`
 #   - PRs are called "Merge Requests" (MRs)
@@ -97,9 +103,9 @@ check_prerequisites() {
         exit 2
     fi
 
-    # Check GitLab is accessible
-    if ! curl -sf "$GITLAB_URL/-/health" > /dev/null 2>&1; then
-        error "GitLab not accessible at $GITLAB_URL"
+    # Check GitLab is accessible (use API since health endpoint may return 404)
+    if ! curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" "$GITLAB_URL/api/v4/user" > /dev/null 2>&1; then
+        error "GitLab not accessible at $GITLAB_URL (or token invalid)"
         error "Start with: docker compose -f plans/validation/docker/gitlab.yaml up -d"
         error "Note: GitLab takes ~5 minutes to start"
         exit 2
@@ -216,27 +222,111 @@ agent_provider:
   base_url: "http://localhost:11434"
   model: qwen3:8b
 
+workflow:
+  plans_directory: plans
+  state_directory: .sapiens/state
+
 automation:
-  labels:
-    planning: needs-planning
-    approved: approved
-    in_progress: in-progress
-    done: done
+  mode:
+    mode: native
+
+  label_triggers:
+    "needs-planning":
+      label_pattern: "needs-planning"
+      handler: proposal
+      ai_enabled: true
+      remove_on_complete: false
+      success_label: plan-ready
+    "approved":
+      label_pattern: "approved"
+      handler: approval
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: implemented
 CONFIG_EOF
 
     log "Config written to $config_file"
 
     # Process the specific issue
-    log "Running: sapiens process-label --issue $ISSUE_IID"
+    # Build GitLab-style event data with proper structure
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "needs-planning"}]
+    }
+  }
+}
+EVENT_JSON
+)
+    log "Running: sapiens process-label --event-type issues.labeled --issue $ISSUE_IID"
 
     mkdir -p "$RESULTS_DIR/$RUN_ID"
-    if uv run sapiens --config "$config_file" process-label --issue "$ISSUE_IID" --verbose 2>&1 | tee "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+    if echo "$event_json" | uv run sapiens --config "$config_file" process-label --event-type issues.labeled --source gitlab 2>&1 | tee "$RESULTS_DIR/$RUN_ID/process-output.log"; then
         log "Issue processing completed"
     else
         warn "Issue processing returned non-zero exit code"
     fi
 
-    rm -f "$config_file"
+    # Store config file path for reuse
+    export SAPIENS_CONFIG_FILE="$config_file"
+}
+
+# Phase 2: Process approval (adds approved label and processes)
+process_approval() {
+    step "Phase 2: Processing approval..."
+
+    # First, add the 'approved' label to the proposal issue (or original issue)
+    log "Adding 'approved' label to issue #$ISSUE_IID..."
+
+    # Ensure the label exists
+    gitlab_api POST "/projects/$PROJECT_ENCODED/labels" '{
+        "name": "approved",
+        "color": "#28A745"
+    }' 2>/dev/null || true
+
+    # Update issue with approved label
+    local current_labels
+    current_labels=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID" | jq -r '.labels | join(",")')
+    gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID" "{\"labels\": \"$current_labels,approved\"}" > /dev/null
+
+    log "Added 'approved' label"
+
+    # Build event data for approval
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [{"title": "plan-ready"}],
+      "current": [{"title": "plan-ready"}, {"title": "approved"}]
+    }
+  }
+}
+EVENT_JSON
+)
+    log "Running: sapiens process-label --event-type issues.labeled (approval)"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label --event-type issues.labeled --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Approval processing completed"
+    else
+        warn "Approval processing returned non-zero exit code"
+    fi
+}
+
+# Cleanup config file
+cleanup_config() {
+    if [[ -n "${SAPIENS_CONFIG_FILE:-}" ]]; then
+        rm -f "$SAPIENS_CONFIG_FILE"
+    fi
 }
 
 # Verify results
@@ -246,36 +336,45 @@ verify_results() {
     local passed=0
     local failed=0
 
-    # Check 1: Issue should have a plan comment (GitLab calls them "notes")
-    log "Checking for plan comment..."
-    local notes
-    notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID/notes" || echo "[]")
-    local plan_note
-    plan_note=$(echo "$notes" | jq -r '.[] | select(.body | contains("## Plan")) | .id' | head -1)
-
-    if [[ -n "$plan_note" ]]; then
-        log "  Plan comment found"
-        ((passed++))
-    else
-        error "  No plan comment found"
-        ((failed++))
-    fi
-
-    # Check 2: Issue labels should have changed
-    log "Checking issue labels..."
+    # Check 1: Issue should have plan-ready label (indicates proposal was generated)
+    log "Checking for plan-ready label..."
     local issue
     issue=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$ISSUE_IID")
     local labels
     labels=$(echo "$issue" | jq -r '.labels[]' 2>/dev/null | tr '\n' ',')
 
-    if [[ "$labels" == *"approved"* ]] || [[ "$labels" == *"in-progress"* ]] || [[ "$labels" == *"done"* ]]; then
-        log "  Issue labels updated: $labels"
+    if [[ "$labels" == *"plan-ready"* ]]; then
+        log "  Plan-ready label found: $labels"
         ((passed++))
     else
-        warn "  Issue labels unchanged: $labels (may need manual approval)"
+        error "  No plan-ready label found (labels: $labels)"
+        ((failed++))
     fi
 
-    # Check 3: Look for created branch
+    # Check 2: Proposal issue should exist (sapiens creates a [PROPOSAL] issue)
+    log "Checking for proposal issue..."
+    local proposals
+    proposals=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues?search=PROPOSAL&in=title" || echo "[]")
+    local proposal_iid
+    proposal_iid=$(echo "$proposals" | jq -r ".[] | select(.title | contains(\"#$ISSUE_IID\")) | .iid" | head -1)
+
+    if [[ -n "$proposal_iid" ]]; then
+        log "  Proposal issue found: #$proposal_iid"
+        ((passed++))
+    else
+        warn "  No proposal issue found"
+    fi
+
+    # Check 3: Look for 'implemented' label (from approval handler)
+    log "Checking for implemented label..."
+    if [[ "$labels" == *"implemented"* ]]; then
+        log "  Implemented label found (approval handler succeeded)"
+        ((passed++))
+    else
+        warn "  No implemented label found (approval may not have run)"
+    fi
+
+    # Check 4: Look for created branch
     log "Checking for feature branch..."
     local branches
     branches=$(gitlab_api GET "/projects/$PROJECT_ENCODED/repository/branches" || echo "[]")
@@ -287,10 +386,10 @@ verify_results() {
         ((passed++))
         FEATURE_BRANCH="$feature_branch"
     else
-        warn "  No feature branch found (may need approved label)"
+        warn "  No feature branch found (implementation may not have run)"
     fi
 
-    # Check 4: Look for MR (merge request)
+    # Check 5: Look for MR (merge request)
     log "Checking for merge request..."
     local mrs
     mrs=$(gitlab_api GET "/projects/$PROJECT_ENCODED/merge_requests?state=all" || echo "[]")
@@ -302,7 +401,7 @@ verify_results() {
         ((passed++))
         MR_IID="$test_mr"
     else
-        warn "  No merge request found (workflow may not have completed)"
+        warn "  No merge request found (implementation may not have created MR)"
     fi
 
     # Summary
@@ -329,16 +428,25 @@ generate_report() {
 
 | Setting | Value |
 |---------|-------|
+| Docker Context | $DOCKER_CONTEXT |
 | GitLab URL | $GITLAB_URL |
 | Project | $GITLAB_PROJECT |
 | Test Prefix | $TEST_PREFIX |
 
 ## Test Flow
 
+### Phase 1: Proposal Handler (needs-planning)
 1. **Create Issue**: #${ISSUE_IID:-N/A}
-2. **Process with sapiens**: See process-output.log
-3. **Feature Branch**: ${FEATURE_BRANCH:-Not created}
-4. **Merge Request**: !${MR_IID:-Not created}
+2. **Add needs-planning label**: Triggers proposal handler
+3. **Expected**: plan-ready label, proposal issue created
+
+### Phase 2: Approval Handler (approved)
+4. **Add approved label**: Triggers approval handler
+5. **Expected**: implemented label, feature branch, MR created
+
+### Results
+- **Feature Branch**: ${FEATURE_BRANCH:-Not created}
+- **Merge Request**: !${MR_IID:-Not created}
 
 ## Result
 
@@ -363,17 +471,28 @@ REPORT_EOF
 # Main
 #############################################
 main() {
-    docker context use "$DOCKER_CONTEXT" 2>/dev/null || true
+    # Switch to specified docker context
+    log "Switching to docker context: $DOCKER_CONTEXT"
+    docker context use "$DOCKER_CONTEXT"
 
     mkdir -p "$RESULTS_DIR/$RUN_ID"
 
     log "=== GitLab E2E Integration Test ==="
     log "Run ID: $RUN_ID"
+    log "Docker Context: $DOCKER_CONTEXT"
     echo ""
 
     check_prerequisites
+
+    # Phase 1: Create issue and process with proposal handler
     create_test_issue
     process_issue
+
+    # Phase 2: Add approved label and process with approval handler
+    process_approval
+
+    # Cleanup config file
+    cleanup_config
 
     if verify_results; then
         generate_report "PASSED"

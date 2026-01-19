@@ -94,20 +94,24 @@ def process_label_command(
         except json.JSONDecodeError as e:
             click.echo(f"Error: Invalid JSON in --event-data: {e}", err=True)
             sys.exit(1)
-    elif not sys.stdin.isatty():
-        # Read from stdin
-        try:
-            event_payload = json.load(sys.stdin)
-        except json.JSONDecodeError as e:
-            click.echo(f"Error: Invalid JSON from stdin: {e}", err=True)
-            sys.exit(1)
-    else:
+    elif label or issue:
         # Build minimal event payload from options
         event_payload = {}
         if label:
             event_payload["label"] = {"name": label}
         if issue:
             event_payload["issue"] = {"number": issue}
+    elif not sys.stdin.isatty():
+        # Read from stdin (only if no options provided)
+        try:
+            event_payload = json.load(sys.stdin)
+        except json.JSONDecodeError as e:
+            click.echo(f"Error: Invalid JSON from stdin: {e}", err=True)
+            sys.exit(1)
+    else:
+        # No input provided
+        click.echo("Error: Provide --event-data, --label/--issue, or pipe JSON to stdin", err=True)
+        sys.exit(1)
 
     # Determine source
     if source:

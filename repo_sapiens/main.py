@@ -10,6 +10,7 @@ import structlog
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.health import health_check
 from repo_sapiens.cli.init import init_command
+from repo_sapiens.cli.process_label import process_label_command
 from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.orchestrator import WorkflowOrchestrator
@@ -92,12 +93,17 @@ def cli(ctx: click.Context, config: str, log_level: str) -> None:
 
 @cli.command()
 @click.option("--issue", type=int, required=True, help="Issue number to process")
+@click.option(
+    "--system-prompt",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Path to custom system prompt file",
+)
 @click.pass_context
-def process_issue(ctx: click.Context, issue: int) -> None:
+def process_issue(ctx: click.Context, issue: int, system_prompt: str | None) -> None:
     """Process a single issue manually."""
     try:
         settings = ctx.obj["settings"]
-        asyncio.run(_process_single_issue(settings, issue))
+        asyncio.run(_process_single_issue(settings, issue, system_prompt))
     except RepoSapiensError as e:
         click.echo(f"Error: {e.message}", err=True)
         log.debug("process_issue_error", exc_info=True)
@@ -686,6 +692,9 @@ cli.add_command(init_command)
 # Add update command
 cli.add_command(update_command)
 
+# Add process-label command
+cli.add_command(process_label_command)
+
 
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:
     """Create and initialize orchestrator.
@@ -764,21 +773,40 @@ async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestr
     return orchestrator
 
 
-async def _process_single_issue(settings: AutomationSettings, issue_number: int) -> None:
+async def _process_single_issue(
+    settings: AutomationSettings,
+    issue_number: int,
+    system_prompt_path: str | None = None,
+) -> None:
     """Process a single issue.
 
     Args:
         settings: Automation settings
         issue_number: Issue number to process
+        system_prompt_path: Optional path to custom system prompt file
     """
     log.info("processing_single_issue", issue=issue_number)
+
+    # Load custom system prompt if provided
+    custom_system_prompt = None
+    if system_prompt_path:
+        try:
+            with open(system_prompt_path) as f:
+                custom_system_prompt = f.read()
+            click.echo(f"Loaded custom system prompt from: {system_prompt_path}")
+        except Exception as e:
+            click.echo(f"Warning: Failed to read system prompt file: {e}", err=True)
 
     orchestrator = await _create_orchestrator(settings)
 
     # Get issue
     issue = await orchestrator.git.get_issue(issue_number)
 
-    # Process issue
+    # Process issue with optional custom prompt
+    if custom_system_prompt:
+        # Inject custom system prompt into the issue context
+        orchestrator.custom_system_prompt = custom_system_prompt
+
     await orchestrator.process_issue(issue)
 
     click.echo(f"✅ Issue #{issue_number} processed successfully")

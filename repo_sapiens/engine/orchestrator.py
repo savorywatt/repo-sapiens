@@ -132,6 +132,7 @@ class WorkflowOrchestrator:
         self.git = git
         self.agent = agent
         self.state = state
+        self.custom_system_prompt: str | None = None
 
         # Initialize stages
         self.stages = {

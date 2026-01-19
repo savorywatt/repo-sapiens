@@ -217,6 +217,30 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch.
+
+        Removes a branch from the repository. Cannot delete protected branches
+        or the default branch.
+
+        Args:
+            branch_name: Name of the branch to delete.
+
+        Returns:
+            True if the branch was deleted, False if it didn't exist.
+
+        Raises:
+            httpx.HTTPStatusError: If the API request fails (Gitea/GitLab).
+            GithubException: If the API request fails (GitHub).
+            PermissionError: If the branch is protected or is the default branch.
+
+        Note:
+            GitHub uses the Git refs API to delete branches, while Gitea
+            and GitLab have dedicated branch deletion endpoints.
+        """
+        pass
+
+    @abstractmethod
     async def get_branch(self, branch_name: str) -> Branch | None:
         """Get branch information.
 

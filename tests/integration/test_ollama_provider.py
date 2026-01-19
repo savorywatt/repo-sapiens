@@ -50,10 +50,7 @@ class TestOllamaModels:
         model = ollama_config["model"]
         model_base = model.split(":")[0]
 
-        found = any(
-            m == model or m.startswith(f"{model_base}:")
-            for m in model_names
-        )
+        found = any(m == model or m.startswith(f"{model_base}:") for m in model_names)
 
         if not found:
             pytest.skip(f"Model {model} not available. Pull with: ollama pull {model}")
@@ -91,9 +88,7 @@ class TestOllamaGeneration:
             f"{ollama_url}/api/chat",
             json={
                 "model": ollama_config["model"],
-                "messages": [
-                    {"role": "user", "content": "Say 'hello' and nothing else."}
-                ],
+                "messages": [{"role": "user", "content": "Say 'hello' and nothing else."}],
                 "stream": False,
                 "options": {
                     "num_predict": 10,
@@ -128,9 +123,7 @@ class TestOllamaOpenAICompatibility:
             f"{ollama_url}/v1/chat/completions",
             json={
                 "model": ollama_config["model"],
-                "messages": [
-                    {"role": "user", "content": "Say 'hello' and nothing else."}
-                ],
+                "messages": [{"role": "user", "content": "Say 'hello' and nothing else."}],
                 "max_tokens": 10,
                 "temperature": 0.0,
             },

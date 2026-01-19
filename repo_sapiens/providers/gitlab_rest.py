@@ -299,6 +299,29 @@ class GitLabRestProvider(GitProvider):
                 return None
             raise
 
+    async def delete_branch(self, branch_name: str) -> bool:
+        """Delete a branch.
+
+        Args:
+            branch_name: Branch name to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        log.info("delete_branch", branch=branch_name)
+
+        try:
+            encoded_branch = urllib.parse.quote(branch_name, safe="")
+            response = await self._pool.delete(f"/projects/{self.project_path}/repository/branches/{encoded_branch}")
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                log.debug("gitlab_branch_not_found", branch=branch_name)
+                return False
+            log.error("gitlab_delete_branch_failed", branch=branch_name, error=str(e))
+            raise
+
     @async_retry(max_attempts=3, backoff_factor=2.0)
     async def get_diff(self, base: str, head: str, mr_number: int | None = None) -> str:
         """Get diff between two branches or for a MR.

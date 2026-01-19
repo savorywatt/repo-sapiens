@@ -8,11 +8,25 @@
 #   - Requires 4GB+ RAM (6GB recommended)
 #   - Requires 2+ CPU cores
 #   - Initial startup takes 5-10 minutes
+#   - Container runs in privileged mode (required for GitLab's internal services)
+#
+# RECOMMENDED: Run on a remote server using docker context:
+#   DOCKER_CONTEXT=remote-server ./scripts/bootstrap-gitlab.sh
+#
+# CLEANUP: To start fresh, run:
+#   ./scripts/gitlab-cleanup.sh [--context remote-server]
+#
+# Environment Variables:
+#   DOCKER_CONTEXT   Docker context to use (default: "default" for local docker)
+#   GITLAB_URL       GitLab URL (default: http://localhost:8080)
+#   COMPOSE_FILE     Path to docker-compose file
 #
 # Usage:
 #   ./scripts/bootstrap-gitlab.sh [options]
+#   DOCKER_CONTEXT=remote-server ./scripts/bootstrap-gitlab.sh
 #
 # Options:
+#   --context NAME      Docker context to use (overrides DOCKER_CONTEXT env var)
 #   --url URL           GitLab URL (default: http://localhost:8080)
 #   --docker NAME       Docker container name (default: gitlab-test)
 #   --project NAME      Test project name (default: test-repo)
@@ -28,6 +42,7 @@
 set -euo pipefail
 
 # Defaults
+DOCKER_CONTEXT="${DOCKER_CONTEXT:-default}"
 GITLAB_URL="${GITLAB_URL:-http://localhost:8080}"
 DOCKER_CONTAINER="${DOCKER_CONTAINER:-gitlab-test}"
 RUNNER_CONTAINER="${RUNNER_CONTAINER:-gitlab-runner}"
@@ -58,6 +73,7 @@ die() { error "$1"; exit 1; }
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --context) DOCKER_CONTEXT="$2"; shift 2 ;;
         --url) GITLAB_URL="$2"; shift 2 ;;
         --docker) DOCKER_CONTAINER="$2"; shift 2 ;;
         --project) TEST_PROJECT="$2"; shift 2 ;;
@@ -67,12 +83,46 @@ while [[ $# -gt 0 ]]; do
         --with-runner) WITH_RUNNER=true; shift ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         -h|--help)
-            head -30 "$0" | tail -25
+            head -35 "$0" | tail -30
             exit 0
             ;;
         *) die "Unknown option: $1" ;;
     esac
 done
+
+#############################################
+# Step 0a: Switch Docker context
+#############################################
+switch_docker_context() {
+    log "Switching to docker context: $DOCKER_CONTEXT"
+    docker context use "$DOCKER_CONTEXT"
+    log "Current docker context: $(docker context show)"
+}
+
+#############################################
+# Step 0: Check prerequisites
+#############################################
+check_prerequisites() {
+    log "Checking prerequisites..."
+
+    # jq is required for JSON parsing
+    if ! command -v jq >/dev/null 2>&1; then
+        die "jq is required but not installed.
+Install with: sudo apt install jq (Ubuntu) or brew install jq (macOS)"
+    fi
+
+    # curl is required
+    if ! command -v curl >/dev/null 2>&1; then
+        die "curl is required but not installed."
+    fi
+
+    # docker is required
+    if ! command -v docker >/dev/null 2>&1; then
+        die "docker is required but not installed."
+    fi
+
+    log "Prerequisites OK"
+}
 
 #############################################
 # Step 1: Start GitLab container
@@ -251,7 +301,7 @@ verify_api_access() {
     response=$(curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         "$GITLAB_URL/api/v4/user" 2>&1 || echo "")
 
-    if echo "$response" | grep -q '"username":"root"'; then
+    if echo "$response" | jq -e '.username == "root"' > /dev/null 2>&1; then
         log "API access verified (authenticated as root)"
         return 0
     fi
@@ -271,7 +321,7 @@ create_test_project() {
     existing=$(curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
         "$GITLAB_URL/api/v4/projects?search=$TEST_PROJECT" 2>/dev/null || echo "[]")
 
-    if echo "$existing" | grep -q "\"path\":\"$TEST_PROJECT\""; then
+    if echo "$existing" | jq -e ".[] | select(.path == \"$TEST_PROJECT\")" > /dev/null 2>&1; then
         log "Project $TEST_PROJECT already exists"
         return 0
     fi
@@ -289,13 +339,13 @@ create_test_project() {
             \"visibility\": \"public\"
         }" 2>&1 || echo "")
 
-    if echo "$response" | grep -q "\"path\":\"$TEST_PROJECT\""; then
+    if echo "$response" | jq -e ".path == \"$TEST_PROJECT\"" > /dev/null 2>&1; then
         log "Project created successfully"
         return 0
     fi
 
     # Check for "already exists" error
-    if echo "$response" | grep -q "has already been taken"; then
+    if echo "$response" | jq -e '.message | contains("has already been taken")' > /dev/null 2>&1; then
         log "Project already exists"
         return 0
     fi
@@ -331,14 +381,82 @@ create_automation_labels() {
             "$GITLAB_URL/api/v4/projects/$project_encoded/labels" \
             -d "{\"name\": \"$name\", \"color\": \"$color\"}" 2>&1 || echo "")
 
-        if echo "$response" | grep -q "\"name\":\"$name\""; then
+        if echo "$response" | jq -e ".name == \"$name\"" > /dev/null 2>&1; then
             log "  Created label: $name"
-        elif echo "$response" | grep -q "already exists"; then
+        elif echo "$response" | jq -e '.message | contains("already exists")' > /dev/null 2>&1; then
             log "  Label exists: $name"
         else
             warn "  Failed to create label $name: $response"
         fi
     done
+}
+
+#############################################
+# Step 7b: Deploy sapiens CI configuration
+#############################################
+deploy_sapiens_ci() {
+    step "Deploying sapiens CI configuration..."
+
+    local project_encoded="root%2F$TEST_PROJECT"
+
+    # GitLab CI configuration using CI/CD Component
+    # Note: GitLab doesn't have native label triggers - requires webhook handler
+    local ci_content
+    ci_content=$(cat << 'CI_EOF'
+# Generated by repo-sapiens bootstrap
+# GitLab CI/CD configuration using sapiens-dispatcher component
+#
+# NOTE: GitLab doesn't have native label triggers. You need to set up
+# a webhook handler to trigger this pipeline with variables:
+#   SAPIENS_LABEL=<label-name>
+#   SAPIENS_ISSUE=<issue-number>
+#
+# See docs/GITLAB_SETUP.md for webhook handler setup instructions.
+
+include:
+  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
+    inputs:
+      label: $SAPIENS_LABEL
+      issue_number: $SAPIENS_ISSUE
+      event_type: "issues.labeled"
+      # Uncomment and configure AI provider as needed:
+      # ai_provider_type: openai-compatible
+      # ai_base_url: https://openrouter.ai/api/v1
+      # ai_model: anthropic/claude-3.5-sonnet
+CI_EOF
+    )
+
+    local encoded_content
+    encoded_content=$(echo -n "$ci_content" | base64 -w 0)
+
+    # Check if .gitlab-ci.yml exists
+    local existing
+    existing=$(curl -sf -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+        "$GITLAB_URL/api/v4/projects/$project_encoded/repository/files/.gitlab-ci.yml?ref=main" 2>/dev/null || echo "")
+
+    if echo "$existing" | jq -e '.file_name' > /dev/null 2>&1; then
+        log ".gitlab-ci.yml already exists - not overwriting"
+        log "To use sapiens, add the include block from docs/GITLAB_SETUP.md"
+    else
+        log "Creating .gitlab-ci.yml..."
+        local response
+        response=$(curl -sf -X POST \
+            -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$GITLAB_URL/api/v4/projects/$project_encoded/repository/files/.gitlab-ci.yml" \
+            -d "{
+                \"branch\": \"main\",
+                \"content\": \"$ci_content\",
+                \"commit_message\": \"Add sapiens CI configuration\"
+            }" 2>&1 || echo "")
+
+        if echo "$response" | jq -e '.file_path' > /dev/null 2>&1; then
+            log ".gitlab-ci.yml created successfully"
+        else
+            warn "Could not create .gitlab-ci.yml: $response"
+            warn "You may need to create it manually"
+        fi
+    fi
 }
 
 #############################################
@@ -414,6 +532,7 @@ write_output() {
 # Generated by bootstrap-gitlab.sh at $(date -Iseconds)
 # Source this file: source $OUTPUT_FILE
 
+export DOCKER_CONTEXT="$DOCKER_CONTEXT"
 export SAPIENS_GITLAB_TOKEN="$GITLAB_TOKEN"
 export GITLAB_TOKEN="$GITLAB_TOKEN"
 export GITLAB_URL="$GITLAB_URL"
@@ -432,6 +551,8 @@ main() {
     log "This will set up a GitLab instance for repo-sapiens testing."
     echo ""
 
+    switch_docker_context
+    check_prerequisites
     start_gitlab
     wait_for_gitlab
 
@@ -449,12 +570,14 @@ main() {
     verify_api_access
     create_test_project
     create_automation_labels
+    deploy_sapiens_ci
     setup_runner
     write_output
 
     echo ""
     log "=== Bootstrap Complete ==="
     echo ""
+    log "Docker ctx:  $DOCKER_CONTEXT"
     log "GitLab URL:  $GITLAB_URL"
     log "Project:     root/$TEST_PROJECT"
     log "Token:       ${GITLAB_TOKEN:0:12}..."
@@ -463,10 +586,11 @@ main() {
     fi
     echo ""
     log "To use: source $OUTPUT_FILE"
-    log "To run E2E tests: ./scripts/run-gitlab-e2e.sh"
+    log "To run E2E tests: DOCKER_CONTEXT=$DOCKER_CONTEXT ./scripts/run-gitlab-e2e.sh"
     echo ""
 
     # Export for current shell
+    export DOCKER_CONTEXT="$DOCKER_CONTEXT"
     export SAPIENS_GITLAB_TOKEN="$GITLAB_TOKEN"
     export GITLAB_TOKEN="$GITLAB_TOKEN"
     export GITLAB_URL="$GITLAB_URL"

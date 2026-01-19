@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Reusable Workflow Architecture**: Single dispatcher workflow replaces copy-paste templates
+  - `.github/workflows/sapiens-dispatcher.yaml` - Reusable workflow for GitHub and Gitea
+  - `gitlab/sapiens-dispatcher/` - GitLab CI/CD Component (requires GitLab 16.0+)
+  - User repositories now need only ~20 lines instead of ~490 lines
+  - Version-locked via tag reference (e.g., `@v2.1.0` installs `repo-sapiens==2.1.0`)
+  - Supports all Git providers: GitHub, Gitea (uses GitHub workflow), GitLab
+  - Full documentation: `docs/WORKFLOW_REFERENCE.md`, `docs/GITLAB_SETUP.md`, `docs/MIGRATION.md`
 - **GitLab Bootstrap Script**: Automated setup for GitLab integration testing
   - `scripts/bootstrap-gitlab.sh` creates container, waits for health, generates API token
   - Creates test project with automation labels via Rails console
@@ -66,6 +73,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Optional deployment during `sapiens init`
 
 ### Changed
+- **WorkflowGenerator Thin Wrappers**: `WorkflowGenerator` now generates thin wrapper workflows
+  - GitHub/Gitea: ~20 line wrapper referencing `sapiens-dispatcher.yaml@vX.Y.Z`
+  - GitLab: Include directive referencing CI/CD component
+  - Output filename changed from `process-label.yaml` to `sapiens.yaml`
 - **Secret Naming Standardization**: All secrets now use `SAPIENS_` prefix
   - `SAPIENS_GITEA_TOKEN` for Gitea (GITEA_ prefix is reserved by Gitea)
   - `SAPIENS_GITHUB_TOKEN` for GitHub (GITHUB_ prefix is reserved for custom secrets)
@@ -122,6 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI `--log-level` option position
 
 ### Removed
+- **`templates/` directory**: Copy-paste workflow templates replaced by reusable workflows
+  - Users who want customization should fork the repo and modify the dispatcher
+  - Reduces maintenance burden and ensures consistent behavior
 - Docker build from CI workflow (not used by any workflow)
 - Conversation history files from repository (moved to local storage)
 
