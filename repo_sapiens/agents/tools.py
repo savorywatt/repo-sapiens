@@ -130,7 +130,7 @@ class ToolRegistry:
             lines.append(f"  {tool.description}")
         return "\n".join(lines)
 
-    def to_openai_format(self) -> list[dict]:
+    def to_openai_format(self) -> list[dict[str, Any]]:
         """Convert tool definitions to OpenAI function calling format.
 
         Returns:

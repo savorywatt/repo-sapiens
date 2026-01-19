@@ -7,8 +7,8 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from repo_sapiens.mcp.registry import (
-    DefaultMCPRegistry,
     MCP_REGISTRY,
+    DefaultMCPRegistry,
     MCPServerSpec,
     get_default_registry,
     get_official_servers,

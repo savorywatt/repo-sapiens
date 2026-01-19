@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import Any, cast
 
 from repo_sapiens.mcp.exceptions import (
     MCPProtocolError,
@@ -164,7 +164,7 @@ class StdioMCPClient:
                     self._process.stdout.readline(),
                     timeout=timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 raise MCPTimeoutError(
                     self.name,
                     f"Request {method} timed out after {timeout}s",
@@ -198,7 +198,7 @@ class StdioMCPClient:
                     f"[{error.get('code', 'unknown')}] {error.get('message', 'Unknown error')}",
                 )
 
-            return response.get("result", {})
+            return cast(dict[str, Any], response.get("result", {}))
 
     async def close(self) -> None:
         """Close the connection (does not terminate the server process)."""

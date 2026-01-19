@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from repo_sapiens.config.mcp import MCPConfig, MCPServerConfig
-from repo_sapiens.mcp.exceptions import MCPConfigError, MCPInstallError, MCPServerError
+from repo_sapiens.mcp.exceptions import MCPConfigError, MCPServerError
 from repo_sapiens.mcp.manager import AgentType, MCPManager
 
 

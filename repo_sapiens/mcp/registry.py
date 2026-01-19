@@ -285,9 +285,7 @@ def get_python_native_servers() -> dict[str, MCPServerSpec]:
     Returns:
         Dictionary of servers with python_native=True.
     """
-    return {
-        name: spec for name, spec in MCP_REGISTRY.items() if spec.python_native
-    }
+    return {name: spec for name, spec in MCP_REGISTRY.items() if spec.python_native}
 
 
 def get_official_servers() -> dict[str, MCPServerSpec]:

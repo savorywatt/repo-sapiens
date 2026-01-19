@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -284,9 +284,7 @@ class TestServerErrorResponses:
     async def test_id_mismatch_raises_protocol_error(self) -> None:
         """Should raise MCPProtocolError when response ID doesn't match request."""
         # Response with wrong ID
-        wrong_id_response = json.dumps(
-            {"jsonrpc": "2.0", "id": 999, "result": {}}
-        ).encode() + b"\n"
+        wrong_id_response = json.dumps({"jsonrpc": "2.0", "id": 999, "result": {}}).encode() + b"\n"
         process = make_mock_process(returncode=None, stdout_data=wrong_id_response)
 
         client = StdioMCPClient("test-server", process)

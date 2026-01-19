@@ -152,7 +152,7 @@ ACTION_INPUT: {{"answer": "\\n".join(files)}}  <- NO! Don't use code
             system_prompt: Custom system prompt (uses default if None)
         """
         self.config = config or ReActConfig()
-        self.working_dir = Path(working_dir or os.getcwd()).resolve()
+        self.working_dir = str(Path(working_dir or os.getcwd()).resolve())
         self.tools = ToolRegistry(
             self.working_dir,
             allowed_commands=allowed_commands,

@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **MCP (Model Context Protocol) Support**: Unified MCP integration across all agent backends
+  - `repo_sapiens/mcp/` package with registry, client, adapter, and manager modules
+  - `MCPServerSpec` frozen dataclass for immutable server specifications
+  - `MCPServerRegistry` protocol with `DefaultMCPRegistry` implementation
+  - 9 built-in MCP servers: github, gitlab, jira, linear, taiga, git, filesystem, brave-search, fetch
+  - `StdioMCPClient` for JSON-RPC 2.0 communication over stdin/stdout
+  - `MCPToolAdapter` bridges MCP tools to sapiens `ToolRegistry`
+  - `MCPManager` async context manager for server lifecycle (install, configure, start, teardown)
+  - Process group management (`start_new_session=True`, `os.killpg()`) for reliable cleanup
+  - Agent-specific config generation: `.claude.json` for Claude, `goose.yaml` for Goose
+  - `MCPConfig` and `MCPServerConfig` Pydantic models with env var mapping
+  - `sapiens mcp` CLI command group: list, status, configure, install, test
+  - Exception hierarchy: `MCPError`, `MCPConfigError`, `MCPInstallError`, `MCPServerError`, `MCPTimeoutError`, `MCPProtocolError`
+  - 121 unit tests covering registry, client, adapter, manager, and exceptions
+  - Documentation: `docs/mcp-ticket-systems.md` for ticket system integration guide
 - **OpenAI Function Calling Support**: ReAct agent now supports native function calling
   - `ChatResponse` and `ToolCall` dataclasses for structured tool call handling
   - `to_openai_format()` method on `ToolRegistry` for OpenAI-compatible tool definitions

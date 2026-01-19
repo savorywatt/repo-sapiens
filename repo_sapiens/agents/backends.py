@@ -91,7 +91,7 @@ class LLMBackend(ABC):
         messages: list[dict[str, Any]],
         model: str,
         temperature: float = 0.7,
-        tools: list[dict] | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
         """Send chat messages and return the response.
 
@@ -108,6 +108,13 @@ class LLMBackend(ABC):
         Raises:
             httpx.HTTPError: On HTTP request failures.
             AgentError: On backend-specific errors.
+        """
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Close any open connections.
+
+        Implementations should clean up any resources (HTTP clients, etc.).
         """
 
 
@@ -199,7 +206,7 @@ class OllamaBackend(LLMBackend):
         messages: list[dict[str, Any]],
         model: str,
         temperature: float = 0.7,
-        tools: list[dict] | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
         """Send chat messages to Ollama and return the response.
 
@@ -399,7 +406,7 @@ class OpenAIBackend(LLMBackend):
         messages: list[dict[str, Any]],
         model: str,
         temperature: float = 0.7,
-        tools: list[dict] | None = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
         """Send chat messages to the OpenAI-compatible server and return the response.
 

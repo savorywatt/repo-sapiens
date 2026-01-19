@@ -27,10 +27,11 @@ import asyncio
 import json
 import os
 import signal
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -43,7 +44,7 @@ from repo_sapiens.mcp.exceptions import (
 from repo_sapiens.mcp.registry import MCP_REGISTRY
 
 if TYPE_CHECKING:
-    from repo_sapiens.config.mcp import MCPConfig, MCPServerConfig
+    from repo_sapiens.config.mcp import MCPConfig
 
 log = structlog.get_logger()
 
@@ -144,7 +145,7 @@ class MCPManager:
 
                     try:
                         await asyncio.wait_for(process.wait(), timeout=5.0)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         log.warning("mcp_server_kill", name=name, reason="timeout")
                         try:
                             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
@@ -179,9 +180,7 @@ class MCPManager:
             for env_var in spec.required_env:
                 resolved = self._resolve_env(env_var, server_cfg.env_mapping)
                 if not os.environ.get(resolved):
-                    errors.append(
-                        f"{server_cfg.name}: missing {env_var} (mapped to {resolved})"
-                    )
+                    errors.append(f"{server_cfg.name}: missing {env_var} (mapped to {resolved})")
 
         if errors:
             raise MCPConfigError("MCP configuration errors:\n" + "\n".join(errors))

@@ -43,7 +43,7 @@ from repo_sapiens.mcp import (
 )
 
 if TYPE_CHECKING:
-    from repo_sapiens.config.mcp import MCPConfig
+    pass
 
 log = structlog.get_logger(__name__)
 
@@ -76,8 +76,7 @@ def list_servers(verbose: bool, category: str | None) -> None:
     click.echo("Available MCP Servers\n")
 
     if category:
-        by_category = get_servers_by_category()
-        servers = {name: MCP_REGISTRY[name] for name in by_category.get(category, [])}
+        servers = get_servers_by_category(category)
     else:
         servers = MCP_REGISTRY
 
@@ -173,14 +172,12 @@ def status(ctx: click.Context, config: str | None) -> None:
     help="Agent type to generate config for",
 )
 @click.option("--output", "-o", type=click.Path(), help="Output path (default: auto)")
-@click.option("--profile", default="sapiens", help="Profile name for Goose config")
 @click.option("--config", "-c", type=click.Path(exists=True), help="Config file path")
 @click.pass_context
 def configure(
     ctx: click.Context,
     agent: str,
     output: str | None,
-    profile: str,
     config: str | None,
 ) -> None:
     """Generate MCP configuration for a specific agent."""
@@ -222,11 +219,11 @@ def configure(
         agent_type = AgentType.CLAUDE if agent == "claude" else AgentType.GOOSE
 
         if agent_type == AgentType.CLAUDE:
-            config_path = manager._generate_claude_config()
+            generated_path = manager._generate_claude_config()
         else:
-            config_path = manager._generate_goose_config(profile=profile)
+            generated_path = manager._generate_goose_config()
 
-        click.echo(f"Generated: {config_path}")
+        click.echo(f"Generated: {generated_path}")
         click.echo(f"Servers: {len(mcp_config.get_enabled_servers())}")
         click.echo("\nConfiguration generated successfully.")
 
@@ -258,12 +255,12 @@ def install(
         if settings is None:
             config_path = config or ".sapiens/config.yaml"
             if Path(config_path).exists():
+                import contextlib
+
                 from repo_sapiens.config.settings import AutomationSettings
 
-                try:
+                with contextlib.suppress(Exception):
                     settings = AutomationSettings.from_yaml(config_path)
-                except Exception:
-                    pass
 
         if settings and settings.mcp.enabled:
             servers_to_install = [s.name for s in settings.mcp.get_enabled_servers()]
@@ -286,7 +283,7 @@ def install(
             try:
                 import subprocess
 
-                result = subprocess.run(
+                result = subprocess.run(  # nosec B607 - uv is a known tool
                     ["uv", "pip", "install", spec.package],
                     capture_output=True,
                     text=True,

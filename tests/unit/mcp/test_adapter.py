@@ -219,11 +219,7 @@ class TestExecute:
     async def test_calls_correct_server(self) -> None:
         """execute should call the tool on the correct server."""
         client = make_mock_client("github")
-        client.call_tool = AsyncMock(
-            return_value={
-                "content": [{"type": "text", "text": "success"}]
-            }
-        )
+        client.call_tool = AsyncMock(return_value={"content": [{"type": "text", "text": "success"}]})
         adapter = MCPToolAdapter({"github": client})
         adapter._tool_to_server["github_list_repos"] = "github"
 
