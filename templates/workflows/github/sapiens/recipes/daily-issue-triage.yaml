@@ -1,0 +1,101 @@
+# @repo-sapiens-template
+# @version: 1.1.0
+# @name: daily-issue-triage
+#
+# Daily Issue Triage for GitHub Actions
+#
+# Automatically reviews and labels new issues, adds initial assessments,
+# and identifies issues that need immediate attention.
+#
+# Setup:
+# 1. Copy to .github/workflows/daily-issue-triage.yaml
+# 2. Set required secrets:
+#    - ANTHROPIC_API_KEY: Claude API key
+# 3. Create labels: bug, enhancement, question, needs-triage, priority-high
+
+name: Daily Issue Triage
+
+on:
+  schedule:
+    # Every day at 8am UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  triage-issues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Get untriaged issues
+        id: issues
+        env:
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+        run: |
+          # Get issues without standard labels
+          gh issue list --state open --json number,title,labels,createdAt \
+            --jq '[.[] | select(.labels | length == 0 or all(.name != "bug" and .name != "enhancement" and .name != "question"))]' \
+            > untriaged.json
+
+          COUNT=$(cat untriaged.json | jq 'length')
+          echo "untriaged_count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Found $COUNT untriaged issues"
+
+      - name: Triage issues
+        if: steps.issues.outputs.untriaged_count != '0'
+        env:
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          sapiens task "Triage open issues in this GitHub repository.
+
+          Repository: ${{ github.repository }}
+          Untriaged issues: $(cat untriaged.json)
+
+          Tasks:
+          1. For each issue in the list above:
+             a. Read the issue title and check its content via: gh issue view <number>
+             b. Categorize: bug, enhancement, question, or documentation
+             c. Assess priority: low, medium, high (based on impact and urgency)
+             d. Add labels via: gh issue edit <number> --add-label <label>
+             e. If high priority, add a comment noting it needs attention
+
+          Commands to use:
+          - View issue: gh issue view <number>
+          - Add label: gh issue edit <number> --add-label bug
+          - Add comment: gh issue comment <number> --body 'message'
+
+          Label mapping:
+          - Bug reports → 'bug' label
+          - Feature requests → 'enhancement' label
+          - Questions → 'question' label
+          - Security issues → 'priority-high' + 'security' labels
+
+          Guidelines:
+          - Be helpful and welcoming in any comments
+          - Don't close issues automatically
+          - Flag unclear issues with 'needs-info' label
+          - Note if issue appears to be a duplicate"
+
+      - name: Summary
+        run: |
+          echo "## Issue Triage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Processed ${{ steps.issues.outputs.untriaged_count }} untriaged issues" >> $GITHUB_STEP_SUMMARY

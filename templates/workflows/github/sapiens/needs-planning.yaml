@@ -1,0 +1,77 @@
+name: Needs Planning
+
+# Triggers specifically when 'needs-planning' label is added
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-plan:
+    name: Create Development Plan
+    if: github.event.label.name == 'needs-planning'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Download pre-built wheel (if available)
+        uses: actions/download-artifact@v3
+        with:
+          name: sapiens-wheel
+          path: dist/
+        continue-on-error: true
+
+      - name: Install sapiens
+        run: |
+          pip install --upgrade pip
+          # Use pre-built wheel if available, otherwise install from source
+          if [ -f dist/*.whl ]; then
+            echo "✅ Using pre-built wheel"
+            pip install dist/*.whl
+          else
+            echo "⚠️ Building from source"
+            pip install -e .
+          fi
+
+      - name: Create plan proposal
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          echo "🔍 Processing issue #${{ github.event.issue.number }} for planning"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/needs-planning.md
+
+      - name: Post success comment
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "✅ **Plan proposal created!**\n\nThe development plan has been generated. Review the plan and add the `approved` label to proceed with task creation.\n\n🤖 Posted by Sapiens Automation"}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "❌ **Plan creation failed**\n\nThere was an error creating the development plan. Check the workflow logs for details.\n\n🤖 Posted by Sapiens Automation"}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

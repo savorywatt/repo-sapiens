@@ -1,0 +1,51 @@
+name: Create Fix Proposal
+
+# Triggers when 'needs-fix' label is added after code review
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  create-fix-proposal:
+    name: Generate Fix Proposal
+    if: github.event.label.name == 'needs-fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install sapiens
+        run: pip install -e .
+
+      - name: Create fix proposal
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          echo "🔧 Creating fix proposal for issue/PR #${{ github.event.issue.number }}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/needs-fix.md
+
+      - name: Post success comment
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "🔧 **Fix proposal created!**\n\nReview the proposed fixes and add the `approved` label to apply them.\n\n🤖 Posted by Sapiens Automation"}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

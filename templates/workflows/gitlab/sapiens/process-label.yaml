@@ -1,0 +1,36 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: process-label
+#
+# Process Label Job for GitLab CI
+# Add this to your .gitlab-ci.yml
+
+stages:
+  - automation
+
+process-label:
+  stage: automation
+  image: python:3.12
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
+    - if: '$CI_PIPELINE_SOURCE == "issue"'
+      when: always
+  before_script:
+    - pip install repo-sapiens
+  script:
+    - |
+      echo "Processing labels on MR !${CI_MERGE_REQUEST_IID}"
+      sapiens process-label \
+        --event-type "merge_request.labeled" \
+        --label "${CI_MERGE_REQUEST_LABELS}" \
+        --issue "${CI_MERGE_REQUEST_IID}" \
+        --source gitlab
+  variables:
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY

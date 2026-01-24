@@ -1,0 +1,113 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: process-label
+#
+# Process Label Workflow for Gitea Actions
+#
+# Triggers when an issue or PR is labeled with a sapiens-managed label.
+# Routes to the appropriate handler based on configuration.
+
+name: Process Label
+
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    # Note: Gitea sets github.event.label to null, use labels array instead
+    # Process any of the configured sapiens labels when present
+    if: |
+      contains(github.event.issue.labels.*.name, 'needs-planning') ||
+      contains(github.event.issue.labels.*.name, 'needs-review') ||
+      contains(github.event.issue.labels.*.name, 'execute') ||
+      contains(github.event.pull_request.labels.*.name, 'needs-planning') ||
+      contains(github.event.pull_request.labels.*.name, 'needs-review') ||
+      contains(github.event.pull_request.labels.*.name, 'execute')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect triggering label
+        id: detect-label
+        run: |
+          # In Gitea, github.event.label is null, so we detect which sapiens label is present
+          # Check issue labels first, then PR labels
+          LABELS='${{ toJSON(github.event.issue.labels.*.name) }}'
+          if [ "$LABELS" = "null" ] || [ "$LABELS" = "[]" ]; then
+            LABELS='${{ toJSON(github.event.pull_request.labels.*.name) }}'
+          fi
+
+          # Find the first sapiens-managed label
+          DETECTED_LABEL=""
+          for label in needs-planning needs-review execute; do
+            if echo "$LABELS" | grep -q "\"$label\""; then
+              DETECTED_LABEL="$label"
+              break
+            fi
+          done
+
+          echo "Detected label: $DETECTED_LABEL"
+          echo "label=$DETECTED_LABEL" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Process label event
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          # Agent credentials (uncomment as needed)
+          # ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          TARGET_NUMBER="${ISSUE_NUMBER:-$PR_NUMBER}"
+          LABEL="${{ steps.detect-label.outputs.label }}"
+
+          echo "Processing label '$LABEL' on #${TARGET_NUMBER}"
+
+          sapiens process-label \
+            --event-type "issues.labeled" \
+            --label "$LABEL" \
+            --issue "${TARGET_NUMBER}" \
+            --source gitea
+
+      - name: Post success comment
+        if: success()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          TARGET_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          LABEL="${{ steps.detect-label.outputs.label }}"
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"body\": \"Label handler completed successfully for \`$LABEL\`\"}" \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${TARGET_NUMBER}/comments"
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          TARGET_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          LABEL="${{ steps.detect-label.outputs.label }}"
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"body\": \"Label handler failed for \`$LABEL\`. Check [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).\"}" \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${TARGET_NUMBER}/comments"

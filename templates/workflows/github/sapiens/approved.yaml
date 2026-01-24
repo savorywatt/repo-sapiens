@@ -1,0 +1,42 @@
+name: Approved
+
+# Triggers when 'approved' label is added to an issue or PR
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
+
+jobs:
+  process-approval:
+    name: Process Approval
+    if: github.event.label.name == 'approved'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install sapiens
+        run: pip install -e .
+
+      - name: Process approval
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}${{ github.event.pull_request.number }}"
+          echo "✅ Processing approval for #${ISSUE_NUM}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${ISSUE_NUM} --system-prompt .github/workflows/sapiens/prompts/approved.md

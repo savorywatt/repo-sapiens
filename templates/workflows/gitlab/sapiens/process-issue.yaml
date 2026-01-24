@@ -1,0 +1,113 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: process-issue
+#
+# Process Issue Pipeline for GitLab CI/CD
+#
+# This pipeline is triggered manually or via API to process a specific issue.
+#
+# GitLab doesn't have native issue webhook triggers in CI/CD like GitHub/Gitea.
+# Options for triggering on issue events:
+# 1. Use GitLab webhooks to call the pipeline API with ISSUE_NUMBER variable
+# 2. Use a scheduled pipeline that scans for labeled issues
+# 3. Trigger manually with ISSUE_NUMBER variable
+#
+# Setup:
+# 1. Copy to .gitlab-ci.yml (or include via `include:`)
+# 2. Set required CI/CD variables:
+#    - SAPIENS_GITLAB_TOKEN: Your GitLab API token (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_CLAUDE_API_KEY: (if using claude-api agent)
+# 3. Create the 'needs-planning' label in your project
+#
+# To trigger for a specific issue:
+#   - Pipeline UI: Run pipeline with variable ISSUE_NUMBER=123
+#   - API: POST /projects/:id/pipeline with variables[ISSUE_NUMBER]=123
+#   - Webhook: Configure issue webhook to call pipeline trigger
+
+variables:
+  CONFIG_FILE: sapiens_config.ci.yaml
+  PYTHON_VERSION: "3.11"
+  # Set this when triggering the pipeline
+  ISSUE_NUMBER: ""
+
+stages:
+  - process
+
+# Default settings for all jobs
+default:
+  interruptible: true
+
+# Process a specific issue
+process-issue:
+  stage: process
+  image: python:${PYTHON_VERSION}-slim
+  timeout: 30 minutes
+  rules:
+    # Only run when ISSUE_NUMBER is provided
+    - if: $ISSUE_NUMBER != ""
+  variables:
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
+    PIP_NO_CACHE_DIR: "1"
+  before_script:
+    - pip install --quiet --no-cache-dir repo-sapiens
+  script:
+    - echo "Processing issue #${ISSUE_NUMBER}"
+    - sapiens --config $CONFIG_FILE process-issue --issue $ISSUE_NUMBER
+  after_script:
+    # Post success/failure comment to the issue
+    - |
+      if [ "$CI_JOB_STATUS" = "success" ]; then
+        COMMENT_BODY="Plan generated successfully. Review the plan and add \`approved\` label to proceed."
+      else
+        COMMENT_BODY="Failed to generate plan. Check the [pipeline logs](${CI_PIPELINE_URL})."
+      fi
+      curl --silent --request POST \
+        --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+        --header "Content-Type: application/json" \
+        --data "{\"body\": \"${COMMENT_BODY}\"}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/issues/${ISSUE_NUMBER}/notes" || true
+
+# Scan for issues with 'needs-planning' label (alternative to webhook trigger)
+scan-labeled-issues:
+  stage: process
+  image: python:${PYTHON_VERSION}-slim
+  timeout: 30 minutes
+  rules:
+    # Run on schedule to check for new labeled issues
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $ISSUE_NUMBER == ""
+  variables:
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_CLAUDE_API_KEY
+    PIP_NO_CACHE_DIR: "1"
+  before_script:
+    - pip install --quiet --no-cache-dir repo-sapiens
+  script:
+    - |
+      echo "Scanning for issues with 'needs-planning' label..."
+      # Fetch issues with the target label
+      ISSUES=$(curl --silent \
+        --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/issues?labels=needs-planning&state=opened" \
+        | python -c "import sys, json; print(' '.join(str(i['iid']) for i in json.load(sys.stdin)))")
+
+      if [ -z "$ISSUES" ]; then
+        echo "No issues found with 'needs-planning' label"
+        exit 0
+      fi
+
+      echo "Found issues: $ISSUES"
+      for ISSUE_ID in $ISSUES; do
+        echo "Processing issue #${ISSUE_ID}..."
+        sapiens --config $CONFIG_FILE process-issue --issue $ISSUE_ID || true
+      done

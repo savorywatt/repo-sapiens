@@ -71,9 +71,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Note: Don't pass custom token here - Gitea doesn't support it the same way as GitHub
-          # The default GITHUB_TOKEN/GITEA_TOKEN works for checkout
-          # Custom token is used later for API operations via sapiens CLI
+          # Pass the GIT_TOKEN for checkout - needed for cross-repo reusable workflows
+          # The token allows checking out the calling repository
+          token: ${{ secrets.GIT_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -90,6 +90,27 @@ jobs:
         run: |
           git config --global user.name "Sapiens Bot"
           git config --global user.email "sapiens-bot@users.noreply.github.com"
+
+      - name: Generate sapiens config
+        env:
+          GIT_PROVIDER_TYPE: ${{ inputs.git_provider_type }}
+          GIT_PROVIDER_URL: ${{ inputs.git_provider_url }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          AI_PROVIDER_TYPE: ${{ inputs.ai_provider_type }}
+          AI_MODEL: ${{ inputs.ai_model }}
+          AI_BASE_URL: ${{ inputs.ai_base_url }}
+        run: |
+          # Use existing config if present, otherwise generate minimal config
+          if [ -f ".sapiens/config.yaml" ]; then
+            echo "Using existing .sapiens/config.yaml"
+          else
+            echo "Generating minimal sapiens config..."
+            mkdir -p .sapiens
+            printf 'git_provider:\n  provider_type: "%s"\n  base_url: "%s"\n  api_token: "@env:AUTOMATION__GIT_PROVIDER__API_TOKEN"\n\nrepository:\n  owner: "%s"\n  name: "%s"\n\nagent_provider:\n  provider_type: "%s"\n  model: "%s"\n  api_key: "@env:AUTOMATION__AGENT_PROVIDER__API_KEY"\n  base_url: "%s"\n' "$GIT_PROVIDER_TYPE" "$GIT_PROVIDER_URL" "$REPO_OWNER" "$REPO_NAME" "$AI_PROVIDER_TYPE" "${AI_MODEL:-claude-sonnet-4.5}" "${AI_BASE_URL:-http://localhost:11434}" > .sapiens/config.yaml
+            echo "Config generated:"
+            cat .sapiens/config.yaml
+          fi
 
       - name: Process label
         env:
