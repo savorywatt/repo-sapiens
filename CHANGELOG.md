@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Branding Update**: Renamed "Builder Automation" to "Sapiens Automation" throughout codebase
+- **Bot Signature Icon**: Changed from robot emoji (🤖) to diamond (◆) for cleaner appearance
+- **GitLab E2E Default AI Provider**: Changed default from OpenRouter to Ollama for local testing
+
+### Added
+- **Comprehensive GitLab E2E Testing**: Parity with GitHub E2E test coverage
+  - Phase 1.5 Component Integration test for sapiens-dispatcher CI component
+  - Automatic GitLab Runner setup and registration
+  - CI/CD secrets configuration (SAPIENS_GITLAB_TOKEN, SAPIENS_AI_API_KEY)
+  - Sapiens config deployment via API for CI job execution
+  - Support for both Ollama and OpenRouter AI providers via `--ai-provider` flag
+  - Configurable Ollama URL via `OLLAMA_URL` environment variable
+- **Bootstrap Script Improvements**
+  - `configure_external_url()` function for GitLab Runner compatibility
+  - Internal health check fallback when external_url differs from actual URL
+  - Automatic sourcing of existing `.env.gitlab-test` for token reuse
+  - `run_sapiens_init()` function to configure repositories via CLI
+
+### Fixed
+- **GitLab CI YAML Comment Bug**: Fixed `#` being interpreted as YAML comment in echo statements
+- **GitLab Runner Clone Failure**: Fixed external_url configuration from `localhost` to `gitlab` hostname
+- **Bootstrap Token Reuse**: Fixed bootstrap failing when root password file was deleted
+
 ## [0.4.0] - 2026-01-19
 
 ### Added

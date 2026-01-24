@@ -71,9 +71,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Pass the GIT_TOKEN for checkout - needed for cross-repo reusable workflows
-          # The token allows checking out the calling repository
-          token: ${{ secrets.GIT_TOKEN }}
+          # Use GIT_TOKEN if provided, otherwise fall back to default GITHUB_TOKEN
+          # GIT_TOKEN is needed for cross-repo reusable workflows
+          token: ${{ secrets.GIT_TOKEN || github.token }}
           fetch-depth: 0
 
       - name: Set up Python

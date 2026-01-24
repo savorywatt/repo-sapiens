@@ -58,7 +58,7 @@ class PRReviewStage(WorkflowStage):
                 f"Reviewing PR #{pr.number}\n"
                 f"Branch: `{pr.head}`\n\n"
                 f"I'll analyze the code and provide feedback.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Build context for agent
@@ -129,7 +129,7 @@ Be constructive and specific in your feedback.
                     issue.number,
                     "✅ **Code Review Complete**\n\n"
                     "The code looks good! No issues found.\n\n"
-                    "🤖 Posted by Builder Automation",
+                    "◆ Posted by Sapiens Automation",
                 )
 
                 # Update labels: remove 'needs-review', add 'approved'
@@ -160,7 +160,7 @@ Be constructive and specific in your feedback.
                                 "Please address these items. When ready, "
                                 "add the `needs-fix` label to create fix tasks.\n\n"
                             ),
-                            "🤖 Posted by Builder Automation",
+                            "◆ Posted by Sapiens Automation",
                         ]
                     )
 
@@ -182,7 +182,7 @@ Be constructive and specific in your feedback.
                 f"❌ **Code Review Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please try again.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             raise
 

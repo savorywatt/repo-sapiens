@@ -52,7 +52,7 @@ class QAStage(WorkflowStage):
                 f"Branch: `{pr.head}`\n"
                 f"PR: #{pr.number}\n\n"
                 f"I'll build the project and run tests.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Checkout branch in playground repo
@@ -88,7 +88,7 @@ class QAStage(WorkflowStage):
                     issue.number,
                     "📝 **No Tests Found - Creating Unit Tests**\n\n"
                     "I'll analyze the code and create unit tests.\n\n"
-                    "🤖 Posted by Builder Automation",
+                    "◆ Posted by Sapiens Automation",
                 )
 
                 # Use agent to create tests
@@ -159,7 +159,7 @@ class QAStage(WorkflowStage):
             if test_result.get("output"):
                 result_lines.append(f"```\n{test_result['output'][-1000:]}\n```")
 
-            result_lines.extend(["", "---", "", "🤖 Posted by Builder Automation"])
+            result_lines.extend(["", "---", "", "◆ Posted by Sapiens Automation"])
 
             await self.git.add_comment(issue.number, "\n".join(result_lines))
 
@@ -177,7 +177,7 @@ class QAStage(WorkflowStage):
                 f"❌ **QA Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             raise
 

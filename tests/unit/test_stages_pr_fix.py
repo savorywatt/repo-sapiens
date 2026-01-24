@@ -80,7 +80,7 @@ class TestFormatFixProposal:
         assert "## Review Feedback" in result
         assert "## Proposed Fixes" in result
         assert "## Approval" in result
-        assert "Builder Automation" in result
+        assert "Sapiens Automation" in result
 
     def test_includes_branch_name(self, pr_fix_stage):
         """Should include branch name in proposal."""

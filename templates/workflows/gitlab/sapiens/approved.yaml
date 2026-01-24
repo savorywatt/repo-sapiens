@@ -54,7 +54,7 @@ process-approval:
         curl -sS -X POST \
           -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{"body": "✅ **Approval processed!**\n\n🤖 Posted by Sapiens Automation"}' \
+          -d '{"body": "✅ **Approval processed!**\n\n◆ Posted by Sapiens Automation"}' \
           "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/issues/${SAPIENS_ISSUE_NUMBER}/notes"
       fi
   resource_group: sapiens-approved

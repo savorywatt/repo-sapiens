@@ -47,7 +47,7 @@ create-fix-proposal:
         curl -sS -X POST \
           -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{"body": "🔧 **Fix proposal created!**\n\nReview the proposed fixes and add `approved` label to apply them.\n\n🤖 Posted by Sapiens Automation"}' \
+          -d '{"body": "🔧 **Fix proposal created!**\n\nReview the proposed fixes and add `approved` label to apply them.\n\n◆ Posted by Sapiens Automation"}' \
           "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
       fi
   resource_group: sapiens-fix

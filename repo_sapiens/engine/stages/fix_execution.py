@@ -72,7 +72,7 @@ class FixExecutionStage(WorkflowStage):
                 f"Branch: `{branch_name}`\n"
                 f"PR: #{pr_number}\n\n"
                 f"I'll implement the fixes and push to the branch.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Checkout branch in playground repo
@@ -197,7 +197,7 @@ Focus on addressing the feedback completely and correctly.
                         f"All review feedback has been addressed.\n"
                         f"Changes have been pushed to branch `{branch_name}`.\n\n"
                         f"Please review PR #{pr_number} again.\n\n"
-                        f"🤖 Posted by Builder Automation",
+                        f"◆ Posted by Sapiens Automation",
                     )
 
                     # Close fix proposal
@@ -209,7 +209,7 @@ Focus on addressing the feedback completely and correctly.
                         f"🔧 **Fixes Applied**\n\n"
                         f"Review feedback has been addressed via fix proposal #{issue.number}.\n"
                         f"Please review the updates.\n\n"
-                        f"🤖 Posted by Builder Automation",
+                        f"◆ Posted by Sapiens Automation",
                     )
 
                     log.info("fix_execution_complete", fix_proposal=issue.number, pr=pr_number)
@@ -220,7 +220,7 @@ Focus on addressing the feedback completely and correctly.
                         "⚠️ **No Changes Made**\n\n"
                         "The agent didn't make any changes.\n"
                         "Please review the feedback and try again.\n\n"
-                        "🤖 Posted by Builder Automation",
+                        "◆ Posted by Sapiens Automation",
                     )
 
             finally:
@@ -234,7 +234,7 @@ Focus on addressing the feedback completely and correctly.
                 f"❌ **Fix Implementation Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             raise
 

@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🚀 Builder Automation Setup"
+echo "🚀 Sapiens Automation Setup"
 echo "=========================="
 echo
 

@@ -58,7 +58,7 @@ class PRFixStage(WorkflowStage):
                     "⚠️ **No Review Comments Found**\n\n"
                     "I couldn't find any review comments to address.\n"
                     "Add comments to this PR and re-add the `needs-fix` label.\n\n"
-                    "🤖 Posted by Sapiens Automation",
+                    "◆ Posted by Sapiens Automation",
                 )
                 # Remove both labels
                 updated_labels = [label for label in updated_labels if label not in ["needs-fix", "fixes-in-progress"]]
@@ -99,7 +99,7 @@ class PRFixStage(WorkflowStage):
                 f"❌ **Fix Processing Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Sapiens Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             # Remove in-progress label on failure
             updated_labels = [label for label in issue.labels if label != "fixes-in-progress"]
@@ -139,7 +139,7 @@ class PRFixStage(WorkflowStage):
                 "I'll reply to each comment with my planned action.",
                 "",
                 "---",
-                "🤖 Posted by Sapiens Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
@@ -193,7 +193,7 @@ class PRFixStage(WorkflowStage):
         else:
             reply = f"🤔 **Analyzed**: {comment.reasoning}"
 
-        reply += "\n\n---\n🤖 Posted by Sapiens Automation"
+        reply += "\n\n---\n◆ Posted by Sapiens Automation"
 
         # Post reply
         try:

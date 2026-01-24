@@ -63,7 +63,7 @@ jobs:
           curl -sS -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"body": "✅ **Plan proposal created!**\n\nThe development plan has been generated. Review the plan and add the `approved` label to proceed with task creation.\n\n🤖 Posted by Sapiens Automation"}' \
+            -d '{"body": "✅ **Plan proposal created!**\n\nThe development plan has been generated. Review the plan and add the `approved` label to proceed with task creation.\n\n◆ Posted by Sapiens Automation"}' \
             "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"
 
       - name: Post failure comment
@@ -74,5 +74,5 @@ jobs:
           curl -sS -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"body": "❌ **Plan creation failed**\n\nThere was an error creating the development plan. Check the workflow logs for details.\n\n🤖 Posted by Sapiens Automation"}' \
+            -d '{"body": "❌ **Plan creation failed**\n\nThere was an error creating the development plan. Check the workflow logs for details.\n\n◆ Posted by Sapiens Automation"}' \
             "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

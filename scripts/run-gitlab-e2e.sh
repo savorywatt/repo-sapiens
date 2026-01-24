@@ -83,7 +83,7 @@ CI_ONLY=false
 TEST_COMPONENT=false
 WITH_RUNNER=true
 NO_CLEANUP=false
-AI_PROVIDER="${AI_PROVIDER:-openrouter}"
+AI_PROVIDER="${AI_PROVIDER:-ollama}"
 COMPONENT_REF="${COMPONENT_REF:-v2}"
 RESULTS_DIR="${RESULTS_DIR:-./validation-results}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -690,6 +690,76 @@ run_ci_test() {
 # Phase 1.5: Component Integration Test
 #############################################
 
+# Deploy minimal sapiens config file for CI
+deploy_sapiens_config() {
+    step "Deploying sapiens configuration..."
+
+    # Check if config already exists
+    local existing
+    existing=$(gitlab_api GET "/projects/$PROJECT_ENCODED/repository/files/.sapiens%2Fconfig.yaml?ref=main" 2>/dev/null || echo "")
+
+    if echo "$existing" | jq -e '.content' > /dev/null 2>&1; then
+        log "Sapiens config already exists"
+        return 0
+    fi
+
+    # Determine AI provider config
+    local ai_provider_type ai_base_url ai_model
+    if [[ "$AI_PROVIDER" == "openrouter" ]]; then
+        ai_provider_type="openai-compatible"
+        ai_base_url="https://openrouter.ai/api/v1"
+        ai_model="${OPENROUTER_MODEL}"
+    else
+        ai_provider_type="ollama"
+        # Use OLLAMA_URL if set, otherwise use the LAN IP for runner access
+        ai_base_url="${OLLAMA_URL:-http://192.168.1.241:11434}"
+        ai_model="${OLLAMA_MODEL:-qwen3:8b}"
+    fi
+
+    # Create minimal config that uses CI environment variables
+    local config_content
+    config_content=$(cat << CONFIG_EOF
+# Sapiens Configuration
+# Generated for GitLab CI component testing
+# Uses CI/CD variables for secrets
+
+git_provider:
+  provider_type: gitlab
+  base_url: http://gitlab
+  api_token: \${SAPIENS_GITLAB_TOKEN}
+
+repository:
+  owner: \${CI_PROJECT_NAMESPACE}
+  name: \${CI_PROJECT_NAME}
+
+agent_provider:
+  provider_type: ${ai_provider_type}
+  base_url: "${ai_base_url}"
+  model: "${ai_model}"
+  api_key: \${SAPIENS_AI_API_KEY}
+  local_mode: false
+CONFIG_EOF
+    )
+
+    local encoded_content
+    encoded_content=$(echo -n "$config_content" | base64 -w 0)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/repository/files/.sapiens%2Fconfig.yaml" "{
+        \"branch\": \"main\",
+        \"content\": \"$encoded_content\",
+        \"encoding\": \"base64\",
+        \"commit_message\": \"Add sapiens config for CI testing\"
+    }" 2>&1 || echo "")
+
+    if echo "$response" | jq -e '.file_path' > /dev/null 2>&1; then
+        log "Sapiens config created"
+    else
+        warn "Could not deploy sapiens config: $response"
+        return 1
+    fi
+}
+
 # Deploy the sapiens-dispatcher component CI configuration
 deploy_sapiens_component() {
     step "Deploying sapiens-dispatcher component..."
@@ -718,9 +788,9 @@ deploy_sapiens_component() {
         ai_model="${OPENROUTER_MODEL}"
     else
         ai_provider_type="ollama"
-        # Use Docker host IP for Ollama access from runner
-        ai_base_url="http://host.docker.internal:11434"
-        ai_model="qwen3:8b"
+        # Use OLLAMA_URL if set, otherwise use the LAN IP for runner access
+        ai_base_url="${OLLAMA_URL:-http://192.168.1.241:11434}"
+        ai_model="${OLLAMA_MODEL:-qwen3:8b}"
     fi
 
     log "Creating sapiens component CI config..."
@@ -761,12 +831,12 @@ sapiens-dispatch:
     SAPIENS_AI_API_KEY: \${SAPIENS_AI_API_KEY}
   before_script:
     - apt-get update && apt-get install -y git
-    - pip install --quiet repo-sapiens>=2.0.0
+    - pip install git+https://github.com/savorywatt/repo-sapiens.git
     - git config --global user.name "Sapiens Bot"
     - git config --global user.email "sapiens-bot@gitlab.local"
   script:
     - echo "Sapiens Dispatcher - GitLab CI Component"
-    - echo "Processing label '\${SAPIENS_LABEL}' on issue #\${SAPIENS_ISSUE}"
+    - 'echo "Processing label \${SAPIENS_LABEL} on issue \${SAPIENS_ISSUE}"'
     - |
       sapiens process-label \\
         --event-type "\${SAPIENS_EVENT_TYPE:-issues.labeled}" \\
@@ -961,6 +1031,11 @@ run_component_test() {
     # Configure CI/CD secrets
     configure_ci_secrets || {
         warn "Could not configure CI secrets"
+    }
+
+    # Deploy sapiens config first (needed by process-label)
+    deploy_sapiens_config || {
+        warn "Could not deploy sapiens config"
     }
 
     # Deploy component CI config

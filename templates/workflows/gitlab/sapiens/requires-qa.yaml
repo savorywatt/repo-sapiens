@@ -47,7 +47,7 @@ generate-qa-plan:
         curl -sS -X POST \
           -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{"body": "🧪 **QA plan generated!**\n\nSee test plan above.\n\n🤖 Posted by Sapiens Automation"}' \
+          -d '{"body": "🧪 **QA plan generated!**\n\nSee test plan above.\n\n◆ Posted by Sapiens Automation"}' \
           "$CI_SERVER_URL/api/v4/projects/$CI_PROJECT_ID/merge_requests/${CI_MERGE_REQUEST_IID}/notes"
       fi
   resource_group: sapiens-qa

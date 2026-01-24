@@ -42,7 +42,7 @@ class TestFormatQuestion:
         assert "Builder Question" in result
         assert "**Question:** What color?" in result
         assert "Context" not in result
-        assert "Posted by Builder Automation" in result
+        assert "Posted by Sapiens Automation" in result
 
     def test_format_question_with_context(self):
         """Should format question with context."""
@@ -53,7 +53,7 @@ class TestFormatQuestion:
 
         assert "**Question:** What color?" in result
         assert "**Context:** Working on UI design" in result
-        assert "Posted by Builder Automation" in result
+        assert "Posted by Sapiens Automation" in result
 
     def test_format_question_has_reply_instructions(self):
         """Should include reply instructions."""
@@ -197,7 +197,7 @@ class TestIsBotComment:
         mock_git = MagicMock()
         handler = InteractiveQAHandler(mock_git)
 
-        result = handler._is_bot_comment("Some text\n\n\U0001f916 Posted by Builder Automation")
+        result = handler._is_bot_comment("Some text\n\n◆ Posted by Sapiens Automation")
 
         assert result is True
 

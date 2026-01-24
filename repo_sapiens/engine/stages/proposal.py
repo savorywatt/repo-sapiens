@@ -32,7 +32,7 @@ class ProposalStage(WorkflowStage):
             "📋 **Generating Plan Proposal**\n\n"
             "I'm analyzing your requirements and creating a development plan.\n"
             "I'll post a proposal issue for your review shortly.\n\n"
-            "🤖 Posted by Builder Automation",
+            "◆ Posted by Sapiens Automation",
         )
 
         try:
@@ -82,7 +82,7 @@ class ProposalStage(WorkflowStage):
                 f"[#{proposal_issue.number}]({proposal_issue.url})\n"
                 f"2. Comment `ok` on the proposal to approve\n"
                 f"3. I'll then create a project and task issues for execution\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Update labels on original issue
@@ -100,7 +100,7 @@ class ProposalStage(WorkflowStage):
             log.error("proposal_stage_failed", issue=issue.number, error=str(e), exc_info=True)
             await self.git.add_comment(
                 issue.number,
-                f"❌ **Plan Generation Failed**\n\n" f"Error: {str(e)}\n\n" f"🤖 Posted by Builder Automation",
+                f"❌ **Plan Generation Failed**\n\n" f"Error: {str(e)}\n\n" f"◆ Posted by Sapiens Automation",
             )
             raise
 
@@ -191,7 +191,7 @@ class ProposalStage(WorkflowStage):
                 "3. Link all tasks to the original issue",
                 "4. Wait for you to mark tasks as `execute` when ready",
                 "",
-                "🤖 Posted by Builder Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
