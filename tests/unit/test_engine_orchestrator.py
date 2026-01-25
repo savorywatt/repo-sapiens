@@ -147,6 +147,12 @@ class TestOrchestratorInitialization:
             "pr_fix",
             "fix_execution",
             "qa",
+            # Specialized stages
+            "triage",
+            "docs_generation",
+            "test_coverage",
+            "dependency_audit",
+            "security_review",
             # Legacy stages
             "planning",
             "plan_review",

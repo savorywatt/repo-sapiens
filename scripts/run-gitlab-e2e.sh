@@ -862,6 +862,41 @@ agent_provider:
   model: "${ai_model}"
   api_key: \${SAPIENS_AI_API_KEY}
   local_mode: false
+
+automation:
+  label_triggers:
+    "sapiens/triage":
+      handler: triage
+    "sapiens/needs-work":
+      handler: proposal
+    "sapiens/approved":
+      handler: execution
+    "sapiens/needs-review":
+      handler: code_review
+    "sapiens/needs-fix":
+      handler: fix_request
+    "sapiens/requires-qa":
+      handler: qa_request
+    "sapiens/security-review":
+      handler: security_review
+    "sapiens/dependency-audit":
+      handler: dependency_audit
+    "sapiens/docs-generation":
+      handler: docs_generation
+    "sapiens/test-coverage":
+      handler: test_coverage
+    "sapiens/plan-review":
+      handler: plan_review
+    "triage":
+      handler: triage
+    "needs-work":
+      handler: proposal
+    "needs-review":
+      handler: code_review
+    "needs-fix":
+      handler: fix_request
+    "requires-qa":
+      handler: qa_request
 CONFIG_EOF
     )
 

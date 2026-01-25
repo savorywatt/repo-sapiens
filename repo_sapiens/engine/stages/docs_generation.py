@@ -1,5 +1,7 @@
 """Documentation generation stage - auto-generates documentation for code changes."""
 
+from typing import Any
+
 import structlog
 
 from repo_sapiens.engine.stages.base import WorkflowStage
@@ -65,7 +67,7 @@ class DocsGenerationStage(WorkflowStage):
             )
             raise
 
-    async def _get_pr_for_issue(self, issue: Issue):
+    async def _get_pr_for_issue(self, issue: Issue) -> Any:
         """Try to find a PR associated with this issue."""
         try:
             pr = await self.git.get_pull_request(issue.number)
@@ -74,7 +76,7 @@ class DocsGenerationStage(WorkflowStage):
             log.debug("pr_lookup_failed", issue=issue.number, error=str(e))
             return None
 
-    async def _generate_docs_for_pr(self, issue: Issue, pr) -> None:
+    async def _generate_docs_for_pr(self, issue: Issue, pr: Any) -> None:
         """Generate documentation based on PR changes."""
         log.info("generating_docs_for_pr", pr=pr.number)
 

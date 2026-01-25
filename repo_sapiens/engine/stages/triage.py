@@ -1,5 +1,7 @@
 """Triage stage - categorizes and prioritizes incoming issues."""
 
+from typing import Any
+
 import structlog
 
 from repo_sapiens.engine.stages.base import WorkflowStage
@@ -62,7 +64,7 @@ class TriageStage(WorkflowStage):
             )
             raise
 
-    async def _analyze_issue(self, issue: Issue) -> dict:
+    async def _analyze_issue(self, issue: Issue) -> dict[str, Any]:
         """Analyze issue and determine categorization."""
         log.info("analyzing_issue_for_triage", issue=issue.number)
 
@@ -149,16 +151,17 @@ Be accurate and conservative in your assessment. When uncertain, prefer lower pr
 
         return triage_data
 
-    def _parse_triage_response(self, output: str) -> dict:
+    def _parse_triage_response(self, output: str) -> dict[str, Any]:
         """Parse the triage response from the agent."""
         import json
         import re
+        from typing import cast
 
         # Try to extract JSON from the response
         json_match = re.search(r"```json\s*(\{.*?\})\s*```", output, re.DOTALL)
         if json_match:
             try:
-                return json.loads(json_match.group(1))
+                return cast(dict[str, Any], json.loads(json_match.group(1)))
             except json.JSONDecodeError:
                 pass
 
@@ -168,7 +171,7 @@ Be accurate and conservative in your assessment. When uncertain, prefer lower pr
             json_start = output.find("{")
             json_end = output.rfind("}") + 1
             if json_start >= 0 and json_end > json_start:
-                return json.loads(output[json_start:json_end])
+                return cast(dict[str, Any], json.loads(output[json_start:json_end]))
         except json.JSONDecodeError:
             pass
 
@@ -186,7 +189,7 @@ Be accurate and conservative in your assessment. When uncertain, prefer lower pr
             "raw_analysis": output,
         }
 
-    async def _post_triage_results(self, issue: Issue, triage_result: dict) -> None:
+    async def _post_triage_results(self, issue: Issue, triage_result: dict[str, Any]) -> None:
         """Post triage results and update labels."""
         # Build the summary comment
         summary_parts = [

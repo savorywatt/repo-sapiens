@@ -1,6 +1,7 @@
 """Dependency audit stage - audits dependencies for vulnerabilities and updates."""
 
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -71,11 +72,11 @@ class DependencyAuditStage(WorkflowStage):
             )
             raise
 
-    async def _run_audits(self, project_dir: Path) -> dict:
+    async def _run_audits(self, project_dir: Path) -> dict[str, Any]:
         """Run dependency audit commands for detected package managers."""
         log.info("running_dependency_audits", dir=str(project_dir))
 
-        results = {
+        results: dict[str, Any] = {
             "audits": [],
             "outdated": [],
             "has_vulnerabilities": False,
@@ -135,7 +136,7 @@ class DependencyAuditStage(WorkflowStage):
 
         return results
 
-    async def _run_python_audit(self, project_dir: Path) -> dict:
+    async def _run_python_audit(self, project_dir: Path) -> dict[str, Any]:
         """Run pip-audit."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -172,7 +173,7 @@ class DependencyAuditStage(WorkflowStage):
                 "vulnerabilities": 0,
             }
 
-    async def _run_python_outdated(self, project_dir: Path) -> dict:
+    async def _run_python_outdated(self, project_dir: Path) -> dict[str, Any]:
         """Check for outdated Python packages."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -196,7 +197,7 @@ class DependencyAuditStage(WorkflowStage):
                 "output": "pip not found",
             }
 
-    async def _run_npm_audit(self, project_dir: Path) -> dict:
+    async def _run_npm_audit(self, project_dir: Path) -> dict[str, Any]:
         """Run npm audit."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -236,7 +237,7 @@ class DependencyAuditStage(WorkflowStage):
                 "vulnerabilities": 0,
             }
 
-    async def _run_npm_outdated(self, project_dir: Path) -> dict:
+    async def _run_npm_outdated(self, project_dir: Path) -> dict[str, Any]:
         """Check for outdated npm packages."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -259,7 +260,7 @@ class DependencyAuditStage(WorkflowStage):
                 "output": "npm not found",
             }
 
-    async def _run_cargo_audit(self, project_dir: Path) -> dict:
+    async def _run_cargo_audit(self, project_dir: Path) -> dict[str, Any]:
         """Run cargo audit."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -288,7 +289,7 @@ class DependencyAuditStage(WorkflowStage):
                 "vulnerabilities": 0,
             }
 
-    async def _run_cargo_outdated(self, project_dir: Path) -> dict:
+    async def _run_cargo_outdated(self, project_dir: Path) -> dict[str, Any]:
         """Check for outdated Rust packages."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -310,7 +311,7 @@ class DependencyAuditStage(WorkflowStage):
                 "output": "cargo outdated not installed. Install with: cargo install cargo-outdated",
             }
 
-    async def _run_go_audit(self, project_dir: Path) -> dict:
+    async def _run_go_audit(self, project_dir: Path) -> dict[str, Any]:
         """Run govulncheck."""
         try:
             stdout, stderr, returncode = await run_command(
@@ -340,7 +341,7 @@ class DependencyAuditStage(WorkflowStage):
                 "vulnerabilities": 0,
             }
 
-    async def _post_audit_results(self, issue: Issue, results: dict) -> None:
+    async def _post_audit_results(self, issue: Issue, results: dict[str, Any]) -> None:
         """Post audit results as a comment."""
         severity_emoji = "🔴" if results["has_vulnerabilities"] else "🟢"
 

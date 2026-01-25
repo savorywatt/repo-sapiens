@@ -467,13 +467,14 @@ run_sapiens_init() {
 
     # Run sapiens init non-interactively with essential workflows
     # Gitea doesn't support reusable workflows, so we deploy actual workflow files
-    log "Running: sapiens init --non-interactive --run-mode local --deploy-workflows essential --ai-provider claude-local"
+    # Use --run-mode cicd to generate env-var-based config (not keyring refs)
+    log "Running: sapiens init --non-interactive --run-mode cicd --deploy-workflows essential --ai-provider claude-api"
 
     if command -v sapiens > /dev/null 2>&1; then
         sapiens init --non-interactive \
-            --run-mode local \
+            --run-mode cicd \
             --git-token-env SAPIENS_GITEA_TOKEN \
-            --ai-provider claude-local \
+            --ai-provider claude-api \
             --deploy-workflows essential \
             --no-setup-secrets || {
             warn "sapiens init failed, falling back to manual config"
@@ -484,9 +485,9 @@ run_sapiens_init() {
     elif command -v uv > /dev/null 2>&1 && [[ -f "$SCRIPT_DIR/../pyproject.toml" ]]; then
         # Try running from development checkout
         uv run --project "$SCRIPT_DIR/.." sapiens init --non-interactive \
-            --run-mode local \
+            --run-mode cicd \
             --git-token-env SAPIENS_GITEA_TOKEN \
-            --ai-provider claude-local \
+            --ai-provider claude-api \
             --deploy-workflows essential \
             --no-setup-secrets || {
             warn "sapiens init (via uv) failed, falling back to manual config"

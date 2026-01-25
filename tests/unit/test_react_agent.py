@@ -448,7 +448,7 @@ class TestReActAgentProvider:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            base_url="http://localhost:11434",
             max_iterations=3,
         )
 
@@ -638,7 +638,8 @@ class TestReActConfig:
         """Test default configuration values."""
         config = ReActConfig()
         assert config.model == "qwen3:latest"
-        assert config.ollama_url == "http://localhost:11434"
+        assert config.base_url is None  # base_url defaults to None
+        assert config.ollama_url == "http://localhost:11434"  # Legacy property returns default
         assert config.max_iterations == 10
         assert config.temperature == 0.7
         assert config.timeout == 300
@@ -669,7 +670,7 @@ class TestGenerateStep:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            base_url="http://localhost:11434",
             max_iterations=3,
         )
 
@@ -770,7 +771,7 @@ class TestFinishWithInvalidJson:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            base_url="http://localhost:11434",
             max_iterations=5,
         )
 

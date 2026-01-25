@@ -1,6 +1,7 @@
 """Test coverage stage - analyzes and reports on test coverage."""
 
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -67,7 +68,7 @@ class TestCoverageStage(WorkflowStage):
             )
             raise
 
-    async def _get_pr_for_issue(self, issue: Issue):
+    async def _get_pr_for_issue(self, issue: Issue) -> Any:
         """Try to find a PR associated with this issue."""
         try:
             pr = await self.git.get_pull_request(issue.number)
@@ -76,7 +77,7 @@ class TestCoverageStage(WorkflowStage):
             log.debug("pr_lookup_failed", issue=issue.number, error=str(e))
             return None
 
-    async def _analyze_pr_coverage(self, issue: Issue, pr) -> None:
+    async def _analyze_pr_coverage(self, issue: Issue, pr: Any) -> None:
         """Analyze test coverage for a specific PR."""
         log.info("analyzing_pr_coverage", pr=pr.number)
 
@@ -118,7 +119,7 @@ class TestCoverageStage(WorkflowStage):
         # Generate report
         await self._post_coverage_report(issue, coverage_result)
 
-    async def _run_coverage(self, project_dir: Path) -> dict:
+    async def _run_coverage(self, project_dir: Path) -> dict[str, Any]:
         """Run coverage commands and return results."""
         log.info("running_coverage", dir=str(project_dir))
 
@@ -178,7 +179,7 @@ class TestCoverageStage(WorkflowStage):
             "language": "unknown",
         }
 
-    async def _post_coverage_report(self, issue: Issue, coverage_result: dict, pr=None) -> None:
+    async def _post_coverage_report(self, issue: Issue, coverage_result: dict[str, Any], pr: Any = None) -> None:
         """Post coverage report as a comment."""
         context_str = f"PR #{pr.number}" if pr else f"Issue #{issue.number}"
 
@@ -290,7 +291,7 @@ Be specific and actionable.
         updated_labels.append("coverage-analyzed")
         await self.git.update_issue(issue.number, labels=updated_labels)
 
-    def _parse_coverage_summary(self, coverage_result: dict) -> str:
+    def _parse_coverage_summary(self, coverage_result: dict[str, Any]) -> str:
         """Parse coverage output to extract summary statistics."""
         output = coverage_result.get("output", "")
 
