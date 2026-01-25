@@ -862,6 +862,72 @@ agent_provider:
         # The literal value should be preserved as-is
         assert settings.git_provider.api_token
 
+    def test_env_var_with_default_value_uses_default(self, temp_yaml_file: Path):
+        """Test ${VAR:-default} syntax uses default when var not set."""
+        config_content = """
+git_provider:
+  base_url: ${UNSET_VAR:-https://default.example.com}
+  api_token: ${UNSET_TOKEN:-default-token}
+repository:
+  owner: org
+  name: repo
+agent_provider:
+  provider_type: ollama
+  base_url: ${OLLAMA_URL:-http://localhost:11434}
+"""
+
+        with open(temp_yaml_file, "w") as f:
+            f.write(config_content)
+
+        settings = AutomationSettings.from_yaml(str(temp_yaml_file))
+        assert "default.example.com" in str(settings.git_provider.base_url)
+        assert settings.git_provider.api_token.get_secret_value() == "default-token"
+        assert "localhost:11434" in str(settings.agent_provider.base_url)
+
+    def test_env_var_with_default_value_prefers_env(self, temp_yaml_file: Path, monkeypatch):
+        """Test ${VAR:-default} syntax prefers env var when set."""
+        monkeypatch.setenv("MY_BASE_URL", "https://from-env.example.com")
+        monkeypatch.setenv("MY_TOKEN", "env-token")
+
+        config_content = """
+git_provider:
+  base_url: ${MY_BASE_URL:-https://default.example.com}
+  api_token: ${MY_TOKEN:-default-token}
+repository:
+  owner: org
+  name: repo
+agent_provider:
+  provider_type: claude-local
+"""
+
+        with open(temp_yaml_file, "w") as f:
+            f.write(config_content)
+
+        settings = AutomationSettings.from_yaml(str(temp_yaml_file))
+        assert "from-env.example.com" in str(settings.git_provider.base_url)
+        assert settings.git_provider.api_token.get_secret_value() == "env-token"
+
+    def test_env_var_default_with_url_containing_colons(self, temp_yaml_file: Path):
+        """Test ${VAR:-default} with URL default containing colons and slashes."""
+        config_content = """
+git_provider:
+  base_url: ${GITEA_URL:-http://192.168.1.100:3000}
+  api_token: token
+repository:
+  owner: org
+  name: repo
+agent_provider:
+  provider_type: ollama
+  base_url: ${OLLAMA_URL:-http://192.168.1.241:11434}
+"""
+
+        with open(temp_yaml_file, "w") as f:
+            f.write(config_content)
+
+        settings = AutomationSettings.from_yaml(str(temp_yaml_file))
+        assert "192.168.1.100:3000" in str(settings.git_provider.base_url)
+        assert "192.168.1.241:11434" in str(settings.agent_provider.base_url)
+
 
 class TestConfigurationMerging:
     """Test merging file-based and environment variable configuration."""
