@@ -23,11 +23,7 @@ on:
     # Every Monday at 9am UTC
     - cron: '0 9 * * 1'
   workflow_dispatch:
-    inputs:
-      target_coverage:
-        description: 'Minimum coverage % to target'
-        type: number
-        default: 60
+    # Manual trigger - uses default coverage threshold from reusable workflow (60%)
 
 # Required for cross-repo reusable workflow
 permissions:
@@ -37,11 +33,8 @@ permissions:
 jobs:
   test-coverage:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-test-coverage.yaml@v2
-    with:
-      # Convert to number using fromJSON to ensure proper type for reusable workflow
-      coverage_threshold: ${{ fromJSON(github.event.inputs.target_coverage || '60') }}
-      # Customize test command if needed (default: pytest with coverage)
-      # test_command: "python -m pytest tests/ --cov --cov-report=json --cov-report=term -q"
+    # All inputs use defaults from the reusable workflow
+    # Customize test_command if needed: "python -m pytest tests/ --cov --cov-report=json"
     secrets:
       GIT_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
       AI_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
