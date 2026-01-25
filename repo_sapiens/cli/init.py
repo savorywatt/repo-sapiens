@@ -2834,8 +2834,9 @@ class RepoInitializer:
             # AUTOMATION__AGENT_PROVIDER__API_KEY which get interpolated by from_yaml()
             git_token_ref = "${AUTOMATION__GIT_PROVIDER__API_TOKEN}"  # nosec B105
 
-            # Agent API key - use unified env var for CICD
-            agent_api_key_ref = "${AUTOMATION__AGENT_PROVIDER__API_KEY}" if self.agent_api_key else "null"
+            # Agent API key - always use env var reference for CICD mode
+            # The actual key comes from GitHub secrets at runtime
+            agent_api_key_ref = "${AUTOMATION__AGENT_PROVIDER__API_KEY}"  # nosec B105
 
         # Generate agent provider configuration
         if self.agent_type == AgentType.GOOSE:
@@ -2880,9 +2881,18 @@ class RepoInitializer:
   local_mode: true
   base_url: {base_url}/v1"""
             else:
-                # Cloud provider (openai, anthropic, openrouter, groq)
+                # Cloud provider (openai, anthropic, openrouter, groq, openai-compatible)
                 provider_type = self.builtin_provider
-                agent_config = f"""agent_provider:
+                # Include base_url for openai-compatible providers (OpenRouter, etc.)
+                if self.builtin_base_url:
+                    agent_config = f"""agent_provider:
+  provider_type: {provider_type}
+  model: {model}
+  api_key: {agent_api_key_ref}
+  base_url: {self.builtin_base_url}
+  local_mode: false"""
+                else:
+                    agent_config = f"""agent_provider:
   provider_type: {provider_type}
   model: {model}
   api_key: {agent_api_key_ref}
@@ -3303,6 +3313,11 @@ tags:
 
                 if content is None:
                     return False
+
+                # Substitute AI secret name in templates
+                # Templates use ANTHROPIC_API_KEY as placeholder, replace with configured secret
+                ai_secret_name = self.cli_ai_api_key_env or "SAPIENS_AI_API_KEY"
+                content = content.replace("ANTHROPIC_API_KEY", ai_secret_name)
 
                 # Determine target file path
                 is_recipe = template_name.startswith("recipes/")
