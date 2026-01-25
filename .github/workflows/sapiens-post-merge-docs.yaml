@@ -73,6 +73,7 @@ jobs:
         if: steps.check-ai.outputs.has_key == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
         run: |
           sapiens task "Review the recent commits and update documentation if needed.

@@ -368,6 +368,8 @@ jobs:
         if: (env.VULN_TOTAL != '0' || env.LICENSE_PROBLEMS != '0') && steps.check-ai.outputs.has_key == 'true'
         continue-on-error: true
         env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
         run: |
           pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
