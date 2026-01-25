@@ -1,0 +1,141 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: automation-daemon
+#
+# Sapiens Automation Daemon for GitLab CI/CD
+#
+# This is the RECOMMENDED approach for GitLab label-based automation.
+# Unlike GitHub (which has native label events), GitLab requires polling.
+# This pipeline runs on a schedule and processes all issues with sapiens labels.
+#
+# How it works:
+#   1. Runs on a schedule (configured via GitLab UI)
+#   2. Fetches all open issues
+#   3. For each issue, examines labels and routes to appropriate handler:
+#      - sapiens/needs-planning → creates implementation plan
+#      - approved → executes approved changes
+#      - sapiens/needs-review → performs code review
+#      - sapiens/needs-fix → creates fix proposal
+#      - sapiens/requires-qa → generates test plan
+#
+# Setup:
+#   1. Include this file in your .gitlab-ci.yml:
+#
+#      include:
+#        - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v2/templates/workflows/gitlab/sapiens/automation-daemon.yaml'
+#
+#   2. Set required CI/CD variables in GitLab project settings:
+#      - SAPIENS_GITLAB_TOKEN: GitLab API token with 'api' scope
+#      - SAPIENS_AI_API_KEY: AI provider API key (not required for Ollama)
+#
+#   3. (Optional) Set AI provider variables:
+#      - SAPIENS_AI_PROVIDER: "ollama" or "openai-compatible" (default: openai-compatible)
+#      - SAPIENS_AI_MODEL: Model name (default: claude-sonnet-4.5)
+#      - SAPIENS_AI_BASE_URL: Provider URL (required for Ollama)
+#
+#   4. Create a pipeline schedule in GitLab:
+#      Settings > CI/CD > Pipeline schedules > New schedule
+#      Recommended: Every 5 minutes (*/5 * * * *)
+#
+# Comparison with sapiens-dispatcher.yaml:
+#   - automation-daemon (this file): Scheduled polling, simpler setup, slight delay
+#   - sapiens-dispatcher: Real-time via webhooks, requires external webhook handler
+
+stages:
+  - sapiens
+
+variables:
+  # AI provider configuration (can be overridden per-project)
+  SAPIENS_AI_PROVIDER:
+    value: "openai-compatible"
+    description: "AI provider: openai-compatible, ollama, claude-api"
+  SAPIENS_AI_MODEL:
+    value: "claude-sonnet-4.5"
+    description: "AI model to use"
+  SAPIENS_AI_BASE_URL:
+    value: ""
+    description: "AI provider base URL (required for ollama)"
+
+.sapiens-base:
+  image: python:3.12-slim
+  timeout: 45 minutes
+  interruptible: true
+  variables:
+    # Map GitLab CI variables to sapiens environment variables
+    AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: "gitlab"
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: $SAPIENS_AI_PROVIDER
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
+    AUTOMATION__AGENT_PROVIDER__MODEL: $SAPIENS_AI_MODEL
+    AUTOMATION__AGENT_PROVIDER__BASE_URL: $SAPIENS_AI_BASE_URL
+    PIP_NO_CACHE_DIR: "1"
+  before_script:
+    - pip install --quiet --no-cache-dir git+https://github.com/savorywatt/repo-sapiens.git@v2
+    - |
+      # Configure git for commits
+      git config --global user.name "Sapiens Bot"
+      git config --global user.email "sapiens-bot@users.noreply.gitlab.com"
+
+sapiens-daemon:
+  extends: .sapiens-base
+  stage: sapiens
+  rules:
+    # Run on schedule (configured via GitLab UI: Settings > CI/CD > Pipeline schedules)
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    # Allow manual trigger from pipeline UI
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+    # Allow API trigger
+    - if: $CI_PIPELINE_SOURCE == "api"
+  script:
+    - |
+      echo "========================================"
+      echo "Sapiens Automation Daemon"
+      echo "========================================"
+      echo "Repository: ${CI_PROJECT_PATH}"
+      echo "AI Provider: ${SAPIENS_AI_PROVIDER}"
+      echo "AI Model: ${SAPIENS_AI_MODEL}"
+      echo "========================================"
+    - |
+      # Generate sapiens config if not present
+      if [ -f ".sapiens/config.yaml" ]; then
+        echo "Using existing .sapiens/config.yaml"
+      else
+        echo "Generating sapiens config..."
+        mkdir -p .sapiens
+        cat > .sapiens/config.yaml << 'YAML'
+      git_provider:
+        provider_type: "gitlab"
+        base_url: "@env:AUTOMATION__GIT_PROVIDER__BASE_URL"
+        api_token: "@env:AUTOMATION__GIT_PROVIDER__API_TOKEN"
+
+      repository:
+        owner: "@env:AUTOMATION__REPOSITORY__OWNER"
+        name: "@env:AUTOMATION__REPOSITORY__NAME"
+
+      agent_provider:
+        provider_type: "@env:AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE"
+        model: "@env:AUTOMATION__AGENT_PROVIDER__MODEL"
+        api_key: "@env:AUTOMATION__AGENT_PROVIDER__API_KEY"
+        base_url: "@env:AUTOMATION__AGENT_PROVIDER__BASE_URL"
+      YAML
+        cat .sapiens/config.yaml
+      fi
+    - |
+      # Process all issues with sapiens labels
+      echo "Processing all labeled issues..."
+      sapiens process-all --log-level INFO
+  after_script:
+    - |
+      if [ "$CI_JOB_STATUS" != "success" ]; then
+        echo "Daemon run completed with errors. Check logs above."
+      fi
+  artifacts:
+    paths:
+      - .sapiens/
+    expire_in: 7 days
+    when: always
+  resource_group: sapiens-daemon

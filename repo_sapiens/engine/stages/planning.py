@@ -122,7 +122,7 @@ class PlanningStage(WorkflowStage):
             issue.number,
             "🚀 **Builder Starting**\n\nI'm starting to work on this issue. "
             "I'll generate a development plan and post it for review.\n\n"
-            "🤖 Posted by Builder Automation",
+            "◆ Posted by Sapiens Automation",
         )
 
         try:

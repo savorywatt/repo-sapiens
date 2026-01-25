@@ -272,9 +272,9 @@ class GitHubRestProvider(GitProvider):
             log.error("github_delete_branch_failed", branch=branch_name, error=str(e))
             raise
 
-    async def get_diff(self, base: str, head: str) -> str:
+    async def get_diff(self, base: str, head: str, pr_number: int | None = None) -> str:
         """Get diff between two branches."""
-        log.info("get_diff", base=base, head=head)
+        log.info("get_diff", base=base, head=head, pr_number=pr_number)
 
         try:
 

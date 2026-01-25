@@ -251,6 +251,7 @@ def _create_agent_provider(settings: AutomationSettings) -> AgentProvider:
             api_key=api_key,
             working_dir=str(Path.cwd()),
             qa_handler=qa_handler,
+            strip_thinking_tags=settings.agent_provider.strip_thinking_tags,
         )
 
     # External agent (Claude, Goose, or Copilot)

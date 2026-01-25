@@ -1,0 +1,170 @@
+# GitLab CI/CD Dispatcher for Sapiens Automation
+#
+# NOTE: For most GitLab setups, use automation-daemon.yaml instead!
+#       The daemon polls on a schedule and requires no webhook setup.
+#       This dispatcher is only needed if you want REAL-TIME label responses
+#       and are willing to deploy an external webhook handler.
+#
+# This is the GitLab equivalent of the GitHub sapiens-dispatcher.yaml.
+# It provides a unified entry point for all sapiens label-triggered workflows.
+#
+# Usage:
+#   Include this file in your .gitlab-ci.yml and trigger via webhook or API:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v2/templates/workflows/gitlab/sapiens-dispatcher.yaml'
+#
+#   # Or for self-hosted GitLab with local copy:
+#   include:
+#     - local: '.gitlab/workflows/sapiens-dispatcher.yaml'
+#
+# Triggering:
+#   GitLab doesn't have native label events. Trigger pipelines via:
+#   1. Webhook to pipeline trigger endpoint
+#   2. GitLab API: POST /projects/:id/trigger/pipeline
+#   3. Manual run from UI with variables set
+#
+#   Required trigger variables:
+#     - SAPIENS_LABEL: The label that triggered (e.g., "sapiens/needs-planning", "approved")
+#     - SAPIENS_ISSUE_NUMBER: Issue or MR number to process
+#
+#   Optional trigger variables:
+#     - SAPIENS_EVENT_TYPE: Event type (default: "issues.labeled")
+#
+# Required CI/CD Variables (set in GitLab project settings):
+#   - SAPIENS_GITLAB_TOKEN: GitLab API token with api scope
+#   - SAPIENS_AI_API_KEY: AI provider API key (not required for ollama)
+#
+# Optional CI/CD Variables:
+#   - SAPIENS_AI_PROVIDER: AI provider type (default: "openai-compatible")
+#   - SAPIENS_AI_MODEL: AI model to use (default: "claude-sonnet-4.5")
+#   - SAPIENS_AI_BASE_URL: AI provider base URL (for ollama/openai-compatible)
+
+stages:
+  - sapiens
+
+variables:
+  # Defaults - can be overridden per-project or per-trigger
+  SAPIENS_AI_PROVIDER:
+    value: "openai-compatible"
+    description: "AI provider type: openai-compatible, ollama, claude-api"
+  SAPIENS_AI_MODEL:
+    value: "claude-sonnet-4.5"
+    description: "AI model to use"
+  SAPIENS_AI_BASE_URL:
+    value: ""
+    description: "AI provider base URL (required for ollama)"
+  SAPIENS_EVENT_TYPE:
+    value: "issues.labeled"
+    description: "Event type for sapiens CLI"
+
+.sapiens-base:
+  image: python:3.12-slim
+  timeout: 45 minutes
+  interruptible: true
+  variables:
+    # Map GitLab CI variables to sapiens environment variables
+    # Note: GITLAB_ prefix is reserved by GitLab, so we use SAPIENS_GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: "gitlab"
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: $SAPIENS_AI_PROVIDER
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
+    AUTOMATION__AGENT_PROVIDER__MODEL: $SAPIENS_AI_MODEL
+    AUTOMATION__AGENT_PROVIDER__BASE_URL: $SAPIENS_AI_BASE_URL
+  before_script:
+    - pip install --quiet --no-cache-dir git+https://github.com/savorywatt/repo-sapiens.git@v2
+    - |
+      # Configure git for commits (needed for approved/execute labels)
+      git config --global user.name "Sapiens Bot"
+      git config --global user.email "sapiens-bot@users.noreply.gitlab.com"
+
+sapiens-dispatcher:
+  extends: .sapiens-base
+  stage: sapiens
+  rules:
+    # Triggered via API/webhook with required variables
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $SAPIENS_LABEL && $SAPIENS_ISSUE_NUMBER
+    # Triggered via pipeline API
+    - if: $CI_PIPELINE_SOURCE == "pipeline" && $SAPIENS_LABEL && $SAPIENS_ISSUE_NUMBER
+    # Manual trigger from UI
+    - if: $CI_PIPELINE_SOURCE == "web" && $SAPIENS_LABEL && $SAPIENS_ISSUE_NUMBER
+      when: manual
+  script:
+    - |
+      echo "========================================"
+      echo "Sapiens Dispatcher"
+      echo "========================================"
+      echo "Label:    ${SAPIENS_LABEL}"
+      echo "Issue:    #${SAPIENS_ISSUE_NUMBER}"
+      echo "Event:    ${SAPIENS_EVENT_TYPE}"
+      echo "Provider: gitlab"
+      echo "AI:       ${SAPIENS_AI_PROVIDER}"
+      echo "Model:    ${SAPIENS_AI_MODEL}"
+      echo "========================================"
+    - |
+      # Generate sapiens config if not present
+      if [ -f ".sapiens/config.yaml" ]; then
+        echo "Using existing .sapiens/config.yaml"
+      else
+        echo "Generating sapiens config..."
+        mkdir -p .sapiens
+        cat > .sapiens/config.yaml << 'YAML'
+      git_provider:
+        provider_type: "gitlab"
+        base_url: "@env:AUTOMATION__GIT_PROVIDER__BASE_URL"
+        api_token: "@env:AUTOMATION__GIT_PROVIDER__API_TOKEN"
+
+      repository:
+        owner: "@env:AUTOMATION__REPOSITORY__OWNER"
+        name: "@env:AUTOMATION__REPOSITORY__NAME"
+
+      agent_provider:
+        provider_type: "@env:AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE"
+        model: "@env:AUTOMATION__AGENT_PROVIDER__MODEL"
+        api_key: "@env:AUTOMATION__AGENT_PROVIDER__API_KEY"
+        base_url: "@env:AUTOMATION__AGENT_PROVIDER__BASE_URL"
+      YAML
+        echo "Config generated:"
+        cat .sapiens/config.yaml
+      fi
+    - |
+      # Process the label
+      sapiens process-label \
+        --event-type "${SAPIENS_EVENT_TYPE}" \
+        --label "${SAPIENS_LABEL}" \
+        --issue "${SAPIENS_ISSUE_NUMBER}" \
+        --source gitlab
+  after_script:
+    - |
+      # Post status comment on completion
+      if [ -n "$SAPIENS_GITLAB_TOKEN" ] && [ -n "$SAPIENS_ISSUE_NUMBER" ]; then
+        if [ "$CI_JOB_STATUS" == "success" ]; then
+          BODY="**Sapiens automation completed**\n\nLabel: \`${SAPIENS_LABEL}\`\nSee [job logs](${CI_JOB_URL}) for details.\n\n◆ Posted by Sapiens Automation"
+        else
+          BODY="**Sapiens automation failed**\n\nLabel: \`${SAPIENS_LABEL}\`\nCheck the [job logs](${CI_JOB_URL}) for details.\n\n◆ Posted by Sapiens Automation"
+        fi
+
+        # Determine if it's an issue or MR and post comment
+        # Try issue first, fall back to MR
+        curl -sS -X POST \
+          -H "PRIVATE-TOKEN: ${SAPIENS_GITLAB_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"body\": \"${BODY}\"}" \
+          "${CI_SERVER_URL}/api/v4/projects/${CI_PROJECT_ID}/issues/${SAPIENS_ISSUE_NUMBER}/notes" \
+          2>/dev/null || \
+        curl -sS -X POST \
+          -H "PRIVATE-TOKEN: ${SAPIENS_GITLAB_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"body\": \"${BODY}\"}" \
+          "${CI_SERVER_URL}/api/v4/projects/${CI_PROJECT_ID}/merge_requests/${SAPIENS_ISSUE_NUMBER}/notes" \
+          2>/dev/null || true
+      fi
+  artifacts:
+    paths:
+      - .sapiens/
+    expire_in: 7 days
+    when: always
+  resource_group: sapiens-$SAPIENS_LABEL

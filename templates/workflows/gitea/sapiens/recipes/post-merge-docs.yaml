@@ -1,0 +1,95 @@
+# @repo-sapiens-template
+# @version: 1.1.0
+# @name: post-merge-docs
+#
+# Post-Merge Documentation Update for Gitea Actions
+#
+# Automatically reviews changes after merges to main and updates
+# documentation if needed (README, CHANGELOG, API docs).
+#
+# Setup:
+# 1. Copy to .gitea/workflows/post-merge-docs.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITEA_TOKEN: Gitea API token with repo write access
+#    - SAPIENS_OLLAMA_URL: Ollama base URL (e.g., http://192.168.1.241:11434) (or configure for Ollama)
+# 3. Customize the task prompt as needed
+
+name: Update Documentation
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip if commit message contains [skip docs] or [no docs]
+    if: |
+      !contains(github.event.head_commit.message, '[skip docs]') &&
+      !contains(github.event.head_commit.message, '[no docs]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10  # Get recent history for context
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        env:
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
+        run: |
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            echo "Installing from $SAPIENS_REPO_URL (branch: ${SAPIENS_BRANCH:-main})"
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens
+            cd /tmp/repo-sapiens
+            git checkout "${SAPIENS_BRANCH:-main}"
+            pip install -e .
+          else
+            echo "Installing from PyPI"
+            pip install repo-sapiens
+          fi
+
+      - name: Get recent changes
+        id: changes
+        run: |
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          git log --oneline -5 >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Update documentation
+        env:
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          # For ollama - pass base URL (no API key needed)
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_OLLAMA_URL }}
+        run: |
+          sapiens task "Review the recent commits and update documentation if needed.
+
+          Recent commits:
+          ${{ steps.changes.outputs.commits }}
+
+          Tasks:
+          1. Check if README.md needs updates for any new features or changed behavior
+          2. Add CHANGELOG.md entries for notable changes (if not already present)
+          3. Update any API documentation if function signatures changed
+          4. Fix any broken links or outdated examples
+
+          Only make changes if genuinely needed. If no updates required, just finish.
+          If changes are made, commit them with message: 'docs: Update documentation [skip docs]'"
+
+      - name: Push changes
+        run: |
+          git config user.name "repo-sapiens[bot]"
+          git config user.email "repo-sapiens[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "docs: Auto-update documentation [skip docs]"
+          git push || echo "No changes to push"

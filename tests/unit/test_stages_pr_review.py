@@ -163,16 +163,27 @@ class TestPRReviewStageExecute:
     """Tests for PRReviewStage execute method."""
 
     @pytest.mark.asyncio
-    async def test_skip_if_no_pr(self, pr_review_stage, mock_git_provider):
-        """Should skip if no PR found for issue."""
+    async def test_skip_if_no_pr(self, pr_review_stage, mock_git_provider, mock_agent_provider):
+        """Should review issue content when no PR is found.
+
+        The implementation now falls back to reviewing the issue content
+        when no associated PR is found, rather than skipping entirely.
+        """
         mock_git_provider.get_pull_request.side_effect = Exception("Not a PR")
+        # Mock the agent to return a successful review
+        mock_agent_provider.execute_prompt.return_value = {
+            "success": True,
+            "output": "Issue looks well-defined. Good scope.",
+        }
 
         issue = make_issue(labels=["needs-review"])
 
         await pr_review_stage.execute(issue)
 
-        # Should not try to add comments
-        mock_git_provider.add_comment.assert_not_called()
+        # Should add comments for issue review (start and complete messages)
+        assert mock_git_provider.add_comment.call_count == 2
+        # Should update labels
+        mock_git_provider.update_issue.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_skip_if_already_reviewed(self, pr_review_stage, mock_git_provider):

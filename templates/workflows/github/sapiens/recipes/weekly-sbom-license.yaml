@@ -1,0 +1,53 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: weekly-sbom-license
+# @type: thin-wrapper
+#
+# Weekly SBOM & License Compliance - Thin Wrapper
+#
+# Calls the reusable workflow from savorywatt/repo-sapiens.
+# Generates SBOM, scans for vulnerabilities, checks license compliance.
+#
+# Setup:
+# 1. Copy to .github/workflows/weekly-sbom-license.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITHUB_TOKEN: GitHub token with repo access
+#    - ANTHROPIC_API_KEY: Claude API key (optional, for AI analysis)
+# 3. Configure project_license and deny_licenses as needed
+# 4. Adjust schedule as needed
+
+name: Weekly SBOM & License Compliance
+
+on:
+  schedule:
+    # Every Monday at 6am UTC (start of week)
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      create_issues:
+        description: 'Create issues for problems found'
+        type: boolean
+        default: true
+      fail_on_vulnerabilities:
+        description: 'Fail on high/critical vulnerabilities'
+        type: boolean
+        default: false
+
+# Required for cross-repo reusable workflow
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sbom-license:
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-sbom-license.yaml@v2
+    with:
+      # Your project's license (for compatibility checking)
+      project_license: "{{PROJECT_LICENSE}}"
+      # Licenses to deny (comma-separated, e.g., "GPL-3.0,AGPL-3.0")
+      deny_licenses: "{{DENY_LICENSES}}"
+      create_issues: ${{ github.event.inputs.create_issues == 'true' || github.event.inputs.create_issues == '' }}
+      fail_on_vulnerabilities: ${{ github.event.inputs.fail_on_vulnerabilities == 'true' }}
+    secrets:
+      GIT_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+      AI_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -679,7 +679,7 @@ class TestFormatProposalBody:
 
         result = stage._format_proposal_body(plan, open_issue, "plans/42.md")
 
-        assert "Posted by Builder Automation" in result
+        assert "Posted by Sapiens Automation" in result
 
     def test_format_proposal_body_approval_instructions(
         self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings, open_issue

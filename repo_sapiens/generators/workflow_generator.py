@@ -133,11 +133,17 @@ class WorkflowGenerator:
         }
 
         # Generate workflow content
+        # Note: permissions must be granted by the caller for cross-repo reusable workflows
         workflow = {
             "name": "Sapiens Automation",
             "on": {
                 "issues": {"types": ["labeled"]},
                 "pull_request": {"types": ["labeled"]},
+            },
+            "permissions": {
+                "contents": "write",
+                "issues": "write",
+                "pull-requests": "write",
             },
             "jobs": {
                 "sapiens": {

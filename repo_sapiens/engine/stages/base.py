@@ -47,6 +47,7 @@ Example:
 """
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import structlog
 
@@ -128,6 +129,52 @@ class WorkflowStage(ABC):
         self.agent = agent
         self.state = state
         self.settings = settings
+
+    def get_playground_dir(self) -> Path | None:
+        """Get the playground directory for code execution.
+
+        The playground is a separate clone of the target repository where
+        stages can safely execute code, run tests, and make modifications
+        without affecting the automation repository.
+
+        Resolution order:
+            1. SAPIENS_PLAYGROUND_DIR environment variable (for CI/CD)
+            2. settings.workflow.playground_dir if configured
+            3. ../playground relative to project root (legacy default)
+
+        Returns:
+            Path to playground directory if it exists, None otherwise.
+
+        Note:
+            Stages should handle None gracefully by providing guidance
+            or falling back to API-only operations.
+        """
+        import os
+
+        # Check environment variable first (CI/CD override)
+        env_path = os.environ.get("SAPIENS_PLAYGROUND_DIR")
+        if env_path:
+            path = Path(env_path)
+            if path.exists():
+                return path
+            log.warning("playground_env_not_found", path=env_path)
+
+        # Check settings if available
+        if hasattr(self.settings, "workflow") and hasattr(self.settings.workflow, "playground_dir"):
+            configured = getattr(self.settings.workflow, "playground_dir", None)
+            if configured:
+                path = Path(configured)
+                if path.exists():
+                    return path
+                log.warning("playground_config_not_found", path=str(configured))
+
+        # Legacy fallback: relative to project root
+        # This works when running from repo-sapiens checkout
+        legacy_path = Path(__file__).parent.parent.parent.parent.parent / "playground"
+        if legacy_path.exists():
+            return legacy_path
+
+        return None
 
     @abstractmethod
     async def execute(self, issue: Issue) -> None:

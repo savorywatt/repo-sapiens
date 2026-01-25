@@ -349,7 +349,7 @@ class InteractiveQAHandler:
                 "---",
                 ("*Please reply to this comment with your answer. " "The agent will continue once you respond.*"),
                 "",
-                "🤖 Posted by Builder Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
@@ -374,7 +374,7 @@ class InteractiveQAHandler:
 
         icon = icons.get(message_type, "ℹ️")
 
-        return f"{icon} **Builder Update**\n\n{message}\n\n🤖 Posted by Builder Automation"
+        return f"{icon} **Builder Update**\n\n{message}\n\n◆ Posted by Sapiens Automation"
 
     def _format_progress_report(
         self,
@@ -420,7 +420,7 @@ class InteractiveQAHandler:
         parts.extend(
             [
                 "",
-                "🤖 Posted by Builder Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
@@ -438,7 +438,7 @@ class InteractiveQAHandler:
             True if the comment contains bot markers, False otherwise.
         """
         bot_markers = [
-            "🤖 Posted by Builder Automation",
+            "◆ Posted by Sapiens Automation",
             "Builder Question",
             "Builder Update",
             "Task Progress",

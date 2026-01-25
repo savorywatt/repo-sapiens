@@ -71,7 +71,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GIT_TOKEN }}
+          # Use GIT_TOKEN if provided, otherwise fall back to default GITHUB_TOKEN
+          # GIT_TOKEN is needed for cross-repo reusable workflows
+          token: ${{ secrets.GIT_TOKEN || github.token }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -89,11 +91,35 @@ jobs:
           git config --global user.name "Sapiens Bot"
           git config --global user.email "sapiens-bot@users.noreply.github.com"
 
+      - name: Generate sapiens config
+        env:
+          GIT_PROVIDER_TYPE: ${{ inputs.git_provider_type }}
+          GIT_PROVIDER_URL: ${{ inputs.git_provider_url }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          AI_PROVIDER_TYPE: ${{ inputs.ai_provider_type }}
+          AI_MODEL: ${{ inputs.ai_model }}
+          AI_BASE_URL: ${{ inputs.ai_base_url }}
+        run: |
+          # Use existing config if present, otherwise generate minimal config
+          if [ -f ".sapiens/config.yaml" ]; then
+            echo "Using existing .sapiens/config.yaml"
+          else
+            echo "Generating minimal sapiens config..."
+            mkdir -p .sapiens
+            # Use ${...} format for env var interpolation (resolved by from_yaml())
+            # The actual values come from AUTOMATION__* env vars set in the Process label step
+            printf 'git_provider:\n  provider_type: "%s"\n  base_url: "%s"\n  api_token: "${AUTOMATION__GIT_PROVIDER__API_TOKEN}"\n\nrepository:\n  owner: "%s"\n  name: "%s"\n\nagent_provider:\n  provider_type: "%s"\n  model: "%s"\n  api_key: "${AUTOMATION__AGENT_PROVIDER__API_KEY}"\n  base_url: "%s"\n' "$GIT_PROVIDER_TYPE" "$GIT_PROVIDER_URL" "$REPO_OWNER" "$REPO_NAME" "$AI_PROVIDER_TYPE" "${AI_MODEL:-claude-sonnet-4.5}" "${AI_BASE_URL:-http://localhost:11434}" > .sapiens/config.yaml
+            echo "Config generated:"
+            cat .sapiens/config.yaml
+          fi
+
       - name: Process label
         env:
           AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: ${{ inputs.git_provider_type }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ inputs.git_provider_url }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
+          # Use GIT_TOKEN if provided, otherwise fall back to github.token
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN || github.token }}
           AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: ${{ inputs.ai_provider_type }}
@@ -123,7 +149,7 @@ jobs:
       - name: Post failure comment (GitHub)
         if: failure() && inputs.git_provider_type == 'github'
         env:
-          GH_TOKEN: ${{ secrets.GIT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GIT_TOKEN || github.token }}
         run: |
           gh issue comment ${{ inputs.issue_number }} \
             --body "**Sapiens automation failed**

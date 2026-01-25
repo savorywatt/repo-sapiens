@@ -8,6 +8,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+#### Specialized Workflow Stages
+- **DependencyAuditStage**: Audits dependencies for vulnerabilities using pip-audit, npm audit, cargo audit, govulncheck
+- **DocsGenerationStage**: Auto-generates documentation suggestions for PRs and issues
+- **SecurityReviewStage**: Performs OWASP Top 10 security-focused code review on PRs
+- **TestCoverageStage**: Runs coverage analysis (pytest-cov, nyc, go test -cover) and suggests improvements
+
+#### Playground Directory Support
+- **`get_playground_dir()` method**: Configurable workspace directory for safe code execution
+  - Resolution order: `SAPIENS_PLAYGROUND_DIR` env var → config → legacy `../playground` fallback
+  - Enables CI/CD environments to specify isolated workspace locations
+  - All workflow stages now use this method instead of hardcoded paths
+
+#### Reasoning Model Support
+- **`strip_thinking_tags` config**: Strips `<think>...</think>` tags from reasoning models (qwen3, deepseek-r1)
+- **Content preservation fix**: Correctly preserves content when stripping thinking tags
+
+#### Comment-Response Workflow
+- **AI-driven issue comment actions**: New workflow for responding to comments on issues
+- **GitLab webhook handler**: Comment-triggered pipeline support via webhook bridge
+
+#### Configuration Enhancements
+- **`${VAR:-default}` syntax**: Environment variable interpolation with default values
+
+### Changed
+- **Type annotations**: Stages now return `PullRequest | None` instead of `Any` for better type safety
+- **Workflow installation**: Templates now install `repo-sapiens` from GitHub instead of PyPI
+
+### Fixed
+- **Error message sanitization**: Public error comments no longer expose sensitive details
+  - Only error type shown (e.g., `Error type: ValueError`)
+  - Full details logged privately for debugging
+- **Event classifier**: Correctly extracts label from CLI format for all sources
+- **PR fix stage tests**: Updated to match new proposal-based behavior
+- **CI configuration**: Corrected OpenAI backend type and added `GIT_TOKEN` env var
+
+## [0.5.0] - 2026-01-24
+
+### Added
+
+#### Tiered Workflow Deployment
+- **`--deploy-workflows` accepts tier names**: Changed from boolean to multi-value option
+  - `essential`: Label-triggered AI work (`process-label.yaml`, `sapiens.yaml` wrapper)
+  - `core`: Repository maintenance (`post-merge-docs`, `weekly-test-coverage`)
+  - `security`: Security audits (`weekly-security-review`, `dependency-audit`, `sbom-license`)
+  - `support`: Issue management (`daily-issue-triage`)
+  - `all`: Deploy all tiers
+- **Provider-specific deployment strategies**:
+  - GitHub: Thin wrapper → reusable dispatcher for essential tier; actual files for recipe tiers
+  - Gitea/GitLab: Full workflow files for all tiers (no cross-repo reusable support)
+- **Interactive tier selection**: Prompts for which tiers to deploy during `sapiens init`
+- **Essential tier always implied**: When specifying other tiers, essential is automatically included
+
+#### Reusable Workflows (GitHub)
+Six new reusable workflows in `.github/workflows/` for cross-repository use:
+- `sapiens-security-review.yaml`: Multi-language security scanning (Python, Go, Java, Rust, TypeScript, etc.)
+- `sapiens-sbom-license.yaml`: SBOM generation and license compliance auditing
+- `sapiens-dependency-audit.yaml`: Dependency vulnerability auditing and updates
+- `sapiens-test-coverage.yaml`: Test coverage analysis and improvement suggestions
+- `sapiens-issue-triage.yaml`: Automated issue labeling and prioritization
+- `sapiens-post-merge-docs.yaml`: Post-merge documentation updates
+
+**Recipe template changes**:
+- All 6 GitHub recipe templates converted to thin wrappers (~35-45 lines)
+- Thin wrappers call reusable workflows via `workflow_call`
+- Gitea recipes remain full implementations (Gitea lacks cross-repo reusable workflow support)
+- Added `permissions:` blocks to all wrapper workflows (required by GitHub for cross-repo calls)
+
+#### Workflow Removal
+- **`--remove-workflows` option**: New CLI option to remove deployed workflow tiers
+  - Removes files from `.github/workflows/sapiens/` or `.gitlab/sapiens/`
+  - Automatically cleans up empty directories
+  - Supports same tier options: `essential`, `core`, `security`, `support`, `all`
+
+#### GitLab Integration Improvements
+- **Automation Daemon v2.0**: Updated `automation-daemon.yaml` as the recommended approach
+  - Polls on schedule (configured via GitLab UI variables)
+  - Processes all issues with sapiens labels via `sapiens process-all`
+  - Supports `include: remote:` for cross-project reuse
+  - Configurable AI provider settings via CI/CD variables
+- **GitLab Dispatcher**: Optional `sapiens-dispatcher.yaml` for real-time responses
+  - For users who need instant label reactions (requires external webhook handler)
+  - Includes `webhook-trigger.py` example script for bridging GitLab events to pipelines
+- **Individual label workflows removed**: Replaced by unified daemon approach
+- **GitLab init validation**: Prevents misconfiguration
+  - Shows warning that GitLab lacks native label triggers
+  - Defaults to "daemon" mode instead of "native" for GitLab repos
+  - Non-interactive mode automatically uses daemon mode for GitLab
+
+#### CI/CD Mode Enhancements
+- **Pydantic environment variable format**: Credentials now use `${AUTOMATION__GIT_PROVIDER__API_TOKEN}` format for proper CI/CD resolution
+- **Provider-specific handling**: GitHub, Gitea, and GitLab credentials configured appropriately for CICD backend
+- **Workflow deployment in CICD mode**: `sapiens init` now properly deploys workflows when `--cicd` flag is used
+- **AI provider configuration**: Always includes `base_url` for openai-compatible providers in CICD mode
+
+#### GitHub Copilot Documentation
+- **Direct API approach for CI/CD**: Document using `https://api.githubcopilot.com` endpoint
+  - Works with `openai-compatible` provider type
+  - OAuth token extracted from IDE (one-time setup)
+  - Supports models: `gpt-4o`, `claude-3.7-sonnet`, `gemini-2.5-pro`
+- **Two-approach documentation**: Reorganized COPILOT_SETUP.md to cover:
+  1. Direct API (CI/CD, headless environments)
+  2. copilot-api proxy (local development)
+- **Goose integration**: Added example for using Goose with Copilot backend
+
+#### E2E Testing Improvements
+- **Tier E2E test script**: New `scripts/test-workflow-tiers.sh`
+  - Tests install, idempotent re-deploy, update, and remove for each tier
+  - Validates files via Gitea API
+  - Supports `--bootstrap` for automated Gitea setup
+- **GitHub E2E modernization**: Updated `run-github-e2e.sh` to use `sapiens init --deploy-workflows`
+  - Tests `needs-planning` and `approved` workflow triggers
+  - Uses absolute paths for results directory
+  - Added AI provider configuration options
+- **Comprehensive Gitea workflow tier testing**: Full execution validation via `workflow_dispatch`
+  - New `--test-tiers` flag for `run-gitea-e2e.sh`
+  - Tests Core, Security, and Support tier workflows
+  - Real-time progress display with phase tracking
+
+### Changed
+- **Branding Update**: Renamed "Builder Automation" to "Sapiens Automation" throughout codebase
+- **Bot Signature Icon**: Changed from robot emoji (🤖) to diamond (◆) for cleaner appearance
+- **GitLab E2E Default AI Provider**: Changed from OpenRouter to Ollama for local testing
+- **Bootstrap scripts updated**: Use `--deploy-workflows essential` instead of boolean flag
+
+### Fixed
+- **Cross-repo workflow permissions**: Added required `permissions:` blocks to all GitHub recipe thin wrappers
+  - GitHub requires calling workflows to grant permissions when invoking cross-repo reusable workflows
+- **Test coverage workflow inputs**: Fixed `fromJSON()` usage for number type inputs in thin wrappers
+- **Reusable workflow secrets**: Corrected `secrets` usage in workflow conditions
+- **GitLab CI YAML comment bug**: Fixed `#` being interpreted as YAML comment in echo statements
+- **GitLab Runner clone failure**: Fixed `external_url` configuration from `localhost` to `gitlab` hostname
+- **Bootstrap token reuse**: Fixed bootstrap failing when root password file was deleted
+- **OpenAI-compatible provider**: Fixed mypy type error in `Task` conversion
+
+### Removed
+- **GitLab individual label workflows**: Replaced by unified `automation-daemon.yaml`
+  - `approved.yaml`, `needs-planning.yaml`, `needs-review.yaml`, `needs-fix.yaml`
+  - `requires-qa.yaml`, `process-label.yaml`, `execute-task.yaml`, `process-issue.yaml`
+
+## [0.4.0] - 2026-01-19
+
+### Added
 - **MCP (Model Context Protocol) Support**: Unified MCP integration across all agent backends
   - `repo_sapiens/mcp/` package with registry, client, adapter, and manager modules
   - `MCPServerSpec` frozen dataclass for immutable server specifications
@@ -52,12 +195,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Uses preferred remotes (origin > upstream > first) in non-interactive mode
   - Prompts user to select provider when multiple are detected
 - **GitHub Copilot Integration**: Support for GitHub Copilot as an AI agent provider
-  - New `copilot-local` provider type using the official `gh copilot` CLI
-  - Automatic detection of GitHub CLI and Copilot extension during `sapiens init`
-  - Interactive setup with extension installation prompt
-  - Health checks for GitHub CLI, Copilot extension, and authentication status
-  - Integration with ExternalAgentProvider for CLI-based execution
-  - Support in process-label workflow for label-triggered automation
+  - New `copilot-local` provider type using `copilot-api` proxy (unofficial)
+  - Full `CopilotProvider` class with OpenAI-compatible API delegation
+  - Managed proxy mode: auto-starts `npx copilot-api@latest` subprocess
+  - External proxy mode: connects to existing `copilot-api` instance
+  - Rate limiting support to avoid GitHub abuse detection
+  - Custom error handling: `CopilotAuthenticationError`, `CopilotRateLimitError`, `CopilotAbuseDetectedError`
+  - Health checks for Node.js/npx, GitHub token, and proxy status
+  - Prominent disclaimers: unofficial API, not endorsed by GitHub, may violate ToS
+  - Interactive warning during `sapiens init` requiring explicit risk acceptance
+  - Updated documentation: `docs/COPILOT_SETUP.md`, `docs/AGENT_COMPARISON.md`
 - **Native Label Trigger System**: Instant automation via CI/CD workflows instead of daemon polling
   - `sapiens process-label` command for handling label events in workflows
   - `sapiens migrate` commands for analyzing and generating native trigger workflows
@@ -353,6 +500,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core dependencies install without optional dependencies (correct split)
 - Version extraction works: repo_sapiens.__version__ = "0.1.0"
 
+[0.5.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.5.0
+[0.4.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.4.0
 [0.3.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.3.0
 [0.2.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.1.0

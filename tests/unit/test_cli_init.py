@@ -332,10 +332,11 @@ class TestRepoInitializerCollectCredentials:
 
     @patch.dict(os.environ, {}, clear=True)
     def test_collect_from_environment_missing_token(self, tmp_path, mock_repo_info):
-        """Should raise ClickException when GITEA_TOKEN is missing."""
-        # Ensure environment variable is not set
-        if "GITEA_TOKEN" in os.environ:
-            del os.environ["GITEA_TOKEN"]
+        """Should raise ClickException when git token is missing from environment."""
+        # Ensure environment variables are not set
+        for var in ["SAPIENS_GITEA_TOKEN", "GITEA_TOKEN", "GITHUB_TOKEN", "GITLAB_TOKEN"]:
+            if var in os.environ:
+                del os.environ[var]
 
         with patch.object(RepoInitializer, "_detect_backend", return_value="environment"):
             initializer = RepoInitializer(
@@ -351,7 +352,8 @@ class TestRepoInitializerCollectCredentials:
         with pytest.raises(ClickException) as exc_info:
             initializer._collect_from_environment()
 
-        assert "GITEA_TOKEN environment variable required" in str(exc_info.value)
+        # Error message now lists all supported environment variable names
+        assert "Git token required" in str(exc_info.value)
 
     @patch("repo_sapiens.cli.init.click.confirm")
     @patch("repo_sapiens.cli.init.click.prompt")
@@ -1006,9 +1008,10 @@ class TestRepoInitializerGenerateConfig:
         assert config_path.exists()
         content = config_path.read_text()
 
-        assert "${SAPIENS_GITEA_TOKEN}" in content
+        # Environment backend now uses Pydantic env var format for CICD compatibility
+        assert "${AUTOMATION__GIT_PROVIDER__API_TOKEN}" in content
         assert "provider_type: claude-api" in content
-        assert "${CLAUDE_API_KEY}" in content
+        assert "${AUTOMATION__AGENT_PROVIDER__API_KEY}" in content
         assert "local_mode: false" in content
 
     def test_generate_config_goose_openai(self, tmp_path, mock_repo_info):
@@ -1125,8 +1128,9 @@ class TestRepoInitializerGenerateConfig:
         content = config_path.read_text()
 
         # GitLab-specific assertions for environment backend
+        # Environment backend now uses Pydantic env var format for CICD compatibility
         assert "provider_type: gitlab" in content
-        assert "${GITLAB_TOKEN}" in content
+        assert "${AUTOMATION__GIT_PROVIDER__API_TOKEN}" in content
         assert "mcp_server: null" in content
 
     def test_generate_config_creates_parent_directories(self, tmp_path, mock_repo_info):
@@ -1325,7 +1329,11 @@ class TestRepoInitializerValidateSetup:
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
     def test_validate_setup_environment_success(self, mock_resolver_class, tmp_path, mock_repo_info):
-        """Should validate environment credentials successfully."""
+        """Should skip credential validation for environment backend.
+
+        Environment backend now skips credential resolution because env vars
+        are set by the dispatcher at runtime, not at init time.
+        """
         mock_resolver = Mock()
         mock_resolver.resolve.return_value = "resolved-token"
         mock_resolver_class.return_value = mock_resolver
@@ -1342,7 +1350,8 @@ class TestRepoInitializerValidateSetup:
 
         initializer._validate_setup()
 
-        mock_resolver.resolve.assert_called_once_with("${SAPIENS_GITEA_TOKEN}", cache=False)
+        # Environment backend skips credential resolution - env vars are set at runtime
+        mock_resolver.resolve.assert_not_called()
 
     @patch("repo_sapiens.cli.init.CredentialResolver")
     def test_validate_setup_failure_handled_gracefully(self, mock_resolver_class, tmp_path, mock_repo_info):

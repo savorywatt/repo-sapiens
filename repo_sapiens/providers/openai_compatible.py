@@ -27,6 +27,7 @@ class OpenAICompatibleProvider(AgentProvider):
         working_dir: str | None = None,
         qa_handler: Any | None = None,
         timeout: float = 300.0,
+        strip_thinking_tags: bool = False,
     ):
         """Initialize OpenAI-compatible provider.
 
@@ -37,6 +38,7 @@ class OpenAICompatibleProvider(AgentProvider):
             working_dir: Working directory for operations
             qa_handler: Interactive Q&A handler
             timeout: Request timeout in seconds (default: 300)
+            strip_thinking_tags: Strip <think>...</think> tags from responses
         """
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -44,6 +46,7 @@ class OpenAICompatibleProvider(AgentProvider):
         self.working_dir = working_dir or "."
         self.qa_handler = qa_handler
         self.timeout = timeout
+        self.strip_thinking_tags = strip_thinking_tags
         self.current_issue_number: int | None = None
 
         # Build headers
@@ -144,6 +147,10 @@ class OpenAICompatibleProvider(AgentProvider):
 
             output = choices[0].get("message", {}).get("content", "")
 
+            # Strip thinking tags if configured (for reasoning models like DeepSeek R1)
+            if self.strip_thinking_tags:
+                output = self._strip_thinking_tags(output)
+
             # Extract usage statistics if available
             usage = result.get("usage", {})
             tokens = usage.get("total_tokens", usage.get("completion_tokens", 0))
@@ -190,6 +197,18 @@ class OpenAICompatibleProvider(AgentProvider):
                 "files_changed": [],
                 "error": str(e),
             }
+
+    def _strip_thinking_tags(self, output: str) -> str:
+        """Strip <think>...</think> tags from output, keeping the content.
+
+        Reasoning models like DeepSeek R1 wrap their response in thinking blocks.
+        We remove just the tags but preserve the content inside.
+        """
+        # Remove <think>...</think> tags but keep content (case-insensitive, multiline)
+        output = re.sub(r"<think>(.*?)</think>", r"\1", output, flags=re.DOTALL | re.IGNORECASE)
+        # Also handle <thinking>...</thinking> variant
+        output = re.sub(r"<thinking>(.*?)</thinking>", r"\1", output, flags=re.DOTALL | re.IGNORECASE)
+        return output.strip()
 
     def _detect_changed_files(self, output: str) -> list[str]:
         """Detect which files were changed from output.
@@ -272,7 +291,7 @@ class OpenAICompatibleProvider(AgentProvider):
             def __setattr__(self, key: str, value: Any) -> None:
                 self[key] = value
 
-        task_objects = []
+        task_objects: list[dict[str, Any]] = []
         for t in tasks:
             task_obj = TaskDict(
                 id=t["id"],
@@ -327,8 +346,18 @@ IMPORTANT:
         result = await self.execute_prompt(prompt)
         output = result.get("output", "")
 
-        # Parse tasks from markdown output
-        tasks = self._parse_tasks_from_markdown(output)
+        # Parse tasks from markdown output and convert to Task objects
+        parsed_tasks = self._parse_tasks_from_markdown(output)
+        tasks = [
+            Task(
+                id=t["id"],
+                prompt_issue_id=issue.number,
+                title=t["title"],
+                description=t.get("description", ""),
+                dependencies=t.get("dependencies", []),
+            )
+            for t in parsed_tasks
+        ]
 
         plan = Plan(
             id=str(issue.number),

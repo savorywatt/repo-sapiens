@@ -1,4 +1,7 @@
+# @repo-sapiens-template
 # @version: 1.0.0
+# @name: Sapiens AI Task (Gitea)
+#
 # Sapiens AI Task - Gitea Composite Action
 # Reusable action for running AI tasks with repo-sapiens
 

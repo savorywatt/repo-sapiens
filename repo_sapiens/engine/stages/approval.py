@@ -93,7 +93,7 @@ class ApprovalStage(WorkflowStage):
                 issue.number,
                 f"✅ **Plan Approved by @{approver}**\n\n"
                 f"Creating project and {len(tasks)} task issues...\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Create task issues
@@ -135,7 +135,7 @@ class ApprovalStage(WorkflowStage):
                     "- Change any task label from `ready` to `execute` to start implementation",
                     "- Tasks will be executed in dependency order",
                     "",
-                    "🤖 Posted by Builder Automation",
+                    "◆ Posted by Sapiens Automation",
                 ]
             )
 
@@ -153,7 +153,7 @@ class ApprovalStage(WorkflowStage):
                 f"✅ **Proposal Executed**\n\n"
                 f"Created {len(task_issues)} task issues.\n"
                 f"Keeping this proposal open for reference.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             log.info("approval_stage_complete", original=original_issue_number, tasks=len(task_issues))
@@ -162,13 +162,13 @@ class ApprovalStage(WorkflowStage):
             log.error("approval_stage_failed", issue=issue.number, error=str(e), exc_info=True)
             await self.git.add_comment(
                 issue.number,
-                f"❌ **Approval Processing Failed**\n\n" f"Error: {str(e)}\n\n" f"🤖 Posted by Builder Automation",
+                f"❌ **Approval Processing Failed**\n\n" f"Error: {str(e)}\n\n" f"◆ Posted by Sapiens Automation",
             )
             raise
 
     def _is_bot_comment(self, body: str) -> bool:
         """Check if comment is from bot."""
-        return "🤖 Posted by Builder Automation" in body
+        return "◆ Posted by Sapiens Automation" in body
 
     def _extract_plan_from_body(self, body: str) -> str:
         """Extract plan content from proposal body."""
@@ -291,7 +291,7 @@ class ApprovalStage(WorkflowStage):
                 "- Builder will create a branch and implement the task",
                 "- A pull request will be created for review",
                 "",
-                "🤖 Posted by Builder Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 

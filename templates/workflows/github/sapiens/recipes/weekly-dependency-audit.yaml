@@ -1,0 +1,39 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: weekly-dependency-audit
+# @type: thin-wrapper
+#
+# Weekly Dependency Audit - Thin Wrapper
+#
+# Calls the reusable workflow from savorywatt/repo-sapiens.
+# Checks for outdated dependencies and security vulnerabilities.
+#
+# Setup:
+# 1. Copy to .github/workflows/weekly-dependency-audit.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITHUB_TOKEN: GitHub token with repo access
+#    - ANTHROPIC_API_KEY: Claude API key
+# 3. Adjust schedule as needed
+
+name: Dependency Audit
+
+on:
+  schedule:
+    # Every Wednesday at 10am UTC
+    - cron: '0 10 * * 3'
+  workflow_dispatch:
+
+# Required for cross-repo reusable workflow
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependency-audit:
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dependency-audit.yaml@v2
+    with:
+      fail_on_critical: false
+      ignore_dev: false
+    secrets:
+      GIT_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+      AI_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

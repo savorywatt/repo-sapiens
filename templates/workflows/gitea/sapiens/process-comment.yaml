@@ -1,0 +1,84 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: process-comment
+#
+# Process Comment Workflow for Gitea Actions
+#
+# Triggers when an issue comment is created that contains trigger keywords
+# (e.g., @sapiens, sapiens:). Routes to AI for analysis and action execution.
+
+name: Process Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    # Only trigger on comments containing @sapiens or sapiens:
+    if: |
+      contains(github.event.comment.body, '@sapiens') ||
+      contains(github.event.comment.body, 'sapiens:')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        env:
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
+        run: |
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            echo "Installing from $SAPIENS_REPO_URL (branch: ${SAPIENS_BRANCH:-main})"
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens
+            cd /tmp/repo-sapiens
+            git checkout "${SAPIENS_BRANCH:-main}"
+            pip install -e .
+          else
+            echo "Installing from PyPI"
+            pip install repo-sapiens
+          fi
+
+      - name: Process comment
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          # For ollama - pass base URL (no API key needed)
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_OLLAMA_URL }}
+        run: |
+          # Extract comment body, handling multiline content
+          COMMENT_BODY=$(cat <<'COMMENT_EOF'
+          ${{ github.event.comment.body }}
+          COMMENT_EOF
+          )
+
+          echo "Processing comment on issue #${{ github.event.issue.number }}"
+          echo "Comment author: ${{ github.event.comment.user.login }}"
+
+          sapiens process-comment \
+            --issue "${{ github.event.issue.number }}" \
+            --comment-id "${{ github.event.comment.id }}" \
+            --comment-author "${{ github.event.comment.user.login }}" \
+            --comment-body "$COMMENT_BODY" \
+            --source gitea
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "Failed to process comment. Check [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

@@ -183,7 +183,7 @@ class TaskExecutionStage(WorkflowStage):
                 f"Branch: `{branch_name}`\n"
                 f"Task: {task_num} of {total_tasks}\n\n"
                 f"I'll implement this task and create a pull request when complete.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Create branch
@@ -402,7 +402,7 @@ class TaskExecutionStage(WorkflowStage):
                 f"- Review the pull request\n"
                 f"- Merge when satisfied, or comment for changes\n"
                 f"- Task will be closed automatically when PR is merged\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             log.info("task_execution_complete", task=task_num, pr=pr.number)
@@ -414,7 +414,7 @@ class TaskExecutionStage(WorkflowStage):
                 f"❌ **Task Execution Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             raise
 
@@ -602,7 +602,7 @@ class TaskExecutionStage(WorkflowStage):
                 "",
                 f"**Related Issues**: Implements #{original_issue.number}",
                 "",
-                "🤖 Posted by Builder Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
@@ -662,7 +662,7 @@ class TaskExecutionStage(WorkflowStage):
                 "",
                 (f"**Related Issues**: Closes #{task_issue.number}, " f"Implements #{original_issue.number}"),
                 "",
-                "🤖 Posted by Builder Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
