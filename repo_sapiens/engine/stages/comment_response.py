@@ -314,21 +314,22 @@ If no action is needed, return an empty actions array.
     ) -> list[ActionRequest]:
         """Execute the suggested actions."""
         executed = []
-        current_labels = list(issue.labels)
+        current_labels = list(issue.labels or [])
+        labels_changed = False
 
         for action in analysis.actions:
             try:
                 if action.action_type == CommentAction.ADD_LABEL:
                     if action.value not in current_labels:
                         current_labels.append(action.value)
-                        await self.git.update_issue(issue.number, labels=current_labels)
+                        labels_changed = True
                         log.info("label_added", issue=issue.number, label=action.value)
                     executed.append(action)
 
                 elif action.action_type == CommentAction.REMOVE_LABEL:
                     if action.value in current_labels:
                         current_labels.remove(action.value)
-                        await self.git.update_issue(issue.number, labels=current_labels)
+                        labels_changed = True
                         log.info("label_removed", issue=issue.number, label=action.value)
                     executed.append(action)
 
@@ -348,6 +349,10 @@ If no action is needed, return an empty actions array.
                     action_type=action.action_type.value,
                     error=str(e),
                 )
+
+        # Single API call for all label changes
+        if labels_changed:
+            await self.git.update_issue(issue.number, labels=current_labels)
 
         return executed
 

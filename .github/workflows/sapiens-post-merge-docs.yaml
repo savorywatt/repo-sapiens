@@ -48,7 +48,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install repo-sapiens
-        run: pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
+        run: pip install repo-sapiens==0.5.0
 
       - name: Get recent changes
         id: changes
