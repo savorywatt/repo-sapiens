@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-01-25
+
 ### Added
 
 #### Specialized Workflow Stages
@@ -500,6 +502,7 @@ Six new reusable workflows in `.github/workflows/` for cross-repository use:
 - Core dependencies install without optional dependencies (correct split)
 - Version extraction works: repo_sapiens.__version__ = "0.1.0"
 
+[0.5.1]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.5.1
 [0.5.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.5.0
 [0.4.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.4.0
 [0.3.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.3.0

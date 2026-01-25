@@ -49,7 +49,7 @@ sapiens:
     AUTOMATION__AGENT_PROVIDER__MODEL: $[[ inputs.ai_model ]]
     AUTOMATION__AGENT_PROVIDER__BASE_URL: $[[ inputs.ai_base_url ]]
   before_script:
-    - pip install repo-sapiens==2.1.0
+    - pip install repo-sapiens==0.5.1
     - git config --global user.name "Sapiens Bot"
     - git config --global user.email "sapiens-bot@gitlab.local"
   script:
