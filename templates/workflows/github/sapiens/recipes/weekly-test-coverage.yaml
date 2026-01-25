@@ -38,7 +38,8 @@ jobs:
   test-coverage:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-test-coverage.yaml@v2
     with:
-      coverage_threshold: ${{ github.event.inputs.target_coverage || 60 }}
+      # Convert to number using fromJSON to ensure proper type for reusable workflow
+      coverage_threshold: ${{ fromJSON(github.event.inputs.target_coverage || '60') }}
       # Customize test command if needed (default: pytest with coverage)
       # test_command: "python -m pytest tests/ --cov --cov-report=json --cov-report=term -q"
     secrets:
