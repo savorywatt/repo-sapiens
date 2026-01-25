@@ -1007,7 +1007,7 @@ sapiens-dispatch:
     SAPIENS_AI_API_KEY: \${SAPIENS_AI_API_KEY}
   before_script:
     - apt-get update && apt-get install -y git
-    - pip install git+https://github.com/savorywatt/repo-sapiens.git
+    - pip install git+https://github.com/savorywatt/repo-sapiens.git@feat/gitlab-e2e-and-branding
     - git config --global user.name "Sapiens Bot"
     - git config --global user.email "sapiens-bot@gitlab.local"
   script:
