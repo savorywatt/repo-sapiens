@@ -45,7 +45,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
+          pip install repo-sapiens==0.5.0
           pip install -e ".[dev]" 2>/dev/null || pip install -e . pytest pytest-cov
 
       - name: Run coverage analysis

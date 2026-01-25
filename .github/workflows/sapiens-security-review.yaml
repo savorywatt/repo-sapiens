@@ -716,7 +716,7 @@ jobs:
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
         run: |
-          pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
+          pip install repo-sapiens==0.5.0
 
           sapiens task "Review the security report and fix identified vulnerabilities.
 
