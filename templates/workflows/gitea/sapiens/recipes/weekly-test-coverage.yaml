@@ -42,8 +42,21 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
+        env:
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
         run: |
-          pip install repo-sapiens
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            echo "Installing repo-sapiens from $SAPIENS_REPO_URL (branch: ${SAPIENS_BRANCH:-main})"
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens
+            cd /tmp/repo-sapiens
+            git checkout "${SAPIENS_BRANCH:-main}"
+            pip install -e .
+            cd -
+          else
+            echo "Installing repo-sapiens from PyPI"
+            pip install repo-sapiens
+          fi
           pip install -e ".[dev]" 2>/dev/null || pip install -e . pytest pytest-cov
 
       - name: Run coverage analysis

@@ -35,6 +35,8 @@ import structlog
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.stages.approval import ApprovalStage
 from repo_sapiens.engine.stages.code_review import CodeReviewStage
+from repo_sapiens.engine.stages.dependency_audit import DependencyAuditStage
+from repo_sapiens.engine.stages.docs_generation import DocsGenerationStage
 from repo_sapiens.engine.stages.execution import TaskExecutionStage
 from repo_sapiens.engine.stages.fix_execution import FixExecutionStage
 from repo_sapiens.engine.stages.implementation import ImplementationStage
@@ -45,6 +47,9 @@ from repo_sapiens.engine.stages.pr_fix import PRFixStage
 from repo_sapiens.engine.stages.pr_review import PRReviewStage
 from repo_sapiens.engine.stages.proposal import ProposalStage
 from repo_sapiens.engine.stages.qa import QAStage
+from repo_sapiens.engine.stages.security_review import SecurityReviewStage
+from repo_sapiens.engine.stages.test_coverage import TestCoverageStage
+from repo_sapiens.engine.stages.triage import TriageStage
 from repo_sapiens.engine.state_manager import StateManager
 from repo_sapiens.engine.types import StageState, WorkflowState
 from repo_sapiens.models.domain import Issue, Task
@@ -144,6 +149,12 @@ class WorkflowOrchestrator:
             "pr_fix": PRFixStage(git, agent, state, settings),
             "fix_execution": FixExecutionStage(git, agent, state, settings),
             "qa": QAStage(git, agent, state, settings),
+            # Specialized stages
+            "triage": TriageStage(git, agent, state, settings),
+            "docs_generation": DocsGenerationStage(git, agent, state, settings),
+            "test_coverage": TestCoverageStage(git, agent, state, settings),
+            "dependency_audit": DependencyAuditStage(git, agent, state, settings),
+            "security_review": SecurityReviewStage(git, agent, state, settings),
             # Legacy stages (kept for compatibility)
             "planning": PlanningStage(git, agent, state, settings),
             "plan_review": PlanReviewStage(git, agent, state, settings),
@@ -593,5 +604,21 @@ class WorkflowOrchestrator:
 
         if tags.merge_ready in issue.labels:
             return "merge"
+
+        # Specialized stages
+        if "sapiens/triage" in issue.labels or "triage" in issue.labels:
+            return "triage"
+
+        if "sapiens/docs-generation" in issue.labels or "docs-generation" in issue.labels:
+            return "docs_generation"
+
+        if "sapiens/test-coverage" in issue.labels or "test-coverage" in issue.labels:
+            return "test_coverage"
+
+        if "sapiens/dependency-audit" in issue.labels or "dependency-audit" in issue.labels:
+            return "dependency_audit"
+
+        if "sapiens/security-review" in issue.labels or "security-review" in issue.labels:
+            return "security_review"
 
         return None

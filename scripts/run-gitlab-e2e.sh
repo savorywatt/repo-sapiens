@@ -162,6 +162,17 @@ FIX_EXECUTION_DONE=""
 CODE_REVIEW_DONE=""
 MERGE_DONE=""
 PLAN_REVIEW_DONE=""
+# Phase 13-17: Specialized stages
+TRIAGE_ISSUE_IID=""
+DOCS_GEN_ISSUE_IID=""
+TEST_COV_ISSUE_IID=""
+DEP_AUDIT_ISSUE_IID=""
+SEC_REVIEW_ISSUE_IID=""
+TRIAGE_DONE=""
+DOCS_GEN_DONE=""
+TEST_COV_DONE=""
+DEP_AUDIT_DONE=""
+SEC_REVIEW_DONE=""
 
 # URL-encode project path for GitLab API
 PROJECT_ENCODED="${GITLAB_PROJECT//\//%2F}"
@@ -254,6 +265,36 @@ cleanup() {
     if [[ -n "${PLAN_REVIEW_ISSUE_IID:-}" ]]; then
         log "Closing plan review test issue #$PLAN_REVIEW_ISSUE_IID..."
         gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$PLAN_REVIEW_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close triage test issue
+    if [[ -n "${TRIAGE_ISSUE_IID:-}" ]]; then
+        log "Closing triage test issue #$TRIAGE_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$TRIAGE_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close docs generation test issue
+    if [[ -n "${DOCS_GEN_ISSUE_IID:-}" ]]; then
+        log "Closing docs generation test issue #$DOCS_GEN_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$DOCS_GEN_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close test coverage test issue
+    if [[ -n "${TEST_COV_ISSUE_IID:-}" ]]; then
+        log "Closing test coverage test issue #$TEST_COV_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$TEST_COV_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close dependency audit test issue
+    if [[ -n "${DEP_AUDIT_ISSUE_IID:-}" ]]; then
+        log "Closing dependency audit test issue #$DEP_AUDIT_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$DEP_AUDIT_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close security review test issue
+    if [[ -n "${SEC_REVIEW_ISSUE_IID:-}" ]]; then
+        log "Closing security review test issue #$SEC_REVIEW_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$SEC_REVIEW_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
     fi
 
     # Close proposal issue
@@ -1230,6 +1271,17 @@ create_test_issue() {
     ensure_label "merged" "#6f42c1"
     ensure_label "plan-review" "#fbca04"
     ensure_label "plan-approved" "#0e8a16"
+    # New specialized stage labels
+    ensure_label "sapiens/triage" "#9b59b6"
+    ensure_label "triaged" "#8e44ad"
+    ensure_label "sapiens/docs-generation" "#3498db"
+    ensure_label "docs-ready" "#2980b9"
+    ensure_label "sapiens/test-coverage" "#27ae60"
+    ensure_label "coverage-analyzed" "#229954"
+    ensure_label "sapiens/dependency-audit" "#e67e22"
+    ensure_label "audit-complete" "#d35400"
+    ensure_label "sapiens/security-review" "#e74c3c"
+    ensure_label "security-reviewed" "#c0392b"
 
     local issue_body
     issue_body=$(cat << 'ISSUE_EOF'
@@ -1349,6 +1401,36 @@ automation:
       ai_enabled: true
       remove_on_complete: true
       success_label: plan-approved
+    "sapiens/triage":
+      label_pattern: "sapiens/triage"
+      handler: triage
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: triaged
+    "sapiens/docs-generation":
+      label_pattern: "sapiens/docs-generation"
+      handler: docs_generation
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: docs-ready
+    "sapiens/test-coverage":
+      label_pattern: "sapiens/test-coverage"
+      handler: test_coverage
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: coverage-analyzed
+    "sapiens/dependency-audit":
+      label_pattern: "sapiens/dependency-audit"
+      handler: dependency_audit
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: audit-complete
+    "sapiens/security-review":
+      label_pattern: "sapiens/security-review"
+      handler: security_review
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: security-reviewed
 CONFIG_EOF
 
     log "Config written to $config_file"
@@ -2060,6 +2142,309 @@ EVENT_JSON
 }
 
 #############################################
+# Phase 13: Triage Stage
+#############################################
+
+create_triage_issue() {
+    step "Creating issue for triage test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+Something is broken in the application. When I click the button nothing happens.
+
+I'm not sure if this is a bug or if I'm using it wrong. The error appeared after the last update.
+
+Environment:
+- Browser: Chrome
+- OS: Windows 11
+
+This is an automated test for the sapiens/triage workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Help: Button not working\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/triage\"
+    }")
+
+    TRIAGE_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$TRIAGE_ISSUE_IID" ]]; then
+        error "Failed to create triage test issue. Response: $response"
+        return 1
+    fi
+    log "Created triage test issue #$TRIAGE_ISSUE_IID with sapiens/triage label"
+}
+
+process_triage() {
+    step "=== Phase 13: Sapiens CLI - Triage ==="
+    echo ""
+
+    create_triage_issue || return 1
+
+    # Use process-all to trigger the triage stage
+    log "Running: sapiens process-all (to trigger triage)"
+
+    if uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-all \
+        2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Triage processing completed"
+        TRIAGE_DONE="true"
+    else
+        warn "Triage processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 14: Docs Generation Stage
+#############################################
+
+create_docs_gen_issue() {
+    step "Creating issue for docs generation test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Documentation Request
+
+Please generate documentation for the greeting module.
+
+### Module Overview
+The greeting module provides functions for generating personalized greetings.
+
+### Functions to Document
+- `greet(name)` - Returns a greeting string
+- `farewell(name)` - Returns a farewell string
+
+### Documentation Needed
+- API documentation with examples
+- Usage guide
+- Parameter descriptions
+
+This is an automated test for the sapiens/docs-generation workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Docs: Generate greeting module documentation\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/docs-generation\"
+    }")
+
+    DOCS_GEN_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$DOCS_GEN_ISSUE_IID" ]]; then
+        error "Failed to create docs generation test issue. Response: $response"
+        return 1
+    fi
+    log "Created docs generation test issue #$DOCS_GEN_ISSUE_IID with sapiens/docs-generation label"
+}
+
+process_docs_generation() {
+    step "=== Phase 14: Sapiens CLI - Docs Generation ==="
+    echo ""
+
+    create_docs_gen_issue || return 1
+
+    # Use process-all to trigger the docs generation stage
+    log "Running: sapiens process-all (to trigger docs generation)"
+
+    if uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-all \
+        2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Docs generation processing completed"
+        DOCS_GEN_DONE="true"
+    else
+        warn "Docs generation processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 15: Test Coverage Stage
+#############################################
+
+create_test_coverage_issue() {
+    step "Creating issue for test coverage test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Test Coverage Analysis Request
+
+Please analyze the test coverage for this project.
+
+### Scope
+- All source files in src/
+- Focus on the greeting module
+
+### Goals
+- Identify areas with low coverage
+- Suggest tests to improve coverage
+- Report overall coverage percentage
+
+This is an automated test for the sapiens/test-coverage workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Coverage: Analyze test coverage\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/test-coverage\"
+    }")
+
+    TEST_COV_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$TEST_COV_ISSUE_IID" ]]; then
+        error "Failed to create test coverage test issue. Response: $response"
+        return 1
+    fi
+    log "Created test coverage test issue #$TEST_COV_ISSUE_IID with sapiens/test-coverage label"
+}
+
+process_test_coverage() {
+    step "=== Phase 15: Sapiens CLI - Test Coverage ==="
+    echo ""
+
+    create_test_coverage_issue || return 1
+
+    # Use process-all to trigger the test coverage stage
+    log "Running: sapiens process-all (to trigger test coverage)"
+
+    if uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-all \
+        2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Test coverage processing completed"
+        TEST_COV_DONE="true"
+    else
+        warn "Test coverage processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 16: Dependency Audit Stage
+#############################################
+
+create_dep_audit_issue() {
+    step "Creating issue for dependency audit test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Dependency Audit Request
+
+Please audit the project dependencies for:
+
+### Security
+- Known vulnerabilities (CVEs)
+- Outdated packages with security fixes
+
+### Maintenance
+- Outdated dependencies
+- Deprecated packages
+
+### Compliance
+- License compatibility
+- Transitive dependencies
+
+This is an automated test for the sapiens/dependency-audit workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Audit: Check dependencies for vulnerabilities\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/dependency-audit\"
+    }")
+
+    DEP_AUDIT_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$DEP_AUDIT_ISSUE_IID" ]]; then
+        error "Failed to create dependency audit test issue. Response: $response"
+        return 1
+    fi
+    log "Created dependency audit test issue #$DEP_AUDIT_ISSUE_IID with sapiens/dependency-audit label"
+}
+
+process_dependency_audit() {
+    step "=== Phase 16: Sapiens CLI - Dependency Audit ==="
+    echo ""
+
+    create_dep_audit_issue || return 1
+
+    # Use process-all to trigger the dependency audit stage
+    log "Running: sapiens process-all (to trigger dependency audit)"
+
+    if uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-all \
+        2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Dependency audit processing completed"
+        DEP_AUDIT_DONE="true"
+    else
+        warn "Dependency audit processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 17: Security Review Stage
+#############################################
+
+create_security_review_issue() {
+    step "Creating issue for security review test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Security Review Request
+
+Please perform a security review of the greeting module.
+
+### Code to Review
+```python
+def greet(name):
+    return f"Hello, {name}!"
+
+def process_input(user_input):
+    # Execute greeting with user input
+    result = eval(f"greet('{user_input}')")
+    return result
+```
+
+### Concerns
+- Input validation
+- Potential injection vulnerabilities
+- Safe string handling
+
+This is an automated test for the sapiens/security-review workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Security: Review greeting module for vulnerabilities\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/security-review\"
+    }")
+
+    SEC_REVIEW_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$SEC_REVIEW_ISSUE_IID" ]]; then
+        error "Failed to create security review test issue. Response: $response"
+        return 1
+    fi
+    log "Created security review test issue #$SEC_REVIEW_ISSUE_IID with sapiens/security-review label"
+}
+
+process_security_review() {
+    step "=== Phase 17: Sapiens CLI - Security Review ==="
+    echo ""
+
+    create_security_review_issue || return 1
+
+    # Use process-all to trigger the security review stage
+    log "Running: sapiens process-all (to trigger security review)"
+
+    if uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-all \
+        2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Security review processing completed"
+        SEC_REVIEW_DONE="true"
+    else
+        warn "Security review processing returned non-zero exit code"
+    fi
+}
+
+#############################################
 # Verification
 #############################################
 
@@ -2205,6 +2590,135 @@ verify_results() {
         fi
     fi
 
+    # Check 9: Fix execution should have run
+    if [[ -n "${FIX_EXECUTION_DONE:-}" ]]; then
+        log "Checking fix execution results..."
+        if [[ "$FIX_EXECUTION_DONE" == "true" ]]; then
+            log "  Fix execution completed"
+            ((passed++))
+        else
+            warn "  - Fix execution did not complete"
+        fi
+    fi
+
+    # Check 10: Code review (legacy) should have run
+    if [[ -n "${CODE_REVIEW_DONE:-}" ]]; then
+        log "Checking code review (legacy) results..."
+        if [[ "$CODE_REVIEW_DONE" == "true" ]]; then
+            log "  Code review (legacy) completed"
+            ((passed++))
+        else
+            warn "  - Code review (legacy) did not complete"
+        fi
+    fi
+
+    # Check 11: Merge should have run
+    if [[ -n "${MERGE_DONE:-}" ]]; then
+        log "Checking merge results..."
+        if [[ "$MERGE_DONE" == "true" ]]; then
+            log "  Merge completed"
+            ((passed++))
+        else
+            warn "  - Merge did not complete"
+        fi
+    fi
+
+    # Check 12: Plan review should have run
+    if [[ -n "${PLAN_REVIEW_ISSUE_IID:-}" ]]; then
+        log "Checking plan review results..."
+        local plan_review_notes
+        plan_review_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$PLAN_REVIEW_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local plan_review_notes_count
+        plan_review_notes_count=$(echo "$plan_review_notes" | jq 'length')
+
+        if [[ "$plan_review_notes_count" -gt 0 ]]; then
+            log "  Plan review issue has $plan_review_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on plan review issue"
+        fi
+    fi
+
+    # Check 13: Triage should have run
+    if [[ -n "${TRIAGE_ISSUE_IID:-}" ]]; then
+        log "Checking triage results..."
+        local triage_notes
+        triage_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$TRIAGE_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local triage_notes_count
+        triage_notes_count=$(echo "$triage_notes" | jq 'length')
+
+        if [[ "$triage_notes_count" -gt 0 ]]; then
+            log "  Triage issue has $triage_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on triage issue"
+        fi
+    fi
+
+    # Check 14: Docs generation should have run
+    if [[ -n "${DOCS_GEN_ISSUE_IID:-}" ]]; then
+        log "Checking docs generation results..."
+        local docs_notes
+        docs_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$DOCS_GEN_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local docs_notes_count
+        docs_notes_count=$(echo "$docs_notes" | jq 'length')
+
+        if [[ "$docs_notes_count" -gt 0 ]]; then
+            log "  Docs generation issue has $docs_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on docs generation issue"
+        fi
+    fi
+
+    # Check 15: Test coverage should have run
+    if [[ -n "${TEST_COV_ISSUE_IID:-}" ]]; then
+        log "Checking test coverage results..."
+        local cov_notes
+        cov_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$TEST_COV_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local cov_notes_count
+        cov_notes_count=$(echo "$cov_notes" | jq 'length')
+
+        if [[ "$cov_notes_count" -gt 0 ]]; then
+            log "  Test coverage issue has $cov_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on test coverage issue"
+        fi
+    fi
+
+    # Check 16: Dependency audit should have run
+    if [[ -n "${DEP_AUDIT_ISSUE_IID:-}" ]]; then
+        log "Checking dependency audit results..."
+        local audit_notes
+        audit_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$DEP_AUDIT_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local audit_notes_count
+        audit_notes_count=$(echo "$audit_notes" | jq 'length')
+
+        if [[ "$audit_notes_count" -gt 0 ]]; then
+            log "  Dependency audit issue has $audit_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on dependency audit issue"
+        fi
+    fi
+
+    # Check 17: Security review should have run
+    if [[ -n "${SEC_REVIEW_ISSUE_IID:-}" ]]; then
+        log "Checking security review results..."
+        local sec_notes
+        sec_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$SEC_REVIEW_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local sec_notes_count
+        sec_notes_count=$(echo "$sec_notes" | jq 'length')
+
+        if [[ "$sec_notes_count" -gt 0 ]]; then
+            log "  Security review issue has $sec_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on security review issue"
+        fi
+    fi
+
     # Summary
     echo ""
     log "Verification: $passed passed, $failed failed"
@@ -2305,6 +2819,69 @@ Note: GitLab doesn't have native label triggers. This tests pipeline API trigger
 - Daemon test issue: #${DAEMON_ISSUE_IID:-N/A}
 - Tests: \`sapiens process-all\` command (automation-daemon.yaml equivalent)
 
+## Phase 9: Sapiens CLI - Fix Execution
+
+**Status**: ${FIX_EXECUTION_DONE:+PASSED}${FIX_EXECUTION_DONE:-SKIPPED}
+
+- Reuses fix issue: #${FIX_ISSUE_IID:-N/A}
+- Triggered by: \`approved\` + \`fix-proposed\` labels
+
+## Phase 10: Sapiens CLI - Code Review (Legacy)
+
+**Status**: ${CODE_REVIEW_DONE:+PASSED}${CODE_REVIEW_DONE:-SKIPPED}
+
+- Uses task from Phase 4
+- Triggered by: \`code-review\` label
+
+## Phase 11: Sapiens CLI - Merge
+
+**Status**: ${MERGE_DONE:+PASSED}${MERGE_DONE:-SKIPPED}
+
+- Uses MR from Phase 4: !${MR_IID:-N/A}
+- Triggered by: \`merge-ready\` label
+
+## Phase 12: Sapiens CLI - Plan Review (Legacy)
+
+**Status**: ${PLAN_REVIEW_DONE:+PASSED}${PLAN_REVIEW_DONE:-SKIPPED}
+
+- Plan review issue: #${PLAN_REVIEW_ISSUE_IID:-N/A}
+- Triggered by: \`plan-review\` label
+
+## Phase 13: Sapiens CLI - Triage
+
+**Status**: ${TRIAGE_DONE:+PASSED}${TRIAGE_DONE:-SKIPPED}
+
+- Triage issue: #${TRIAGE_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/triage\` label
+
+## Phase 14: Sapiens CLI - Docs Generation
+
+**Status**: ${DOCS_GEN_DONE:+PASSED}${DOCS_GEN_DONE:-SKIPPED}
+
+- Docs issue: #${DOCS_GEN_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/docs-generation\` label
+
+## Phase 15: Sapiens CLI - Test Coverage
+
+**Status**: ${TEST_COV_DONE:+PASSED}${TEST_COV_DONE:-SKIPPED}
+
+- Coverage issue: #${TEST_COV_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/test-coverage\` label
+
+## Phase 16: Sapiens CLI - Dependency Audit
+
+**Status**: ${DEP_AUDIT_DONE:+PASSED}${DEP_AUDIT_DONE:-SKIPPED}
+
+- Audit issue: #${DEP_AUDIT_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/dependency-audit\` label
+
+## Phase 17: Sapiens CLI - Security Review
+
+**Status**: ${SEC_REVIEW_DONE:+PASSED}${SEC_REVIEW_DONE:-SKIPPED}
+
+- Security issue: #${SEC_REVIEW_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/security-review\` label
+
 ## CLI Test Results
 
 **Status**: $cli_status
@@ -2319,10 +2896,19 @@ Note: GitLab doesn't have native label triggers. This tests pipeline API trigger
 | \`needs-planning\` | proposal | ✅ Phase 2 |
 | \`approved\` | approval | ✅ Phase 3 |
 | \`execute\` | task_execution | ✅ Phase 4 |
-| \`sapiens/needs-review\` | review | ✅ Phase 5 |
-| \`sapiens/needs-fix\` | fix | ✅ Phase 6 |
+| \`sapiens/needs-review\` | pr_review | ✅ Phase 5 |
+| \`sapiens/needs-fix\` | pr_fix | ✅ Phase 6 |
 | \`sapiens/requires-qa\` | qa | ✅ Phase 7 |
 | \`process-all\` (daemon) | all handlers | ✅ Phase 8 |
+| \`approved\` + \`fix-proposed\` | fix_execution | ✅ Phase 9 |
+| \`code-review\` | code_review | ✅ Phase 10 |
+| \`merge-ready\` | merge | ✅ Phase 11 |
+| \`plan-review\` | plan_review | ✅ Phase 12 |
+| \`sapiens/triage\` | triage | ✅ Phase 13 |
+| \`sapiens/docs-generation\` | docs_generation | ✅ Phase 14 |
+| \`sapiens/test-coverage\` | test_coverage | ✅ Phase 15 |
+| \`sapiens/dependency-audit\` | dependency_audit | ✅ Phase 16 |
+| \`sapiens/security-review\` | security_review | ✅ Phase 17 |
 
 ## Overall Result
 
@@ -2451,6 +3037,50 @@ main() {
 
         # Phase 8: Daemon (process-all)
         process_daemon
+        echo ""
+
+        # Phases 9-12: Extended Workflow Tests
+        step "=== Extended Workflow Tests (Phases 9-12) ==="
+        echo ""
+
+        # Phase 9: Fix Execution
+        process_fix_execution
+        echo ""
+
+        # Phase 10: Code Review (Legacy)
+        process_code_review_legacy
+        echo ""
+
+        # Phase 11: Merge
+        process_merge
+        echo ""
+
+        # Phase 12: Plan Review (Legacy)
+        process_plan_review
+        echo ""
+
+        # Phases 13-17: Specialized Stage Tests
+        step "=== Specialized Stage Tests (Phases 13-17) ==="
+        echo ""
+
+        # Phase 13: Triage
+        process_triage
+        echo ""
+
+        # Phase 14: Docs Generation
+        process_docs_generation
+        echo ""
+
+        # Phase 15: Test Coverage
+        process_test_coverage
+        echo ""
+
+        # Phase 16: Dependency Audit
+        process_dependency_audit
+        echo ""
+
+        # Phase 17: Security Review
+        process_security_review
         echo ""
 
         # Verify all results

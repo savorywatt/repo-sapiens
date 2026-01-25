@@ -719,8 +719,19 @@ jobs:
         if: env.TOTAL_ISSUES != '0' && (github.event.inputs.auto_fix != 'false')
         env:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
         run: |
-          pip install repo-sapiens || pip3 install repo-sapiens
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            echo "Installing repo-sapiens from $SAPIENS_REPO_URL (branch: ${SAPIENS_BRANCH:-main})"
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens
+            cd /tmp/repo-sapiens
+            git checkout "${SAPIENS_BRANCH:-main}"
+            pip install -e .
+            cd -
+          else
+            pip install repo-sapiens || pip3 install repo-sapiens
+          fi
 
           sapiens task "Review the security report and fix identified vulnerabilities.
 

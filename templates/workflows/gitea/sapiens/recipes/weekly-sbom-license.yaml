@@ -372,13 +372,24 @@ jobs:
         continue-on-error: true
         env:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
         run: |
           if [ -z "$AUTOMATION__AGENT_PROVIDER__API_KEY" ]; then
             echo "No API key configured, skipping AI analysis"
             exit 0
           fi
 
-          pip install repo-sapiens || pip3 install repo-sapiens
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            echo "Installing repo-sapiens from $SAPIENS_REPO_URL (branch: ${SAPIENS_BRANCH:-main})"
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens
+            cd /tmp/repo-sapiens
+            git checkout "${SAPIENS_BRANCH:-main}"
+            pip install -e .
+            cd -
+          else
+            pip install repo-sapiens || pip3 install repo-sapiens
+          fi
 
           sapiens task "Analyze this SBOM and security report for a software project.
 
