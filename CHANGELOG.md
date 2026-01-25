@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Specialized Workflow Stages
+- **DependencyAuditStage**: Audits dependencies for vulnerabilities using pip-audit, npm audit, cargo audit, govulncheck
+- **DocsGenerationStage**: Auto-generates documentation suggestions for PRs and issues
+- **SecurityReviewStage**: Performs OWASP Top 10 security-focused code review on PRs
+- **TestCoverageStage**: Runs coverage analysis (pytest-cov, nyc, go test -cover) and suggests improvements
+
+#### Playground Directory Support
+- **`get_playground_dir()` method**: Configurable workspace directory for safe code execution
+  - Resolution order: `SAPIENS_PLAYGROUND_DIR` env var → config → legacy `../playground` fallback
+  - Enables CI/CD environments to specify isolated workspace locations
+  - All workflow stages now use this method instead of hardcoded paths
+
+#### Reasoning Model Support
+- **`strip_thinking_tags` config**: Strips `<think>...</think>` tags from reasoning models (qwen3, deepseek-r1)
+- **Content preservation fix**: Correctly preserves content when stripping thinking tags
+
+#### Comment-Response Workflow
+- **AI-driven issue comment actions**: New workflow for responding to comments on issues
+- **GitLab webhook handler**: Comment-triggered pipeline support via webhook bridge
+
+#### Configuration Enhancements
+- **`${VAR:-default}` syntax**: Environment variable interpolation with default values
+
+### Changed
+- **Type annotations**: Stages now return `PullRequest | None` instead of `Any` for better type safety
+- **Workflow installation**: Templates now install `repo-sapiens` from GitHub instead of PyPI
+
+### Fixed
+- **Error message sanitization**: Public error comments no longer expose sensitive details
+  - Only error type shown (e.g., `Error type: ValueError`)
+  - Full details logged privately for debugging
+- **Event classifier**: Correctly extracts label from CLI format for all sources
+- **PR fix stage tests**: Updated to match new proposal-based behavior
+- **CI configuration**: Corrected OpenAI backend type and added `GIT_TOKEN` env var
+
 ## [0.5.0] - 2026-01-24
 
 ### Added
