@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitLab E2E Default AI Provider**: Changed default from OpenRouter to Ollama for local testing
 
 ### Added
+- **GitLab Automation Daemon** (v2.0): Updated `automation-daemon.yaml` as recommended approach
+  - Polls on schedule (configured via GitLab UI) - no webhook setup required
+  - Processes all issues with sapiens labels via `sapiens process-all`
+  - Supports `include: remote:` for cross-project reuse
+  - Configurable AI provider settings via CI/CD variables
+  - Automatic config generation if `.sapiens/config.yaml` not present
+- **GitLab Dispatcher** (optional): New `sapiens-dispatcher.yaml` for real-time responses
+  - For users who need instant label reactions (requires external webhook handler)
+  - Webhook trigger example script (`webhook-trigger.py`) bridges GitLab events to pipelines
+  - Most users should prefer the daemon approach instead
+- **GitLab Workflow Deprecations**: Individual label workflows deprecated in favor of daemon
+- **Daemon Interval Configuration**: `sapiens init` now prompts for daemon polling interval
+  - New `--daemon-interval` CLI flag for non-interactive setup
+  - Interval stored in config as `automation.mode.daemon_interval`
+  - Displayed in "Next Steps" with correct seconds conversion
 - **Tiered Workflow Deployment**: `--deploy-workflows` option now accepts tier names
   - `essential`: Label-triggered AI work (process-label.yaml)
   - `core`: Repository maintenance (post-merge-docs, weekly-test-coverage)
@@ -22,6 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Gitea/GitLab deploy actual workflow files for all tiers
   - Interactive mode prompts for tier selection
   - Essential tier always implied when other tiers specified
+- **Workflow Removal**: New `--remove-workflows` option to remove deployed workflow tiers
+  - Removes workflow files from `.github/workflows/sapiens/` or `.gitlab/sapiens/`
+  - Cleans up empty directories automatically
+  - Supports same tier options: essential, core, security, support, all
+- **Tier E2E Test Script**: New `scripts/test-workflow-tiers.sh` for testing workflow operations
+  - Tests install, idempotent re-deploy, update, and remove for each tier
+  - Validates files via Gitea API
+  - Supports `--bootstrap` for automated Gitea setup
 - **Comprehensive GitLab E2E Testing**: Parity with GitHub E2E test coverage
   - Phase 1.5 Component Integration test for sapiens-dispatcher CI component
   - Automatic GitLab Runner setup and registration

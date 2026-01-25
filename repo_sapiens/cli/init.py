@@ -88,6 +88,12 @@ log = structlog.get_logger(__name__)
     help="Deploy workflow tiers: essential, core, security, support, or all",
 )
 @click.option(
+    "--remove-workflows",
+    multiple=True,
+    type=click.Choice(["essential", "core", "security", "support", "all"]),
+    help="Remove workflow tiers from repository",
+)
+@click.option(
     "--run-mode",
     type=click.Choice(["local", "cicd", "both"]),
     default=None,
@@ -123,6 +129,12 @@ log = structlog.get_logger(__name__)
     default=None,
     help="Environment variable name containing AI API key (e.g., OPENROUTER_API_KEY)",
 )
+@click.option(
+    "--daemon-interval",
+    type=int,
+    default=None,
+    help="Polling interval in minutes for daemon/hybrid mode (default: 5)",
+)
 def init_command(
     repo_path: Path,
     config_path: Path,
@@ -131,12 +143,14 @@ def init_command(
     setup_secrets: bool,
     deploy_actions: bool,
     deploy_workflows: tuple[str, ...],
+    remove_workflows: tuple[str, ...],
     run_mode: str | None,
     git_token_env: str | None,
     ai_provider: str | None,
     ai_model: str | None,
     ai_base_url: str | None,
     ai_api_key_env: str | None,
+    daemon_interval: int | None,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -179,6 +193,10 @@ def init_command(
         sapiens init --deploy-workflows essential
         sapiens init --deploy-workflows essential core security
         sapiens init --deploy-workflows all
+
+        # Remove workflow templates
+        sapiens init --remove-workflows essential
+        sapiens init --remove-workflows all
     """
     try:
         initializer = RepoInitializer(
@@ -189,12 +207,14 @@ def init_command(
             setup_secrets=setup_secrets,
             deploy_actions=deploy_actions,
             deploy_workflows=deploy_workflows,
+            remove_workflows=remove_workflows,
             run_mode=run_mode,
             git_token_env=git_token_env,
             ai_provider=ai_provider,
             ai_model=ai_model,
             ai_base_url=ai_base_url,
             ai_api_key_env=ai_api_key_env,
+            daemon_interval=daemon_interval,
         )
         initializer.run()
 
@@ -259,12 +279,14 @@ class RepoInitializer:
         setup_secrets: bool,
         deploy_actions: bool = True,
         deploy_workflows: tuple[str, ...] = (),
+        remove_workflows: tuple[str, ...] = (),
         run_mode: str | None = None,
         git_token_env: str | None = None,
         ai_provider: str | None = None,
         ai_model: str | None = None,
         ai_base_url: str | None = None,
         ai_api_key_env: str | None = None,
+        daemon_interval: int | None = None,
     ) -> None:
         """Initialize the repository initializer with configuration options.
 
@@ -284,6 +306,8 @@ class RepoInitializer:
                 action to the repository.
             deploy_workflows: Tuple of workflow tiers to deploy ('essential', 'core',
                 'security', 'support', 'all'). Essential is always implied.
+            remove_workflows: Tuple of workflow tiers to remove ('essential', 'core',
+                'security', 'support', 'all'). Removes files from repository.
             run_mode: Configuration target ('local', 'cicd', 'both'). Defaults to
                 'local' in non-interactive mode.
             git_token_env: Name of environment variable containing git token.
@@ -291,6 +315,8 @@ class RepoInitializer:
             ai_model: AI model name to use.
             ai_base_url: Base URL for AI provider (for ollama/openai-compatible).
             ai_api_key_env: Name of environment variable containing AI API key.
+            daemon_interval: Polling interval in minutes for daemon/hybrid mode.
+                Defaults to 5 if not specified.
         """
         self.repo_path = repo_path
         self.config_path = config_path
@@ -299,6 +325,7 @@ class RepoInitializer:
         self.setup_secrets = setup_secrets
         self.deploy_actions = deploy_actions
         self.deploy_workflows = deploy_workflows
+        self.remove_workflows = remove_workflows
 
         # CLI-provided configuration for non-interactive mode
         self.cli_run_mode = run_mode
@@ -307,6 +334,7 @@ class RepoInitializer:
         self.cli_ai_model = ai_model
         self.cli_ai_base_url = ai_base_url
         self.cli_ai_api_key_env = ai_api_key_env
+        self.cli_daemon_interval = daemon_interval
 
         self.repo_info = None
         self.provider_type = None  # 'github', 'gitea', or 'gitlab' (detected)
@@ -337,6 +365,7 @@ class RepoInitializer:
 
         # Automation mode settings
         self.automation_mode = "native"  # 'native', 'daemon', or 'hybrid'
+        self.daemon_interval = 5  # Polling interval in minutes for daemon/hybrid mode
         self.label_prefix = "sapiens/"
         self.is_cicd_setup = False  # True if setting up for CI/CD workflows
 
@@ -776,7 +805,11 @@ class RepoInitializer:
         if self.deploy_actions and self.config_target == "local":
             self._deploy_composite_action()
 
-        # Step 7: Deploy CI/CD workflows (optional, only for local)
+        # Step 7a: Remove CI/CD workflows (if requested)
+        if self.config_target == "local" and self.remove_workflows:
+            self._remove_workflows(self.remove_workflows)
+
+        # Step 7b: Deploy CI/CD workflows (optional, only for local)
         # In interactive mode, always offer the choice
         # In non-interactive mode, only deploy if tiers were explicitly specified
         if self.config_target == "local" and (self.deploy_workflows or (not self.non_interactive)):
@@ -2326,6 +2359,7 @@ class RepoInitializer:
 
         Updates:
             self.automation_mode: Set to 'native', 'daemon', or 'hybrid'.
+            self.daemon_interval: Set to polling interval in minutes for daemon/hybrid.
             self.label_prefix: Set to user-specified prefix (e.g., 'sapiens/').
 
         Side Effects:
@@ -2360,6 +2394,25 @@ class RepoInitializer:
             default="native",
         )
 
+        # Configure daemon interval for daemon/hybrid modes
+        if self.automation_mode in ("daemon", "hybrid"):
+            click.echo()
+            click.echo(click.style("Daemon Polling Interval:", bold=True))
+            click.echo()
+            click.echo("How often should the daemon check for issues with sapiens labels?")
+            click.echo("  • Shorter intervals = faster response, more API calls")
+            click.echo("  • Longer intervals = fewer resources, delayed response")
+            click.echo()
+            # Use CLI value if provided, otherwise prompt
+            if self.cli_daemon_interval is not None:
+                self.daemon_interval = self.cli_daemon_interval
+            else:
+                self.daemon_interval = click.prompt(
+                    "Polling interval (minutes)",
+                    type=int,
+                    default=5,
+                )
+
         # Configure label prefix for native/hybrid modes
         if self.automation_mode in ("native", "hybrid"):
             click.echo()
@@ -2380,6 +2433,8 @@ class RepoInitializer:
 
         click.echo()
         click.echo(f"   ✓ Configured {self.automation_mode} mode")
+        if self.automation_mode in ("daemon", "hybrid"):
+            click.echo(f"   ✓ Polling interval: {self.daemon_interval} minutes")
         if self.automation_mode in ("native", "hybrid"):
             click.echo(f"   ✓ Label prefix: {self.label_prefix}")
 
@@ -2963,6 +3018,7 @@ tags:
     mode: {self.automation_mode}
     native_enabled: {native_enabled}
     daemon_enabled: {daemon_enabled}
+    daemon_interval: {self.daemon_interval}
     label_prefix: "{self.label_prefix}\""""
 
         # Add label triggers for native/hybrid modes
@@ -3277,6 +3333,137 @@ jobs:
                     else:
                         click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
 
+        click.echo()
+
+    def _remove_workflows(self, requested_tiers: tuple[str, ...]) -> None:
+        """Remove CI/CD workflow templates based on selected tiers.
+
+        Workflow Tiers:
+            - essential: process-label.yaml (label-triggered AI work)
+            - core: post-merge-docs.yaml, weekly-test-coverage.yaml (repo maintenance)
+            - security: weekly-security-review.yaml, weekly-dependency-audit.yaml,
+                weekly-sbom-license.yaml (security audits)
+            - support: daily-issue-triage.yaml (issue management)
+
+        Args:
+            requested_tiers: Tuple of tier names to remove. 'all' removes everything.
+
+        Side Effects:
+            - Deletes workflow files from the repository
+            - Cleans up empty directories (sapiens/, recipes/)
+            - Prints progress and confirmation messages
+        """
+        # Define tier mappings (same as _deploy_workflows)
+        workflow_tiers = {
+            "essential": [
+                ("process-label.yaml", "Process label (label-triggered AI work)"),
+            ],
+            "core": [
+                ("recipes/post-merge-docs.yaml", "Post-merge documentation update"),
+                ("recipes/weekly-test-coverage.yaml", "Weekly test coverage report"),
+            ],
+            "security": [
+                ("recipes/weekly-security-review.yaml", "Weekly security review"),
+                ("recipes/weekly-dependency-audit.yaml", "Weekly dependency audit"),
+                ("recipes/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
+            ],
+            "support": [
+                ("recipes/daily-issue-triage.yaml", "Daily issue triage"),
+            ],
+        }
+
+        click.echo(click.style("🗑️  Removing workflow templates...", bold=True))
+        click.echo()
+
+        # Determine which tiers to remove
+        tiers_to_remove: set[str] = set()
+
+        if "all" in requested_tiers:
+            tiers_to_remove = {"essential", "core", "security", "support"}
+        else:
+            tiers_to_remove = set(requested_tiers)
+
+        # Determine paths based on provider type
+        if self.provider_type == "github":
+            workflows_dir = self.repo_path / ".github" / "workflows"
+        elif self.provider_type == "gitlab":
+            workflows_dir = self.repo_path / ".gitlab" / "sapiens"
+        else:  # gitea
+            workflows_dir = self.repo_path / ".github" / "workflows"
+
+        sapiens_dir = workflows_dir / "sapiens" if self.provider_type != "gitlab" else workflows_dir
+
+        def remove_file(file_path: Path, description: str) -> bool:
+            """Remove a single file and report status."""
+            if file_path.exists():
+                try:
+                    file_path.unlink()
+                    click.echo(f"   ✓ Removed: {description}")
+                    return True
+                except Exception as e:
+                    click.echo(click.style(f"   ⚠ Could not remove {description}: {e}", fg="yellow"))
+                    return False
+            else:
+                click.echo(f"   - Not present: {description}")
+                return False
+
+        # Remove workflows for each selected tier
+        click.echo(f"Removing tiers: {', '.join(sorted(tiers_to_remove))}")
+        click.echo()
+
+        removed_count = 0
+
+        for tier in sorted(tiers_to_remove):
+            workflows = workflow_tiers.get(tier, [])
+
+            for template_name, description in workflows:
+                is_recipe = template_name.startswith("recipes/")
+
+                # Handle essential tier's thin wrapper for GitHub
+                if self.provider_type == "github" and tier == "essential" and template_name == "process-label.yaml":
+                    wrapper_file = workflows_dir / "sapiens.yaml"
+                    if remove_file(wrapper_file, f"{description} (sapiens.yaml)"):
+                        removed_count += 1
+                else:
+                    # Determine target file path
+                    if self.provider_type == "gitlab":
+                        if is_recipe:
+                            target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
+                        else:
+                            # GitLab main workflow is .gitlab-ci.yml
+                            target_file = self.repo_path / ".gitlab-ci.yml"
+                    else:
+                        # GitHub/Gitea
+                        if is_recipe:
+                            target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
+                        else:
+                            target_file = sapiens_dir / template_name
+
+                    if remove_file(target_file, description):
+                        removed_count += 1
+
+        # Clean up empty directories
+        click.echo()
+        click.echo("Cleaning up empty directories...")
+
+        directories_to_check = [
+            sapiens_dir / "recipes",
+            sapiens_dir,
+        ]
+
+        for directory in directories_to_check:
+            if directory.exists() and directory.is_dir():
+                try:
+                    # Check if directory is empty
+                    if not any(directory.iterdir()):
+                        directory.rmdir()
+                        rel_path = directory.relative_to(self.repo_path)
+                        click.echo(f"   ✓ Removed empty directory: {rel_path}")
+                except Exception:
+                    pass  # Directory not empty or other issue
+
+        click.echo()
+        click.echo(f"Removed {removed_count} workflow file(s)")
         click.echo()
 
     def _deploy_validation_workflow(self, workflows_dir: Path, deploy_fn) -> None:
@@ -3695,11 +3882,13 @@ validate-sapiens:
             else:
                 click.echo(f"   • Check workflows: {urls['actions']}")
         elif self.automation_mode == "daemon":
+            daemon_seconds = self.daemon_interval * 60
             click.echo(f"{step_num}. Run the automation daemon:")
-            click.echo(f"   sapiens --config {self.config_path} daemon --interval 60")
+            click.echo(f"   sapiens --config {self.config_path} daemon --interval {daemon_seconds}")
             click.echo()
             click.echo(f"{step_num + 1}. Watch the automation work!")
         else:  # hybrid
+            daemon_seconds = self.daemon_interval * 60
             click.echo(f"{step_num}. Automation runs in hybrid mode:")
             click.echo("   • Label triggers work instantly via workflows")
             if self.provider_type == "gitlab":
@@ -3708,7 +3897,7 @@ validate-sapiens:
                 click.echo(f"   • Check workflows: {urls['actions']}")
             click.echo()
             click.echo("   • Optional: Run daemon for additional automation:")
-            click.echo(f"     sapiens --config {self.config_path} daemon --interval 60")
+            click.echo(f"     sapiens --config {self.config_path} daemon --interval {daemon_seconds}")
 
         click.echo()
         click.echo("For more information, see:")
