@@ -807,13 +807,13 @@ class RepoInitializer:
             self._deploy_composite_action()
 
         # Step 7a: Remove CI/CD workflows (if requested)
-        if self.config_target == "local" and self.remove_workflows:
+        if self.remove_workflows:
             self._remove_workflows(self.remove_workflows)
 
-        # Step 7b: Deploy CI/CD workflows (optional, only for local)
+        # Step 7b: Deploy CI/CD workflows (optional)
         # In interactive mode, always offer the choice
         # In non-interactive mode, only deploy if tiers were explicitly specified
-        if self.config_target == "local" and (self.deploy_workflows or (not self.non_interactive)):
+        if self.deploy_workflows or (not self.non_interactive):
             self._deploy_workflows(self.deploy_workflows)
 
         # Step 8: Validate setup
