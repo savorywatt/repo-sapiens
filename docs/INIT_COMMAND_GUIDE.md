@@ -86,8 +86,8 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
 export SAPIENS_GITEA_TOKEN="your-token-here"
 # For GitHub
 export SAPIENS_GITHUB_TOKEN="your-token-here"
-# For GitLab
-export GITLAB_TOKEN="your-token-here"
+# For GitLab (note: GITLAB_ prefix is reserved by GitLab)
+export SAPIENS_GITLAB_TOKEN="your-token-here"
 export CLAUDE_API_KEY="your-key-here"  # optional
 sapiens init --non-interactive
 ```
@@ -128,7 +128,7 @@ The command guides you through setting up repository secrets for your CI/CD plat
 **For GitLab CI/CD**:
 ```
 🔐 Setting up GitLab CI/CD variables...
-   ℹ Please set GITLAB_TOKEN manually in GitLab UI
+   ℹ Please set SAPIENS_GITLAB_TOKEN manually in GitLab UI
    Navigate to: https://gitlab.com/mygroup/my-project/-/settings/ci_cd
    Expand "Variables" section and add your tokens
 ```
@@ -139,8 +139,10 @@ The command guides you through setting up repository secrets for your CI/CD plat
 |----------|-------------|-------------|
 | Gitea | `SAPIENS_GITEA_TOKEN` | Gitea API token (required) |
 | GitHub | `SAPIENS_GITHUB_TOKEN` | GitHub personal access token (often auto-provided) |
-| GitLab | `GITLAB_TOKEN` | GitLab personal access token with `api`, `read_repository`, `write_repository` scopes |
-| All | `CLAUDE_API_KEY` | Claude API key (only if using API mode)
+| GitLab | `SAPIENS_GITLAB_TOKEN` | GitLab personal access token with `api`, `read_repository`, `write_repository` scopes |
+| All | `CLAUDE_API_KEY` or `SAPIENS_AI_API_KEY` | AI API key (only if using API mode)
+
+> **Note for GitLab**: Use `SAPIENS_GITLAB_TOKEN`, not `GITLAB_TOKEN`. The `GITLAB_` prefix is reserved by GitLab for system variables.
 
 **How to set them**:
 
@@ -158,7 +160,7 @@ The command guides you through setting up repository secrets for your CI/CD plat
 1. Navigate to: `https://gitlab.com/<namespace>/<project>/-/settings/ci_cd`
 2. Expand "Variables" section
 3. Click "Add variable"
-4. Add `GITLAB_TOKEN` and `CLAUDE_API_KEY`
+4. Add `SAPIENS_GITLAB_TOKEN` and `SAPIENS_AI_API_KEY`
 5. Recommended: Check "Mask variable" to hide values in job logs
 
 **Why these secrets are needed**:
@@ -412,7 +414,7 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
    ✓ Credentials stored securely
 
 🔐 Setting up GitLab CI/CD variables...
-   ℹ Please set GITLAB_TOKEN manually in GitLab UI
+   ℹ Please set SAPIENS_GITLAB_TOKEN manually in GitLab UI
    Navigate to: https://gitlab.com/mygroup/subgroup/my-project/-/settings/ci_cd
 
 📝 Creating configuration file...
@@ -439,8 +441,8 @@ Do you want to use Claude API or local Claude Code? [local/api]: local
 
 ```bash
 # In your .gitlab-ci.yml pipeline
-export GITLAB_TOKEN="${GITLAB_TOKEN}"
-export CLAUDE_API_KEY="${CLAUDE_API_KEY}"
+export SAPIENS_GITLAB_TOKEN="${SAPIENS_GITLAB_TOKEN}"
+export SAPIENS_AI_API_KEY="${SAPIENS_AI_API_KEY}"
 
 sapiens init --non-interactive --backend environment
 ```
@@ -451,7 +453,7 @@ sapiens init --non-interactive --backend environment
 
 CI/CD workflows run in isolated environments and need credentials to:
 
-1. **Access Git Provider API** (`SAPIENS_GITEA_TOKEN` / `SAPIENS_GITHUB_TOKEN` / `GITLAB_TOKEN`):
+1. **Access Git Provider API** (`SAPIENS_GITEA_TOKEN` / `SAPIENS_GITHUB_TOKEN` / `SAPIENS_GITLAB_TOKEN`):
    - Read issues and comments
    - Create branches and pull/merge requests
    - Update issue labels and status
@@ -496,11 +498,13 @@ CI/CD workflows run in isolated environments and need credentials to:
 1. Navigate to: `https://gitlab.com/<namespace>/<project>/-/settings/ci_cd`
 2. Expand "Variables" section
 3. Click "Add variable"
-4. Add `GITLAB_TOKEN`:
-   - Key: `GITLAB_TOKEN`
+4. Add `SAPIENS_GITLAB_TOKEN`:
+   - Key: `SAPIENS_GITLAB_TOKEN`
    - Value: Your personal access token
    - Check "Mask variable" to hide in logs
    - Required scopes: `api`, `read_repository`, `write_repository`
+
+   > **Note**: Use `SAPIENS_GITLAB_TOKEN`, not `GITLAB_TOKEN`. The `GITLAB_` prefix is reserved by GitLab.
 5. Add `CLAUDE_API_KEY` if using API mode
 
 ### Using Secrets in Workflows

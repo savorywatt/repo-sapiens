@@ -1,6 +1,6 @@
 # Setting Up repo-sapiens with GitLab
 
-A complete guide for configuring repo-sapiens automation on a GitLab repository using CI/CD Components.
+A complete guide for configuring repo-sapiens v0.5.1 automation on a GitLab repository.
 
 ---
 
@@ -8,14 +8,23 @@ A complete guide for configuring repo-sapiens automation on a GitLab repository 
 
 GitLab uses a different approach than GitHub/Gitea:
 
-- **CI/CD Components** instead of reusable workflows
-- **Webhook handler required** for label-triggered automation
-- **Pipeline triggers** instead of direct workflow calls
+- **CI/CD pipelines** with includes instead of reusable workflows
+- **Two automation modes** for label-triggered automation
+- **Pipeline schedules and triggers** instead of direct workflow calls
+
+### Automation Modes
+
+repo-sapiens supports two automation modes for GitLab:
+
+| Mode | Description | Setup Complexity | Response Time |
+|------|-------------|------------------|---------------|
+| **Daemon mode** (recommended) | Polls for labeled issues on a schedule | Simple | Minutes (poll interval) |
+| **Webhook mode** | Instant triggers via external webhook handler | Complex | Seconds |
 
 This guide covers:
-- Setting up the GitLab CI/CD Component
-- Configuring a webhook handler for label events
-- Required CI/CD variables
+- Setting up CI/CD variables
+- Configuring daemon mode (recommended)
+- Optional: Setting up webhook mode for instant triggers
 
 ---
 
@@ -50,56 +59,96 @@ Navigate to **Settings** > **CI/CD** > **Variables** and add:
 
 ---
 
-## Part 2: Configure `.gitlab-ci.yml`
+## Part 2: Daemon Mode (Recommended)
 
-Create or update your `.gitlab-ci.yml` to include the sapiens component:
+Daemon mode polls for labeled issues on a schedule. This is the simplest setup and requires no external infrastructure.
+
+### 2.1 Configure `.gitlab-ci.yml`
+
+Add the automation daemon to your `.gitlab-ci.yml`:
 
 ```yaml
 # .gitlab-ci.yml
 
 include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
-    inputs:
-      label: $SAPIENS_LABEL
-      issue_number: $SAPIENS_ISSUE
-      event_type: "issues.labeled"
-      ai_provider_type: openai-compatible
-      ai_base_url: https://openrouter.ai/api/v1
-      ai_model: anthropic/claude-3.5-sonnet
+  - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v0.5.1/templates/workflows/gitlab/sapiens/automation-daemon.yaml'
+
+variables:
+  SAPIENS_AI_PROVIDER: "openai-compatible"
+  SAPIENS_AI_BASE_URL: "https://openrouter.ai/api/v1"
+  SAPIENS_AI_MODEL: "anthropic/claude-3.5-sonnet"
 ```
 
-### Component Inputs
-
-| Input | Type | Default | Description |
-|-------|------|---------|-------------|
-| `label` | string | required | Label that triggered the pipeline |
-| `issue_number` | number | required | Issue or MR number |
-| `event_type` | string | `issues.labeled` | Event type for sapiens CLI |
-| `ai_provider_type` | string | `openai-compatible` | AI provider type |
-| `ai_model` | string | *(empty)* | AI model to use |
-| `ai_base_url` | string | *(empty)* | AI provider base URL |
-
-### Using Ollama
+Or copy the full daemon configuration directly:
 
 ```yaml
-include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
-    inputs:
-      label: $SAPIENS_LABEL
-      issue_number: $SAPIENS_ISSUE
-      event_type: "issues.labeled"
-      ai_provider_type: ollama
-      ai_base_url: http://ollama.internal:11434
-      ai_model: llama3.1:8b
+# .gitlab-ci.yml
+
+stages:
+  - automation
+
+sapiens-daemon:
+  stage: automation
+  image: python:3.12-slim
+  timeout: 45 minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  variables:
+    AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: "gitlab"
+    AUTOMATION__GIT_PROVIDER__BASE_URL: $CI_SERVER_URL
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__REPOSITORY__OWNER: $CI_PROJECT_NAMESPACE
+    AUTOMATION__REPOSITORY__NAME: $CI_PROJECT_NAME
+    AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: $SAPIENS_AI_PROVIDER
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
+    AUTOMATION__AGENT_PROVIDER__MODEL: $SAPIENS_AI_MODEL
+    AUTOMATION__AGENT_PROVIDER__BASE_URL: $SAPIENS_AI_BASE_URL
+  before_script:
+    - pip install --quiet --no-cache-dir repo-sapiens==0.5.1
+    - git config --global user.name "Sapiens Bot"
+    - git config --global user.email "sapiens-bot@users.noreply.gitlab.com"
+  script:
+    - sapiens process-all --log-level INFO
+  artifacts:
+    paths:
+      - .sapiens/
+    expire_in: 7 days
+    when: always
 ```
+
+### 2.2 Create a Pipeline Schedule
+
+1. Go to **Build** > **Pipeline schedules**
+2. Click **New schedule**
+3. Configure:
+   - **Description**: "Sapiens Automation Daemon"
+   - **Interval pattern**: `*/5 * * * *` (every 5 minutes)
+   - **Target branch**: `main`
+4. Click **Save pipeline schedule**
+
+### 2.3 Using Ollama (Local AI)
+
+```yaml
+variables:
+  SAPIENS_AI_PROVIDER: "ollama"
+  SAPIENS_AI_BASE_URL: "http://ollama.internal:11434"
+  SAPIENS_AI_MODEL: "llama3.1:8b"
+```
+
+Note: When using Ollama, you do not need to set `SAPIENS_AI_API_KEY`.
 
 ---
 
-## Part 3: Webhook Handler Setup
+## Part 3: Webhook Mode (Optional)
 
-**Important:** GitLab does not have native label triggers like GitHub/Gitea. You need webhook handlers to trigger pipelines when:
-- Labels are added to issues or merge requests
-- Comments are posted with trigger keywords (e.g., `@sapiens`)
+For instant label-triggered automation, deploy an external webhook handler. This is more complex but provides immediate response to label events.
+
+**Important:** GitLab does not have native label triggers like GitHub/Gitea. Webhook handlers bridge this gap by:
+- Receiving webhook events from GitLab
+- Triggering pipelines when labels are added to issues or merge requests
+- Handling comments with trigger keywords (e.g., `@sapiens`)
 
 repo-sapiens provides ready-to-use webhook handlers in the `scripts/` directory.
 
@@ -408,7 +457,24 @@ curl http://localhost:8000/health
 
 ---
 
-## Part 4: Create Labels
+## Part 4: Webhook Dispatcher (For Webhook Mode)
+
+If you're using webhook mode, you'll also need the dispatcher pipeline job that processes incoming webhook triggers:
+
+```yaml
+# Add to .gitlab-ci.yml (for webhook mode only)
+
+include:
+  - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v0.5.1/templates/workflows/gitlab/sapiens-dispatcher.yaml'
+```
+
+The dispatcher is triggered when the webhook handler calls the GitLab pipeline API with:
+- `SAPIENS_LABEL` - The label that triggered the event
+- `SAPIENS_ISSUE_NUMBER` - The issue or MR number
+
+---
+
+## Part 5: Create Labels
 
 Create the standard sapiens labels in your GitLab project:
 
@@ -431,23 +497,24 @@ Create the standard sapiens labels in your GitLab project:
 
 ---
 
-## Part 5: Test Your Setup
+## Part 6: Test Your Setup
 
-### Manual Pipeline Test
+### Manual Pipeline Test (Daemon Mode)
 
-1. Go to **CI/CD** > **Pipelines**
-2. Click **Run pipeline**
-3. Add variables:
-   - `SAPIENS_LABEL`: `needs-planning`
-   - `SAPIENS_ISSUE`: `1`
-4. Click **Run pipeline**
+1. Create a test issue with the `needs-planning` label
+2. Go to **Build** > **Pipelines**
+3. Click **Run pipeline**
+4. Select the branch with your `.gitlab-ci.yml`
+5. Click **Run pipeline**
+6. Watch the `sapiens-daemon` job process your labeled issue
 
-### Webhook Test
+### Webhook Mode Test
 
-1. Create a test issue
-2. Add the `needs-planning` label
-3. Check your webhook handler logs
-4. Verify pipeline was triggered in **CI/CD** > **Pipelines**
+1. Ensure your webhook handler is running and accessible
+2. Create a test issue
+3. Add the `needs-planning` label
+4. Check your webhook handler logs
+5. Verify pipeline was triggered in **Build** > **Pipelines**
 
 ---
 
@@ -485,24 +552,34 @@ Create the standard sapiens labels in your GitLab project:
 
 | Variable | Description |
 |----------|-------------|
-| `SAPIENS_GITLAB_TOKEN` | GitLab PAT with api, read_repository, write_repository |
-| `SAPIENS_AI_API_KEY` | AI provider API key (OpenRouter, etc.) |
+| `SAPIENS_GITLAB_TOKEN` | GitLab PAT with `api`, `read_repository`, `write_repository` scopes |
+| `SAPIENS_AI_API_KEY` | AI provider API key (OpenRouter, Anthropic, etc.) |
 
-### Webhook Handler Environment Variables
+> **Note**: Use `SAPIENS_GITLAB_TOKEN`, not `GITLAB_TOKEN`. The `GITLAB_` prefix is reserved by GitLab for system variables.
 
-| Variable | Description |
-|----------|-------------|
-| `GITLAB_URL` | Your GitLab instance URL |
-| `GITLAB_PROJECT_ID` | Your project's numeric ID |
-| `GITLAB_TRIGGER_TOKEN` | Pipeline trigger token |
-| `GITLAB_WEBHOOK_SECRET` | Optional webhook secret |
+### Optional AI Configuration Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SAPIENS_AI_PROVIDER` | `openai-compatible` | AI provider type: `openai-compatible`, `ollama`, `claude-api` |
+| `SAPIENS_AI_MODEL` | `claude-sonnet-4.5` | AI model to use |
+| `SAPIENS_AI_BASE_URL` | *(empty)* | AI provider base URL (required for Ollama) |
+
+### Webhook Handler Environment Variables (Webhook Mode Only)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITLAB_URL` | Yes | Your GitLab instance URL |
+| `GITLAB_API_TOKEN` | Yes | GitLab PAT with `api` scope |
+| `GITLAB_WEBHOOK_SECRET` | Yes | Secret for webhook verification |
+| `TRIGGER_REF` | No | Git ref for pipeline triggers (default: `main`) |
 
 ### Pipeline Variables (Set by Webhook Handler)
 
 | Variable | Description |
 |----------|-------------|
 | `SAPIENS_LABEL` | Label that triggered the pipeline |
-| `SAPIENS_ISSUE` | Issue or MR IID |
+| `SAPIENS_ISSUE_NUMBER` | Issue or MR IID |
 | `SAPIENS_EVENT_TYPE` | Event type (`issues.labeled` or `merge_request.labeled`) |
 
 ---

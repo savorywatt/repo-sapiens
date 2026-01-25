@@ -261,7 +261,10 @@ jobs:
 
 ### GitLab CI
 
-**Note:** GitLab doesn't have native issue webhook triggers. Use scheduled pipelines or manual triggers.
+**Note:** GitLab doesn't have native label event triggers like GitHub/Gitea. repo-sapiens supports two automation modes:
+
+1. **Daemon mode** (recommended): Scheduled pipeline polls for labeled issues
+2. **Webhook mode**: External webhook handler triggers pipelines instantly
 
 **Pipeline:** `.gitlab-ci.yml`
 
@@ -273,7 +276,24 @@ variables:
 stages:
   - process
 
-# Process a specific issue (triggered manually with ISSUE_NUMBER variable)
+# Daemon mode: Scan for labeled issues (scheduled)
+sapiens-daemon:
+  stage: process
+  image: python:${PYTHON_VERSION}-slim
+  timeout: 45 minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  variables:
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
+  before_script:
+    - pip install repo-sapiens==0.5.1
+  script:
+    - sapiens process-all --log-level INFO
+
+# Process a specific issue (triggered manually or via webhook)
 process-issue:
   stage: process
   image: python:${PYTHON_VERSION}-slim
@@ -281,39 +301,21 @@ process-issue:
   rules:
     - if: $ISSUE_NUMBER != ""
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
   before_script:
-    - pip install repo-sapiens
+    - pip install repo-sapiens==0.5.1
   script:
     - |
       sapiens --config $CONFIG_FILE \
         process-issue --issue $ISSUE_NUMBER \
         --system-prompt .gitlab/sapiens/prompts/needs-planning.md
-
-# Scan for labeled issues (scheduled)
-scan-labeled-issues:
-  stage: process
-  image: python:${PYTHON_VERSION}-slim
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-  before_script:
-    - pip install repo-sapiens
-  script:
-    - |
-      # Fetch issues with 'needs-planning' label
-      ISSUES=$(curl -sS \
-        --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/issues?labels=needs-planning&state=opened" \
-        | python -c "import sys, json; print(' '.join(str(i['iid']) for i in json.load(sys.stdin)))")
-
-      for ISSUE_ID in $ISSUES; do
-        sapiens --config $CONFIG_FILE process-issue --issue $ISSUE_ID || true
-      done
 ```
 
 **Required CI/CD Variables (GitLab):**
-- `GITLAB_TOKEN` - GitLab Personal Access Token
-- `CLAUDE_API_KEY` - AI provider API key
+- `SAPIENS_GITLAB_TOKEN` - GitLab Personal Access Token
+- `SAPIENS_AI_API_KEY` - AI provider API key
+
+> **Note**: Use `SAPIENS_GITLAB_TOKEN`, not `GITLAB_TOKEN`. The `GITLAB_` prefix is reserved by GitLab for system variables.
 
 **GitLab-specific notes:**
 - Uses merge requests (MRs) instead of pull requests
@@ -344,8 +346,8 @@ scan-labeled-issues:
 - `CLAUDE_API_KEY` - AI provider key
 
 **GitLab:**
-- `GITLAB_TOKEN` - Personal Access Token
-- `CLAUDE_API_KEY` - AI provider key
+- `SAPIENS_GITLAB_TOKEN` - Personal Access Token (note: `GITLAB_` prefix is reserved)
+- `SAPIENS_AI_API_KEY` - AI provider key
 
 ### Configuration Override
 
@@ -431,7 +433,7 @@ curl "https://api.github.com/repos/{owner}/{repo}/actions/runs" \
 **GitLab:**
 ```bash
 # View pipeline jobs
-curl --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+curl --header "PRIVATE-TOKEN: ${SAPIENS_GITLAB_TOKEN}" \
   "${CI_API_V4_URL}/projects/${PROJECT_ID}/pipelines"
 ```
 

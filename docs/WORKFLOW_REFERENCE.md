@@ -85,7 +85,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -112,7 +112,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -139,7 +139,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -166,7 +166,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -188,7 +188,7 @@ GitLab uses CI/CD Components instead of GitHub Actions reusable workflows. See [
 ```yaml
 # .gitlab-ci.yml
 include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
+  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v0.5.1
     inputs:
       label: $SAPIENS_LABEL
       issue_number: $SAPIENS_ISSUE
@@ -209,8 +209,8 @@ include:
 
 | Reference | Description |
 |-----------|-------------|
-| `@v2` | Latest v2.x release (recommended for most users) |
-| `@v2.1.0` | Specific version (recommended for production) |
+| `@v0.5.1` | Current stable release (recommended) |
+| `@v0.5.0` | Previous release |
 | `@main` | Latest development (not recommended) |
 
 ### Pinning Versions
@@ -218,13 +218,13 @@ include:
 For production environments, pin to a specific version:
 
 ```yaml
-uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2.1.0
+uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
 ```
 
-For development or testing, track the major version:
+For development or testing, you can use a specific version or main (with caution):
 
 ```yaml
-uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
 ```
 
 ---

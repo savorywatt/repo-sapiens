@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitlab-ci.yml (or include via `include:`)
 # 2. Set required CI/CD variables (Settings > CI/CD > Variables):
-#    - GITLAB_TOKEN: GitLab API token with repo write access
-#    - ANTHROPIC_API_KEY: Claude API key (masked, protected)
+#    - SAPIENS_GITLAB_TOKEN: GitLab API token with repo write access (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_AI_API_KEY: Claude API key (masked, protected)
 # 3. Customize the task prompt as needed
 
 variables:
@@ -37,8 +37,9 @@ update-docs:
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    AUTOMATION__AGENT_PROVIDER__API_KEY: $ANTHROPIC_API_KEY
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
     - apt-get update && apt-get install -y git
@@ -75,7 +76,7 @@ update-docs:
       git add -A
       if ! git diff --staged --quiet; then
         git commit -m "docs: Auto-update documentation [skip docs]"
-        git push "https://gitlab-ci-token:${GITLAB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:${CI_COMMIT_BRANCH} || echo "Push failed - may need write permissions"
+        git push "https://gitlab-ci-token:${SAPIENS_GITLAB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" HEAD:${CI_COMMIT_BRANCH} || echo "Push failed - may need write permissions"
       else
         echo "No documentation changes needed"
       fi

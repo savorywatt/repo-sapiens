@@ -13,14 +13,14 @@ Deploy as a simple webhook endpoint (Flask, FastAPI, or serverless function).
 
 Environment Variables:
     GITLAB_URL: GitLab instance URL (e.g., https://gitlab.example.com)
-    GITLAB_TOKEN: GitLab API token with 'api' scope
+    GITLAB_API_TOKEN: GitLab API token with 'api' scope (note: GITLAB_TOKEN prefix is reserved)
     TRIGGER_TOKEN: Pipeline trigger token for target projects
     SAPIENS_LABELS: Comma-separated list of labels to handle (default: all sapiens/* labels)
 
 Example deployment with Flask:
     pip install flask requests
     GITLAB_URL=https://gitlab.example.com \
-    GITLAB_TOKEN=glpat-xxx \
+    GITLAB_API_TOKEN=glpat-xxx \
     TRIGGER_TOKEN=xxx \
     python webhook-trigger.py
 
@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 GITLAB_URL = os.environ.get("GITLAB_URL", "https://gitlab.com")
-GITLAB_TOKEN = os.environ.get("GITLAB_TOKEN", "")
+# Note: GITLAB_TOKEN prefix is reserved by GitLab, so we use GITLAB_API_TOKEN
+GITLAB_API_TOKEN = os.environ.get("GITLAB_API_TOKEN", os.environ.get("SAPIENS_GITLAB_TOKEN", ""))
 TRIGGER_TOKEN = os.environ.get("TRIGGER_TOKEN", "")
 SAPIENS_LABELS = os.environ.get("SAPIENS_LABELS", "").split(",") if os.environ.get("SAPIENS_LABELS") else None
 

@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitlab-ci.yml (or include via `include:`)
 # 2. Set required CI/CD variables (Settings > CI/CD > Variables):
-#    - GITLAB_TOKEN: GitLab API token with repo/MR write access
-#    - ANTHROPIC_API_KEY: Claude API key (masked, protected)
+#    - SAPIENS_GITLAB_TOKEN: GitLab API token with repo/MR write access (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_AI_API_KEY: Claude API key (masked, protected)
 # 3. Set up a weekly pipeline schedule (CI/CD > Schedules)
 
 variables:
@@ -98,8 +98,9 @@ update-dependencies:
     - job: audit-dependencies
       artifacts: true
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    AUTOMATION__AGENT_PROVIDER__API_KEY: $ANTHROPIC_API_KEY
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
     - apt-get update && apt-get install -y git

@@ -13,7 +13,7 @@ Include the component in your `.gitlab-ci.yml`:
 
 ```yaml
 include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
+  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v0.5.1
     inputs:
       label: $SAPIENS_LABEL
       issue_number: $SAPIENS_ISSUE
@@ -126,7 +126,7 @@ For testing, you can manually trigger pipelines with variables:
 
 ```yaml
 include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
+  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v0.5.1
     inputs:
       label: $SAPIENS_LABEL
       issue_number: $SAPIENS_ISSUE
@@ -139,7 +139,7 @@ include:
 
 ```yaml
 include:
-  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v2
+  - component: gitlab.com/savorywatt/repo-sapiens/gitlab/sapiens-dispatcher@v0.5.1
     inputs:
       label: $SAPIENS_LABEL
       issue_number: $SAPIENS_ISSUE

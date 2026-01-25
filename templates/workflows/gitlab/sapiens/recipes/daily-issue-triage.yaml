@@ -10,8 +10,8 @@
 # Setup:
 # 1. Copy to .gitlab-ci.yml (or include via `include:`)
 # 2. Set required CI/CD variables (Settings > CI/CD > Variables):
-#    - GITLAB_TOKEN: GitLab API token with issue write access
-#    - ANTHROPIC_API_KEY: Claude API key (masked, protected)
+#    - SAPIENS_GITLAB_TOKEN: GitLab API token with issue write access (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_AI_API_KEY: Claude API key (masked, protected)
 # 3. Create labels: bug, enhancement, question, needs-triage, priority-high
 # 4. Set up a daily pipeline schedule (CI/CD > Schedules)
 #
@@ -39,8 +39,9 @@ triage-issues:
     - if: $CI_PIPELINE_SOURCE == "web"
       when: manual
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    AUTOMATION__AGENT_PROVIDER__API_KEY: $ANTHROPIC_API_KEY
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
     - apt-get update && apt-get install -y curl jq

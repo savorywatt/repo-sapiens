@@ -50,7 +50,7 @@ This wrapper references the official dispatcher workflow, which:
 | Benefit | Description |
 |---------|-------------|
 | Less maintenance | Single file to maintain instead of 7+ |
-| Automatic updates | Bump `@v2` to `@v2.1.0` to get new features |
+| Automatic updates | Bump version tag (e.g., `@v0.5.1`) to get new features |
 | Consistency | Same workflow logic across all your repositories |
 | Easier debugging | One workflow, one set of logs |
 | Simpler configuration | All settings in one place |
@@ -105,7 +105,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -130,7 +130,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -236,7 +236,7 @@ with:
 
 1. Ensure you're using the correct workflow reference:
    ```yaml
-   uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+   uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
    ```
 2. For private repos: check if you have access to the repo-sapiens repository
 

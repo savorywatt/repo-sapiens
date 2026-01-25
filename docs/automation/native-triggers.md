@@ -164,9 +164,12 @@ Workflow triggers on:
 Generated workflow location: `.gitlab-ci.yml` (process-label job)
 
 Required variables:
-- `GITLAB_TOKEN` - GitLab API token
+- `SAPIENS_GITLAB_TOKEN` - GitLab API token (note: `GITLAB_` prefix is reserved)
+- `SAPIENS_AI_API_KEY` - AI provider API key
 
-**Note**: GitLab CI has limited support for label-specific triggers. The workflow runs on merge request events and filters by labels at runtime.
+**Note**: GitLab CI doesn't have native label event triggers like GitHub/Gitea. repo-sapiens supports two automation modes for GitLab:
+- **Daemon mode**: Scheduled pipeline polls for labeled issues (recommended, simpler setup)
+- **Webhook mode**: External webhook handler triggers pipelines instantly (more complex)
 
 ## Migration Commands
 
@@ -358,10 +361,13 @@ For GitLab:
 ```bash
 # Set CI/CD variable
 # Settings > CI/CD > Variables > Add Variable
-# Key: GITLAB_TOKEN
+# Key: SAPIENS_GITLAB_TOKEN
 # Value: <your-token>
 # Protected: Yes (if only used on protected branches)
+# Masked: Yes (recommended)
 ```
+
+> **Note**: Use `SAPIENS_GITLAB_TOKEN`, not `GITLAB_TOKEN`. The `GITLAB_` prefix is reserved by GitLab for system variables.
 
 ## See Also
 

@@ -23,7 +23,7 @@ on:
 jobs:
   sapiens:
     # Use absolute URL for Gitea compatibility
-    uses: https://github.com/savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: https://github.com/savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -42,7 +42,7 @@ jobs:
 ### Benefits
 
 - **96% less boilerplate**: From ~490 lines to ~20 lines
-- **Automatic updates**: Bump `@v2` to `@v2.1.0` for updates
+- **Automatic updates**: Bump version tag (e.g., `@v0.5.1`) for updates
 - **Single source of truth**: All workflow logic in repo-sapiens
 - **Consistent behavior**: Same workflow works across all repos
 

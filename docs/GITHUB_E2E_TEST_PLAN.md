@@ -9,26 +9,26 @@ This plan tests **all workflow tiers** deployed via `sapiens init --deploy-workf
 ```
 Tier: Essential
 ├── sapiens.yaml (thin wrapper)
-│   └── calls: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+│   └── calls: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
 │       └── handles labels: needs-planning, approved, execute, needs-review, needs-fix, requires-qa
 
 Tier: Core
 ├── post-merge-docs.yaml (thin wrapper)
-│   └── calls: sapiens-post-merge-docs.yaml@v2
+│   └── calls: sapiens-post-merge-docs.yaml@v0.5.1
 └── weekly-test-coverage.yaml (thin wrapper)
-    └── calls: sapiens-test-coverage.yaml@v2
+    └── calls: sapiens-test-coverage.yaml@v0.5.1
 
 Tier: Security
 ├── weekly-security-review.yaml
-│   └── calls: sapiens-security-review.yaml@v2
+│   └── calls: sapiens-security-review.yaml@v0.5.1
 ├── weekly-dependency-audit.yaml
-│   └── calls: sapiens-dependency-audit.yaml@v2
+│   └── calls: sapiens-dependency-audit.yaml@v0.5.1
 └── weekly-sbom-license.yaml
-    └── calls: sapiens-sbom-license.yaml@v2
+    └── calls: sapiens-sbom-license.yaml@v0.5.1
 
 Tier: Support
 └── daily-issue-triage.yaml
-    └── calls: sapiens-issue-triage.yaml@v2
+    └── calls: sapiens-issue-triage.yaml@v0.5.1
 ```
 
 ## Prerequisites
@@ -228,5 +228,5 @@ gh workflow run "Daily Issue Triage" --repo owner/repo
 
 1. **AI API Keys**: Recipe workflows expect `ANTHROPIC_API_KEY`, essential tier uses `OPENROUTER_API_KEY`
 2. **Template Placeholders**: `{{SECURITY_LANGUAGES}}` needs to be filled in during deployment
-3. **Reusable Workflows**: Must be available at `@v2` tag in savorywatt/repo-sapiens
+3. **Reusable Workflows**: Must be available at `@v0.5.1` tag in savorywatt/repo-sapiens
 4. **Test Repo Content**: Some workflows need actual code/tests to analyze

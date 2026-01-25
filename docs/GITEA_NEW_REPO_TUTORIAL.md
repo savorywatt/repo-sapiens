@@ -323,6 +323,8 @@ The secrets you need depend on your chosen AI provider:
 | `SAPIENS_GITEA_TOKEN` | Your Gitea API token | Used to interact with issues, PRs, and labels |
 | `SAPIENS_GITEA_URL` | `https://gitea.example.com` | Your Gitea instance URL |
 
+> **Important:** Use `SAPIENS_GITEA_TOKEN`, not `GITEA_TOKEN`. The `GITEA_` prefix is reserved by Gitea for internal environment variables and will not be passed to workflows.
+
 #### If Using Claude API
 
 | Secret Name | Value | Description |
@@ -363,85 +365,102 @@ SAPIENS_OLLAMA_MODEL      *****
 
 ---
 
-## Part 5: Create Workflow File
+## Part 5: Create Workflow Files
 
-repo-sapiens uses a **reusable workflow** approach. Gitea Actions is compatible with GitHub Actions, so Gitea repositories reference the GitHub reusable workflow directly.
+Unlike GitHub, **Gitea does not support cross-repository reusable workflows**. Instead, repo-sapiens deploys complete workflow files directly to your repository. This is handled automatically by `sapiens init`, but you can also create them manually.
 
-### Step 5.1: Create the Workflows Directory
+### Step 5.1: Using sapiens init (Recommended)
+
+The easiest way to set up workflows is with the init command:
 
 ```bash
-mkdir -p .gitea/workflows
+sapiens init --deploy-workflows essential
 ```
 
-### Step 5.2: Create the Workflow File
+This creates:
+- `.gitea/workflows/sapiens/*.yaml` - Full workflow files for each automation stage
+- `.gitea/workflows/sapiens/prompts/*.md` - AI prompt templates
+- `.sapiens/config.yaml` - Configuration file
 
-Create a single file at `.gitea/workflows/sapiens.yaml`:
+### Step 5.2: Manual Setup (Alternative)
+
+If you prefer manual setup, create the workflows directory:
+
+```bash
+mkdir -p .gitea/workflows/sapiens
+```
+
+Then copy the workflow templates from the repo-sapiens package or create them based on the templates in `templates/workflows/gitea/`.
+
+### Step 5.3: Example Workflow File
+
+Here's what a typical Gitea workflow looks like (this is the full workflow, not a thin wrapper):
 
 ```yaml
-# .gitea/workflows/sapiens.yaml
-name: Sapiens
+# .gitea/workflows/sapiens/needs-planning.yaml
+name: Needs Planning
 
 on:
   issues:
     types: [labeled]
-  pull_request:
-    types: [labeled]
 
 jobs:
-  sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
-    with:
-      label: ${{ github.event.label.name }}
-      issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
-      event_type: ${{ github.event_name == 'pull_request' && 'pull_request.labeled' || 'issues.labeled' }}
-      # Required for Gitea: specify the git provider type and URL
-      git_provider_type: gitea
-      git_provider_url: https://gitea.example.com  # Replace with your Gitea URL
-      # AI provider configuration
-      ai_provider_type: openai-compatible
-      ai_base_url: https://openrouter.ai/api/v1
-      ai_model: anthropic/claude-3.5-sonnet
-    secrets:
-      GIT_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
-      AI_API_KEY: ${{ secrets.SAPIENS_AI_API_KEY }}
+  create-plan:
+    name: Create Development Plan
+    if: contains(github.event.issue.labels.*.name, 'needs-planning')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install sapiens
+        run: pip install repo-sapiens==0.5.1
+
+      - name: Create plan proposal
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_OLLAMA_URL }}
+        run: |
+          sapiens process-issue --issue ${{ github.event.issue.number }}
 ```
 
-> **Important for Gitea users:**
-> - `git_provider_type: gitea` is **required** - this tells sapiens to use the Gitea API
-> - `git_provider_url` is **required** - set this to your Gitea instance URL (e.g., `https://gitea.example.com`)
+### Step 5.4: Configure for Your AI Provider
 
-### Step 5.3: Configure for Your AI Provider
+Set the appropriate secrets based on your AI provider:
 
-**For OpenRouter (recommended):**
-```yaml
-ai_provider_type: openai-compatible
-ai_base_url: https://openrouter.ai/api/v1
-ai_model: anthropic/claude-3.5-sonnet
-```
+**For OpenRouter/Claude API:**
+- `SAPIENS_AI_API_KEY` - Your API key
 
 **For Ollama (self-hosted):**
-```yaml
-ai_provider_type: ollama
-ai_base_url: http://ollama.internal:11434  # Or localhost if on same machine as runner
-ai_model: llama3.1:8b
-```
+- `SAPIENS_OLLAMA_URL` - Ollama server URL (e.g., `http://ollama.internal:11434`)
+- No API key required
 
-When using Ollama, the `AI_API_KEY` secret is not required - you can omit it from the secrets block.
-
-### Step 5.4: Commit and Push
+### Step 5.5: Commit and Push
 
 ```bash
-git add .gitea/workflows/sapiens.yaml
-git commit -m "Add repo-sapiens automation workflow"
+git add .gitea/workflows/
+git commit -m "Add repo-sapiens automation workflows"
 git push origin main
 ```
 
-**Benefits of the reusable workflow approach:**
+**Why Gitea uses full workflow files:**
 
-- Single file instead of 7+ workflow files
-- Automatic updates when you bump the version tag
-- Gitea and GitHub use the same underlying dispatcher
-- Less maintenance overhead
+- Gitea Actions doesn't support the `uses: org/repo/.github/workflows/workflow.yaml@ref` syntax for cross-repo workflows
+- Full workflows give you complete control over customization
+- Prompts and configuration are local to your repository
+- No external dependencies during workflow execution
 
 ---
 
@@ -724,18 +743,18 @@ AUTOMATION__AGENT_PROVIDER__MODEL=qwen3:latest
 **Checklist:**
 1. Is Gitea Actions enabled for your repository?
 2. Is there an available runner?
-3. Does `.gitea/workflows/sapiens.yaml` exist?
-4. Did you push the workflow to the `main` branch?
+3. Do workflow files exist in `.gitea/workflows/sapiens/`?
+4. Did you push the workflows to the `main` branch?
 5. Is the label name exactly correct (case-sensitive)?
-6. Can the runner access GitHub to fetch the reusable workflow?
+6. Can the runner access PyPI to install repo-sapiens?
 
 **Debug:**
 ```bash
-# Verify workflow is present
-ls -la .gitea/workflows/sapiens.yaml
+# Verify workflows are present
+ls -la .gitea/workflows/sapiens/
 
-# Check if Actions sees your workflow
-# (In Gitea UI: Actions tab should list "Sapiens")
+# Check if Actions sees your workflows
+# (In Gitea UI: Actions tab should list workflow names like "Needs Planning")
 ```
 
 ### Authentication Errors
@@ -846,15 +865,20 @@ ollama pull codellama:7b-instruct-q4_0
 
 ### Update to Latest Version
 
-To get the latest sapiens features and bug fixes, update the version tag in your workflow:
+To get the latest sapiens features and bug fixes, update the package version in your workflows:
 
-```yaml
-# Pin to a specific version (recommended for production)
-uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2.1.0
+```bash
+# Check current version
+pip show repo-sapiens
 
-# Or track the latest v2.x release
-uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+# Update to latest
+pip install --upgrade repo-sapiens
+
+# Or pin to a specific version (recommended for production)
+pip install repo-sapiens==0.5.1
 ```
+
+Since Gitea uses full workflow files (not reusable workflows), you'll need to update the `pip install` command in your workflow files to specify the new version.
 
 ### Workflow Reference
 
@@ -915,14 +939,14 @@ sapiens daemon --interval 60
 
 ### Required Repository Secrets
 
-The reusable workflow expects these secrets:
+The workflows expect these secrets:
 
 | Secret | Purpose | Required |
 |--------|---------|----------|
-| `SAPIENS_GITEA_TOKEN` | Gitea API access (maps to `GIT_TOKEN`) | Yes |
-| `SAPIENS_AI_API_KEY` | AI provider API key (maps to `AI_API_KEY`) | No (not needed for Ollama) |
+| `SAPIENS_GITEA_TOKEN` | Gitea API access | Yes |
+| `SAPIENS_AI_API_KEY` | AI provider API key | No (not needed for Ollama) |
 
-> **Note:** The workflow inputs `git_provider_type` and `git_provider_url` are set in the workflow file itself, not as secrets.
+> **Note:** Use `SAPIENS_GITEA_TOKEN`, not `GITEA_TOKEN`. The `GITEA_` prefix is reserved by Gitea for internal variables.
 
 ### Label Flow
 

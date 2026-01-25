@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-01-25
+
+### Added
+
+#### AI-Powered Security Review Summary
+- **AI Summary step**: Security review workflows now generate an AI-powered summary comment
+  - Analyzes scan findings and provides actionable recommendations
+  - Posts summary as issue/PR comment for visibility
+  - Available in GitHub, Gitea, and GitLab security review templates
+
+#### Quick Start Documentation
+- **Provider-specific quick start guides**: New `docs/quickstart/` directory
+  - `GITHUB.md`: 5-minute setup using reusable workflows
+  - `GITEA.md`: 5-minute setup with full workflow files
+  - `GITLAB.md`: 10-minute setup covering daemon and webhook modes
+  - `README.md`: Index with provider comparison table
+
+#### GitLab Enhancements
+- **Comment webhook handler docs**: Setup instructions for `gitlab-comment-webhook.py`
+- **Daemon vs webhook mode**: Clear documentation of both automation approaches
+
+### Changed
+- **Documentation updates**: All provider docs updated for v0.5.1 conventions
+  - Correct secret naming: `SAPIENS_GITHUB_TOKEN`, `SAPIENS_GITEA_TOKEN`, `SAPIENS_GITLAB_TOKEN`
+  - Workflow references updated from `@v2` to `@v0.5.1`
+  - GitLab recipe templates use `SAPIENS_GITLAB_TOKEN` (GITLAB_ prefix reserved)
+
+### Fixed
+- **Security review regex**: Fixed Python regex quoting in security scan patterns
+- **Integration tests**: Updated `test_full_workflow.py` to match current workflow design
+
 ## [0.5.1] - 2026-01-25
 
 ### Added

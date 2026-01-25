@@ -188,7 +188,7 @@ You have three options for managing credentials. Choose the one that fits your e
 # Choose the appropriate token for your Git provider:
 export GITEA_API_TOKEN="your-gitea-token-here"
 # or: export SAPIENS_GITHUB_TOKEN="your-github-token-here"
-# or: export GITLAB_TOKEN="your-gitlab-token-here"
+# or: export SAPIENS_GITLAB_TOKEN="your-gitlab-token-here"  # Note: GITLAB_ prefix is reserved
 export CLAUDE_API_KEY="your-claude-api-key-here"
 
 # Verify configuration loads correctly
@@ -310,7 +310,7 @@ git_provider:
   provider_type: gitea  # or github, gitlab
   mcp_server: null  # Optional: Name of MCP server for git ops
   base_url: https://your-gitea-instance.com
-  api_token: "${GITEA_API_TOKEN}"  # or SAPIENS_GITHUB_TOKEN, GITLAB_TOKEN
+  api_token: "${GITEA_API_TOKEN}"  # or SAPIENS_GITHUB_TOKEN, SAPIENS_GITLAB_TOKEN
 
 # Repository Configuration
 repository:
@@ -462,20 +462,26 @@ jobs:
 **GitLab CI/CD Example** (`.gitlab-ci.yml`):
 
 ```yaml
-automation:
-  image: python:3.12
+sapiens-daemon:
+  image: python:3.12-slim
   stage: automation
   rules:
-    - if: $CI_PIPELINE_SOURCE == "issue"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
   script:
-    - pip install repo-sapiens
-    - sapiens --config my_config.yaml process-all
+    - pip install repo-sapiens==0.5.1
+    - sapiens process-all --log-level INFO
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    CLAUDE_API_KEY: $CLAUDE_API_KEY
+    AUTOMATION__GIT_PROVIDER__API_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
 ```
 
-Note: GitLab uses merge requests instead of pull requests. The automation will create merge requests when appropriate.
+Note: Use `SAPIENS_GITLAB_TOKEN`, not `GITLAB_TOKEN` - the `GITLAB_` prefix is reserved by GitLab for system variables. GitLab uses merge requests instead of pull requests. The automation will create merge requests when appropriate.
+
+GitLab supports two automation modes:
+- **Daemon mode** (above): Polls for labeled issues on a schedule
+- **Webhook mode**: Instant triggers via external webhook handler (see [GITLAB_SETUP.md](GITLAB_SETUP.md))
 
 **Pros**:
 - Native CI/CD support
@@ -949,8 +955,8 @@ See: [Advanced Configuration Guide](advanced-config.md)
 
 Set up automated workflows:
 
-- **GitHub Actions**: Trigger automation on issue events (`.github/workflows/`)
-- **Gitea Actions**: Native integration with Gitea workflows (`.gitea/workflows/`)
+- **GitHub Actions**: Trigger automation on issue events (`.github/workflows/`), supports reusable workflows
+- **Gitea Actions**: Native integration with Gitea workflows (`.gitea/workflows/`), uses full workflow files since Gitea doesn't support cross-repo reusable workflows
 - **GitLab CI/CD**: Single `.gitlab-ci.yml` file for all automation
 - **Jenkins**: Integrate with Jenkins pipelines
 

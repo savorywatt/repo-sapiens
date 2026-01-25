@@ -1,5 +1,5 @@
 # @repo-sapiens-template
-# @version: 1.1.0
+# @version: 2.0.1
 # @name: weekly-security-review
 #
 # Weekly Security Review for Gitea Actions
@@ -612,12 +612,12 @@ jobs:
           import re
 
           patterns = [
-              (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*['\"]?[a-zA-Z0-9_-]{20,}', 'API Key'),
-              (r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*['\"]?[^\s'\",]{8,}', 'Secret/Password'),
-              (r'(?i)bearer\s+[a-zA-Z0-9_-]{20,}', 'Bearer Token'),
-              (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
-              (r'sk-[a-zA-Z0-9]{48}', 'OpenAI Key'),
-              (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
+              (r"(?i)(api[_-]?key|apikey)\s*[=:]\s*[a-zA-Z0-9_-]{20,}", "API Key"),
+              (r"(?i)(secret|password|passwd|pwd)\s*[=:]\s*\S{8,}", "Secret/Password"),
+              (r"(?i)bearer\s+[a-zA-Z0-9_-]{20,}", "Bearer Token"),
+              (r"ghp_[a-zA-Z0-9]{36}", "GitHub Token"),
+              (r"sk-[a-zA-Z0-9]{48}", "OpenAI Key"),
+              (r"AKIA[0-9A-Z]{16}", "AWS Access Key"),
           ]
 
           findings = []
@@ -705,6 +705,31 @@ jobs:
           echo "**Total issues: $TOTAL**" >> security-report.md
 
           echo "TOTAL_ISSUES=$TOTAL" >> $GITHUB_ENV
+
+      - name: AI Summary
+        continue-on-error: true
+        env:
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_OLLAMA_URL }}
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
+        run: |
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens 2>/dev/null || true
+            cd /tmp/repo-sapiens && git checkout "${SAPIENS_BRANCH:-main}" 2>/dev/null && pip install -e . && cd - || pip install repo-sapiens
+          else
+            pip install repo-sapiens || pip3 install repo-sapiens
+          fi
+
+          sapiens task "Summarize the security review results for this repository.
+
+          $(cat security-report.md)
+
+          Write a brief, friendly summary (3-5 sentences) covering:
+          1. Which security scanners ran and what they checked
+          2. Whether any issues were found (and their severity if so)
+          3. Overall security posture assessment
+
+          Output ONLY the summary text to stdout, nothing else. Do not create or modify any files."
 
       - name: Create fix branch
         if: env.TOTAL_ISSUES != '0'

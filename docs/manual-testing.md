@@ -174,8 +174,8 @@ Body: When I tap the login button on iOS Safari, nothing happens.
 Fastest way to verify Sapiens is working:
 
 ```bash
-# 1. Create test issue via API
-curl -X POST -H "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+# 1. Create test issue via API (use SAPIENS_GITLAB_TOKEN - GITLAB_ prefix is reserved)
+curl -X POST -H "PRIVATE-TOKEN: $SAPIENS_GITLAB_TOKEN" \
   "$GITLAB_URL/api/v4/projects/$PROJECT_ID/issues" \
   -d "title=Test: Button alignment broken" \
   -d "description=The submit button is misaligned on the checkout page." \

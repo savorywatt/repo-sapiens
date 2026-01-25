@@ -201,7 +201,7 @@ on:
 
 jobs:
   sapiens:
-    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v0.5.1
     with:
       label: ${{ github.event.label.name }}
       issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}

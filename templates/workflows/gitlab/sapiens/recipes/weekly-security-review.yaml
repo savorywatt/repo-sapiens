@@ -1,5 +1,5 @@
 # @repo-sapiens-template
-# @version: 1.0.0
+# @version: 2.0.1
 # @name: weekly-security-review
 #
 # Weekly Security Review for GitLab CI/CD
@@ -12,8 +12,8 @@
 # Setup:
 # 1. Copy to .gitlab-ci.yml (or include via `include:`)
 # 2. Set required CI/CD variables (Settings > CI/CD > Variables):
-#    - GITLAB_TOKEN: GitLab API token with repo write access
-#    - ANTHROPIC_API_KEY: Claude API key (masked, protected)
+#    - SAPIENS_GITLAB_TOKEN: GitLab API token with repo write access (note: GITLAB_ prefix is reserved)
+#    - SAPIENS_AI_API_KEY: Claude API key (masked, protected)
 # 3. Configure SECURITY_LANGUAGES below with your project's languages
 # 4. Set up a pipeline schedule (CI/CD > Schedules) for weekly runs
 #
@@ -30,6 +30,7 @@ variables:
 stages:
   - scan
   - report
+  - summary
   - fix
 
 default:
@@ -196,6 +197,36 @@ generate-report:
       dotenv: build.env
     expire_in: 30 days
 
+# AI-powered summary of security findings
+ai-summary:
+  stage: summary
+  image: python:${PYTHON_VERSION}-slim
+  timeout: 10 minutes
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+  needs:
+    - job: generate-report
+      artifacts: true
+  variables:
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $ANTHROPIC_API_KEY
+  before_script:
+    - pip install --quiet --no-cache-dir repo-sapiens
+  script:
+    - |
+      sapiens task "Summarize the security review results for this repository.
+
+      $(cat security-report.md)
+
+      Write a brief, friendly summary (3-5 sentences) covering:
+      1. Which security scanners ran and what they checked
+      2. Whether any issues were found (and their severity if so)
+      3. Overall security posture assessment
+
+      Output ONLY the summary text to stdout, nothing else. Do not create or modify any files."
+  allow_failure: true
+
 # Auto-fix security issues (optional)
 auto-fix-security:
   stage: fix
@@ -210,8 +241,9 @@ auto-fix-security:
     - job: generate-report
       artifacts: true
   variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
-    AUTOMATION__AGENT_PROVIDER__API_KEY: $ANTHROPIC_API_KEY
+    # Note: GITLAB_ prefix is reserved, so we source from SAPIENS_GITLAB_TOKEN
+    GITLAB_TOKEN: $SAPIENS_GITLAB_TOKEN
+    AUTOMATION__AGENT_PROVIDER__API_KEY: $SAPIENS_AI_API_KEY
   before_script:
     - pip install --quiet --no-cache-dir repo-sapiens
     - apt-get update && apt-get install -y git
