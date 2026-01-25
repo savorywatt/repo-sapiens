@@ -605,12 +605,12 @@ jobs:
           import re
 
           patterns = [
-              (r'(?i)(api[_-]?key|apikey)\s*[=:]\s*['\"]?[a-zA-Z0-9_-]{20,}', 'API Key'),
-              (r'(?i)(secret|password|passwd|pwd)\s*[=:]\s*['\"]?[^\s'\",]{8,}', 'Secret/Password'),
-              (r'(?i)bearer\s+[a-zA-Z0-9_-]{20,}', 'Bearer Token'),
-              (r'ghp_[a-zA-Z0-9]{36}', 'GitHub Token'),
-              (r'sk-[a-zA-Z0-9]{48}', 'OpenAI Key'),
-              (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
+              (r"(?i)(api[_-]?key|apikey)\s*[=:]\s*[a-zA-Z0-9_-]{20,}", "API Key"),
+              (r"(?i)(secret|password|passwd|pwd)\s*[=:]\s*\S{8,}", "Secret/Password"),
+              (r"(?i)bearer\s+[a-zA-Z0-9_-]{20,}", "Bearer Token"),
+              (r"ghp_[a-zA-Z0-9]{36}", "GitHub Token"),
+              (r"sk-[a-zA-Z0-9]{48}", "OpenAI Key"),
+              (r"AKIA[0-9A-Z]{16}", "AWS Access Key"),
           ]
 
           findings = []
@@ -698,6 +698,38 @@ jobs:
           echo "**Total issues: $TOTAL**" >> security-report.md
 
           echo "TOTAL_ISSUES=$TOTAL" >> $GITHUB_ENV
+
+      - name: Check AI API key
+        id: check-ai
+        env:
+          AI_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -n "$AI_KEY" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: AI Summary
+        if: steps.check-ai.outputs.has_key == 'true'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          pip install repo-sapiens==0.5.1
+
+          sapiens task "Summarize the security review results for this repository.
+
+          $(cat security-report.md)
+
+          Write a brief, friendly summary (3-5 sentences) covering:
+          1. Which security scanners ran and what they checked
+          2. Whether any issues were found (and their severity if so)
+          3. Overall security posture assessment
+
+          Output ONLY the summary text to stdout, nothing else. Do not create or modify any files."
 
       - name: Create fix branch
         if: env.TOTAL_ISSUES != '0'
