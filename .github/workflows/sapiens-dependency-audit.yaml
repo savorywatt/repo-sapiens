@@ -45,7 +45,7 @@ jobs:
 
       - name: Install tools
         run: |
-          pip install repo-sapiens pip-audit safety
+          pip install git+https://github.com/savorywatt/repo-sapiens.git@v2 pip-audit safety
 
       - name: Check for outdated packages
         id: outdated

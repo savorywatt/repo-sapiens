@@ -370,7 +370,7 @@ jobs:
         env:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
         run: |
-          pip install repo-sapiens || pip3 install repo-sapiens
+          pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
 
           sapiens task "Analyze this SBOM and security report for a software project.
 

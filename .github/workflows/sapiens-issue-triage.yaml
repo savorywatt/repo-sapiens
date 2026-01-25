@@ -44,7 +44,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install repo-sapiens
-        run: pip install repo-sapiens
+        run: pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
 
       - name: Get untriaged issues
         id: issues
