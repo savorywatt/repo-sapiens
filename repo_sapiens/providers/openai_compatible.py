@@ -272,7 +272,7 @@ class OpenAICompatibleProvider(AgentProvider):
             def __setattr__(self, key: str, value: Any) -> None:
                 self[key] = value
 
-        task_objects = []
+        task_objects: list[dict[str, Any]] = []
         for t in tasks:
             task_obj = TaskDict(
                 id=t["id"],
@@ -327,8 +327,18 @@ IMPORTANT:
         result = await self.execute_prompt(prompt)
         output = result.get("output", "")
 
-        # Parse tasks from markdown output
-        tasks = self._parse_tasks_from_markdown(output)
+        # Parse tasks from markdown output and convert to Task objects
+        parsed_tasks = self._parse_tasks_from_markdown(output)
+        tasks = [
+            Task(
+                id=t["id"],
+                prompt_issue_id=issue.number,
+                title=t["title"],
+                description=t.get("description", ""),
+                dependencies=t.get("dependencies", []),
+            )
+            for t in parsed_tasks
+        ]
 
         plan = Plan(
             id=str(issue.number),

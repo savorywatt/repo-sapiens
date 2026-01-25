@@ -1,0 +1,53 @@
+# Example .gitlab-ci.yml for Sapiens Integration
+#
+# This shows the RECOMMENDED setup using the automation-daemon (scheduled polling).
+# For GitLab, this is simpler than webhook-based triggering.
+#
+# Setup:
+# 1. Add CI/CD variables in GitLab project settings:
+#    - SAPIENS_GITLAB_TOKEN: GitLab API token with 'api' scope
+#    - SAPIENS_AI_API_KEY: Your AI provider API key (not needed for Ollama)
+#
+# 2. (Optional) Override AI provider settings:
+#    - SAPIENS_AI_PROVIDER: "ollama" or "openai-compatible"
+#    - SAPIENS_AI_MODEL: Model name (e.g., "qwen3:8b", "gpt-4")
+#    - SAPIENS_AI_BASE_URL: Provider URL (e.g., "http://ollama:11434")
+#
+# 3. Create a pipeline schedule:
+#    Settings > CI/CD > Pipeline schedules > New schedule
+#    Cron: */5 * * * * (every 5 minutes)
+#
+# How it works:
+#   - The daemon runs on schedule and checks all open issues
+#   - Issues with sapiens labels (needs-planning, approved, etc.) are processed
+#   - No webhook setup required - just schedule and go
+
+include:
+  # Include the automation daemon (recommended for GitLab)
+  - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v2/templates/workflows/gitlab/sapiens/automation-daemon.yaml'
+
+# Override default AI provider settings if needed
+variables:
+  SAPIENS_AI_PROVIDER: "ollama"
+  SAPIENS_AI_MODEL: "qwen3:8b"
+  SAPIENS_AI_BASE_URL: "http://ollama.internal:11434"
+
+# Your existing stages and jobs continue here...
+stages:
+  - build
+  - test
+  - sapiens  # Added by the included daemon
+
+# Your normal CI jobs
+build:
+  stage: build
+  script:
+    - echo "Building..."
+
+test:
+  stage: test
+  script:
+    - echo "Testing..."
+
+# The sapiens-daemon job is automatically included from the remote file
+# It will run on schedule and process issues with sapiens labels

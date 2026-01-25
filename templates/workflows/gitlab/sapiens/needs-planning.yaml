@@ -1,6 +1,15 @@
 # @repo-sapiens-template
 # @version: 1.0.0
 # @name: needs-planning
+# @deprecated: Use sapiens-dispatcher.yaml instead
+#
+# DEPRECATED: This standalone workflow is maintained for backwards compatibility.
+# For new projects, use the unified sapiens-dispatcher.yaml which handles all labels:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v2/templates/workflows/gitlab/sapiens-dispatcher.yaml'
+#
+# ---
 #
 # Triggered when 'sapiens/needs-planning' label is added.
 # Creates implementation plan for the issue.

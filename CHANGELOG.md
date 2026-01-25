@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `--daemon-interval` CLI flag for non-interactive setup
   - Interval stored in config as `automation.mode.daemon_interval`
   - Displayed in "Next Steps" with correct seconds conversion
+- **GitLab Init Validation**: Prevents misconfiguration when targeting GitLab
+  - Shows warning that GitLab lacks native label triggers
+  - Defaults to "daemon" mode instead of "native" for GitLab repos
+  - Warns and prompts confirmation if user explicitly selects "native" mode
+  - Non-interactive mode automatically uses daemon mode for GitLab
 - **Tiered Workflow Deployment**: `--deploy-workflows` option now accepts tier names
   - `essential`: Label-triggered AI work (process-label.yaml)
   - `core`: Repository maintenance (post-merge-docs, weekly-test-coverage)

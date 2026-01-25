@@ -1092,6 +1092,16 @@ class RepoInitializer:
             click.echo(f"   ✓ Provider: {self.provider_type.upper()}")
             click.echo(f"   ✓ Parsed: owner={self.repo_info.owner}, repo={self.repo_info.repo}")
             click.echo(f"   ✓ Base URL: {self.repo_info.base_url}")
+
+            # Set smart defaults for GitLab (no native label triggers)
+            if self.provider_type == "gitlab" and self.non_interactive:
+                # Use CLI-provided daemon interval or default to 5 minutes
+                if self.cli_daemon_interval is not None:
+                    self.daemon_interval = self.cli_daemon_interval
+                # Default to daemon mode for GitLab in non-interactive
+                self.automation_mode = "daemon"
+                click.echo(f"   ✓ Automation: daemon mode (GitLab default, {self.daemon_interval}m interval)")
+
             click.echo()
 
         except GitDiscoveryError as e:
@@ -2369,30 +2379,85 @@ class RepoInitializer:
         click.echo(click.style("🔧 Automation Mode Configuration", bold=True, fg="cyan"))
         click.echo()
 
+        # GitLab-specific warning about lack of native label triggers
+        is_gitlab = self.provider_type == "gitlab"
+        if is_gitlab:
+            click.echo(click.style("⚠️  GitLab Note:", fg="yellow", bold=True))
+            click.echo("   GitLab does not have native label-triggered pipelines like GitHub/Gitea.")
+            click.echo("   For GitLab, sapiens uses scheduled pipelines that poll for labeled issues.")
+            click.echo("   The 'daemon' mode is recommended for GitLab repositories.")
+            click.echo()
+
         # Show mode options with explanations
         click.echo("Available modes:")
         click.echo()
-        click.echo(click.style("  native", bold=True) + " (recommended)")
-        click.echo("    • Instant response via CI/CD workflows")
-        click.echo("    • Triggers on label events")
-        click.echo("    • No daemon process needed")
-        click.echo("    • Uses Gitea/GitHub Actions runners")
+        if is_gitlab:
+            # For GitLab, daemon is recommended
+            click.echo(click.style("  daemon", bold=True) + " (recommended for GitLab)")
+            click.echo("    • Scheduled pipeline polls for labeled issues")
+            click.echo("    • Configure schedule in GitLab CI/CD settings")
+            click.echo("    • Simple setup, no external services needed")
+            click.echo()
+            click.echo(click.style("  native", bold=True) + " (requires webhook handler)")
+            click.echo("    • Real-time response to label changes")
+            click.echo("    • Requires deploying webhook-trigger.py service")
+            click.echo("    • More complex but instant reactions")
+            click.echo()
+            click.echo(click.style("  hybrid", bold=True))
+            click.echo("    • Webhook handler + scheduled fallback")
+            click.echo("    • Best reliability if webhook handler goes down")
+        else:
+            # For GitHub/Gitea, native is recommended
+            click.echo(click.style("  native", bold=True) + " (recommended)")
+            click.echo("    • Instant response via CI/CD workflows")
+            click.echo("    • Triggers on label events")
+            click.echo("    • No daemon process needed")
+            click.echo("    • Uses Gitea/GitHub Actions runners")
+            click.echo()
+            click.echo(click.style("  daemon", bold=True))
+            click.echo("    • Polling-based (checks every N minutes)")
+            click.echo("    • Requires continuous process")
+            click.echo("    • Works without CI/CD")
+            click.echo()
+            click.echo(click.style("  hybrid", bold=True))
+            click.echo("    • Native triggers + daemon fallback")
+            click.echo("    • Best of both worlds")
         click.echo()
-        click.echo(click.style("  daemon", bold=True))
-        click.echo("    • Polling-based (checks every N minutes)")
-        click.echo("    • Requires continuous process")
-        click.echo("    • Works without CI/CD")
-        click.echo()
-        click.echo(click.style("  hybrid", bold=True))
-        click.echo("    • Native triggers + daemon fallback")
-        click.echo("    • Best of both worlds")
-        click.echo()
+
+        # Set default based on provider
+        default_mode = "daemon" if is_gitlab else "native"
 
         self.automation_mode = click.prompt(
             "Which mode?",
             type=click.Choice(["native", "daemon", "hybrid"]),
-            default="native",
+            default=default_mode,
         )
+
+        # Warn GitLab users who select native mode - they need webhook handler
+        if is_gitlab and self.automation_mode == "native":
+            click.echo()
+            click.echo(click.style("⚠️  GitLab Native Mode Setup Required:", fg="yellow", bold=True))
+            click.echo()
+            click.echo("   GitLab lacks native label-triggered pipelines. To use 'native' mode,")
+            click.echo("   you MUST deploy a webhook handler to bridge label events to pipelines.")
+            click.echo()
+            click.echo(click.style("   Required Setup:", bold=True))
+            click.echo("   1. Deploy the webhook handler script:")
+            click.echo("      templates/workflows/gitlab/examples/webhook-trigger.py")
+            click.echo()
+            click.echo("   2. Configure GitLab webhook:")
+            click.echo("      Settings → Webhooks → Add webhook")
+            click.echo("      URL: https://your-handler/gitlab-webhook")
+            click.echo("      Triggers: Issues events, Merge request events")
+            click.echo()
+            click.echo("   3. Set environment variables on the handler:")
+            click.echo("      GITLAB_URL, GITLAB_TOKEN, TRIGGER_TOKEN")
+            click.echo()
+            click.echo("   See webhook-trigger.py for deployment options (Flask, serverless, etc.)")
+            click.echo()
+            if not click.confirm("I understand and will set up the webhook handler. Continue?", default=False):
+                self.automation_mode = "daemon"
+                click.echo("   → Switched to daemon mode (no webhook setup needed)")
 
         # Configure daemon interval for daemon/hybrid modes
         if self.automation_mode in ("daemon", "hybrid"):

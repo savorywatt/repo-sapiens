@@ -1,6 +1,15 @@
 # @repo-sapiens-template
 # @version: 1.0.0
 # @name: approved
+# @deprecated: Use sapiens-dispatcher.yaml instead
+#
+# DEPRECATED: This standalone workflow is maintained for backwards compatibility.
+# For new projects, use the unified sapiens-dispatcher.yaml which handles all labels:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/savorywatt/repo-sapiens/v2/templates/workflows/gitlab/sapiens-dispatcher.yaml'
+#
+# ---
 #
 # Triggered when 'approved' label is added to issue or MR.
 # Executes the approved changes.
