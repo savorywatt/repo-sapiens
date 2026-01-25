@@ -7,86 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **Branding Update**: Renamed "Builder Automation" to "Sapiens Automation" throughout codebase
-- **Bot Signature Icon**: Changed from robot emoji (🤖) to diamond (◆) for cleaner appearance
-- **GitLab E2E Default AI Provider**: Changed default from OpenRouter to Ollama for local testing
+## [0.5.0] - 2026-01-24
 
 ### Added
-- **GitLab Automation Daemon** (v2.0): Updated `automation-daemon.yaml` as recommended approach
-  - Polls on schedule (configured via GitLab UI) - no webhook setup required
+
+#### Tiered Workflow Deployment
+- **`--deploy-workflows` accepts tier names**: Changed from boolean to multi-value option
+  - `essential`: Label-triggered AI work (`process-label.yaml`, `sapiens.yaml` wrapper)
+  - `core`: Repository maintenance (`post-merge-docs`, `weekly-test-coverage`)
+  - `security`: Security audits (`weekly-security-review`, `dependency-audit`, `sbom-license`)
+  - `support`: Issue management (`daily-issue-triage`)
+  - `all`: Deploy all tiers
+- **Provider-specific deployment strategies**:
+  - GitHub: Thin wrapper → reusable dispatcher for essential tier; actual files for recipe tiers
+  - Gitea/GitLab: Full workflow files for all tiers (no cross-repo reusable support)
+- **Interactive tier selection**: Prompts for which tiers to deploy during `sapiens init`
+- **Essential tier always implied**: When specifying other tiers, essential is automatically included
+
+#### Reusable Workflows (GitHub)
+Six new reusable workflows in `.github/workflows/` for cross-repository use:
+- `sapiens-security-review.yaml`: Multi-language security scanning (Python, Go, Java, Rust, TypeScript, etc.)
+- `sapiens-sbom-license.yaml`: SBOM generation and license compliance auditing
+- `sapiens-dependency-audit.yaml`: Dependency vulnerability auditing and updates
+- `sapiens-test-coverage.yaml`: Test coverage analysis and improvement suggestions
+- `sapiens-issue-triage.yaml`: Automated issue labeling and prioritization
+- `sapiens-post-merge-docs.yaml`: Post-merge documentation updates
+
+**Recipe template changes**:
+- All 6 GitHub recipe templates converted to thin wrappers (~35-45 lines)
+- Thin wrappers call reusable workflows via `workflow_call`
+- Gitea recipes remain full implementations (Gitea lacks cross-repo reusable workflow support)
+- Added `permissions:` blocks to all wrapper workflows (required by GitHub for cross-repo calls)
+
+#### Workflow Removal
+- **`--remove-workflows` option**: New CLI option to remove deployed workflow tiers
+  - Removes files from `.github/workflows/sapiens/` or `.gitlab/sapiens/`
+  - Automatically cleans up empty directories
+  - Supports same tier options: `essential`, `core`, `security`, `support`, `all`
+
+#### GitLab Integration Improvements
+- **Automation Daemon v2.0**: Updated `automation-daemon.yaml` as the recommended approach
+  - Polls on schedule (configured via GitLab UI variables)
   - Processes all issues with sapiens labels via `sapiens process-all`
   - Supports `include: remote:` for cross-project reuse
   - Configurable AI provider settings via CI/CD variables
-  - Automatic config generation if `.sapiens/config.yaml` not present
-- **GitLab Dispatcher** (optional): New `sapiens-dispatcher.yaml` for real-time responses
+- **GitLab Dispatcher**: Optional `sapiens-dispatcher.yaml` for real-time responses
   - For users who need instant label reactions (requires external webhook handler)
-  - Webhook trigger example script (`webhook-trigger.py`) bridges GitLab events to pipelines
-  - Most users should prefer the daemon approach instead
-- **GitLab Workflow Cleanup**: Removed redundant individual label workflows (see Removed section)
-- **Daemon Interval Configuration**: `sapiens init` now prompts for daemon polling interval
-  - New `--daemon-interval` CLI flag for non-interactive setup
-  - Interval stored in config as `automation.mode.daemon_interval`
-  - Displayed in "Next Steps" with correct seconds conversion
-- **GitLab Init Validation**: Prevents misconfiguration when targeting GitLab
+  - Includes `webhook-trigger.py` example script for bridging GitLab events to pipelines
+- **Individual label workflows removed**: Replaced by unified daemon approach
+- **GitLab init validation**: Prevents misconfiguration
   - Shows warning that GitLab lacks native label triggers
   - Defaults to "daemon" mode instead of "native" for GitLab repos
-  - Warns and prompts confirmation if user explicitly selects "native" mode
   - Non-interactive mode automatically uses daemon mode for GitLab
-- **Tiered Workflow Deployment**: `--deploy-workflows` option now accepts tier names
-  - `essential`: Label-triggered AI work (process-label.yaml)
-  - `core`: Repository maintenance (post-merge-docs, weekly-test-coverage)
-  - `security`: Security audits (weekly-security-review, dependency-audit, sbom-license)
-  - `support`: Issue management (daily-issue-triage)
-  - GitHub uses thin wrapper → dispatcher for essential tier; actual files for other tiers
-  - Gitea/GitLab deploy actual workflow files for all tiers
-  - Interactive mode prompts for tier selection
-  - Essential tier always implied when other tiers specified
-- **Workflow Removal**: New `--remove-workflows` option to remove deployed workflow tiers
-  - Removes workflow files from `.github/workflows/sapiens/` or `.gitlab/sapiens/`
-  - Cleans up empty directories automatically
-  - Supports same tier options: essential, core, security, support, all
-- **Tier E2E Test Script**: New `scripts/test-workflow-tiers.sh` for testing workflow operations
+
+#### CI/CD Mode Enhancements
+- **Pydantic environment variable format**: Credentials now use `${AUTOMATION__GIT_PROVIDER__API_TOKEN}` format for proper CI/CD resolution
+- **Provider-specific handling**: GitHub, Gitea, and GitLab credentials configured appropriately for CICD backend
+- **Workflow deployment in CICD mode**: `sapiens init` now properly deploys workflows when `--cicd` flag is used
+- **AI provider configuration**: Always includes `base_url` for openai-compatible providers in CICD mode
+
+#### GitHub Copilot Documentation
+- **Direct API approach for CI/CD**: Document using `https://api.githubcopilot.com` endpoint
+  - Works with `openai-compatible` provider type
+  - OAuth token extracted from IDE (one-time setup)
+  - Supports models: `gpt-4o`, `claude-3.7-sonnet`, `gemini-2.5-pro`
+- **Two-approach documentation**: Reorganized COPILOT_SETUP.md to cover:
+  1. Direct API (CI/CD, headless environments)
+  2. copilot-api proxy (local development)
+- **Goose integration**: Added example for using Goose with Copilot backend
+
+#### E2E Testing Improvements
+- **Tier E2E test script**: New `scripts/test-workflow-tiers.sh`
   - Tests install, idempotent re-deploy, update, and remove for each tier
   - Validates files via Gitea API
   - Supports `--bootstrap` for automated Gitea setup
-- **Comprehensive GitLab E2E Testing**: Full workflow coverage parity with sapiens labels
-  - Phase 1.5 Component Integration test for sapiens-dispatcher CI component
-  - Automatic GitLab Runner setup and registration
-  - CI/CD secrets configuration (SAPIENS_GITLAB_TOKEN, SAPIENS_AI_API_KEY)
-  - Sapiens config deployment via API for CI job execution
-  - Support for both Ollama and OpenRouter AI providers via `--ai-provider` flag
-  - Configurable Ollama URL via `OLLAMA_URL` environment variable
-  - Phase 5: Code Review (`sapiens/needs-review` label)
-  - Phase 6: Fix Request (`sapiens/needs-fix` label)
-  - Phase 7: QA Request (`sapiens/requires-qa` label)
-  - Phase 8: Daemon test (`sapiens process-all` - simulates automation-daemon.yaml)
-- **Gitea Template Workflow E2E Testing** (Phase 1.6): Validates actual template execution
-  - Deploys and tests `process-label.yaml` template (not just thin wrappers)
-  - `SAPIENS_REPO_URL` and `SAPIENS_BRANCH` secrets for testing local changes
-  - Verifies workflow triggers, executes, and posts comments correctly
-  - Fills testing gap: templates now tested as actual Gitea Actions
-- **Bootstrap Script Improvements**
-  - `configure_external_url()` function for GitLab Runner compatibility
-  - Internal health check fallback when external_url differs from actual URL
-  - Automatic sourcing of existing `.env.gitlab-test` for token reuse
-  - `run_sapiens_init()` function to configure repositories via CLI
+- **GitHub E2E modernization**: Updated `run-github-e2e.sh` to use `sapiens init --deploy-workflows`
+  - Tests `needs-planning` and `approved` workflow triggers
+  - Uses absolute paths for results directory
+  - Added AI provider configuration options
+- **Comprehensive Gitea workflow tier testing**: Full execution validation via `workflow_dispatch`
+  - New `--test-tiers` flag for `run-gitea-e2e.sh`
+  - Tests Core, Security, and Support tier workflows
+  - Real-time progress display with phase tracking
 
-### Removed
-- **GitLab Individual Label Workflows**: Removed in favor of unified `automation-daemon.yaml`
-  - `approved.yaml` - use daemon instead
-  - `needs-planning.yaml` - use daemon instead
-  - `needs-review.yaml` - use daemon instead
-  - `needs-fix.yaml` - use daemon instead
-  - `requires-qa.yaml` - use daemon instead
-  - `process-label.yaml` - use daemon instead
-  - `execute-task.yaml` - use daemon instead
-  - `process-issue.yaml` - use daemon instead
+### Changed
+- **Branding Update**: Renamed "Builder Automation" to "Sapiens Automation" throughout codebase
+- **Bot Signature Icon**: Changed from robot emoji (🤖) to diamond (◆) for cleaner appearance
+- **GitLab E2E Default AI Provider**: Changed from OpenRouter to Ollama for local testing
+- **Bootstrap scripts updated**: Use `--deploy-workflows essential` instead of boolean flag
 
 ### Fixed
-- **GitLab CI YAML Comment Bug**: Fixed `#` being interpreted as YAML comment in echo statements
-- **GitLab Runner Clone Failure**: Fixed external_url configuration from `localhost` to `gitlab` hostname
-- **Bootstrap Token Reuse**: Fixed bootstrap failing when root password file was deleted
+- **Cross-repo workflow permissions**: Added required `permissions:` blocks to all GitHub recipe thin wrappers
+  - GitHub requires calling workflows to grant permissions when invoking cross-repo reusable workflows
+- **Test coverage workflow inputs**: Fixed `fromJSON()` usage for number type inputs in thin wrappers
+- **Reusable workflow secrets**: Corrected `secrets` usage in workflow conditions
+- **GitLab CI YAML comment bug**: Fixed `#` being interpreted as YAML comment in echo statements
+- **GitLab Runner clone failure**: Fixed `external_url` configuration from `localhost` to `gitlab` hostname
+- **Bootstrap token reuse**: Fixed bootstrap failing when root password file was deleted
+- **OpenAI-compatible provider**: Fixed mypy type error in `Task` conversion
+
+### Removed
+- **GitLab individual label workflows**: Replaced by unified `automation-daemon.yaml`
+  - `approved.yaml`, `needs-planning.yaml`, `needs-review.yaml`, `needs-fix.yaml`
+  - `requires-qa.yaml`, `process-label.yaml`, `execute-task.yaml`, `process-issue.yaml`
 
 ## [0.4.0] - 2026-01-19
 
@@ -440,6 +463,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core dependencies install without optional dependencies (correct split)
 - Version extraction works: repo_sapiens.__version__ = "0.1.0"
 
+[0.5.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.5.0
+[0.4.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.4.0
 [0.3.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.3.0
 [0.2.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/savorywatt/repo-sapiens/releases/tag/v0.1.0
