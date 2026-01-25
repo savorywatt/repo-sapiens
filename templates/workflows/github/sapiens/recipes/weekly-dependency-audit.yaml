@@ -23,6 +23,11 @@ on:
     - cron: '0 10 * * 3'
   workflow_dispatch:
 
+# Required for cross-repo reusable workflow
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   dependency-audit:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dependency-audit.yaml@v2

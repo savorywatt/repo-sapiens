@@ -31,10 +31,8 @@ GitLab Webhook Setup:
     4. Trigger: Issues events, Merge request events
 """
 
-import os
-import json
 import logging
-from typing import Optional
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -67,8 +65,8 @@ def get_added_labels(payload: dict) -> list[str]:
     changes = payload.get("changes", {})
     labels_change = changes.get("labels", {})
 
-    previous = {l["title"] for l in labels_change.get("previous", [])}
-    current = {l["title"] for l in labels_change.get("current", [])}
+    previous = {lbl["title"] for lbl in labels_change.get("previous", [])}
+    current = {lbl["title"] for lbl in labels_change.get("current", [])}
 
     return list(current - previous)
 
@@ -121,7 +119,7 @@ def handle_webhook(payload: dict) -> dict:
 
     # Check for label changes
     added_labels = get_added_labels(payload)
-    sapiens_labels = [l for l in added_labels if is_sapiens_label(l)]
+    sapiens_labels = [lbl for lbl in added_labels if is_sapiens_label(lbl)]
 
     if not sapiens_labels:
         return {"status": "ignored", "reason": "No sapiens labels added"}
@@ -138,7 +136,7 @@ def handle_webhook(payload: dict) -> dict:
 # Flask app (if running standalone)
 if __name__ == "__main__":
     try:
-        from flask import Flask, request, jsonify
+        from flask import Flask, jsonify, request
     except ImportError:
         print("Flask not installed. Install with: pip install flask requests")
         print("\nAlternatively, use this module's handle_webhook() function in your own server.")

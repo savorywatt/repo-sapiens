@@ -29,6 +29,13 @@ on:
         type: boolean
         default: true
 
+# Required for cross-repo reusable workflow
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  security-events: write
+
 jobs:
   security-review:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-security-review.yaml@v2

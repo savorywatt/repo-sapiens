@@ -26,6 +26,11 @@ on:
   issues:
     types: [opened]
 
+# Required for cross-repo reusable workflow
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   issue-triage:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-issue-triage.yaml@v2

@@ -23,6 +23,10 @@ on:
       - main
   workflow_dispatch:
 
+# Required for cross-repo reusable workflow
+permissions:
+  contents: write
+
 jobs:
   post-merge-docs:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-post-merge-docs.yaml@v2

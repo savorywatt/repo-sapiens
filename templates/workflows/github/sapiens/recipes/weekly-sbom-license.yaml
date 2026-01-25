@@ -33,6 +33,11 @@ on:
         type: boolean
         default: false
 
+# Required for cross-repo reusable workflow
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   sbom-license:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-sbom-license.yaml@v2
