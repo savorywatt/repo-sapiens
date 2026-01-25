@@ -97,7 +97,13 @@ include:
 
 ## Part 3: Webhook Handler Setup
 
-**Important:** GitLab does not have native label triggers like GitHub/Gitea. You need a webhook handler to trigger pipelines when labels are added to issues or merge requests.
+**Important:** GitLab does not have native label triggers like GitHub/Gitea. You need webhook handlers to trigger pipelines when:
+- Labels are added to issues or merge requests
+- Comments are posted with trigger keywords (e.g., `@sapiens`)
+
+repo-sapiens provides ready-to-use webhook handlers in the `scripts/` directory.
+
+---
 
 ### 3.1 Create a Pipeline Trigger Token
 
@@ -106,9 +112,13 @@ include:
 3. Give it a description (e.g., "Sapiens webhook handler")
 4. Copy the trigger token
 
-### 3.2 Deploy the Webhook Handler
+---
 
-Here's a simple Python webhook handler using Flask:
+### 3.2 Label Webhook Handler
+
+This handler triggers pipelines when labels are added to issues or merge requests.
+
+#### Simple Flask Handler
 
 ```python
 # gitlab_webhook_handler.py
@@ -317,6 +327,84 @@ gunicorn gitlab_webhook_handler:app -b 0.0.0.0:8080
    - **Enable SSL verification**: Yes (if using HTTPS)
 3. Click **Add webhook**
 4. Test the webhook with the "Test" button
+
+---
+
+### 3.5 Comment Webhook Handler (for @sapiens mentions)
+
+This handler enables the **comment-response workflow** - allowing users to interact with sapiens by mentioning `@sapiens` in issue comments.
+
+repo-sapiens includes a production-ready comment webhook handler at `scripts/gitlab-comment-webhook.py`.
+
+#### Deploy with Docker (Recommended)
+
+```bash
+# Build the image
+cd scripts/
+docker build -t gitlab-comment-webhook -f Dockerfile.gitlab-webhook .
+
+# Run the container
+docker run -d --name gitlab-webhook \
+    -e GITLAB_URL=https://gitlab.example.com \
+    -e GITLAB_API_TOKEN=glpat-xxxxxxxxxxxx \
+    -e GITLAB_WEBHOOK_SECRET=your-secure-secret \
+    -e TRIGGER_REF=main \
+    -p 8000:8000 \
+    gitlab-comment-webhook
+```
+
+#### Deploy Standalone
+
+```bash
+# Install dependencies
+pip install fastapi uvicorn httpx
+
+# Run the server
+GITLAB_URL=https://gitlab.example.com \
+GITLAB_API_TOKEN=glpat-xxxxxxxxxxxx \
+GITLAB_WEBHOOK_SECRET=your-secure-secret \
+python scripts/gitlab-comment-webhook.py
+```
+
+#### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GITLAB_API_TOKEN` | Yes | - | GitLab PAT with `api` scope |
+| `GITLAB_WEBHOOK_SECRET` | Yes | - | Secret token for webhook verification |
+| `GITLAB_URL` | No | `http://localhost` | GitLab instance URL |
+| `LISTEN_PORT` | No | `8000` | Port to listen on |
+| `TRIGGER_REF` | No | `main` | Git ref for pipeline triggers |
+| `LOG_LEVEL` | No | `INFO` | Logging level |
+
+#### Configure GitLab Webhook for Comments
+
+1. Go to **Settings** > **Webhooks**
+2. Add a new webhook:
+   - **URL**: `https://your-handler-url/webhook/gitlab/comment`
+   - **Secret token**: Match `GITLAB_WEBHOOK_SECRET`
+   - **Trigger**: Select **"Comments"** (Note events)
+   - **Enable SSL verification**: Yes (if using HTTPS)
+3. Click **Add webhook**
+
+#### Trigger Keywords
+
+Comments containing these keywords will trigger the sapiens pipeline:
+- `@sapiens` - Mention sapiens
+- `sapiens:` - Command prefix
+
+Example comment:
+```
+@sapiens can you analyze this bug and suggest a fix?
+```
+
+#### Health Check
+
+The webhook handler exposes a health endpoint:
+```bash
+curl http://localhost:8000/health
+# {"status": "healthy", "gitlab_url": "https://gitlab.example.com"}
+```
 
 ---
 
