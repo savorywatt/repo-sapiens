@@ -8,7 +8,7 @@
 git_provider:
   provider_type: gitea
   base_url: "${GITEA_URL}"
-  api_token: "@env:AUTOMATION__GIT_PROVIDER__API_TOKEN"
+  api_token: "${AUTOMATION__GIT_PROVIDER__API_TOKEN}"
 
 repository:
   owner: "${GITEA_OWNER}"

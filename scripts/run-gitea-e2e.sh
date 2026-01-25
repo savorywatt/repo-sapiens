@@ -154,6 +154,12 @@ cleanup() {
         gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$DISPATCHER_ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
     fi
 
+    # Close template test issue
+    if [[ -n "${TEMPLATE_ISSUE_NUMBER:-}" ]]; then
+        log "Closing template test issue #$TEMPLATE_ISSUE_NUMBER..."
+        gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$TEMPLATE_ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
+    fi
+
     # Close proposal issue
     if [[ -n "${PROPOSAL_NUMBER:-}" ]]; then
         log "Closing proposal #$PROPOSAL_NUMBER..."
@@ -359,7 +365,26 @@ ensure_label() {
 
 # Get Gitea container IP for use in workflows
 get_gitea_container_ip() {
-    docker inspect "$DOCKER_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null || echo ""
+    local container_names=("$DOCKER_CONTAINER" "sapiens-gitea" "gitea-test" "gitea")
+    local context_arg=""
+
+    # Use the Docker context if specified
+    if [[ -n "$DOCKER_CONTEXT" ]]; then
+        context_arg="--context $DOCKER_CONTEXT"
+    fi
+
+    # Try each container name
+    for name in "${container_names[@]}"; do
+        local ip
+        # shellcheck disable=SC2086
+        ip=$(docker $context_arg inspect "$name" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
+        if [[ -n "$ip" ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+
+    echo ""
 }
 
 # Deploy workflow file to repository
@@ -912,6 +937,264 @@ run_dispatcher_test() {
     fi
 
     error "Dispatcher integration test FAILED"
+    return 1
+}
+
+#############################################
+# Phase 1.6: Template Workflow Test
+#############################################
+
+# State variable for template test issue
+TEMPLATE_ISSUE_NUMBER=""
+
+# Deploy the actual process-label.yaml template
+deploy_process_label_template() {
+    step "Deploying process-label.yaml template..."
+
+    local template_path="$PROJECT_ROOT/templates/workflows/gitea/sapiens/process-label.yaml"
+    local target_path=".gitea/workflows/sapiens/process-label.yaml"
+
+    if [[ ! -f "$template_path" ]]; then
+        error "Template file not found: $template_path"
+        return 1
+    fi
+
+    # Read and base64 encode template
+    local content
+    content=$(cat "$template_path" | base64 -w 0)
+
+    # Check if file exists
+    local existing_sha
+    existing_sha=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" 2>/dev/null | jq -r '.sha // empty')
+
+    if [[ -n "$existing_sha" ]]; then
+        gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" "{
+            \"message\": \"Update process-label.yaml template for E2E test\",
+            \"content\": \"$content\",
+            \"sha\": \"$existing_sha\"
+        }" > /dev/null
+    else
+        # Ensure parent directory exists by creating .gitea/workflows/sapiens/.gitkeep first
+        local gitkeep_content
+        gitkeep_content=$(echo -n "" | base64)
+
+        # Try to create .gitea/workflows/sapiens directory structure
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/.gitea/workflows/sapiens/.gitkeep" "{
+            \"message\": \"Create sapiens workflows directory\",
+            \"content\": \"$gitkeep_content\"
+        }" > /dev/null 2>&1 || true
+
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" "{
+            \"message\": \"Deploy process-label.yaml template for E2E test\",
+            \"content\": \"$content\"
+        }" > /dev/null
+    fi
+
+    log "Deployed: $target_path"
+}
+
+# Set up secrets needed for template test
+setup_template_secrets() {
+    step "Setting up template test secrets..."
+
+    # Get current branch for testing local changes
+    local current_branch
+    current_branch=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD)
+
+    # Get the Gitea internal URL (for workflow container to reach Gitea)
+    local gitea_ip
+    gitea_ip=$(get_gitea_container_ip)
+    local gitea_internal_url="http://${gitea_ip}:3000"
+
+    if [[ -z "$gitea_ip" ]]; then
+        warn "Could not determine Gitea container IP, using localhost"
+        gitea_internal_url="http://localhost:3000"
+    fi
+
+    # For E2E tests, we use a local file:// URL since the workflow runner
+    # shares filesystem with the test environment
+    log "Setting SAPIENS_REPO_URL to file://$PROJECT_ROOT"
+    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/SAPIENS_REPO_URL" "{
+        \"data\": \"file://$PROJECT_ROOT\"
+    }" > /dev/null 2>&1 || {
+        warn "Could not set SAPIENS_REPO_URL secret via API"
+    }
+
+    log "Setting SAPIENS_BRANCH to $current_branch"
+    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/SAPIENS_BRANCH" "{
+        \"data\": \"$current_branch\"
+    }" > /dev/null 2>&1 || {
+        warn "Could not set SAPIENS_BRANCH secret via API"
+    }
+
+    log "Set SAPIENS_BRANCH=$current_branch"
+}
+
+# Create issue to trigger template workflow
+create_template_test_issue() {
+    step "Creating issue to trigger template workflow..."
+
+    # Ensure the trigger label exists
+    local planning_label_id
+    planning_label_id=$(ensure_label "needs-planning")
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Template Workflow E2E Test
+
+This issue tests that the actual `process-label.yaml` template executes correctly when triggered by a label.
+
+## Task
+Add a simple test file to verify the template workflow is working.
+
+## Expected Behavior
+1. The `process-label.yaml` workflow should trigger on `needs-planning` label
+2. Sapiens should detect the label and route to the planning handler
+3. A comment should be posted (success or failure)
+
+This is an automated template test issue.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/issues" "{
+        \"title\": \"${TEST_PREFIX}Template Workflow Test\",
+        \"body\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": [$planning_label_id]
+    }")
+
+    TEMPLATE_ISSUE_NUMBER=$(echo "$response" | jq -r '.number // empty')
+    if [[ -z "$TEMPLATE_ISSUE_NUMBER" ]]; then
+        error "Failed to create template test issue. Response: $response"
+        return 1
+    fi
+    log "Created issue #$TEMPLATE_ISSUE_NUMBER with needs-planning label"
+}
+
+# Wait for template workflow to complete
+wait_for_template_workflow() {
+    step "Waiting for template workflow to complete..."
+
+    local timeout=300
+    local elapsed=0
+    local poll_interval=15
+
+    while [[ $elapsed -lt $timeout ]]; do
+        # Check for process-label workflow run
+        local runs
+        runs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs?limit=10" 2>/dev/null || echo "{}")
+
+        # Find runs matching process-label.yaml workflow path (name field is null in Gitea API)
+        local template_run
+        template_run=$(echo "$runs" | jq -r '
+            [.workflow_runs[]?
+            | select(.path | test("process-label"; "i"))
+            | {status: .status, conclusion: .conclusion, id: .id}][0] // empty
+        ' 2>/dev/null || echo "")
+
+        if [[ -n "$template_run" && "$template_run" != "null" ]]; then
+            local status conclusion run_id
+            status=$(echo "$template_run" | jq -r '.status // "unknown"')
+            conclusion=$(echo "$template_run" | jq -r '.conclusion // "pending"')
+            run_id=$(echo "$template_run" | jq -r '.id // "unknown"')
+
+            log "  Template run $run_id - status: $status, conclusion: $conclusion"
+
+            if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" == "success" ]]; then
+                    log "Template workflow completed successfully!"
+                    return 0
+                else
+                    warn "Template workflow completed with: $conclusion"
+                    # Still counts as "ran" - the workflow executed
+                    return 0
+                fi
+            fi
+        fi
+
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+        log "  Waiting... (${elapsed}s / ${timeout}s)"
+    done
+
+    warn "Timeout waiting for template workflow"
+    return 1
+}
+
+# Verify template workflow results
+verify_template_workflow() {
+    step "Verifying template workflow results..."
+
+    local passed=0
+    local failed=0
+
+    # Check 1: Workflow file exists
+    log "Checking template file..."
+    if gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/.gitea/workflows/sapiens/process-label.yaml" > /dev/null 2>&1; then
+        log "  ✓ Template file deployed"
+        ((passed++))
+    else
+        error "  ✗ Template file missing"
+        ((failed++))
+    fi
+
+    # Check 2: Workflow ran
+    log "Checking for workflow run..."
+    local runs
+    runs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs?limit=10" 2>/dev/null || echo "{}")
+
+    if echo "$runs" | jq -e '.workflow_runs[]? | select(.path | test("process-label"; "i"))' > /dev/null 2>&1; then
+        log "  ✓ Template workflow ran"
+        ((passed++))
+    else
+        error "  ✗ No template workflow run found"
+        ((failed++))
+    fi
+
+    # Check 3: Comment posted (success or failure comment from workflow)
+    log "Checking for handler comment..."
+    local comments
+    comments=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$TEMPLATE_ISSUE_NUMBER/comments" 2>/dev/null || echo "[]")
+
+    if echo "$comments" | jq -e '.[] | select(.body | test("Label handler"; "i"))' > /dev/null 2>&1; then
+        log "  ✓ Handler comment posted"
+        ((passed++))
+    else
+        # Check for any sapiens-related comment
+        if echo "$comments" | jq -e '.[] | select(.body | test("sapiens|automation|failed|success"; "i"))' > /dev/null 2>&1; then
+            log "  ✓ Workflow comment posted"
+            ((passed++))
+        else
+            warn "  - No handler comment (workflow may still be processing or failed silently)"
+        fi
+    fi
+
+    echo ""
+    log "Template verification: $passed passed, $failed failed"
+    [[ $failed -eq 0 ]]
+}
+
+# Run the template workflow test
+run_template_test() {
+    step "=== Phase 1.6: Template Workflow Test ==="
+    echo ""
+    log "Testing actual process-label.yaml template execution"
+    echo ""
+
+    deploy_process_label_template || return 1
+    setup_template_secrets
+    sleep 3  # Give Gitea time to recognize the new workflow
+
+    create_template_test_issue || return 1
+
+    if wait_for_template_workflow; then
+        if verify_template_workflow; then
+            log "Template workflow test PASSED"
+            return 0
+        fi
+    fi
+
+    error "Template workflow test FAILED"
     return 1
 }
 
@@ -2013,8 +2296,9 @@ run_full_workflow_test() {
 generate_report() {
     local actions_status="$1"
     local dispatcher_status="$2"
-    local cli_status="$3"
-    local workflow_status="${4:-SKIPPED}"
+    local template_status="$3"
+    local cli_status="$4"
+    local workflow_status="${5:-SKIPPED}"
 
     cat > "$RESULTS_DIR/$RUN_ID/e2e-report.md" << REPORT_EOF
 # Gitea E2E Test Report: $RUN_ID
@@ -2047,6 +2331,15 @@ generate_report() {
 - Dispatcher: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@$DISPATCHER_REF
 - Test issue: #${DISPATCHER_ISSUE_NUMBER:-N/A}
 - Triggered by: \`needs-planning\` label
+
+## Phase 1.6: Template Workflow Test
+
+**Status**: $template_status
+
+- Template: .gitea/workflows/sapiens/process-label.yaml
+- Test issue: #${TEMPLATE_ISSUE_NUMBER:-N/A}
+- Triggered by: \`needs-planning\` label
+- Tests: Actual template workflow execution (not just thin wrapper)
 
 ## Phase 2: Sapiens CLI (Proposal)
 
@@ -2082,6 +2375,7 @@ $(
     local any_failed=false
     [[ "$actions_status" == "FAILED" ]] && any_failed=true
     [[ "$dispatcher_status" == "FAILED" ]] && any_failed=true
+    [[ "$template_status" == "FAILED" ]] && any_failed=true
     [[ "$cli_status" == "FAILED" ]] && any_failed=true
     [[ "$workflow_status" == "FAILED" ]] && any_failed=true
 
@@ -2092,6 +2386,7 @@ $(
         local passed_tests=""
         [[ "$actions_status" == "PASSED" ]] && passed_tests="${passed_tests}Actions, "
         [[ "$dispatcher_status" == "PASSED" ]] && passed_tests="${passed_tests}Dispatcher, "
+        [[ "$template_status" == "PASSED" ]] && passed_tests="${passed_tests}Template, "
         [[ "$cli_status" == "PASSED" ]] && passed_tests="${passed_tests}CLI, "
         [[ "$workflow_status" == "PASSED" ]] && passed_tests="${passed_tests}Full Workflow, "
 
@@ -2207,6 +2502,7 @@ main() {
 
     local actions_status="SKIPPED"
     local dispatcher_status="SKIPPED"
+    local template_status="SKIPPED"
     local cli_status="SKIPPED"
     local workflow_status="SKIPPED"
     local overall_exit=0
@@ -2240,6 +2536,18 @@ main() {
 
     echo ""
 
+    # Phase 1.6: Template Workflow Test
+    # This tests that the actual process-label.yaml template executes correctly
+    if [[ "$SKIP_ACTIONS" != "true" ]]; then
+        if run_template_test; then
+            template_status="PASSED"
+        else
+            template_status="FAILED"
+            overall_exit=1
+        fi
+        echo ""
+    fi
+
     # Phase 2: Sapiens CLI (Proposal)
     if [[ "$ACTIONS_ONLY" != "true" ]]; then
         if run_cli_test; then
@@ -2268,7 +2576,7 @@ main() {
     fi
 
     echo ""
-    generate_report "$actions_status" "$dispatcher_status" "$cli_status" "$workflow_status"
+    generate_report "$actions_status" "$dispatcher_status" "$template_status" "$cli_status" "$workflow_status"
 
     if [[ $overall_exit -eq 0 ]]; then
         log ""

@@ -641,8 +641,8 @@ class RepoInitializer:
         """Prompt the user for the CI/CD configuration file path.
 
         Asks where to save the CI/CD-specific configuration file. The default
-        location is 'sapiens_config.ci.yaml' in the project root, which keeps
-        it separate from the local development configuration.
+        location is '.sapiens/config.yaml' which is the standard config path
+        that the workflow dispatcher expects.
 
         In non-interactive mode, uses the default path without prompting.
 
@@ -653,10 +653,11 @@ class RepoInitializer:
             Prints prompt and reads user input via click.prompt().
         """
         if self.non_interactive:
-            self.cicd_config_path = Path("sapiens_config.ci.yaml")
+            # Use standard config path so dispatcher can find it
+            self.cicd_config_path = Path(".sapiens/config.yaml")
             return
 
-        default_path = "sapiens_config.ci.yaml"
+        default_path = ".sapiens/config.yaml"
         click.echo(click.style("CI/CD Configuration Path", bold=True))
         click.echo()
         click.echo("Where should the CI/CD config be saved?")
@@ -2813,6 +2814,8 @@ class RepoInitializer:
         if self.backend == "keyring":
             if self.provider_type == "gitlab":
                 git_token_ref = "@keyring:gitlab/api_token"  # nosec B105
+            elif self.provider_type == "github":
+                git_token_ref = "@keyring:github/api_token"  # nosec B105
             else:
                 git_token_ref = "@keyring:gitea/api_token"  # nosec B105
 
@@ -2826,24 +2829,13 @@ class RepoInitializer:
             else:
                 agent_api_key_ref = "null"
         else:
-            # fmt: off
-            if self.provider_type == "gitlab":
-                git_token_ref = "${GITLAB_TOKEN}"  # nosec B105
-            else:
-                git_token_ref = "${SAPIENS_GITEA_TOKEN}"  # nosec B105
-            # fmt: on
+            # Environment backend - use Pydantic env var format for CICD compatibility
+            # The dispatcher sets AUTOMATION__GIT_PROVIDER__API_TOKEN and
+            # AUTOMATION__AGENT_PROVIDER__API_KEY which get interpolated by from_yaml()
+            git_token_ref = "${AUTOMATION__GIT_PROVIDER__API_TOKEN}"  # nosec B105
 
-            # Determine agent API key reference
-            if self.agent_type == AgentType.GOOSE and self.goose_llm_provider:
-                env_var = f"{self.goose_llm_provider.upper()}_API_KEY"
-                agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
-            elif self.agent_type == AgentType.BUILTIN and self.builtin_provider:
-                env_var = f"{self.builtin_provider.upper()}_API_KEY"
-                agent_api_key_ref = f"${{{env_var}}}" if self.agent_api_key else "null"
-            elif self.agent_type == AgentType.CLAUDE:
-                agent_api_key_ref = "${CLAUDE_API_KEY}" if self.agent_api_key else "null"
-            else:
-                agent_api_key_ref = "null"
+            # Agent API key - use unified env var for CICD
+            agent_api_key_ref = "${AUTOMATION__AGENT_PROVIDER__API_KEY}" if self.agent_api_key else "null"
 
         # Generate agent provider configuration
         if self.agent_type == AgentType.GOOSE:
@@ -3338,7 +3330,26 @@ tags:
 
         def deploy_github_wrapper() -> bool:
             """Deploy thin wrapper for GitHub that calls the dispatcher."""
-            wrapper_content = """# Sapiens Automation - GitHub Workflow
+            # Use the CLI-specified AI API key env var name as the secret name
+            # Default to SAPIENS_AI_API_KEY if not specified
+            ai_secret_name = self.cli_ai_api_key_env or "SAPIENS_AI_API_KEY"
+
+            # Get AI provider configuration from CLI options or defaults
+            ai_provider_type = self.cli_ai_provider or "openai-compatible"
+            ai_model = self.cli_ai_model or ""
+            ai_base_url = self.cli_ai_base_url or ""
+
+            # Build optional AI config lines (only include if values are set)
+            ai_config_lines = []
+            if ai_provider_type:
+                ai_config_lines.append(f"      ai_provider_type: '{ai_provider_type}'")
+            if ai_model:
+                ai_config_lines.append(f"      ai_model: '{ai_model}'")
+            if ai_base_url:
+                ai_config_lines.append(f"      ai_base_url: '{ai_base_url}'")
+            ai_config = "\n".join(ai_config_lines)
+
+            wrapper_content = f"""# Sapiens Automation - GitHub Workflow
 # This thin wrapper calls the reusable sapiens-dispatcher workflow
 # See: https://github.com/savorywatt/repo-sapiens
 
@@ -3350,16 +3361,23 @@ on:
   pull_request:
     types: [labeled]
 
+# Required for cross-repo reusable workflows - grants permissions to the called workflow
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   sapiens:
     uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
     with:
-      label: ${{ github.event.label.name }}
-      issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
-      event_type: ${{ github.event_name == 'pull_request' && 'pull_request.labeled' || 'issues.labeled' }}
+      label: ${{{{ github.event.label.name }}}}
+      issue_number: ${{{{ github.event.issue.number || github.event.pull_request.number }}}}
+      event_type: ${{{{ github.event_name == 'pull_request' && 'pull_request.labeled' || 'issues.labeled' }}}}
+{ai_config}
     secrets:
-      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      AI_API_KEY: ${{ secrets.SAPIENS_AI_API_KEY }}
+      GIT_TOKEN: ${{{{ secrets.GITHUB_TOKEN }}}}
+      AI_API_KEY: ${{{{ secrets.{ai_secret_name} }}}}
 """
             try:
                 target_file = workflows_dir / "sapiens.yaml"
@@ -3740,13 +3758,17 @@ validate-sapiens:
             if self.backend == "keyring":
                 if self.provider_type == "gitlab":
                     token_ref = "@keyring:gitlab/api_token"
+                elif self.provider_type == "github":
+                    token_ref = "@keyring:github/api_token"
                 else:
                     token_ref = "@keyring:gitea/api_token"
             else:
-                if self.provider_type == "gitlab":
-                    token_ref = "${GITLAB_TOKEN}"
-                else:
-                    token_ref = "${SAPIENS_GITEA_TOKEN}"
+                # Environment backend uses Pydantic env var format for CICD compatibility
+                # Skip validation - env vars are set by the dispatcher at runtime
+                click.echo("   ✓ Environment backend configured (credentials resolved at runtime)")
+                click.echo("   ✓ Configuration file created")
+                click.echo()
+                return
 
             resolved = resolver.resolve(token_ref, cache=False)
             if not resolved:

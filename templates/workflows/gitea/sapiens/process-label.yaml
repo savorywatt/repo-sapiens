@@ -60,7 +60,20 @@ jobs:
           python-version: '3.12'
 
       - name: Install repo-sapiens
-        run: pip install repo-sapiens
+        env:
+          SAPIENS_REPO_URL: ${{ secrets.SAPIENS_REPO_URL }}
+          SAPIENS_BRANCH: ${{ secrets.SAPIENS_BRANCH }}
+        run: |
+          if [ -n "$SAPIENS_REPO_URL" ]; then
+            echo "Installing from $SAPIENS_REPO_URL (branch: ${SAPIENS_BRANCH:-main})"
+            git clone "$SAPIENS_REPO_URL" /tmp/repo-sapiens
+            cd /tmp/repo-sapiens
+            git checkout "${SAPIENS_BRANCH:-main}"
+            pip install -e .
+          else
+            echo "Installing from PyPI"
+            pip install repo-sapiens
+          fi
 
       - name: Process label event
         env:

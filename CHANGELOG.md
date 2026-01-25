@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - For users who need instant label reactions (requires external webhook handler)
   - Webhook trigger example script (`webhook-trigger.py`) bridges GitLab events to pipelines
   - Most users should prefer the daemon approach instead
-- **GitLab Workflow Deprecations**: Individual label workflows deprecated in favor of daemon
+- **GitLab Workflow Cleanup**: Removed redundant individual label workflows (see Removed section)
 - **Daemon Interval Configuration**: `sapiens init` now prompts for daemon polling interval
   - New `--daemon-interval` CLI flag for non-interactive setup
   - Interval stored in config as `automation.mode.daemon_interval`
@@ -50,18 +50,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tests install, idempotent re-deploy, update, and remove for each tier
   - Validates files via Gitea API
   - Supports `--bootstrap` for automated Gitea setup
-- **Comprehensive GitLab E2E Testing**: Parity with GitHub E2E test coverage
+- **Comprehensive GitLab E2E Testing**: Full workflow coverage parity with sapiens labels
   - Phase 1.5 Component Integration test for sapiens-dispatcher CI component
   - Automatic GitLab Runner setup and registration
   - CI/CD secrets configuration (SAPIENS_GITLAB_TOKEN, SAPIENS_AI_API_KEY)
   - Sapiens config deployment via API for CI job execution
   - Support for both Ollama and OpenRouter AI providers via `--ai-provider` flag
   - Configurable Ollama URL via `OLLAMA_URL` environment variable
+  - Phase 5: Code Review (`sapiens/needs-review` label)
+  - Phase 6: Fix Request (`sapiens/needs-fix` label)
+  - Phase 7: QA Request (`sapiens/requires-qa` label)
+  - Phase 8: Daemon test (`sapiens process-all` - simulates automation-daemon.yaml)
+- **Gitea Template Workflow E2E Testing** (Phase 1.6): Validates actual template execution
+  - Deploys and tests `process-label.yaml` template (not just thin wrappers)
+  - `SAPIENS_REPO_URL` and `SAPIENS_BRANCH` secrets for testing local changes
+  - Verifies workflow triggers, executes, and posts comments correctly
+  - Fills testing gap: templates now tested as actual Gitea Actions
 - **Bootstrap Script Improvements**
   - `configure_external_url()` function for GitLab Runner compatibility
   - Internal health check fallback when external_url differs from actual URL
   - Automatic sourcing of existing `.env.gitlab-test` for token reuse
   - `run_sapiens_init()` function to configure repositories via CLI
+
+### Removed
+- **GitLab Individual Label Workflows**: Removed in favor of unified `automation-daemon.yaml`
+  - `approved.yaml` - use daemon instead
+  - `needs-planning.yaml` - use daemon instead
+  - `needs-review.yaml` - use daemon instead
+  - `needs-fix.yaml` - use daemon instead
+  - `requires-qa.yaml` - use daemon instead
+  - `process-label.yaml` - use daemon instead
+  - `execute-task.yaml` - use daemon instead
+  - `process-issue.yaml` - use daemon instead
 
 ### Fixed
 - **GitLab CI YAML Comment Bug**: Fixed `#` being interpreted as YAML comment in echo statements

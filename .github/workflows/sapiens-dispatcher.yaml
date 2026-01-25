@@ -107,7 +107,9 @@ jobs:
           else
             echo "Generating minimal sapiens config..."
             mkdir -p .sapiens
-            printf 'git_provider:\n  provider_type: "%s"\n  base_url: "%s"\n  api_token: "@env:AUTOMATION__GIT_PROVIDER__API_TOKEN"\n\nrepository:\n  owner: "%s"\n  name: "%s"\n\nagent_provider:\n  provider_type: "%s"\n  model: "%s"\n  api_key: "@env:AUTOMATION__AGENT_PROVIDER__API_KEY"\n  base_url: "%s"\n' "$GIT_PROVIDER_TYPE" "$GIT_PROVIDER_URL" "$REPO_OWNER" "$REPO_NAME" "$AI_PROVIDER_TYPE" "${AI_MODEL:-claude-sonnet-4.5}" "${AI_BASE_URL:-http://localhost:11434}" > .sapiens/config.yaml
+            # Use ${...} format for env var interpolation (resolved by from_yaml())
+            # The actual values come from AUTOMATION__* env vars set in the Process label step
+            printf 'git_provider:\n  provider_type: "%s"\n  base_url: "%s"\n  api_token: "${AUTOMATION__GIT_PROVIDER__API_TOKEN}"\n\nrepository:\n  owner: "%s"\n  name: "%s"\n\nagent_provider:\n  provider_type: "%s"\n  model: "%s"\n  api_key: "${AUTOMATION__AGENT_PROVIDER__API_KEY}"\n  base_url: "%s"\n' "$GIT_PROVIDER_TYPE" "$GIT_PROVIDER_URL" "$REPO_OWNER" "$REPO_NAME" "$AI_PROVIDER_TYPE" "${AI_MODEL:-claude-sonnet-4.5}" "${AI_BASE_URL:-http://localhost:11434}" > .sapiens/config.yaml
             echo "Config generated:"
             cat .sapiens/config.yaml
           fi

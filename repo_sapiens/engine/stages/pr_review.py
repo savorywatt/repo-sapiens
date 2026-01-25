@@ -33,7 +33,9 @@ class PRReviewStage(WorkflowStage):
         # For now, we'll check if there's an associated PR by trying to get it
         pr = await self._get_pr_for_issue(issue)
         if not pr:
-            log.debug("no_pr_found", issue=issue.number)
+            # No PR found - review the issue content instead
+            log.info("no_pr_found_reviewing_issue", issue=issue.number)
+            await self._review_issue_content(issue)
             return
 
         # Check if already reviewed
@@ -198,6 +200,84 @@ Be constructive and specific in your feedback.
         except Exception as e:
             log.debug("pr_lookup_failed", issue=issue.number, error=str(e))
             return None
+
+    async def _review_issue_content(self, issue: Issue) -> None:
+        """Review issue content when no PR is associated.
+
+        This fallback provides useful feedback on the issue description itself.
+        """
+        log.info("reviewing_issue_content", issue=issue.number)
+
+        try:
+            # Notify start
+            await self.git.add_comment(
+                issue.number,
+                f"🔍 **Starting Issue Review**\n\n"
+                f"Reviewing issue #{issue.number}: {issue.title}\n\n"
+                f"Since this is an issue (not a PR), I'll review the requirements "
+                f"and provide feedback on the approach.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+
+            # Build context for agent
+            context = {
+                "issue_number": issue.number,
+                "issue_title": issue.title,
+                "issue_body": issue.body,
+            }
+
+            # Execute review with agent
+            prompt = f"""You are reviewing an issue/request.
+
+**Issue Title**: {issue.title}
+
+**Issue Description**:
+{issue.body or "(No description provided)"}
+
+**Instructions**:
+Review this issue and provide feedback on:
+1. Clarity of requirements - are they well-defined?
+2. Scope - is the scope reasonable and achievable?
+3. Potential challenges or risks
+4. Suggested approach or implementation strategy
+5. Any clarifying questions that should be asked
+
+Provide constructive, actionable feedback that helps improve the issue quality
+and sets up for successful implementation.
+
+Format your response as a structured review with clear sections.
+"""
+
+            result = await self.agent.execute_prompt(prompt, context, f"issue-review-{issue.number}")
+
+            if not result.get("success"):
+                raise Exception(f"Review execution failed: {result.get('error')}")
+
+            output = result.get("output", "No feedback generated.")
+
+            # Post review
+            await self.git.add_comment(
+                issue.number,
+                f"📝 **Issue Review Complete**\n\n" f"{output}\n\n" f"---\n" f"◆ Posted by Sapiens Automation",
+            )
+
+            # Update labels: remove review label, add 'reviewed'
+            updated_labels = [label for label in issue.labels if label not in ["needs-review", "sapiens/needs-review"]]
+            updated_labels.append("reviewed")
+            await self.git.update_issue(issue.number, labels=updated_labels)
+
+            log.info("issue_review_complete", issue=issue.number)
+
+        except Exception as e:
+            log.error("issue_review_failed", issue=issue.number, error=str(e), exc_info=True)
+            await self.git.add_comment(
+                issue.number,
+                f"❌ **Issue Review Failed**\n\n"
+                f"Error: {str(e)}\n\n"
+                f"Please try again.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+            raise
 
     def _parse_review_comments(self, output: str) -> list:
         """Parse review comments from agent output."""

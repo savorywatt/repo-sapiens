@@ -351,12 +351,16 @@ deploy_with_sapiens_init() {
     git config user.name "Sapiens Bot"
     git config user.email "sapiens-bot@users.noreply.github.com"
 
+    # Remove existing config to force fresh generation with updated credential format
+    # This ensures the E2E test uses the latest init code's credential references
+    rm -rf .sapiens/config.yaml sapiens_config.ci.yaml
+
     # Run sapiens init with workflow deployment
     log "Running sapiens init --deploy-workflows essential..."
 
     local init_args=(
         --non-interactive
-        --run-mode local
+        --run-mode cicd
         --deploy-workflows essential
         --git-token-env SAPIENS_GITHUB_TOKEN
         --ai-provider "$AI_PROVIDER"
@@ -767,12 +771,13 @@ ISSUE_EOF
     log "Created CLI test issue #$ISSUE_NUMBER"
 
     # Create temporary config
+    # Use ${...} format for env var interpolation (resolved by from_yaml())
     local config_file="/tmp/sapiens-e2e-config-${TIMESTAMP}.yaml"
     cat > "$config_file" << CONFIG_EOF
 git_provider:
   provider_type: github
   base_url: "$GITHUB_API"
-  api_token: "@env:SAPIENS_GITHUB_TOKEN"
+  api_token: "\${SAPIENS_GITHUB_TOKEN}"
 
 repository:
   owner: $GITHUB_OWNER
@@ -783,7 +788,7 @@ agent_provider:
   provider_type: $AI_PROVIDER
   base_url: "$AI_BASE_URL"
   model: "$AI_MODEL"
-  api_key: "@env:$AI_API_KEY_ENV"
+  api_key: "\${$AI_API_KEY_ENV}"
 CONFIG_EOF
 
     log "Running sapiens process-issue..."

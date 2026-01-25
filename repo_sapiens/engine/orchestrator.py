@@ -568,20 +568,20 @@ class WorkflowOrchestrator:
             return "proposal"
 
         # PR review workflow
-        # Check for PR needing code review
-        if "needs-review" in issue.labels:
+        # Check for PR needing code review (supports both "needs-review" and "sapiens/needs-review")
+        if "needs-review" in issue.labels or "sapiens/needs-review" in issue.labels:
             return "pr_review"
 
-        # Check for PR review complete, needs fix proposal
-        if "needs-fix" in issue.labels:
+        # Check for PR review complete, needs fix proposal (supports both patterns)
+        if "needs-fix" in issue.labels or "sapiens/needs-fix" in issue.labels:
             return "pr_fix"
 
         # Check for approved fix proposal ready for execution
         if "approved" in issue.labels and "fix-proposal" in issue.labels:
             return "fix_execution"
 
-        # QA workflow - check for QA requirement
-        if "requires-qa" in issue.labels:
+        # QA workflow - check for QA requirement (supports both patterns)
+        if "requires-qa" in issue.labels or "sapiens/requires-qa" in issue.labels:
             return "qa"
 
         # Legacy workflow routing (kept for compatibility)

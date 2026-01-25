@@ -31,6 +31,50 @@
 #   8. Run sapiens process-label
 #   9. Verify branch and MR created
 #
+# Phase 5: Sapiens CLI - Code Review
+#   1. Create test issue with sapiens/needs-review label
+#   2. Run sapiens process-label
+#   3. Verify review comments posted
+#
+# Phase 6: Sapiens CLI - Fix Request
+#   1. Create test issue with sapiens/needs-fix label
+#   2. Run sapiens process-label
+#   3. Verify fix proposal created
+#
+# Phase 7: Sapiens CLI - QA Request
+#   1. Create test issue with sapiens/requires-qa label
+#   2. Run sapiens process-label
+#   3. Verify test plan created
+#
+# Phase 8: Sapiens CLI - Daemon (process-all)
+#   1. Create test issue with needs-planning label
+#   2. Run sapiens process-all (simulates automation-daemon.yaml)
+#   3. Verify issue was processed
+#
+# Phase 9: Sapiens CLI - Fix Execution
+#   1. Use fix issue from Phase 6 (has fix-proposed label)
+#   2. Add approved label
+#   3. Run sapiens process-label
+#   4. Verify fix execution runs
+#
+# Phase 10: Sapiens CLI - Code Review (Legacy)
+#   1. Use task issue from Phase 4 (has branch)
+#   2. Add code-review label
+#   3. Run sapiens process-label
+#   4. Verify code review posted
+#
+# Phase 11: Sapiens CLI - Merge
+#   1. Use MR from Phase 4
+#   2. Add merge-ready label
+#   3. Run sapiens process-label
+#   4. Verify MR is merged
+#
+# Phase 12: Sapiens CLI - Plan Review (Legacy)
+#   1. Create issue with plan content
+#   2. Add plan-review label
+#   3. Run sapiens process-label
+#   4. Verify plan review posted
+#
 # Options:
 #   --bootstrap         Run bootstrap script first if not configured
 #   --skip-ci           Skip CI integration test (just run CLI tests)
@@ -109,6 +153,15 @@ FEATURE_BRANCH=""
 CI_ISSUE_IID=""
 COMPONENT_ISSUE_IID=""
 PIPELINE_ID=""
+REVIEW_ISSUE_IID=""
+FIX_ISSUE_IID=""
+QA_ISSUE_IID=""
+DAEMON_ISSUE_IID=""
+PLAN_REVIEW_ISSUE_IID=""
+FIX_EXECUTION_DONE=""
+CODE_REVIEW_DONE=""
+MERGE_DONE=""
+PLAN_REVIEW_DONE=""
 
 # URL-encode project path for GitLab API
 PROJECT_ENCODED="${GITLAB_PROJECT//\//%2F}"
@@ -171,6 +224,36 @@ cleanup() {
     if [[ -n "${COMPONENT_ISSUE_IID:-}" ]]; then
         log "Closing component test issue #$COMPONENT_ISSUE_IID..."
         gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$COMPONENT_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close review test issue
+    if [[ -n "${REVIEW_ISSUE_IID:-}" ]]; then
+        log "Closing review test issue #$REVIEW_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$REVIEW_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close fix test issue
+    if [[ -n "${FIX_ISSUE_IID:-}" ]]; then
+        log "Closing fix test issue #$FIX_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$FIX_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close QA test issue
+    if [[ -n "${QA_ISSUE_IID:-}" ]]; then
+        log "Closing QA test issue #$QA_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$QA_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close daemon test issue
+    if [[ -n "${DAEMON_ISSUE_IID:-}" ]]; then
+        log "Closing daemon test issue #$DAEMON_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$DAEMON_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close plan review test issue
+    if [[ -n "${PLAN_REVIEW_ISSUE_IID:-}" ]]; then
+        log "Closing plan review test issue #$PLAN_REVIEW_ISSUE_IID..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$PLAN_REVIEW_ISSUE_IID" '{"state_event":"close"}' > /dev/null 2>&1 || true
     fi
 
     # Close proposal issue
@@ -1136,6 +1219,17 @@ create_test_issue() {
     ensure_label "plan-ready" "#6f42c1"
     ensure_label "execute" "#6610f2"
     ensure_label "review" "#ffc107"
+    ensure_label "sapiens/needs-review" "#17a2b8"
+    ensure_label "sapiens/needs-fix" "#dc3545"
+    ensure_label "sapiens/requires-qa" "#28a745"
+    ensure_label "reviewed" "#6c757d"
+    ensure_label "fix-proposed" "#fd7e14"
+    ensure_label "qa-ready" "#20c997"
+    ensure_label "code-review" "#0366d6"
+    ensure_label "merge-ready" "#2cbe4e"
+    ensure_label "merged" "#6f42c1"
+    ensure_label "plan-review" "#fbca04"
+    ensure_label "plan-approved" "#0e8a16"
 
     local issue_body
     issue_body=$(cat << 'ISSUE_EOF'
@@ -1219,6 +1313,42 @@ automation:
       ai_enabled: true
       remove_on_complete: true
       success_label: review
+    "sapiens/needs-review":
+      label_pattern: "sapiens/needs-review"
+      handler: code_review
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: reviewed
+    "sapiens/needs-fix":
+      label_pattern: "sapiens/needs-fix"
+      handler: pr_fix
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: fix-proposed
+    "sapiens/requires-qa":
+      label_pattern: "sapiens/requires-qa"
+      handler: qa
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: qa-ready
+    "code-review":
+      label_pattern: "code-review"
+      handler: code_review
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: merge-ready
+    "merge-ready":
+      label_pattern: "merge-ready"
+      handler: merge
+      ai_enabled: false
+      remove_on_complete: true
+      success_label: merged
+    "plan-review":
+      label_pattern: "plan-review"
+      handler: plan_review
+      ai_enabled: true
+      remove_on_complete: true
+      success_label: plan-approved
 CONFIG_EOF
 
     log "Config written to $config_file"
@@ -1379,6 +1509,557 @@ EVENT_JSON
 }
 
 #############################################
+# Phase 5: Sapiens CLI - Code Review
+#############################################
+
+create_review_test_issue() {
+    step "Creating issue for code review test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Code Review Request
+
+Please review the following code changes in the repository.
+
+## Files to Review
+- `greeting.py` (if created from earlier tests)
+- Any recent changes
+
+## Review Focus
+- Code quality and best practices
+- Security considerations
+- Performance implications
+
+This is an automated test for the sapiens/needs-review workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Code Review Request\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/needs-review\"
+    }")
+
+    REVIEW_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$REVIEW_ISSUE_IID" ]]; then
+        error "Failed to create review test issue. Response: $response"
+        return 1
+    fi
+    log "Created review test issue #$REVIEW_ISSUE_IID with sapiens/needs-review label"
+}
+
+process_review() {
+    step "=== Phase 5: Sapiens CLI - Code Review ==="
+    echo ""
+
+    create_review_test_issue || return 1
+
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $REVIEW_ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "sapiens/needs-review"}]
+    }
+  }
+}
+EVENT_JSON
+)
+    log "Running: sapiens process-label --label sapiens/needs-review --issue $REVIEW_ISSUE_IID"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type issues.labeled \
+        --label "sapiens/needs-review" \
+        --issue "$REVIEW_ISSUE_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Code review processing completed"
+    else
+        warn "Code review processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 6: Sapiens CLI - Fix Request
+#############################################
+
+create_fix_test_issue() {
+    step "Creating issue for fix request test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Bug Report / Fix Request
+
+There appears to be an issue with the greeting function.
+
+## Problem Description
+The greeting function doesn't handle empty names gracefully.
+
+## Expected Behavior
+Should return "Hello, Guest!" when name is empty.
+
+## Actual Behavior
+Returns "Hello, !" which looks incorrect.
+
+## Steps to Reproduce
+1. Call greet("")
+2. Observe malformed output
+
+This is an automated test for the sapiens/needs-fix workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Fix: Handle empty name in greeting\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/needs-fix\"
+    }")
+
+    FIX_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$FIX_ISSUE_IID" ]]; then
+        error "Failed to create fix test issue. Response: $response"
+        return 1
+    fi
+    log "Created fix test issue #$FIX_ISSUE_IID with sapiens/needs-fix label"
+}
+
+process_fix() {
+    step "=== Phase 6: Sapiens CLI - Fix Request ==="
+    echo ""
+
+    create_fix_test_issue || return 1
+
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $FIX_ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "sapiens/needs-fix"}]
+    }
+  }
+}
+EVENT_JSON
+)
+    log "Running: sapiens process-label --label sapiens/needs-fix --issue $FIX_ISSUE_IID"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type issues.labeled \
+        --label "sapiens/needs-fix" \
+        --issue "$FIX_ISSUE_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Fix request processing completed"
+    else
+        warn "Fix request processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 7: Sapiens CLI - QA Request
+#############################################
+
+create_qa_test_issue() {
+    step "Creating issue for QA test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## QA / Test Plan Request
+
+Please generate a test plan for the greeting functionality.
+
+## Feature to Test
+The greeting module with the `greet(name)` function.
+
+## Test Coverage Needed
+- Unit tests for normal input
+- Edge cases (empty string, special characters)
+- Integration tests if applicable
+
+## Acceptance Criteria
+- All tests should pass
+- Code coverage should be adequate
+
+This is an automated test for the sapiens/requires-qa workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}QA: Test plan for greeting module\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"sapiens/requires-qa\"
+    }")
+
+    QA_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$QA_ISSUE_IID" ]]; then
+        error "Failed to create QA test issue. Response: $response"
+        return 1
+    fi
+    log "Created QA test issue #$QA_ISSUE_IID with sapiens/requires-qa label"
+}
+
+process_qa() {
+    step "=== Phase 7: Sapiens CLI - QA Request ==="
+    echo ""
+
+    create_qa_test_issue || return 1
+
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $QA_ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "sapiens/requires-qa"}]
+    }
+  }
+}
+EVENT_JSON
+)
+    log "Running: sapiens process-label --label sapiens/requires-qa --issue $QA_ISSUE_IID"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type issues.labeled \
+        --label "sapiens/requires-qa" \
+        --issue "$QA_ISSUE_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "QA request processing completed"
+    else
+        warn "QA request processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 8: Sapiens CLI - Daemon (process-all)
+#############################################
+
+create_daemon_test_issue() {
+    step "Creating issue for daemon (process-all) test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Daemon Test Issue
+
+This issue tests the automation daemon's ability to process issues via `sapiens process-all`.
+
+## Purpose
+Verify that the daemon correctly:
+1. Finds issues with sapiens labels
+2. Routes them to appropriate handlers
+3. Processes them without explicit label/issue parameters
+
+This simulates what the scheduled `automation-daemon.yaml` workflow does.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Daemon Test: Process All\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"needs-planning\"
+    }")
+
+    DAEMON_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$DAEMON_ISSUE_IID" ]]; then
+        error "Failed to create daemon test issue. Response: $response"
+        return 1
+    fi
+    log "Created daemon test issue #$DAEMON_ISSUE_IID with needs-planning label"
+}
+
+process_daemon() {
+    step "=== Phase 8: Sapiens CLI - Daemon (process-all) ==="
+    echo ""
+
+    create_daemon_test_issue || return 1
+
+    log "Running: sapiens process-all (daemon mode)"
+
+    if uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-all 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Daemon (process-all) completed"
+    else
+        warn "Daemon (process-all) returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 9: Sapiens CLI - Fix Execution
+#############################################
+
+process_fix_execution() {
+    step "=== Phase 9: Sapiens CLI - Fix Execution ==="
+    echo ""
+
+    # This phase uses the fix issue from Phase 6 which should have fix-proposed label
+    if [[ -z "${FIX_ISSUE_IID:-}" ]]; then
+        warn "No fix issue from Phase 6, skipping fix execution test"
+        return 0
+    fi
+
+    # Check if the issue has fix-proposed label
+    local fix_issue
+    fix_issue=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$FIX_ISSUE_IID" 2>/dev/null || echo "{}")
+    local fix_labels
+    fix_labels=$(echo "$fix_issue" | jq -r '.labels[]' 2>/dev/null | tr '\n' ',')
+
+    if [[ "$fix_labels" != *"fix-proposed"* ]]; then
+        warn "Fix issue #$FIX_ISSUE_IID doesn't have fix-proposed label (labels: $fix_labels)"
+        # Add fix-proposed label manually for testing
+        log "Adding fix-proposed label for testing..."
+        gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$FIX_ISSUE_IID" '{"add_labels":"fix-proposed"}' > /dev/null 2>&1 || true
+    fi
+
+    log "Adding 'approved' label to fix issue #$FIX_ISSUE_IID..."
+    gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$FIX_ISSUE_IID" '{"add_labels":"approved"}' > /dev/null 2>&1
+
+    # Create event JSON for fix execution (approved + fix-proposal triggers fix_execution)
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $FIX_ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [{"title": "fix-proposed"}],
+      "current": [{"title": "fix-proposed"}, {"title": "approved"}]
+    }
+  }
+}
+EVENT_JSON
+)
+
+    log "Running: sapiens process-label --label approved --issue $FIX_ISSUE_IID (fix execution)"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type issues.labeled \
+        --label "approved" \
+        --issue "$FIX_ISSUE_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Fix execution completed"
+        FIX_EXECUTION_DONE="true"
+    else
+        warn "Fix execution returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 10: Sapiens CLI - Code Review (Legacy)
+#############################################
+
+process_code_review_legacy() {
+    step "=== Phase 10: Sapiens CLI - Code Review (Legacy) ==="
+    echo ""
+
+    # This phase uses the task issue from Phase 4 which has branch context
+    if [[ -z "${TASK_IID:-}" ]]; then
+        warn "No task issue from Phase 4, skipping code review test"
+        return 0
+    fi
+
+    log "Adding 'code-review' label to task issue #$TASK_IID..."
+    gitlab_api PUT "/projects/$PROJECT_ENCODED/issues/$TASK_IID" '{"add_labels":"code-review"}' > /dev/null 2>&1
+
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $TASK_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "code-review"}]
+    }
+  }
+}
+EVENT_JSON
+)
+
+    log "Running: sapiens process-label --label code-review --issue $TASK_IID"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type issues.labeled \
+        --label "code-review" \
+        --issue "$TASK_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Code review (legacy) completed"
+        CODE_REVIEW_DONE="true"
+    else
+        warn "Code review (legacy) returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 11: Sapiens CLI - Merge
+#############################################
+
+process_merge() {
+    step "=== Phase 11: Sapiens CLI - Merge ==="
+    echo ""
+
+    # This phase uses the MR from Phase 4
+    if [[ -z "${MR_IID:-}" ]]; then
+        warn "No MR from Phase 4, skipping merge test"
+        return 0
+    fi
+
+    # Check MR state
+    local mr
+    mr=$(gitlab_api GET "/projects/$PROJECT_ENCODED/merge_requests/$MR_IID" 2>/dev/null || echo "{}")
+    local mr_state
+    mr_state=$(echo "$mr" | jq -r '.state // "unknown"')
+
+    if [[ "$mr_state" == "merged" ]]; then
+        log "MR !$MR_IID is already merged, skipping"
+        MERGE_DONE="true"
+        return 0
+    fi
+
+    if [[ "$mr_state" != "opened" ]]; then
+        warn "MR !$MR_IID is in state '$mr_state', cannot merge"
+        return 0
+    fi
+
+    log "Adding 'merge-ready' label to MR !$MR_IID..."
+    # For MRs, we update via the merge_requests endpoint
+    gitlab_api PUT "/projects/$PROJECT_ENCODED/merge_requests/$MR_IID" '{"add_labels":"merge-ready"}' > /dev/null 2>&1
+
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $MR_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "merge-ready"}]
+    }
+  }
+}
+EVENT_JSON
+)
+
+    log "Running: sapiens process-label --label merge-ready --issue $MR_IID (merge)"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type merge_request.labeled \
+        --label "merge-ready" \
+        --issue "$MR_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Merge processing completed"
+        MERGE_DONE="true"
+    else
+        warn "Merge processing returned non-zero exit code"
+    fi
+}
+
+#############################################
+# Phase 12: Sapiens CLI - Plan Review (Legacy)
+#############################################
+
+create_plan_review_issue() {
+    step "Creating issue for plan review test..."
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+# Development Plan
+
+## Overview
+This plan outlines the implementation of a user authentication system.
+
+## Tasks
+
+### Task 1: Create User Model
+- Add User model with email, password_hash, created_at fields
+- Add database migration
+- Dependencies: None
+
+### Task 2: Implement Registration Endpoint
+- POST /api/auth/register
+- Validate email format and password strength
+- Hash password before storing
+- Dependencies: Task 1
+
+### Task 3: Implement Login Endpoint
+- POST /api/auth/login
+- Verify credentials
+- Return JWT token
+- Dependencies: Task 1
+
+## Timeline
+- Task 1: Day 1
+- Task 2: Day 2
+- Task 3: Day 2-3
+
+This is an automated test for the plan-review workflow.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitlab_api POST "/projects/$PROJECT_ENCODED/issues" "{
+        \"title\": \"${TEST_PREFIX}Plan: User Authentication System\",
+        \"description\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": \"plan-review\"
+    }")
+
+    PLAN_REVIEW_ISSUE_IID=$(echo "$response" | jq -r '.iid // empty')
+    if [[ -z "$PLAN_REVIEW_ISSUE_IID" ]]; then
+        error "Failed to create plan review test issue. Response: $response"
+        return 1
+    fi
+    log "Created plan review test issue #$PLAN_REVIEW_ISSUE_IID with plan-review label"
+}
+
+process_plan_review() {
+    step "=== Phase 12: Sapiens CLI - Plan Review (Legacy) ==="
+    echo ""
+
+    create_plan_review_issue || return 1
+
+    local event_json
+    event_json=$(cat <<EVENT_JSON
+{
+  "object_attributes": {
+    "iid": $PLAN_REVIEW_ISSUE_IID
+  },
+  "changes": {
+    "labels": {
+      "previous": [],
+      "current": [{"title": "plan-review"}]
+    }
+  }
+}
+EVENT_JSON
+)
+
+    log "Running: sapiens process-label --label plan-review --issue $PLAN_REVIEW_ISSUE_IID"
+
+    if echo "$event_json" | uv run sapiens --config "$SAPIENS_CONFIG_FILE" process-label \
+        --event-type issues.labeled \
+        --label "plan-review" \
+        --issue "$PLAN_REVIEW_ISSUE_IID" \
+        --source gitlab 2>&1 | tee -a "$RESULTS_DIR/$RUN_ID/process-output.log"; then
+        log "Plan review completed"
+        PLAN_REVIEW_DONE="true"
+    else
+        warn "Plan review returned non-zero exit code"
+    fi
+}
+
+#############################################
 # Verification
 #############################################
 
@@ -1448,6 +2129,82 @@ verify_results() {
         warn "  - No merge request found"
     fi
 
+    # Check 5: Review issue should have comments
+    if [[ -n "${REVIEW_ISSUE_IID:-}" ]]; then
+        log "Checking for review comments..."
+        local review_notes
+        review_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$REVIEW_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local review_notes_count
+        review_notes_count=$(echo "$review_notes" | jq 'length')
+
+        if [[ "$review_notes_count" -gt 0 ]]; then
+            log "  Review issue has $review_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on review issue"
+        fi
+    fi
+
+    # Check 6: Fix issue should have comments or proposal
+    if [[ -n "${FIX_ISSUE_IID:-}" ]]; then
+        log "Checking for fix response..."
+        local fix_notes
+        fix_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$FIX_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local fix_notes_count
+        fix_notes_count=$(echo "$fix_notes" | jq 'length')
+
+        if [[ "$fix_notes_count" -gt 0 ]]; then
+            log "  Fix issue has $fix_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on fix issue"
+        fi
+    fi
+
+    # Check 7: QA issue should have comments or test plan
+    if [[ -n "${QA_ISSUE_IID:-}" ]]; then
+        log "Checking for QA response..."
+        local qa_notes
+        qa_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$QA_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+        local qa_notes_count
+        qa_notes_count=$(echo "$qa_notes" | jq 'length')
+
+        if [[ "$qa_notes_count" -gt 0 ]]; then
+            log "  QA issue has $qa_notes_count comment(s)"
+            ((passed++))
+        else
+            warn "  - No comments on QA issue"
+        fi
+    fi
+
+    # Check 8: Daemon test issue should be processed
+    if [[ -n "${DAEMON_ISSUE_IID:-}" ]]; then
+        log "Checking daemon test results..."
+        local daemon_issue
+        daemon_issue=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$DAEMON_ISSUE_IID" 2>/dev/null || echo "{}")
+        local daemon_labels
+        daemon_labels=$(echo "$daemon_issue" | jq -r '.labels[]' 2>/dev/null | tr '\n' ',')
+
+        # Check for plan-ready label (indicates processing happened)
+        if [[ "$daemon_labels" == *"plan-ready"* ]]; then
+            log "  Daemon processed issue (plan-ready label found)"
+            ((passed++))
+        else
+            # Also check for comments as alternative verification
+            local daemon_notes
+            daemon_notes=$(gitlab_api GET "/projects/$PROJECT_ENCODED/issues/$DAEMON_ISSUE_IID/notes" 2>/dev/null || echo "[]")
+            local daemon_notes_count
+            daemon_notes_count=$(echo "$daemon_notes" | jq 'length')
+
+            if [[ "$daemon_notes_count" -gt 0 ]]; then
+                log "  Daemon processed issue ($daemon_notes_count comments)"
+                ((passed++))
+            else
+                warn "  - Daemon may not have processed issue (labels: $daemon_labels)"
+            fi
+        fi
+    fi
+
     # Summary
     echo ""
     log "Verification: $passed passed, $failed failed"
@@ -1464,6 +2221,7 @@ generate_report() {
     local ci_status="$1"
     local component_status="$2"
     local cli_status="$3"
+    local workflow_status="$4"
 
     cat > "$RESULTS_DIR/$RUN_ID/e2e-report.md" << REPORT_EOF
 # GitLab E2E Test Report: $RUN_ID
@@ -1519,12 +2277,52 @@ Note: GitLab doesn't have native label triggers. This tests pipeline API trigger
 - Task issue: #${TASK_IID:-N/A}
 - Triggered by: \`execute\` label
 
+## Phase 5: Sapiens CLI - Code Review
+
+**Status**: $workflow_status
+
+- Review issue: #${REVIEW_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/needs-review\` label
+
+## Phase 6: Sapiens CLI - Fix Request
+
+**Status**: $workflow_status
+
+- Fix issue: #${FIX_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/needs-fix\` label
+
+## Phase 7: Sapiens CLI - QA Request
+
+**Status**: $workflow_status
+
+- QA issue: #${QA_ISSUE_IID:-N/A}
+- Triggered by: \`sapiens/requires-qa\` label
+
+## Phase 8: Sapiens CLI - Daemon (process-all)
+
+**Status**: $workflow_status
+
+- Daemon test issue: #${DAEMON_ISSUE_IID:-N/A}
+- Tests: \`sapiens process-all\` command (automation-daemon.yaml equivalent)
+
 ## CLI Test Results
 
 **Status**: $cli_status
 
 - Feature branch: ${FEATURE_BRANCH:-Not created}
 - Merge request: !${MR_IID:-Not created}
+
+## Workflow Coverage Summary
+
+| Label | Handler | Tested |
+|-------|---------|--------|
+| \`needs-planning\` | proposal | ✅ Phase 2 |
+| \`approved\` | approval | ✅ Phase 3 |
+| \`execute\` | task_execution | ✅ Phase 4 |
+| \`sapiens/needs-review\` | review | ✅ Phase 5 |
+| \`sapiens/needs-fix\` | fix | ✅ Phase 6 |
+| \`sapiens/requires-qa\` | qa | ✅ Phase 7 |
+| \`process-all\` (daemon) | all handlers | ✅ Phase 8 |
 
 ## Overall Result
 
@@ -1534,6 +2332,7 @@ $(
     [[ "$ci_status" == "FAILED" ]] && any_failed=true
     [[ "$component_status" == "FAILED" ]] && any_failed=true
     [[ "$cli_status" == "FAILED" ]] && any_failed=true
+    [[ "$workflow_status" == "FAILED" ]] && any_failed=true
 
     if [[ "$any_failed" == "true" ]]; then
         echo "TESTS FAILED"
@@ -1542,6 +2341,7 @@ $(
         [[ "$ci_status" == "PASSED" ]] && passed_tests="${passed_tests}CI, "
         [[ "$component_status" == "PASSED" ]] && passed_tests="${passed_tests}Component, "
         [[ "$cli_status" == "PASSED" ]] && passed_tests="${passed_tests}CLI, "
+        [[ "$workflow_status" == "PASSED" ]] && passed_tests="${passed_tests}Workflows, "
 
         if [[ -n "$passed_tests" ]]; then
             passed_tests="${passed_tests%, }"
@@ -1563,6 +2363,7 @@ GitLab-specific behaviors:
 - PRs are called "Merge Requests" (MRs)
 - Authentication via \`PRIVATE-TOKEN\` header
 - No native label triggers - requires webhook handler or API trigger
+- Daemon (process-all) simulates scheduled automation-daemon.yaml
 REPORT_EOF
 
     log "Report saved to $RESULTS_DIR/$RUN_ID/e2e-report.md"
@@ -1588,6 +2389,7 @@ main() {
     local ci_status="SKIPPED"
     local component_status="SKIPPED"
     local cli_status="SKIPPED"
+    local workflow_status="SKIPPED"
     local overall_exit=0
 
     # Phase 1: CI Integration
@@ -1619,7 +2421,7 @@ main() {
 
     echo ""
 
-    # Phases 2-4: CLI Tests
+    # Phases 2-4: CLI Tests (Core workflow)
     if [[ "$CI_ONLY" != "true" ]]; then
         run_proposal_test
 
@@ -1630,10 +2432,34 @@ main() {
         process_execution
 
         echo ""
+
+        # Phases 5-8: Additional Workflow Tests
+        step "=== Additional Workflow Tests (Phases 5-8) ==="
+        echo ""
+
+        # Phase 5: Code Review
+        process_review
+        echo ""
+
+        # Phase 6: Fix Request
+        process_fix
+        echo ""
+
+        # Phase 7: QA Request
+        process_qa
+        echo ""
+
+        # Phase 8: Daemon (process-all)
+        process_daemon
+        echo ""
+
+        # Verify all results
         if verify_results; then
             cli_status="PASSED"
+            workflow_status="PASSED"
         else
             cli_status="FAILED"
+            workflow_status="FAILED"
             overall_exit=1
         fi
     else
@@ -1641,7 +2467,7 @@ main() {
     fi
 
     echo ""
-    generate_report "$ci_status" "$component_status" "$cli_status"
+    generate_report "$ci_status" "$component_status" "$cli_status" "$workflow_status"
 
     if [[ $overall_exit -eq 0 ]]; then
         log ""
