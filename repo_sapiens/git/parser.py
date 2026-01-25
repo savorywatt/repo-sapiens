@@ -15,6 +15,8 @@ Supported URL formats:
         - https://github.com/owner/repo
         - https://gitlab.com:8443/owner/repo.git
         - http://gitea.local/owner/repo.git
+        - https://token@github.com/owner/repo.git (with credentials)
+        - https://user:pass@gitea.local/owner/repo.git (with credentials)
 
 Key Exports:
     GitUrlParser: Main class for parsing Git URLs.
@@ -110,7 +112,15 @@ class GitUrlParser:
 
     # Regex pattern for HTTPS format: https://host/path or http://host/path
     # Matches: https://gitea.com/owner/repo.git or https://gitea.com:3000/owner/repo
-    HTTPS_PATTERN = re.compile(r"^https?://(?P<host>[a-zA-Z0-9._-]+)(?::(?P<port>\d+))?/(?P<path>.+?)(?:\.git)?$")
+    # Also supports credentials: https://user:pass@host/path or https://token@host/path
+    HTTPS_PATTERN = re.compile(
+        r"^https?://"
+        r"(?:[^/:@]+(?::[^/:@]+)?@)?"  # Optional userinfo (user:pass@ or user@)
+        r"(?P<host>[a-zA-Z0-9._-]+)"  # Host
+        r"(?::(?P<port>\d+))?"  # Optional port
+        r"/(?P<path>.+?)"  # Path
+        r"(?:\.git)?$"  # Optional .git suffix
+    )
 
     def __init__(self, url: str) -> None:
         """Initialize parser with a Git URL.

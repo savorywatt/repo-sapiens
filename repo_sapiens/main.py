@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 import structlog
 
+from repo_sapiens.__version__ import __version__
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.health import health_check
 from repo_sapiens.cli.init import init_command
@@ -23,7 +24,6 @@ from repo_sapiens.providers.external_agent import ExternalAgentProvider
 from repo_sapiens.providers.factory import create_git_provider
 from repo_sapiens.utils.interactive import InteractiveQAHandler
 from repo_sapiens.utils.logging_config import configure_logging
-from repo_sapiens.__version__ import __version__
 
 log = structlog.get_logger(__name__)
 
@@ -390,7 +390,7 @@ def task_command(
                 break
 
     async def run() -> None:
-        config = ReActConfig(model=model, max_iterations=max_iterations, ollama_url=ollama_url)
+        config = ReActConfig(model=model, max_iterations=max_iterations, base_url=ollama_url)
         agent = ReActAgentProvider(working_dir=working_dir, config=config, system_prompt=custom_system_prompt)
 
         click.echo(f"Starting ReAct agent with model: {model}")

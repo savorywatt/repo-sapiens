@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GitLab E2E Default AI Provider**: Changed default from OpenRouter to Ollama for local testing
 
 ### Added
+- **Tiered Workflow Deployment**: `--deploy-workflows` option now accepts tier names
+  - `essential`: Label-triggered AI work (process-label.yaml)
+  - `core`: Repository maintenance (post-merge-docs, weekly-test-coverage)
+  - `security`: Security audits (weekly-security-review, dependency-audit, sbom-license)
+  - `support`: Issue management (daily-issue-triage)
+  - GitHub uses thin wrapper → dispatcher for essential tier; actual files for other tiers
+  - Gitea/GitLab deploy actual workflow files for all tiers
+  - Interactive mode prompts for tier selection
+  - Essential tier always implied when other tiers specified
 - **Comprehensive GitLab E2E Testing**: Parity with GitHub E2E test coverage
   - Phase 1.5 Component Integration test for sapiens-dispatcher CI component
   - Automatic GitLab Runner setup and registration

@@ -116,7 +116,8 @@ jobs:
         env:
           AUTOMATION__GIT_PROVIDER__PROVIDER_TYPE: ${{ inputs.git_provider_type }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ inputs.git_provider_url }}
-          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
+          # Use GIT_TOKEN if provided, otherwise fall back to github.token
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN || github.token }}
           AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
           AUTOMATION__AGENT_PROVIDER__PROVIDER_TYPE: ${{ inputs.ai_provider_type }}
@@ -146,7 +147,7 @@ jobs:
       - name: Post failure comment (GitHub)
         if: failure() && inputs.git_provider_type == 'github'
         env:
-          GH_TOKEN: ${{ secrets.GIT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GIT_TOKEN || github.token }}
         run: |
           gh issue comment ${{ inputs.issue_number }} \
             --body "**Sapiens automation failed**

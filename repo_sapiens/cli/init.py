@@ -72,10 +72,9 @@ log = structlog.get_logger(__name__)
 )
 @click.option("--non-interactive", is_flag=True, help="Non-interactive mode (requires environment variables)")
 @click.option(
-    "--setup-secrets",
-    is_flag=True,
+    "--setup-secrets/--no-setup-secrets",
     default=True,
-    help="Set up Gitea Actions secrets (default: true)",
+    help="Set up repository Actions secrets (default: true)",
 )
 @click.option(
     "--deploy-actions/--no-deploy-actions",
@@ -83,9 +82,46 @@ log = structlog.get_logger(__name__)
     help="Deploy reusable composite action for AI tasks (default: true)",
 )
 @click.option(
-    "--deploy-workflows/--no-deploy-workflows",
-    default=False,
-    help="Deploy CI/CD workflow templates (default: false, prompts in interactive mode)",
+    "--deploy-workflows",
+    multiple=True,
+    type=click.Choice(["essential", "core", "security", "support", "all"]),
+    help="Deploy workflow tiers: essential, core, security, support, or all",
+)
+@click.option(
+    "--run-mode",
+    type=click.Choice(["local", "cicd", "both"]),
+    default=None,
+    help="Configuration target mode (default: prompts in interactive mode, 'local' in non-interactive)",
+)
+@click.option(
+    "--git-token-env",
+    type=str,
+    default=None,
+    help="Environment variable name containing git provider token (e.g., GITHUB_TOKEN)",
+)
+@click.option(
+    "--ai-provider",
+    type=click.Choice(["ollama", "openai-compatible", "claude-local", "goose-local", "copilot-local"]),
+    default=None,
+    help="AI provider type for the builtin ReAct agent",
+)
+@click.option(
+    "--ai-model",
+    type=str,
+    default=None,
+    help="AI model to use (e.g., llama3.1, gpt-4o, claude-sonnet-4)",
+)
+@click.option(
+    "--ai-base-url",
+    type=str,
+    default=None,
+    help="Base URL for AI provider (e.g., http://localhost:11434 for Ollama)",
+)
+@click.option(
+    "--ai-api-key-env",
+    type=str,
+    default=None,
+    help="Environment variable name containing AI API key (e.g., OPENROUTER_API_KEY)",
 )
 def init_command(
     repo_path: Path,
@@ -94,7 +130,13 @@ def init_command(
     non_interactive: bool,
     setup_secrets: bool,
     deploy_actions: bool,
-    deploy_workflows: bool,
+    deploy_workflows: tuple[str, ...],
+    run_mode: str | None,
+    git_token_env: str | None,
+    ai_provider: str | None,
+    ai_model: str | None,
+    ai_base_url: str | None,
+    ai_api_key_env: str | None,
 ) -> None:
     """Initialize repo-sapiens in your Git repository.
 
@@ -112,19 +154,31 @@ def init_command(
         # Interactive setup (recommended)
         sapiens init
 
-        # Non-interactive setup (for CI/CD)
-        export SAPIENS_GITEA_TOKEN="your-token"
-        export CLAUDE_API_KEY="your-key"
-        sapiens init --non-interactive
+        # Non-interactive with Ollama (local LLM)
+        export GITHUB_TOKEN="ghp_xxx"
+        sapiens init --non-interactive \\
+            --git-token-env GITHUB_TOKEN \\
+            --ai-provider ollama \\
+            --ai-model llama3.1 \\
+            --ai-base-url http://localhost:11434
+
+        # Non-interactive with OpenRouter
+        export GITHUB_TOKEN="ghp_xxx"
+        export OPENROUTER_API_KEY="sk-or-xxx"
+        sapiens init --non-interactive \\
+            --git-token-env GITHUB_TOKEN \\
+            --ai-provider openai-compatible \\
+            --ai-model anthropic/claude-sonnet-4 \\
+            --ai-base-url https://openrouter.ai/api/v1 \\
+            --ai-api-key-env OPENROUTER_API_KEY
 
         # Skip Actions secret setup
         sapiens init --no-setup-secrets
 
-        # Skip action deployment
-        sapiens init --no-deploy-actions
-
-        # Deploy workflow templates
-        sapiens init --deploy-workflows
+        # Deploy workflow templates (tiers: essential, core, security, support, all)
+        sapiens init --deploy-workflows essential
+        sapiens init --deploy-workflows essential core security
+        sapiens init --deploy-workflows all
     """
     try:
         initializer = RepoInitializer(
@@ -135,6 +189,12 @@ def init_command(
             setup_secrets=setup_secrets,
             deploy_actions=deploy_actions,
             deploy_workflows=deploy_workflows,
+            run_mode=run_mode,
+            git_token_env=git_token_env,
+            ai_provider=ai_provider,
+            ai_model=ai_model,
+            ai_base_url=ai_base_url,
+            ai_api_key_env=ai_api_key_env,
         )
         initializer.run()
 
@@ -198,7 +258,13 @@ class RepoInitializer:
         non_interactive: bool,
         setup_secrets: bool,
         deploy_actions: bool = True,
-        deploy_workflows: bool = False,
+        deploy_workflows: tuple[str, ...] = (),
+        run_mode: str | None = None,
+        git_token_env: str | None = None,
+        ai_provider: str | None = None,
+        ai_model: str | None = None,
+        ai_base_url: str | None = None,
+        ai_api_key_env: str | None = None,
     ) -> None:
         """Initialize the repository initializer with configuration options.
 
@@ -216,8 +282,15 @@ class RepoInitializer:
                 secrets via the provider's API.
             deploy_actions: If True, deploy the reusable sapiens-task composite
                 action to the repository.
-            deploy_workflows: If True, deploy CI/CD workflow templates. In
-                interactive mode, this is just the default; user is still prompted.
+            deploy_workflows: Tuple of workflow tiers to deploy ('essential', 'core',
+                'security', 'support', 'all'). Essential is always implied.
+            run_mode: Configuration target ('local', 'cicd', 'both'). Defaults to
+                'local' in non-interactive mode.
+            git_token_env: Name of environment variable containing git token.
+            ai_provider: AI provider type ('ollama', 'openai-compatible', etc.).
+            ai_model: AI model name to use.
+            ai_base_url: Base URL for AI provider (for ollama/openai-compatible).
+            ai_api_key_env: Name of environment variable containing AI API key.
         """
         self.repo_path = repo_path
         self.config_path = config_path
@@ -226,6 +299,14 @@ class RepoInitializer:
         self.setup_secrets = setup_secrets
         self.deploy_actions = deploy_actions
         self.deploy_workflows = deploy_workflows
+
+        # CLI-provided configuration for non-interactive mode
+        self.cli_run_mode = run_mode
+        self.cli_git_token_env = git_token_env
+        self.cli_ai_provider = ai_provider
+        self.cli_ai_model = ai_model
+        self.cli_ai_base_url = ai_base_url
+        self.cli_ai_api_key_env = ai_api_key_env
 
         self.repo_info = None
         self.provider_type = None  # 'github', 'gitea', or 'gitlab' (detected)
@@ -488,9 +569,15 @@ class RepoInitializer:
         Side Effects:
             Prints menu options and reads user selection via click.prompt().
         """
+        # Use CLI-provided run mode if available
+        if self.cli_run_mode:
+            self.run_mode = self.cli_run_mode  # type: ignore[assignment]
+            self.config_target = "local" if self.cli_run_mode != "cicd" else "cicd"
+            return
+
         if self.non_interactive:
-            # In non-interactive mode, use command-line specified config path
-            self.run_mode = "local"  # Default to local
+            # In non-interactive mode, default to local
+            self.run_mode = "local"
             self.config_target = "local"
             return
 
@@ -691,9 +778,9 @@ class RepoInitializer:
 
         # Step 7: Deploy CI/CD workflows (optional, only for local)
         # In interactive mode, always offer the choice
-        # In non-interactive mode, only deploy if explicitly requested
+        # In non-interactive mode, only deploy if tiers were explicitly specified
         if self.config_target == "local" and (self.deploy_workflows or (not self.non_interactive)):
-            self._deploy_workflows()
+            self._deploy_workflows(self.deploy_workflows)
 
         # Step 8: Validate setup
         self._validate_setup()
@@ -1022,34 +1109,92 @@ class RepoInitializer:
     def _collect_from_environment(self) -> None:
         """Collect credentials from environment variables for non-interactive mode.
 
-        Reads required credentials from standard environment variables. This is
-        the primary method for CI/CD pipeline setup where interactive prompts
-        are not available.
+        Reads required credentials from standard environment variables or from
+        CLI-specified environment variable names. This is the primary method for
+        CI/CD pipeline setup where interactive prompts are not available.
 
-        Environment Variables Checked:
-            - SAPIENS_GITEA_TOKEN or GITEA_TOKEN: Git provider API token (required)
-            - CLAUDE_API_KEY: Claude API key (optional, for API mode)
+        Environment Variables Checked (in order):
+            - CLI-specified via --git-token-env (if provided)
+            - SAPIENS_GITEA_TOKEN, GITEA_TOKEN, GITHUB_TOKEN, GITLAB_TOKEN
+
+        AI Configuration (from CLI args):
+            - --ai-provider: Provider type (ollama, openai-compatible, etc.)
+            - --ai-model: Model name
+            - --ai-base-url: Base URL for provider
+            - --ai-api-key-env: Name of env var containing API key
 
         Updates:
             self.gitea_token: Set from environment variable.
-            self.claude_api_key: Set from environment if present.
+            self.agent_type: Set from CLI if --ai-provider specified.
+            self.builtin_provider: Set from CLI if using builtin agent.
+            self.builtin_model: Set from CLI if --ai-model specified.
+            self.builtin_base_url: Set from CLI if --ai-base-url specified.
+            self.agent_api_key: Set from env var specified by --ai-api-key-env.
 
         Raises:
-            click.ClickException: If SAPIENS_GITEA_TOKEN is not set.
+            click.ClickException: If git token not found in environment.
 
         Side Effects:
             Prints confirmation message to stdout.
         """
         import os
 
-        self.gitea_token = os.getenv("SAPIENS_GITEA_TOKEN") or os.getenv("GITEA_TOKEN")
-        if not self.gitea_token:
-            raise click.ClickException("SAPIENS_GITEA_TOKEN environment variable required in non-interactive mode")
+        # Collect git provider token
+        if self.cli_git_token_env:
+            self.gitea_token = os.getenv(self.cli_git_token_env)
+            if not self.gitea_token:
+                raise click.ClickException(f"{self.cli_git_token_env} environment variable not set")
+            click.echo(f"   ✓ Git token from ${self.cli_git_token_env}")
+        else:
+            # Try standard environment variables
+            for env_var in ["SAPIENS_GITEA_TOKEN", "GITEA_TOKEN", "GITHUB_TOKEN", "GITLAB_TOKEN"]:
+                self.gitea_token = os.getenv(env_var)
+                if self.gitea_token:
+                    click.echo(f"   ✓ Git token from ${env_var}")
+                    break
+            if not self.gitea_token:
+                raise click.ClickException(
+                    "Git token required. Set via --git-token-env or one of: "
+                    "SAPIENS_GITEA_TOKEN, GITEA_TOKEN, GITHUB_TOKEN, GITLAB_TOKEN"
+                )
 
-        self.claude_api_key = os.getenv("CLAUDE_API_KEY")
-        # Claude API key is optional (can use local mode)
+        # Configure AI agent from CLI args if provided
+        if self.cli_ai_provider:
+            # Map provider to agent type
+            if self.cli_ai_provider in ("claude-local", "goose-local", "copilot-local"):
+                if self.cli_ai_provider == "claude-local":
+                    self.agent_type = AgentType.CLAUDE
+                elif self.cli_ai_provider == "goose-local":
+                    self.agent_type = AgentType.GOOSE
+                else:
+                    self.agent_type = AgentType.COPILOT
+            else:
+                # ollama, openai-compatible use builtin agent
+                self.agent_type = AgentType.BUILTIN
+                self.builtin_provider = self.cli_ai_provider
 
-        click.echo("   ✓ Using credentials from environment variables")
+            click.echo(f"   ✓ AI provider: {self.cli_ai_provider}")
+
+        if self.cli_ai_model:
+            self.builtin_model = self.cli_ai_model
+            click.echo(f"   ✓ AI model: {self.cli_ai_model}")
+
+        if self.cli_ai_base_url:
+            self.builtin_base_url = self.cli_ai_base_url
+            click.echo(f"   ✓ AI base URL: {self.cli_ai_base_url}")
+
+        # Get AI API key from specified env var
+        if self.cli_ai_api_key_env:
+            self.agent_api_key = os.getenv(self.cli_ai_api_key_env)
+            if self.agent_api_key:
+                click.echo(f"   ✓ AI API key from ${self.cli_ai_api_key_env}")
+            else:
+                click.echo(f"   ⚠ ${self.cli_ai_api_key_env} not set (may be OK for local providers)")
+        else:
+            # Try standard AI key env vars
+            self.agent_api_key = os.getenv("CLAUDE_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+        click.echo("   ✓ Non-interactive configuration complete")
 
     def _collect_interactively(self) -> None:
         """Collect credentials through interactive user prompts.
@@ -2921,83 +3066,104 @@ tags:
 
         click.echo()
 
-    def _deploy_workflows(self) -> None:
-        """Deploy CI/CD workflow templates to the repository.
+    def _deploy_workflows(self, requested_tiers: tuple[str, ...]) -> None:
+        """Deploy CI/CD workflow templates based on selected tiers.
 
-        Interactively deploys workflow files based on user selections. Includes
-        core workflows, label-specific workflows, and optional recipe workflows.
+        Workflow Tiers:
+            - essential: process-label.yaml (label-triggered AI work)
+            - core: post-merge-docs.yaml, weekly-test-coverage.yaml (repo maintenance)
+            - security: weekly-security-review.yaml, weekly-dependency-audit.yaml,
+                weekly-sbom-license.yaml (security audits)
+            - support: daily-issue-triage.yaml (issue management)
 
-        Workflow Categories:
-            - Core: process-label.yaml, automation-daemon.yaml, process-issue.yaml
-            - Label-specific: needs-planning, approved, execute-task, needs-review,
-                requires-qa, needs-fix
-            - Recipes: daily-issue-triage, weekly reports, post-merge docs
+        Provider Behavior:
+            - GitHub: Essential tier deploys thin wrapper → dispatcher; other tiers
+                deploy actual workflow files
+            - Gitea/GitLab: All tiers deploy actual workflow files
 
-        Target Directories:
-            - GitHub: .github/workflows/sapiens/
-            - GitLab: .gitlab-ci.yml (core) and .gitlab/sapiens/recipes/
-            - Gitea: .gitea/workflows/sapiens/
+        Args:
+            requested_tiers: Tuple of tier names to deploy. Empty tuple triggers
+                interactive selection. 'all' deploys everything. Essential is
+                always implied when other tiers are specified.
 
         Side Effects:
             - Creates workflow directories and files
-            - Copies prompt templates to sapiens/prompts/
             - Prints progress and confirmation messages
-            - Prompts user for deployment selections (interactive mode)
+            - Prompts user for tier selection (interactive mode, if no tiers specified)
         """
         import importlib.resources
 
+        # Define tier mappings
+        workflow_tiers = {
+            "essential": [
+                ("process-label.yaml", "Process label (label-triggered AI work)"),
+            ],
+            "core": [
+                ("recipes/post-merge-docs.yaml", "Post-merge documentation update"),
+                ("recipes/weekly-test-coverage.yaml", "Weekly test coverage report"),
+            ],
+            "security": [
+                ("recipes/weekly-security-review.yaml", "Weekly security review"),
+                ("recipes/weekly-dependency-audit.yaml", "Weekly dependency audit"),
+                ("recipes/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
+            ],
+            "support": [
+                ("recipes/daily-issue-triage.yaml", "Daily issue triage"),
+            ],
+        }
+
         click.echo(click.style("📋 Deploying workflow templates...", bold=True))
         click.echo()
+
+        # Determine which tiers to deploy
+        tiers_to_deploy: set[str] = set()
+
+        if "all" in requested_tiers:
+            tiers_to_deploy = {"essential", "core", "security", "support"}
+        elif requested_tiers:
+            # Add requested tiers plus essential (always implied)
+            tiers_to_deploy = set(requested_tiers) | {"essential"}
+        elif not self.non_interactive:
+            # Interactive tier selection
+            click.echo("Select workflow tiers to deploy:")
+            click.echo()
+            click.echo("  essential - Label-triggered AI work (process-label)")
+            click.echo("  core      - Repo maintenance (post-merge docs, test coverage)")
+            click.echo("  security  - Security audits (dependency, code, SBOM)")
+            click.echo("  support   - Issue management (daily triage)")
+            click.echo()
+
+            # Essential is always deployed
+            tiers_to_deploy.add("essential")
+            click.echo("   ✓ essential (always included)")
+
+            if click.confirm("Deploy 'core' tier (post-merge docs, test coverage)?", default=True):
+                tiers_to_deploy.add("core")
+            if click.confirm("Deploy 'security' tier (security audits)?", default=False):
+                tiers_to_deploy.add("security")
+            if click.confirm("Deploy 'support' tier (daily issue triage)?", default=False):
+                tiers_to_deploy.add("support")
+            click.echo()
+        else:
+            # Non-interactive with no tiers specified - skip
+            click.echo("   No workflow tiers specified, skipping deployment.")
+            click.echo("   Use --deploy-workflows essential|core|security|support|all")
+            return
 
         # Determine paths based on provider type
         if self.provider_type == "github":
             workflows_dir = self.repo_path / ".github" / "workflows"
             template_base = "workflows/github/sapiens"
         elif self.provider_type == "gitlab":
-            # GitLab uses single .gitlab-ci.yml at root
             workflows_dir = self.repo_path
             template_base = "workflows/gitlab/sapiens"
-        else:
-            workflows_dir = self.repo_path / ".gitea" / "workflows"
+        else:  # gitea
+            workflows_dir = self.repo_path / ".github" / "workflows"
             template_base = "workflows/gitea/sapiens"
 
         workflows_dir.mkdir(parents=True, exist_ok=True)
 
-        # Core workflows based on automation mode
-        core_workflows = []
-
-        if self.automation_mode in ("native", "hybrid"):
-            # Native/hybrid modes use label triggers
-            core_workflows.append(("process-label.yaml", "Process label (native triggers)"))
-
-        if self.automation_mode in ("daemon", "hybrid"):
-            # Daemon/hybrid modes use the daemon
-            core_workflows.append(("automation-daemon.yaml", "Automation daemon (scheduled processing)"))
-
-        # Process issue is useful for manual triggers in all modes
-        core_workflows.append(("process-issue.yaml", "Process issue (manual trigger)"))
-
-        # Label-specific workflows
-        label_workflows = [
-            ("needs-planning.yaml", "Planning workflow"),
-            ("approved.yaml", "Approved plan workflow"),
-            ("execute-task.yaml", "Task execution workflow"),
-            ("needs-review.yaml", "Code review workflow"),
-            ("requires-qa.yaml", "QA testing workflow"),
-            ("needs-fix.yaml", "Fix proposal workflow"),
-        ]
-
-        # Recipe workflows
-        recipe_workflows = [
-            ("recipes/daily-issue-triage.yaml", "Daily issue triage"),
-            ("recipes/weekly-test-coverage.yaml", "Weekly test coverage report"),
-            ("recipes/weekly-dependency-audit.yaml", "Weekly dependency audit"),
-            ("recipes/weekly-security-review.yaml", "Weekly security review"),
-            ("recipes/weekly-sbom-license.yaml", "Weekly SBOM & license compliance"),
-            ("recipes/post-merge-docs.yaml", "Post-merge documentation update"),
-        ]
-
-        def deploy_template(template_name: str, target_dir: Path) -> bool:
+        def deploy_template(template_name: str) -> bool:
             """Deploy a single template file."""
             template_subpath = f"{template_base}/{template_name}"
             content = None
@@ -3029,17 +3195,15 @@ tags:
                 is_recipe = template_name.startswith("recipes/")
 
                 if self.provider_type == "gitlab":
-                    if not is_recipe:
-                        # Core workflows go to .gitlab-ci.yml
-                        target_file = target_dir / ".gitlab-ci.yml"
-                    else:
-                        # Recipes go to .gitlab/sapiens/recipes/
+                    if is_recipe:
                         gitlab_dir = self.repo_path / ".gitlab" / "sapiens" / "recipes"
                         gitlab_dir.mkdir(parents=True, exist_ok=True)
                         target_file = gitlab_dir / template_name.replace("recipes/", "")
+                    else:
+                        target_file = workflows_dir / ".gitlab-ci.yml"
                 else:
-                    # GitHub/Gitea: use subdirectory structure - recipes nested inside sapiens
-                    sapiens_dir = target_dir / "sapiens"
+                    # GitHub/Gitea: use subdirectory structure
+                    sapiens_dir = workflows_dir / "sapiens"
                     if is_recipe:
                         target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
                     else:
@@ -3051,139 +3215,67 @@ tags:
             except Exception:
                 return False
 
-        # Ask about core workflows
-        if not self.non_interactive:
-            # Build workflow list description
-            workflow_names = ", ".join([desc for _, desc in core_workflows])
-            deploy_core = click.confirm(
-                f"Deploy core workflows ({workflow_names})?",
-                default=True,
-            )
-        else:
-            deploy_core = True
+        def deploy_github_wrapper() -> bool:
+            """Deploy thin wrapper for GitHub that calls the dispatcher."""
+            wrapper_content = """# Sapiens Automation - GitHub Workflow
+# This thin wrapper calls the reusable sapiens-dispatcher workflow
+# See: https://github.com/savorywatt/repo-sapiens
 
-        if deploy_core:
-            for template_name, description in core_workflows:
-                if deploy_template(template_name, workflows_dir):
-                    if self.provider_type == "gitlab":
-                        click.echo(f"   ✓ {description} → .gitlab-ci.yml")
-                    else:
-                        click.echo(f"   ✓ {description} → sapiens/")
-                else:
-                    click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
+name: Sapiens Automation
 
-        click.echo()
+on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [labeled]
 
-        # Ask about label-specific workflows
-        if not self.non_interactive:
-            deploy_labels = click.confirm(
-                "Deploy label-specific workflows "
-                "(needs-planning, approved, execute-task, needs-review, requires-qa, needs-fix)?",
-                default=True,
-            )
-        else:
-            deploy_labels = True
-
-        if deploy_labels:
-            for template_name, description in label_workflows:
-                if deploy_template(template_name, workflows_dir):
-                    if self.provider_type == "gitlab":
-                        click.echo(f"   ✓ {description} → .gitlab-ci.yml")
-                    else:
-                        click.echo(f"   ✓ {description} → sapiens/")
-                else:
-                    click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
-
-        click.echo()
-
-        # Deploy README to sapiens directory
-        if deploy_core and self.provider_type != "gitlab":
-            readme_content = None
+jobs:
+  sapiens:
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-dispatcher.yaml@v2
+    with:
+      label: ${{ github.event.label.name }}
+      issue_number: ${{ github.event.issue.number || github.event.pull_request.number }}
+      event_type: ${{ github.event_name == 'pull_request' && 'pull_request.labeled' || 'issues.labeled' }}
+    secrets:
+      GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AI_API_KEY: ${{ secrets.SAPIENS_AI_API_KEY }}
+"""
             try:
-                # Try to read README from templates
-                repo_root = Path(__file__).parent.parent.parent
-                readme_path = repo_root / "templates" / "workflows" / "sapiens-README.md"
-                if readme_path.exists():
-                    readme_content = readme_path.read_text()
-
-                # Try package templates
-                if readme_content is None:
-                    package_dir = Path(__file__).parent.parent
-                    readme_path = package_dir / "templates" / "workflows" / "sapiens-README.md"
-                    if readme_path.exists():
-                        readme_content = readme_path.read_text()
-
-                # Try importlib.resources
-                if readme_content is None:
-                    readme_files = (
-                        importlib.resources.files("repo_sapiens") / "templates" / "workflows" / "sapiens-README.md"
-                    )
-                    if readme_files.is_file():
-                        readme_content = readme_files.read_text()
-
-                if readme_content:
-                    sapiens_dir = workflows_dir / "sapiens"
-                    readme_file = sapiens_dir / "README.md"
-                    readme_file.write_text(readme_content)
-                    click.echo("   ✓ Documentation → sapiens/README.md")
+                target_file = workflows_dir / "sapiens.yaml"
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                target_file.write_text(wrapper_content)
+                return True
             except Exception:
-                pass  # Non-critical, skip if fails
+                return False
 
-        # Deploy prompts directory
-        if (deploy_core or deploy_labels) and self.provider_type != "gitlab":
-            try:
-                import shutil
-
-                # Determine source prompts directory
-                repo_root = Path(__file__).parent.parent.parent
-                source_prompts = repo_root / "templates" / template_base / "prompts"
-
-                if not source_prompts.exists():
-                    # Try package templates
-                    package_dir = Path(__file__).parent.parent
-                    source_prompts = package_dir / "templates" / template_base / "prompts"
-
-                if source_prompts.exists():
-                    # Determine target directory
-                    sapiens_dir = workflows_dir / "sapiens"
-                    target_prompts = sapiens_dir / "prompts"
-
-                    # Copy prompts directory
-                    if target_prompts.exists():
-                        shutil.rmtree(target_prompts)
-                    shutil.copytree(source_prompts, target_prompts)
-
-                    click.echo("   ✓ Workflow prompts → sapiens/prompts/")
-            except Exception:
-                pass  # Non-critical, skip if fails
-
+        # Deploy workflows for each selected tier
+        click.echo(f"Deploying tiers: {', '.join(sorted(tiers_to_deploy))}")
         click.echo()
 
-        # Ask about recipe workflows (one by one in interactive mode)
-        if not self.non_interactive:  # nosec B105
-            click.echo("Recipe workflows available:")
-            for template_name, description in recipe_workflows:  # nosec B105
-                if click.confirm(f"  Deploy '{description}'?", default=False):
-                    if deploy_template(template_name, workflows_dir):
+        for tier in sorted(tiers_to_deploy):
+            workflows = workflow_tiers.get(tier, [])
+
+            for template_name, description in workflows:
+                # For GitHub essential tier, deploy thin wrapper instead
+                if self.provider_type == "github" and tier == "essential" and template_name == "process-label.yaml":
+                    if deploy_github_wrapper():
+                        click.echo(f"   ✓ {description} → sapiens.yaml (dispatcher wrapper)")
+                    else:
+                        click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
+                else:
+                    if deploy_template(template_name):
                         if self.provider_type == "gitlab":
-                            click.echo(click.style("     ✓ Deployed → .gitlab/sapiens/recipes/", fg="green"))  # nosec B105
+                            if template_name.startswith("recipes/"):
+                                click.echo(f"   ✓ {description} → .gitlab/sapiens/recipes/")
+                            else:
+                                click.echo(f"   ✓ {description} → .gitlab-ci.yml")
                         else:
-                            click.echo(click.style("     ✓ Deployed → sapiens/recipes/", fg="green"))  # nosec B105
+                            if template_name.startswith("recipes/"):
+                                click.echo(f"   ✓ {description} → sapiens/recipes/")
+                            else:
+                                click.echo(f"   ✓ {description} → sapiens/")
                     else:
-                        click.echo(click.style("     ⚠ Could not deploy", fg="yellow"))  # nosec B105
-
-        click.echo()
-
-        # Ask about validation workflow (for CI/CD setups)
-        if not self.non_interactive:
-            click.echo(click.style("Validation Workflow", bold=True))
-            click.echo("A validation workflow tests provider connectivity in CI/CD:")
-            click.echo("  - Verifies API authentication works")
-            click.echo("  - Tests read/write operations (creates test issue/PR)")
-            click.echo("  - Produces diagnostic report")
-            click.echo()
-            if click.confirm("Deploy validation workflow?", default=True):
-                self._deploy_validation_workflow(workflows_dir, deploy_template)
+                        click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
 
         click.echo()
 
