@@ -1,0 +1,61 @@
+# @repo-sapiens-template
+# @version: 1.0.0
+# @name: process-comment
+#
+# Process Comment Workflow for GitHub Actions
+#
+# Triggers when an issue comment is created that contains trigger keywords
+# (e.g., @sapiens, sapiens:). Routes to AI for analysis and action execution.
+
+name: Process Comment
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    # Only trigger on comments containing @sapiens or sapiens:
+    if: |
+      contains(github.event.comment.body, '@sapiens') ||
+      contains(github.event.comment.body, 'sapiens:')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Process comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          # For OpenAI-compatible providers
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_AGENT_URL }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_AGENT_KEY }}
+        run: |
+          # Extract comment body, handling multiline content
+          COMMENT_BODY=$(cat <<'COMMENT_EOF'
+          ${{ github.event.comment.body }}
+          COMMENT_EOF
+          )
+
+          echo "Processing comment on issue #${{ github.event.issue.number }}"
+          echo "Comment author: ${{ github.event.comment.user.login }}"
+
+          sapiens process-comment \
+            --issue "${{ github.event.issue.number }}" \
+            --comment-id "${{ github.event.comment.id }}" \
+            --comment-author "${{ github.event.comment.user.login }}" \
+            --comment-body "$COMMENT_BODY" \
+            --source github

@@ -35,6 +35,7 @@ import structlog
 from repo_sapiens.config.settings import AutomationSettings
 from repo_sapiens.engine.stages.approval import ApprovalStage
 from repo_sapiens.engine.stages.code_review import CodeReviewStage
+from repo_sapiens.engine.stages.comment_response import CommentResponseStage
 from repo_sapiens.engine.stages.dependency_audit import DependencyAuditStage
 from repo_sapiens.engine.stages.docs_generation import DocsGenerationStage
 from repo_sapiens.engine.stages.execution import TaskExecutionStage
@@ -155,6 +156,7 @@ class WorkflowOrchestrator:
             "test_coverage": TestCoverageStage(git, agent, state, settings),
             "dependency_audit": DependencyAuditStage(git, agent, state, settings),
             "security_review": SecurityReviewStage(git, agent, state, settings),
+            "comment_response": CommentResponseStage(git, agent, state, settings),
             # Legacy stages (kept for compatibility)
             "planning": PlanningStage(git, agent, state, settings),
             "plan_review": PlanReviewStage(git, agent, state, settings),

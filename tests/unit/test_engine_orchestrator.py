@@ -153,6 +153,7 @@ class TestOrchestratorInitialization:
             "test_coverage",
             "dependency_audit",
             "security_review",
+            "comment_response",
             # Legacy stages
             "planning",
             "plan_review",

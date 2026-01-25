@@ -12,6 +12,7 @@ from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.health import health_check
 from repo_sapiens.cli.init import init_command
 from repo_sapiens.cli.mcp import mcp_group
+from repo_sapiens.cli.process_comment import process_comment_command
 from repo_sapiens.cli.process_label import process_label_command
 from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
@@ -731,6 +732,9 @@ cli.add_command(update_command)
 
 # Add process-label command
 cli.add_command(process_label_command)
+
+# Add process-comment command
+cli.add_command(process_comment_command)
 
 
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:

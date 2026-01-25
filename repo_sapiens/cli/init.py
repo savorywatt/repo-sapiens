@@ -3193,7 +3193,7 @@ tags:
         """Deploy CI/CD workflow templates based on selected tiers.
 
         Workflow Tiers:
-            - essential: process-label.yaml (label-triggered AI work)
+            - essential: process-label.yaml, process-comment.yaml (AI-triggered work)
             - core: post-merge-docs.yaml, weekly-test-coverage.yaml (repo maintenance)
             - security: weekly-security-review.yaml, weekly-dependency-audit.yaml,
                 weekly-sbom-license.yaml (security audits)
@@ -3220,6 +3220,7 @@ tags:
         workflow_tiers = {
             "essential": [
                 ("process-label.yaml", "Process label (label-triggered AI work)"),
+                ("process-comment.yaml", "Process comment (comment-triggered AI actions)"),
             ],
             "core": [
                 ("recipes/post-merge-docs.yaml", "Post-merge documentation update"),
@@ -3250,7 +3251,7 @@ tags:
             # Interactive tier selection
             click.echo("Select workflow tiers to deploy:")
             click.echo()
-            click.echo("  essential - Label-triggered AI work (process-label)")
+            click.echo("  essential - AI-triggered work (labels & comments)")
             click.echo("  core      - Repo maintenance (post-merge docs, test coverage)")
             click.echo("  security  - Security audits (dependency, code, SBOM)")
             click.echo("  support   - Issue management (daily triage)")
@@ -3438,7 +3439,7 @@ jobs:
         """Remove CI/CD workflow templates based on selected tiers.
 
         Workflow Tiers:
-            - essential: process-label.yaml (label-triggered AI work)
+            - essential: process-label.yaml, process-comment.yaml (AI-triggered work)
             - core: post-merge-docs.yaml, weekly-test-coverage.yaml (repo maintenance)
             - security: weekly-security-review.yaml, weekly-dependency-audit.yaml,
                 weekly-sbom-license.yaml (security audits)
@@ -3456,6 +3457,7 @@ jobs:
         workflow_tiers = {
             "essential": [
                 ("process-label.yaml", "Process label (label-triggered AI work)"),
+                ("process-comment.yaml", "Process comment (comment-triggered AI actions)"),
             ],
             "core": [
                 ("recipes/post-merge-docs.yaml", "Post-merge documentation update"),
