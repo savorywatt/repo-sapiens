@@ -47,6 +47,51 @@ class ScheduleTriggerConfig(BaseModel):
     ai_enabled: bool = Field(default=True, description="Whether this handler requires AI agent")
 
 
+class CommentAction(str, Enum):
+    """Allowed actions that can be triggered by comments."""
+
+    ADD_LABEL = "add_label"
+    REMOVE_LABEL = "remove_label"
+    REPLY = "reply"
+    CLOSE_ISSUE = "close_issue"
+
+
+class CommentTriggerConfig(BaseModel):
+    """Configuration for comment-based triggers.
+
+    Controls how the comment-response workflow processes issue comments.
+    When a user comments with trigger keywords, AI analyzes the comment
+    and suggests actions from the allowed_actions list.
+    """
+
+    keywords: list[str] = Field(
+        default=["@sapiens", "sapiens:"],
+        description="Keywords that trigger AI analysis of comments",
+    )
+    ai_enabled: bool = Field(
+        default=True,
+        description="Whether to use AI for comment analysis",
+    )
+    allowed_actions: list[CommentAction] = Field(
+        default=[CommentAction.ADD_LABEL, CommentAction.REPLY],
+        description="Actions the AI is allowed to perform",
+    )
+    ignore_bot_comments: bool = Field(
+        default=True,
+        description="Ignore comments from bot accounts to prevent loops",
+    )
+    max_actions_per_comment: int = Field(
+        default=3,
+        ge=1,
+        le=5,
+        description="Maximum number of actions per comment",
+    )
+    bot_signature: str = Field(
+        default="◆ Posted by Sapiens Automation",
+        description="Signature used to identify bot-generated comments",
+    )
+
+
 class AutomationModeConfig(BaseModel):
     """Configuration for automation mode selection."""
 
@@ -72,6 +117,10 @@ class AutomationConfig(BaseModel):
     label_triggers: dict[str, LabelTriggerConfig] = Field(default_factory=dict, description="Label-to-handler mappings")
     schedule_triggers: list[ScheduleTriggerConfig] = Field(
         default_factory=list, description="Scheduled automation tasks"
+    )
+    comment_triggers: CommentTriggerConfig = Field(
+        default_factory=CommentTriggerConfig,
+        description="Comment-based trigger configuration",
     )
 
 

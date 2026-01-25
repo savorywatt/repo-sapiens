@@ -1,0 +1,110 @@
+# .github/workflows/sapiens-post-merge-docs.yaml
+# Reusable workflow for post-merge documentation updates
+name: "Sapiens Post-Merge Docs"
+
+on:
+  workflow_call:
+    inputs:
+      docs_path:
+        description: 'Path to documentation directory'
+        required: false
+        type: string
+        default: 'docs'
+      auto_commit:
+        description: 'Automatically commit documentation updates'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      GIT_TOKEN:
+        description: 'GitHub token for API access'
+        required: true
+      AI_API_KEY:
+        description: 'AI provider API key for analysis'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip if commit message contains [skip docs] or [no docs]
+    if: |
+      !contains(github.event.head_commit.message, '[skip docs]') &&
+      !contains(github.event.head_commit.message, '[no docs]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+          token: ${{ secrets.GIT_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install repo-sapiens
+        run: pip install git+https://github.com/savorywatt/repo-sapiens.git@v2
+
+      - name: Get recent changes
+        id: changes
+        run: |
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          git log --oneline -5 >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Check AI API key
+        id: check-ai
+        env:
+          AI_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -n "$AI_KEY" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "::notice::AI_API_KEY not provided - skipping AI-powered documentation update"
+          fi
+
+      - name: Update documentation
+        if: steps.check-ai.outputs.has_key == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.GIT_TOKEN }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          sapiens task "Review the recent commits and update documentation if needed.
+
+          Recent commits:
+          ${{ steps.changes.outputs.commits }}
+
+          Documentation path: ${{ inputs.docs_path }}
+
+          Tasks:
+          1. Check if README.md needs updates for any new features or changed behavior
+          2. Add CHANGELOG.md entries for notable changes (if not already present)
+          3. Update any API documentation if function signatures changed
+          4. Fix any broken links or outdated examples
+
+          Only make changes if genuinely needed. If no updates required, just finish.
+          If changes are made, commit them with message: 'docs: Update documentation [skip docs]'"
+
+      - name: Push changes
+        if: inputs.auto_commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "docs: Auto-update documentation [skip docs]"
+          git push || echo "No changes to push"
+
+      - name: Summary
+        run: |
+          echo "## Documentation Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Recent commits analyzed:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.changes.outputs.commits }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

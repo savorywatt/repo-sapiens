@@ -166,6 +166,10 @@ class AgentProviderConfig(BaseModel):
         default=None,
         description="Copilot-specific configuration (required for provider_type='copilot-local')",
     )
+    strip_thinking_tags: bool = Field(
+        default=False,
+        description="Strip <think>...</think> tags from responses (for reasoning models like DeepSeek R1)",
+    )
 
     @model_validator(mode="after")
     def validate_provider_config(self) -> AgentProviderConfig:
@@ -285,6 +289,10 @@ class AutomationSettings(BaseSettings):
     def _interpolate_env_vars(content: str) -> str:
         """Interpolate ${VAR_NAME} placeholders with environment variables.
 
+        Supports two syntaxes:
+        - ${VAR_NAME} - Required environment variable (raises if not set)
+        - ${VAR_NAME:-default} - Optional with default value
+
         Args:
             content: String content with placeholders
 
@@ -292,31 +300,38 @@ class AutomationSettings(BaseSettings):
             Content with environment variables substituted
 
         Raises:
-            ValueError: If a referenced environment variable is not set
+            ValueError: If a required environment variable is not set
 
         Note:
             YAML comment lines (starting with #) are preserved unchanged,
             allowing documentation examples like ${VAR_NAME} in comments.
         """
-        pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+        # Pattern matches ${VAR_NAME} or ${VAR_NAME:-default}
+        # Group 1: variable name, Group 2: optional default value (including the :-)
+        pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}")
 
         def replace_var(match: re.Match[str]) -> str:
             """Replace matched placeholder with environment variable value.
 
             Args:
-                match: Regex match object containing the variable name
+                match: Regex match object containing the variable name and optional default
 
             Returns:
-                Environment variable value
+                Environment variable value or default
 
             Raises:
-                ValueError: If the environment variable is not set
+                ValueError: If the environment variable is not set and no default provided
             """
             var_name = match.group(1)
+            default_value = match.group(2)  # None if no default specified
             value = os.getenv(var_name)
-            if value is None:
+
+            if value is not None:
+                return value
+            elif default_value is not None:
+                return default_value
+            else:
                 raise ValueError(f"Environment variable {var_name} is not set")
-            return value
 
         def process_line(line: str) -> str:
             """Process a single line, skipping YAML comments."""

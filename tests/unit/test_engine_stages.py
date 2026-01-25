@@ -491,7 +491,7 @@ Description of task 1
         mock_git_provider.get_comments.return_value = [
             Comment(
                 id=1,
-                body="ok, this looks good\n\n\U0001F916 Posted by Builder Automation",
+                body="ok, this looks good\n\n◆ Posted by Sapiens Automation",
                 author="bot",
                 created_at=datetime.now(UTC),
             )
@@ -558,8 +558,8 @@ class TestApprovalStageHelperMethods:
             settings=mock_settings,
         )
 
-        assert stage._is_bot_comment("Some text\n\n\U0001F916 Posted by Builder Automation")
-        assert stage._is_bot_comment("\U0001F916 Posted by Builder Automation")
+        assert stage._is_bot_comment("Some text\n\n◆ Posted by Sapiens Automation")
+        assert stage._is_bot_comment("◆ Posted by Sapiens Automation")
 
     def test_is_bot_comment_false(self, mock_git_provider, mock_agent_provider, mock_state_manager, mock_settings):
         """Test bot comment detection returns False for non-bot comments."""

@@ -1,0 +1,84 @@
+# @repo-sapiens-template
+# @version: 1.1.0
+# @name: process-issue
+#
+# Process Issue Workflow for GitHub Actions
+#
+# Triggers when an issue is labeled with 'needs-planning'.
+#
+# Setup:
+# 1. Copy to .github/workflows/process-issue.yaml
+# 2. Set required secrets (your AI provider key)
+# 3. Create the 'needs-planning' label in your repository
+
+name: Process Issue
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+env:
+  # CI-specific config (separates CI settings from local development config)
+  CONFIG_FILE: sapiens_config.ci.yaml
+
+# Prevent concurrent processing of the same issue
+concurrency:
+  group: process-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  process:
+    if: github.event.label.name == 'needs-planning'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install repo-sapiens
+        run: pip install repo-sapiens
+
+      - name: Process issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          # Uncomment your AI provider:
+          # OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: |
+          echo "Processing issue #${{ github.event.issue.number }}"
+          sapiens --config $CONFIG_FILE process-issue --issue ${{ github.event.issue.number }}
+
+      - name: Post success comment
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: 'Plan generated successfully. Review the plan and add `approved` label to proceed.'
+            })
+
+      - name: Post failure comment
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Failed to generate plan. Check the [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
+            })

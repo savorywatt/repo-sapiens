@@ -1,0 +1,51 @@
+# Gitea test configuration for sapiens
+# Used during integration testing with Gitea Actions
+#
+# Credentials are resolved from environment variables:
+#   AUTOMATION__GIT_PROVIDER__API_TOKEN - Gitea API token
+#   AUTOMATION__AGENT_PROVIDER__API_KEY - AI provider API key (if needed)
+
+git_provider:
+  provider_type: gitea
+  base_url: "${GITEA_URL}"
+  api_token: "${AUTOMATION__GIT_PROVIDER__API_TOKEN}"
+
+repository:
+  owner: "${GITEA_OWNER}"
+  name: "${GITEA_REPO}"
+  default_branch: main
+
+agent_provider:
+  # For testing, use claude-local which doesn't require API calls
+  # In CI, this will just classify the event and skip (no handler configured)
+  provider_type: claude-local
+  model: claude-sonnet-4.5
+  local_mode: true
+
+# Minimal workflow config for testing
+workflow:
+  plans_directory: plans
+  state_directory: .sapiens/state
+  branching_strategy: per-agent
+  max_concurrent_tasks: 1
+
+# Test label handlers - map test labels to actions
+automation:
+  triggers:
+    - label: "sapiens:test"
+      action: log_only
+      description: "Test label for CI validation"
+    - label: "sapiens:plan"
+      action: create_plan
+      description: "Create implementation plan"
+
+# Standard tags
+tags:
+  needs_planning: needs-planning
+  plan_review: plan-review
+  ready_to_implement: ready-to-implement
+  in_progress: in-progress
+  code_review: code-review
+  merge_ready: merge-ready
+  completed: completed
+  needs_attention: needs-attention

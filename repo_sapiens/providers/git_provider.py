@@ -209,9 +209,9 @@ class GiteaProvider(GitProvider):
             return False
 
     @async_retry(max_attempts=3, backoff_factor=2.0)
-    async def get_diff(self, base: str, head: str) -> str:
+    async def get_diff(self, base: str, head: str, pr_number: int | None = None) -> str:
         """Get diff between two branches."""
-        log.info("get_diff", base=base, head=head)
+        log.info("get_diff", base=base, head=head, pr_number=pr_number)
 
         result = await self.mcp.call_tool(
             "gitea_compare",
@@ -265,6 +265,20 @@ class GiteaProvider(GitProvider):
             head=head,
             base=base,
             labels=labels or [],
+        )
+
+        return self._parse_pull_request(result)
+
+    @async_retry(max_attempts=3, backoff_factor=2.0)
+    async def get_pull_request(self, pr_number: int) -> PullRequest:
+        """Get a pull request by number."""
+        log.info("get_pull_request", pr=pr_number)
+
+        result = await self.mcp.call_tool(
+            "gitea_get_pull_request",
+            owner=self.owner,
+            repo=self.repo,
+            number=pr_number,
         )
 
         return self._parse_pull_request(result)

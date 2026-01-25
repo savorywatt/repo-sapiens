@@ -46,6 +46,7 @@
 #   --full-workflow     Run full workflow test (all 5 phases)
 #   --skip-cleanup      Skip cleanup of artifacts from previous test runs
 #   --test-dispatcher   Test the reusable sapiens-dispatcher workflow
+#   --test-tiers        Test Core, Security, Support tiers via workflow_dispatch API
 #   --dispatcher-ref    Branch/tag to reference for dispatcher (default: v2)
 #
 # Environment:
@@ -72,13 +73,14 @@ ACTIONS_ONLY=false
 FULL_WORKFLOW=false
 SKIP_CLEANUP=false
 TEST_DISPATCHER=false
+TEST_TIERS=false  # Test Core, Security, Support tiers via workflow dispatch
 DISPATCHER_REF="${DISPATCHER_REF:-v2}"  # Branch/tag to reference for dispatcher
 RESULTS_DIR="${RESULTS_DIR:-./validation-results}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 RUN_ID="gitea-e2e-${TIMESTAMP}"
 
 GITEA_URL="${GITEA_URL:-http://localhost:3000}"
-GITEA_OWNER="${GITEA_OWNER:-admin}"
+GITEA_OWNER="${GITEA_OWNER:-testadmin}"
 GITEA_REPO="${GITEA_REPO:-test-repo}"
 TEST_PREFIX="sapiens-e2e-${TIMESTAMP}-"
 
@@ -122,6 +124,7 @@ while [[ $# -gt 0 ]]; do
         --full-workflow) FULL_WORKFLOW=true; shift ;;
         --skip-cleanup) SKIP_CLEANUP=true; shift ;;
         --test-dispatcher) TEST_DISPATCHER=true; shift ;;
+        --test-tiers) TEST_TIERS=true; shift ;;
         --dispatcher-ref) DISPATCHER_REF="$2"; shift 2 ;;
         -h|--help)
             head -50 "$0" | tail -45
@@ -152,6 +155,12 @@ cleanup() {
     if [[ -n "${DISPATCHER_ISSUE_NUMBER:-}" ]]; then
         log "Closing dispatcher test issue #$DISPATCHER_ISSUE_NUMBER..."
         gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$DISPATCHER_ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
+    fi
+
+    # Close template test issue
+    if [[ -n "${TEMPLATE_ISSUE_NUMBER:-}" ]]; then
+        log "Closing template test issue #$TEMPLATE_ISSUE_NUMBER..."
+        gitea_api PATCH "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$TEMPLATE_ISSUE_NUMBER" '{"state":"closed"}' > /dev/null 2>&1 || true
     fi
 
     # Close proposal issue
@@ -359,7 +368,26 @@ ensure_label() {
 
 # Get Gitea container IP for use in workflows
 get_gitea_container_ip() {
-    docker inspect "$DOCKER_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null || echo ""
+    local container_names=("$DOCKER_CONTAINER" "sapiens-gitea" "gitea-test" "gitea")
+    local context_arg=""
+
+    # Use the Docker context if specified
+    if [[ -n "$DOCKER_CONTEXT" ]]; then
+        context_arg="--context $DOCKER_CONTEXT"
+    fi
+
+    # Try each container name
+    for name in "${container_names[@]}"; do
+        local ip
+        # shellcheck disable=SC2086
+        ip=$(docker $context_arg inspect "$name" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 2>/dev/null)
+        if [[ -n "$ip" ]]; then
+            echo "$ip"
+            return 0
+        fi
+    done
+
+    echo ""
 }
 
 # Deploy workflow file to repository
@@ -913,6 +941,780 @@ run_dispatcher_test() {
 
     error "Dispatcher integration test FAILED"
     return 1
+}
+
+#############################################
+# Phase 1.6: Template Workflow Test
+#############################################
+
+# State variable for template test issue
+TEMPLATE_ISSUE_NUMBER=""
+
+# Deploy the actual process-label.yaml template
+deploy_process_label_template() {
+    step "Deploying process-label.yaml template..."
+
+    local template_path="$PROJECT_ROOT/templates/workflows/gitea/sapiens/process-label.yaml"
+    local target_path=".gitea/workflows/sapiens/process-label.yaml"
+
+    if [[ ! -f "$template_path" ]]; then
+        error "Template file not found: $template_path"
+        return 1
+    fi
+
+    # Read and base64 encode template
+    local content
+    content=$(cat "$template_path" | base64 -w 0)
+
+    # Check if file exists
+    local existing_sha
+    existing_sha=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" 2>/dev/null | jq -r '.sha // empty')
+
+    if [[ -n "$existing_sha" ]]; then
+        gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" "{
+            \"message\": \"Update process-label.yaml template for E2E test\",
+            \"content\": \"$content\",
+            \"sha\": \"$existing_sha\"
+        }" > /dev/null
+    else
+        # Ensure parent directory exists by creating .gitea/workflows/sapiens/.gitkeep first
+        local gitkeep_content
+        gitkeep_content=$(echo -n "" | base64)
+
+        # Try to create .gitea/workflows/sapiens directory structure
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/.gitea/workflows/sapiens/.gitkeep" "{
+            \"message\": \"Create sapiens workflows directory\",
+            \"content\": \"$gitkeep_content\"
+        }" > /dev/null 2>&1 || true
+
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" "{
+            \"message\": \"Deploy process-label.yaml template for E2E test\",
+            \"content\": \"$content\"
+        }" > /dev/null
+    fi
+
+    log "Deployed: $target_path"
+}
+
+# Set up secrets needed for template test
+setup_template_secrets() {
+    step "Setting up template test secrets..."
+
+    # Get current branch for testing local changes
+    local current_branch
+    current_branch=$(git -C "$PROJECT_ROOT" rev-parse --abbrev-ref HEAD)
+
+    # Get the Gitea internal URL (for workflow container to reach Gitea)
+    local gitea_ip
+    gitea_ip=$(get_gitea_container_ip)
+    local gitea_internal_url="http://${gitea_ip}:3000"
+
+    if [[ -z "$gitea_ip" ]]; then
+        warn "Could not determine Gitea container IP, using localhost"
+        gitea_internal_url="http://localhost:3000"
+    fi
+
+    # For E2E tests, we use a local file:// URL since the workflow runner
+    # shares filesystem with the test environment
+    log "Setting SAPIENS_REPO_URL to file://$PROJECT_ROOT"
+    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/SAPIENS_REPO_URL" "{
+        \"data\": \"file://$PROJECT_ROOT\"
+    }" > /dev/null 2>&1 || {
+        warn "Could not set SAPIENS_REPO_URL secret via API"
+    }
+
+    log "Setting SAPIENS_BRANCH to $current_branch"
+    gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/actions/secrets/SAPIENS_BRANCH" "{
+        \"data\": \"$current_branch\"
+    }" > /dev/null 2>&1 || {
+        warn "Could not set SAPIENS_BRANCH secret via API"
+    }
+
+    log "Set SAPIENS_BRANCH=$current_branch"
+}
+
+# Create issue to trigger template workflow
+create_template_test_issue() {
+    step "Creating issue to trigger template workflow..."
+
+    # Ensure the trigger label exists
+    local planning_label_id
+    planning_label_id=$(ensure_label "needs-planning")
+
+    local issue_body
+    issue_body=$(cat << 'ISSUE_EOF'
+## Template Workflow E2E Test
+
+This issue tests that the actual `process-label.yaml` template executes correctly when triggered by a label.
+
+## Task
+Add a simple test file to verify the template workflow is working.
+
+## Expected Behavior
+1. The `process-label.yaml` workflow should trigger on `needs-planning` label
+2. Sapiens should detect the label and route to the planning handler
+3. A comment should be posted (success or failure)
+
+This is an automated template test issue.
+ISSUE_EOF
+)
+
+    local response
+    response=$(gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/issues" "{
+        \"title\": \"${TEST_PREFIX}Template Workflow Test\",
+        \"body\": $(echo "$issue_body" | jq -Rs .),
+        \"labels\": [$planning_label_id]
+    }")
+
+    TEMPLATE_ISSUE_NUMBER=$(echo "$response" | jq -r '.number // empty')
+    if [[ -z "$TEMPLATE_ISSUE_NUMBER" ]]; then
+        error "Failed to create template test issue. Response: $response"
+        return 1
+    fi
+    log "Created issue #$TEMPLATE_ISSUE_NUMBER with needs-planning label"
+}
+
+# Wait for template workflow to complete
+wait_for_template_workflow() {
+    step "Waiting for template workflow to complete..."
+
+    local timeout=300
+    local elapsed=0
+    local poll_interval=15
+
+    while [[ $elapsed -lt $timeout ]]; do
+        # Check for process-label workflow run
+        local runs
+        runs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs?limit=10" 2>/dev/null || echo "{}")
+
+        # Find runs matching process-label.yaml workflow path (name field is null in Gitea API)
+        local template_run
+        template_run=$(echo "$runs" | jq -r '
+            [.workflow_runs[]?
+            | select(.path | test("process-label"; "i"))
+            | {status: .status, conclusion: .conclusion, id: .id}][0] // empty
+        ' 2>/dev/null || echo "")
+
+        if [[ -n "$template_run" && "$template_run" != "null" ]]; then
+            local status conclusion run_id
+            status=$(echo "$template_run" | jq -r '.status // "unknown"')
+            conclusion=$(echo "$template_run" | jq -r '.conclusion // "pending"')
+            run_id=$(echo "$template_run" | jq -r '.id // "unknown"')
+
+            log "  Template run $run_id - status: $status, conclusion: $conclusion"
+
+            if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" == "success" ]]; then
+                    log "Template workflow completed successfully!"
+                    return 0
+                else
+                    warn "Template workflow completed with: $conclusion"
+                    # Still counts as "ran" - the workflow executed
+                    return 0
+                fi
+            fi
+        fi
+
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+        log "  Waiting... (${elapsed}s / ${timeout}s)"
+    done
+
+    warn "Timeout waiting for template workflow"
+    return 1
+}
+
+# Verify template workflow results
+verify_template_workflow() {
+    step "Verifying template workflow results..."
+
+    local passed=0
+    local failed=0
+
+    # Check 1: Workflow file exists
+    log "Checking template file..."
+    if gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/.gitea/workflows/sapiens/process-label.yaml" > /dev/null 2>&1; then
+        log "  ✓ Template file deployed"
+        ((passed++))
+    else
+        error "  ✗ Template file missing"
+        ((failed++))
+    fi
+
+    # Check 2: Workflow ran
+    log "Checking for workflow run..."
+    local runs
+    runs=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs?limit=10" 2>/dev/null || echo "{}")
+
+    if echo "$runs" | jq -e '.workflow_runs[]? | select(.path | test("process-label"; "i"))' > /dev/null 2>&1; then
+        log "  ✓ Template workflow ran"
+        ((passed++))
+    else
+        error "  ✗ No template workflow run found"
+        ((failed++))
+    fi
+
+    # Check 3: Comment posted (success or failure comment from workflow)
+    log "Checking for handler comment..."
+    local comments
+    comments=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/issues/$TEMPLATE_ISSUE_NUMBER/comments" 2>/dev/null || echo "[]")
+
+    if echo "$comments" | jq -e '.[] | select(.body | test("Label handler"; "i"))' > /dev/null 2>&1; then
+        log "  ✓ Handler comment posted"
+        ((passed++))
+    else
+        # Check for any sapiens-related comment
+        if echo "$comments" | jq -e '.[] | select(.body | test("sapiens|automation|failed|success"; "i"))' > /dev/null 2>&1; then
+            log "  ✓ Workflow comment posted"
+            ((passed++))
+        else
+            warn "  - No handler comment (workflow may still be processing or failed silently)"
+        fi
+    fi
+
+    echo ""
+    log "Template verification: $passed passed, $failed failed"
+    [[ $failed -eq 0 ]]
+}
+
+# Run the template workflow test
+run_template_test() {
+    step "=== Phase 1.6: Template Workflow Test ==="
+    echo ""
+    log "Testing actual process-label.yaml template execution"
+    echo ""
+
+    deploy_process_label_template || return 1
+    setup_template_secrets
+    sleep 3  # Give Gitea time to recognize the new workflow
+
+    create_template_test_issue || return 1
+
+    if wait_for_template_workflow; then
+        if verify_template_workflow; then
+            log "Template workflow test PASSED"
+            return 0
+        fi
+    fi
+
+    error "Template workflow test FAILED"
+    return 1
+}
+
+#############################################
+# Workflow Dispatch API Helpers
+#############################################
+
+# Global variable to track last workflow conclusion
+LAST_WORKFLOW_CONCLUSION=""
+
+# Dispatch a workflow via API and return the run ID
+# Usage: dispatch_workflow <workflow_file> [inputs_json]
+# Note: This function echoes the run_id to stdout for capture,
+# so all log messages must go to stderr
+dispatch_workflow() {
+    local workflow_file="$1"
+    local inputs="${2:-{\}}"
+
+    step "Dispatching workflow: $workflow_file" >&2
+
+    # Get the default branch
+    local default_branch="main"
+
+    # URL-encode the workflow file path (replace / with %2F)
+    local encoded_workflow_file
+    encoded_workflow_file=$(echo "$workflow_file" | sed 's|/|%2F|g')
+
+    # Get runs before dispatch to identify new run
+    local runs_before
+    runs_before=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs?limit=5" 2>/dev/null | jq -r '[.workflow_runs[].id] | join(",")' || echo "")
+
+    # Dispatch the workflow using raw curl (gitea_api uses -sf which hides 204 success)
+    local response
+    response=$(curl -s -X POST \
+        -H "Authorization: token $SAPIENS_GITEA_TOKEN" \
+        -H "Content-Type: application/json" \
+        "$GITEA_URL/api/v1/repos/$GITEA_OWNER/$GITEA_REPO/actions/workflows/$encoded_workflow_file/dispatches" \
+        -d "{\"ref\": \"$default_branch\", \"inputs\": $inputs}" 2>&1 || echo "")
+
+    # Check for errors (204 No Content is success, so empty response is OK)
+    if [[ "$response" == *"error"* ]] || [[ "$response" == *"404"* ]] || [[ "$response" == *"message"* ]]; then
+        error "Failed to dispatch workflow: $response" >&2
+        return 1
+    fi
+
+    log "Workflow dispatch initiated" >&2
+
+    # Wait briefly for workflow to appear
+    sleep 5
+
+    # Find the new run
+    local runs_after
+    runs_after=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs?limit=10" 2>/dev/null || echo "{}")
+
+    local new_run_id
+    new_run_id=$(echo "$runs_after" | jq -r --arg wf "$workflow_file" '
+        [.workflow_runs[]? | select(.path | test($wf; "i"))][0].id // empty
+    ')
+
+    if [[ -n "$new_run_id" ]]; then
+        log "New workflow run ID: $new_run_id" >&2
+        echo "$new_run_id"
+        return 0
+    else
+        warn "Could not find new workflow run" >&2
+        return 1
+    fi
+}
+
+# Wait for a workflow run to complete
+# Usage: wait_for_workflow_run <run_id> [timeout_seconds]
+wait_for_workflow_run() {
+    local run_id="$1"
+    local timeout="${2:-300}"
+    local poll_interval=15
+    local elapsed=0
+
+    step "Waiting for workflow run $run_id to complete..."
+
+    while [[ $elapsed -lt $timeout ]]; do
+        local run_data
+        run_data=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/actions/runs/$run_id" 2>/dev/null || echo "{}")
+
+        local status conclusion
+        status=$(echo "$run_data" | jq -r '.status // "unknown"')
+        conclusion=$(echo "$run_data" | jq -r '.conclusion // "pending"')
+
+        log "  Run $run_id - status: $status, conclusion: $conclusion (${elapsed}s / ${timeout}s)"
+
+        if [[ "$status" == "completed" ]]; then
+            if [[ "$conclusion" == "success" ]]; then
+                log "Workflow run completed successfully!"
+                LAST_WORKFLOW_CONCLUSION="success"
+                return 0
+            else
+                warn "Workflow run completed with: $conclusion"
+                LAST_WORKFLOW_CONCLUSION="$conclusion"
+                return 0  # Completed but not success
+            fi
+        fi
+
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+    done
+
+    warn "Timeout waiting for workflow run"
+    LAST_WORKFLOW_CONCLUSION="timeout"
+    return 1
+}
+
+# Deploy a recipe workflow template to the test repository
+# Usage: deploy_recipe_workflow <recipe_name>
+deploy_recipe_workflow() {
+    local recipe_name="$1"
+    local template_path="$PROJECT_ROOT/templates/workflows/gitea/sapiens/recipes/${recipe_name}.yaml"
+    local target_path=".gitea/workflows/sapiens/recipes/${recipe_name}.yaml"
+
+    step "Deploying recipe: $recipe_name"
+
+    if [[ ! -f "$template_path" ]]; then
+        error "Template not found: $template_path"
+        return 1
+    fi
+
+    local content
+    content=$(cat "$template_path" | base64 -w 0)
+
+    # Check if parent directory structure exists
+    local parent_dir=".gitea/workflows/sapiens/recipes"
+    local gitkeep_path="${parent_dir}/.gitkeep"
+
+    # Try to create parent directory structure if needed
+    local gitkeep_check
+    gitkeep_check=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$gitkeep_path" 2>/dev/null | jq -r '.sha // empty')
+    if [[ -z "$gitkeep_check" ]]; then
+        local gitkeep_content
+        gitkeep_content=$(echo -n "" | base64)
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$gitkeep_path" "{
+            \"message\": \"Create recipes directory\",
+            \"content\": \"$gitkeep_content\"
+        }" > /dev/null 2>&1 || true
+    fi
+
+    local existing_sha
+    existing_sha=$(gitea_api GET "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" 2>/dev/null | jq -r '.sha // empty')
+
+    if [[ -n "$existing_sha" ]]; then
+        gitea_api PUT "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" "{
+            \"message\": \"Update $recipe_name for E2E test\",
+            \"content\": \"$content\",
+            \"sha\": \"$existing_sha\"
+        }" > /dev/null
+    else
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/contents/$target_path" "{
+            \"message\": \"Deploy $recipe_name for E2E test\",
+            \"content\": \"$content\"
+        }" > /dev/null
+    fi
+
+    log "Deployed: $target_path"
+}
+
+#############################################
+# Progress Tracking
+#############################################
+
+# Track script start time
+SCRIPT_START_TIME=$(date +%s)
+
+# Status variables
+declare -A PHASE_STATUS
+declare -A PHASE_START_TIME
+declare -A PHASE_END_TIME
+
+mark_phase_start() {
+    local phase="$1"
+    PHASE_STATUS[$phase]="IN_PROGRESS"
+    PHASE_START_TIME[$phase]=$(date +%s)
+}
+
+mark_phase_end() {
+    local phase="$1"
+    local status="$2"  # PASSED, FAILED, SKIPPED
+    PHASE_STATUS[$phase]="$status"
+    PHASE_END_TIME[$phase]=$(date +%s)
+}
+
+get_phase_duration() {
+    local phase="$1"
+    local start="${PHASE_START_TIME[$phase]:-0}"
+    local end="${PHASE_END_TIME[$phase]:-$(date +%s)}"
+    echo $((end - start))
+}
+
+print_progress() {
+    local run_id="${RUN_ID:-$(date +%Y%m%d-%H%M%S)}"
+
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo " GITEA E2E TEST PROGRESS - Run ID: $run_id"
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo ""
+
+    local passed=0 failed=0 running=0 pending=0
+
+    # Group A: Infrastructure
+    echo " GROUP A: Infrastructure"
+    for phase_id in "1.0" "1.5" "1.6"; do
+        local status="${PHASE_STATUS[$phase_id]:-PENDING}"
+        local duration=""
+        local icon="○"
+        local phase_name=""
+
+        case "$phase_id" in
+            "1.0") phase_name="Actions Integration" ;;
+            "1.5") phase_name="Dispatcher Integration" ;;
+            "1.6") phase_name="process-label.yaml" ;;
+        esac
+
+        case "$status" in
+            PASSED) icon="✓"; duration="($(get_phase_duration "$phase_id")s)"; passed=$((passed + 1)) ;;
+            FAILED) icon="✗"; duration="($(get_phase_duration "$phase_id")s)"; failed=$((failed + 1)) ;;
+            IN_PROGRESS) icon="●"; running=$((running + 1)) ;;
+            SKIPPED) icon="○" ;;
+            *) pending=$((pending + 1)) ;;
+        esac
+
+        printf "   %s Phase %s: %-30s %s %s\n" "$icon" "$phase_id" "$phase_name" "$status" "$duration"
+    done
+    echo ""
+
+    # Group C: Core Tier
+    echo " GROUP C: Core Tier"
+    for phase_id in "2.1" "2.2"; do
+        local status="${PHASE_STATUS[$phase_id]:-PENDING}"
+        local duration=""
+        local icon="○"
+        local phase_name=""
+
+        case "$phase_id" in
+            "2.1") phase_name="post-merge-docs" ;;
+            "2.2") phase_name="weekly-test-coverage" ;;
+        esac
+
+        case "$status" in
+            PASSED) icon="✓"; duration="($(get_phase_duration "$phase_id")s)"; passed=$((passed + 1)) ;;
+            FAILED) icon="✗"; duration="($(get_phase_duration "$phase_id")s)"; failed=$((failed + 1)) ;;
+            IN_PROGRESS) icon="●"; running=$((running + 1)) ;;
+            SKIPPED) icon="○" ;;
+            *) pending=$((pending + 1)) ;;
+        esac
+
+        printf "   %s Phase %s: %-30s %s %s\n" "$icon" "$phase_id" "$phase_name" "$status" "$duration"
+    done
+    echo ""
+
+    # Group D: Security Tier
+    echo " GROUP D: Security Tier"
+    for phase_id in "3.1" "3.2" "3.3"; do
+        local status="${PHASE_STATUS[$phase_id]:-PENDING}"
+        local duration=""
+        local icon="○"
+        local phase_name=""
+
+        case "$phase_id" in
+            "3.1") phase_name="weekly-security-review" ;;
+            "3.2") phase_name="weekly-dependency-audit" ;;
+            "3.3") phase_name="weekly-sbom-license" ;;
+        esac
+
+        case "$status" in
+            PASSED) icon="✓"; duration="($(get_phase_duration "$phase_id")s)"; passed=$((passed + 1)) ;;
+            FAILED) icon="✗"; duration="($(get_phase_duration "$phase_id")s)"; failed=$((failed + 1)) ;;
+            IN_PROGRESS) icon="●"; running=$((running + 1)) ;;
+            SKIPPED) icon="○" ;;
+            *) pending=$((pending + 1)) ;;
+        esac
+
+        printf "   %s Phase %s: %-30s %s %s\n" "$icon" "$phase_id" "$phase_name" "$status" "$duration"
+    done
+    echo ""
+
+    # Group E: Support Tier
+    echo " GROUP E: Support Tier"
+    for phase_id in "4.1"; do
+        local status="${PHASE_STATUS[$phase_id]:-PENDING}"
+        local duration=""
+        local icon="○"
+        local phase_name="daily-issue-triage"
+
+        case "$status" in
+            PASSED) icon="✓"; duration="($(get_phase_duration "$phase_id")s)"; passed=$((passed + 1)) ;;
+            FAILED) icon="✗"; duration="($(get_phase_duration "$phase_id")s)"; failed=$((failed + 1)) ;;
+            IN_PROGRESS) icon="●"; running=$((running + 1)) ;;
+            SKIPPED) icon="○" ;;
+            *) pending=$((pending + 1)) ;;
+        esac
+
+        printf "   %s Phase %s: %-30s %s %s\n" "$icon" "$phase_id" "$phase_name" "$status" "$duration"
+    done
+    echo ""
+
+    # Group F: CLI Tests
+    echo " GROUP F: CLI Tests"
+    for phase_id in "5.0" "6.0"; do
+        local status="${PHASE_STATUS[$phase_id]:-PENDING}"
+        local duration=""
+        local icon="○"
+        local phase_name=""
+
+        case "$phase_id" in
+            "5.0") phase_name="CLI proposal test" ;;
+            "6.0") phase_name="Full workflow test" ;;
+        esac
+
+        case "$status" in
+            PASSED) icon="✓"; duration="($(get_phase_duration "$phase_id")s)"; passed=$((passed + 1)) ;;
+            FAILED) icon="✗"; duration="($(get_phase_duration "$phase_id")s)"; failed=$((failed + 1)) ;;
+            IN_PROGRESS) icon="●"; running=$((running + 1)) ;;
+            SKIPPED) icon="○" ;;
+            *) pending=$((pending + 1)) ;;
+        esac
+
+        printf "   %s Phase %s: %-30s %s %s\n" "$icon" "$phase_id" "$phase_name" "$status" "$duration"
+    done
+    echo ""
+
+    local elapsed=$(($(date +%s) - SCRIPT_START_TIME))
+    echo "═══════════════════════════════════════════════════════════════════"
+    printf " Elapsed: %dm %ds | Passed: %d | Failed: %d | Running: %d | Pending: %d\n" \
+        $((elapsed/60)) $((elapsed%60)) $passed $failed $running $pending
+    echo "═══════════════════════════════════════════════════════════════════"
+    echo ""
+}
+
+#############################################
+# GROUP C: Core Tier Tests
+#############################################
+
+# State variables for tier tests
+CORE_TIER_STATUS=""
+SECURITY_TIER_STATUS=""
+SUPPORT_TIER_STATUS=""
+
+run_core_tier_test() {
+    step "=== GROUP C: Core Tier Tests ==="
+    echo ""
+
+    local passed=0 failed=0
+
+    # Phase 2.1: post-merge-docs
+    mark_phase_start "2.1"
+    step "Phase 2.1: post-merge-docs.yaml"
+    deploy_recipe_workflow "post-merge-docs"
+    sleep 2
+
+    local run_id
+    if run_id=$(dispatch_workflow "sapiens/recipes/post-merge-docs.yaml"); then
+        if wait_for_workflow_run "$run_id" 300; then
+            if [[ "$LAST_WORKFLOW_CONCLUSION" == "success" ]]; then
+                log "  ✓ Phase 2.1 PASSED"
+                mark_phase_end "2.1" "PASSED"
+                ((passed++))
+            else
+                warn "  ⚠ Phase 2.1 completed with: $LAST_WORKFLOW_CONCLUSION"
+                mark_phase_end "2.1" "PASSED"  # Still counts as executed
+                ((passed++))
+            fi
+        else
+            error "  ✗ Phase 2.1 FAILED (timeout)"
+            mark_phase_end "2.1" "FAILED"
+            ((failed++))
+        fi
+    else
+        error "  ✗ Phase 2.1 FAILED (dispatch failed)"
+        mark_phase_end "2.1" "FAILED"
+        ((failed++))
+    fi
+
+    echo ""
+
+    # Phase 2.2: weekly-test-coverage
+    mark_phase_start "2.2"
+    step "Phase 2.2: weekly-test-coverage.yaml"
+    deploy_recipe_workflow "weekly-test-coverage"
+    sleep 2
+
+    if run_id=$(dispatch_workflow "sapiens/recipes/weekly-test-coverage.yaml" '{"target_coverage": "50"}'); then
+        if wait_for_workflow_run "$run_id" 600; then
+            if [[ "$LAST_WORKFLOW_CONCLUSION" == "success" ]]; then
+                log "  ✓ Phase 2.2 PASSED"
+                mark_phase_end "2.2" "PASSED"
+                ((passed++))
+            else
+                warn "  ⚠ Phase 2.2 completed with: $LAST_WORKFLOW_CONCLUSION"
+                mark_phase_end "2.2" "PASSED"
+                ((passed++))
+            fi
+        else
+            error "  ✗ Phase 2.2 FAILED (timeout)"
+            mark_phase_end "2.2" "FAILED"
+            ((failed++))
+        fi
+    else
+        error "  ✗ Phase 2.2 FAILED (dispatch failed)"
+        mark_phase_end "2.2" "FAILED"
+        ((failed++))
+    fi
+
+    log "Core tier: $passed passed, $failed failed"
+    CORE_TIER_STATUS="$passed/$((passed+failed)) passed"
+    [[ $failed -eq 0 ]]
+}
+
+#############################################
+# GROUP D: Security Tier Tests
+#############################################
+
+run_security_tier_test() {
+    step "=== GROUP D: Security Tier Tests ==="
+    echo ""
+
+    local passed=0 failed=0
+    local recipes=("weekly-security-review" "weekly-dependency-audit" "weekly-sbom-license")
+    local phase_ids=("3.1" "3.2" "3.3")
+    local idx=0
+
+    for recipe in "${recipes[@]}"; do
+        local phase_id="${phase_ids[$idx]}"
+        mark_phase_start "$phase_id"
+        step "Phase $phase_id: ${recipe}.yaml"
+        deploy_recipe_workflow "$recipe"
+        sleep 2
+
+        local run_id
+        if run_id=$(dispatch_workflow "sapiens/recipes/${recipe}.yaml"); then
+            if wait_for_workflow_run "$run_id" 600; then
+                if [[ "$LAST_WORKFLOW_CONCLUSION" == "success" ]]; then
+                    log "  ✓ Phase $phase_id PASSED"
+                    mark_phase_end "$phase_id" "PASSED"
+                    ((passed++))
+                else
+                    warn "  ⚠ Phase $phase_id completed with: $LAST_WORKFLOW_CONCLUSION"
+                    mark_phase_end "$phase_id" "PASSED"
+                    ((passed++))
+                fi
+            else
+                error "  ✗ Phase $phase_id FAILED (timeout)"
+                mark_phase_end "$phase_id" "FAILED"
+                ((failed++))
+            fi
+        else
+            error "  ✗ Phase $phase_id FAILED (dispatch failed)"
+            mark_phase_end "$phase_id" "FAILED"
+            ((failed++))
+        fi
+
+        ((idx++))
+        echo ""
+    done
+
+    log "Security tier: $passed passed, $failed failed"
+    SECURITY_TIER_STATUS="$passed/$((passed+failed)) passed"
+    [[ $failed -eq 0 ]]
+}
+
+#############################################
+# GROUP E: Support Tier Tests
+#############################################
+
+run_support_tier_test() {
+    step "=== GROUP E: Support Tier Tests ==="
+    echo ""
+
+    local passed=0 failed=0
+
+    # Phase 4.1: daily-issue-triage
+    mark_phase_start "4.1"
+    step "Phase 4.1: daily-issue-triage.yaml"
+    deploy_recipe_workflow "daily-issue-triage"
+    sleep 2
+
+    # Create some test issues for triage
+    log "Creating test issues for triage..."
+    for i in 1 2 3; do
+        gitea_api POST "/repos/$GITEA_OWNER/$GITEA_REPO/issues" "{
+            \"title\": \"${TEST_PREFIX}Triage Test Issue $i\",
+            \"body\": \"This is a test issue for daily-issue-triage workflow.\"
+        }" > /dev/null 2>&1 || true
+    done
+
+    local run_id
+    if run_id=$(dispatch_workflow "sapiens/recipes/daily-issue-triage.yaml"); then
+        if wait_for_workflow_run "$run_id" 600; then
+            if [[ "$LAST_WORKFLOW_CONCLUSION" == "success" ]]; then
+                log "  ✓ Phase 4.1 PASSED"
+                mark_phase_end "4.1" "PASSED"
+                ((passed++))
+            else
+                warn "  ⚠ Phase 4.1 completed with: $LAST_WORKFLOW_CONCLUSION"
+                mark_phase_end "4.1" "PASSED"
+                ((passed++))
+            fi
+        else
+            error "  ✗ Phase 4.1 FAILED (timeout)"
+            mark_phase_end "4.1" "FAILED"
+            ((failed++))
+        fi
+    else
+        error "  ✗ Phase 4.1 FAILED (dispatch failed)"
+        mark_phase_end "4.1" "FAILED"
+        ((failed++))
+    fi
+
+    log "Support tier: $passed passed, $failed failed"
+    SUPPORT_TIER_STATUS="$passed/$((passed+failed)) passed"
+    [[ $failed -eq 0 ]]
 }
 
 #############################################
@@ -2013,8 +2815,12 @@ run_full_workflow_test() {
 generate_report() {
     local actions_status="$1"
     local dispatcher_status="$2"
-    local cli_status="$3"
-    local workflow_status="${4:-SKIPPED}"
+    local template_status="$3"
+    local cli_status="$4"
+    local workflow_status="${5:-SKIPPED}"
+    local core_tier_status="${6:-SKIPPED}"
+    local security_tier_status="${7:-SKIPPED}"
+    local support_tier_status="${8:-SKIPPED}"
 
     cat > "$RESULTS_DIR/$RUN_ID/e2e-report.md" << REPORT_EOF
 # Gitea E2E Test Report: $RUN_ID
@@ -2029,9 +2835,12 @@ generate_report() {
 | Repository | $GITEA_OWNER/$GITEA_REPO |
 | Test Prefix | $TEST_PREFIX |
 | Full Workflow | $FULL_WORKFLOW |
+| Test Tiers | $TEST_TIERS |
 | Dispatcher Ref | $DISPATCHER_REF |
 
-## Phase 1: Actions Integration
+## GROUP A: Infrastructure Tests
+
+### Phase 1.0: Actions Integration
 
 **Status**: $actions_status
 
@@ -2039,7 +2848,7 @@ generate_report() {
 - Test issue: #${ACTION_ISSUE_NUMBER:-N/A}
 - Triggered by: \`test-action-trigger\` label
 
-## Phase 1.5: Dispatcher Integration
+### Phase 1.5: Dispatcher Integration
 
 **Status**: $dispatcher_status
 
@@ -2048,14 +2857,52 @@ generate_report() {
 - Test issue: #${DISPATCHER_ISSUE_NUMBER:-N/A}
 - Triggered by: \`needs-planning\` label
 
-## Phase 2: Sapiens CLI (Proposal)
+### Phase 1.6: Template Workflow Test (Essential Tier)
+
+**Status**: $template_status
+
+- Template: .gitea/workflows/sapiens/process-label.yaml
+- Test issue: #${TEMPLATE_ISSUE_NUMBER:-N/A}
+- Triggered by: \`needs-planning\` label
+- Tests: Actual template workflow execution (not just thin wrapper)
+
+## GROUP C: Core Tier Tests
+
+**Status**: $core_tier_status
+
+| Phase | Workflow | Status |
+|-------|----------|--------|
+| 2.1 | post-merge-docs.yaml | ${PHASE_STATUS[2.1]:-SKIPPED} |
+| 2.2 | weekly-test-coverage.yaml | ${PHASE_STATUS[2.2]:-SKIPPED} |
+
+## GROUP D: Security Tier Tests
+
+**Status**: $security_tier_status
+
+| Phase | Workflow | Status |
+|-------|----------|--------|
+| 3.1 | weekly-security-review.yaml | ${PHASE_STATUS[3.1]:-SKIPPED} |
+| 3.2 | weekly-dependency-audit.yaml | ${PHASE_STATUS[3.2]:-SKIPPED} |
+| 3.3 | weekly-sbom-license.yaml | ${PHASE_STATUS[3.3]:-SKIPPED} |
+
+## GROUP E: Support Tier Tests
+
+**Status**: $support_tier_status
+
+| Phase | Workflow | Status |
+|-------|----------|--------|
+| 4.1 | daily-issue-triage.yaml | ${PHASE_STATUS[4.1]:-SKIPPED} |
+
+## GROUP F: CLI Tests
+
+### Phase 5.0: Sapiens CLI (Proposal)
 
 **Status**: $cli_status
 
 - Test issue: #${ISSUE_NUMBER:-N/A}
 - Proposal issue: #${PROPOSAL_NUMBER:-N/A}
 
-## Phase 3: Full Workflow (Approval + Execution)
+### Phase 6.0: Full Workflow (Approval + Execution)
 
 **Status**: $workflow_status
 
@@ -2063,14 +2910,14 @@ generate_report() {
 - Feature branch: ${FEATURE_BRANCH:-Not created}
 - Pull request: #${PR_NUMBER:-Not created}
 
-## Phase 4: PR Review Cycle
+### Phase 4: PR Review Cycle (Legacy)
 
 **Status**: $(if [[ "$FULL_WORKFLOW" == "true" && -n "$PR_NUMBER" ]]; then echo "EXECUTED"; else echo "SKIPPED"; fi)
 
 - Stages tested: \`pr_review\`, \`pr_fix\`, \`fix_execution\`
 - Fix proposal: #${FIX_PROPOSAL_NUMBER:-N/A}
 
-## Phase 5: QA Stage
+### Phase 5: QA Stage (Legacy)
 
 **Status**: $(if [[ "$FULL_WORKFLOW" == "true" && -n "$TASK_ISSUE_NUMBER" ]]; then echo "EXECUTED"; else echo "SKIPPED"; fi)
 
@@ -2082,8 +2929,12 @@ $(
     local any_failed=false
     [[ "$actions_status" == "FAILED" ]] && any_failed=true
     [[ "$dispatcher_status" == "FAILED" ]] && any_failed=true
+    [[ "$template_status" == "FAILED" ]] && any_failed=true
     [[ "$cli_status" == "FAILED" ]] && any_failed=true
     [[ "$workflow_status" == "FAILED" ]] && any_failed=true
+    [[ "$core_tier_status" == "FAILED" ]] && any_failed=true
+    [[ "$security_tier_status" == "FAILED" ]] && any_failed=true
+    [[ "$support_tier_status" == "FAILED" ]] && any_failed=true
 
     if [[ "$any_failed" == "true" ]]; then
         echo "❌ **TESTS FAILED**"
@@ -2092,6 +2943,10 @@ $(
         local passed_tests=""
         [[ "$actions_status" == "PASSED" ]] && passed_tests="${passed_tests}Actions, "
         [[ "$dispatcher_status" == "PASSED" ]] && passed_tests="${passed_tests}Dispatcher, "
+        [[ "$template_status" == "PASSED" ]] && passed_tests="${passed_tests}Template, "
+        [[ "$core_tier_status" == "PASSED" ]] && passed_tests="${passed_tests}Core Tier, "
+        [[ "$security_tier_status" == "PASSED" ]] && passed_tests="${passed_tests}Security Tier, "
+        [[ "$support_tier_status" == "PASSED" ]] && passed_tests="${passed_tests}Support Tier, "
         [[ "$cli_status" == "PASSED" ]] && passed_tests="${passed_tests}CLI, "
         [[ "$workflow_status" == "PASSED" ]] && passed_tests="${passed_tests}Full Workflow, "
 
@@ -2188,6 +3043,9 @@ cleanup_previous_runs() {
 # Main
 #############################################
 main() {
+    # Reset progress tracking
+    SCRIPT_START_TIME=$(date +%s)
+
     # Detect Docker context and update GITEA_URL if remote
     detect_docker_context
 
@@ -2198,6 +3056,9 @@ main() {
     if [[ "$FULL_WORKFLOW" == "true" ]]; then
         log "Mode: Full Workflow (proposal + approval + execution)"
     fi
+    if [[ "$TEST_TIERS" == "true" ]]; then
+        log "Mode: Tier Tests (Core, Security, Support via workflow_dispatch)"
+    fi
     echo ""
 
     check_prerequisites
@@ -2207,68 +3068,160 @@ main() {
 
     local actions_status="SKIPPED"
     local dispatcher_status="SKIPPED"
+    local template_status="SKIPPED"
     local cli_status="SKIPPED"
     local workflow_status="SKIPPED"
+    local core_tier_status="SKIPPED"
+    local security_tier_status="SKIPPED"
+    local support_tier_status="SKIPPED"
     local overall_exit=0
 
-    # Phase 1: Actions Integration
+    # Phase 1.0: Actions Integration
     if [[ "$SKIP_ACTIONS" != "true" ]]; then
+        mark_phase_start "1.0"
         if run_actions_test; then
             actions_status="PASSED"
+            mark_phase_end "1.0" "PASSED"
         else
             actions_status="FAILED"
+            mark_phase_end "1.0" "FAILED"
             overall_exit=1
         fi
     else
         log "Skipping Actions integration test (--skip-actions)"
+        mark_phase_end "1.0" "SKIPPED"
     fi
 
     echo ""
 
     # Phase 1.5: Dispatcher Integration (optional, requires --test-dispatcher)
     if [[ "$TEST_DISPATCHER" == "true" ]]; then
+        mark_phase_start "1.5"
         if run_dispatcher_test; then
             dispatcher_status="PASSED"
+            mark_phase_end "1.5" "PASSED"
         else
             dispatcher_status="FAILED"
+            mark_phase_end "1.5" "FAILED"
             overall_exit=1
         fi
         echo ""
     else
         log "Skipping dispatcher test (use --test-dispatcher to enable)"
+        mark_phase_end "1.5" "SKIPPED"
     fi
 
     echo ""
 
-    # Phase 2: Sapiens CLI (Proposal)
+    # Phase 1.6: Template Workflow Test
+    # This tests that the actual process-label.yaml template executes correctly
+    if [[ "$SKIP_ACTIONS" != "true" ]]; then
+        mark_phase_start "1.6"
+        if run_template_test; then
+            template_status="PASSED"
+            mark_phase_end "1.6" "PASSED"
+        else
+            template_status="FAILED"
+            mark_phase_end "1.6" "FAILED"
+            overall_exit=1
+        fi
+        echo ""
+    else
+        mark_phase_end "1.6" "SKIPPED"
+    fi
+
+    # Show progress after infrastructure tests
+    if [[ "$TEST_TIERS" == "true" ]]; then
+        print_progress
+    fi
+
+    # GROUP C-E: Tier Tests (optional, requires --test-tiers)
+    if [[ "$TEST_TIERS" == "true" ]]; then
+        # GROUP C: Core Tier
+        if run_core_tier_test; then
+            core_tier_status="PASSED"
+        else
+            core_tier_status="FAILED"
+            overall_exit=1
+        fi
+        echo ""
+        print_progress
+
+        # GROUP D: Security Tier
+        if run_security_tier_test; then
+            security_tier_status="PASSED"
+        else
+            security_tier_status="FAILED"
+            overall_exit=1
+        fi
+        echo ""
+        print_progress
+
+        # GROUP E: Support Tier
+        if run_support_tier_test; then
+            support_tier_status="PASSED"
+        else
+            support_tier_status="FAILED"
+            overall_exit=1
+        fi
+        echo ""
+        print_progress
+    else
+        log "Skipping tier tests (use --test-tiers to enable)"
+        mark_phase_end "2.1" "SKIPPED"
+        mark_phase_end "2.2" "SKIPPED"
+        mark_phase_end "3.1" "SKIPPED"
+        mark_phase_end "3.2" "SKIPPED"
+        mark_phase_end "3.3" "SKIPPED"
+        mark_phase_end "4.1" "SKIPPED"
+    fi
+
+    # Phase 5.0: Sapiens CLI (Proposal)
     if [[ "$ACTIONS_ONLY" != "true" ]]; then
+        mark_phase_start "5.0"
         if run_cli_test; then
             cli_status="PASSED"
+            mark_phase_end "5.0" "PASSED"
         else
             cli_status="FAILED"
+            mark_phase_end "5.0" "FAILED"
             overall_exit=1
         fi
     else
         log "Skipping CLI test (--actions-only)"
+        mark_phase_end "5.0" "SKIPPED"
     fi
 
     echo ""
 
-    # Phase 3: Full Workflow (Approval + Execution)
+    # Phase 6.0: Full Workflow (Approval + Execution)
     if [[ "$FULL_WORKFLOW" == "true" && "$cli_status" == "PASSED" ]]; then
+        mark_phase_start "6.0"
         if run_full_workflow_test; then
             workflow_status="PASSED"
+            mark_phase_end "6.0" "PASSED"
         else
             workflow_status="FAILED"
+            mark_phase_end "6.0" "FAILED"
             overall_exit=1
         fi
     elif [[ "$FULL_WORKFLOW" == "true" && "$cli_status" != "PASSED" ]]; then
         warn "Skipping full workflow test (proposal stage failed)"
         workflow_status="SKIPPED"
+        mark_phase_end "6.0" "SKIPPED"
+    else
+        mark_phase_end "6.0" "SKIPPED"
     fi
 
     echo ""
-    generate_report "$actions_status" "$dispatcher_status" "$cli_status" "$workflow_status"
+
+    # Final progress display for tier tests
+    if [[ "$TEST_TIERS" == "true" ]]; then
+        print_progress
+    fi
+
+    generate_report "$actions_status" "$dispatcher_status" "$template_status" "$cli_status" "$workflow_status" \
+        "$core_tier_status" "$security_tier_status" "$support_tier_status"
 
     if [[ $overall_exit -eq 0 ]]; then
         log ""

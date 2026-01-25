@@ -39,7 +39,9 @@ class QAStage(WorkflowStage):
         # Get PR for this issue
         pr = await self._get_pr_for_issue(issue)
         if not pr:
-            log.debug("no_pr_found", issue=issue.number)
+            # No PR found - create test plan for the issue instead
+            log.info("no_pr_found_creating_test_plan", issue=issue.number)
+            await self._create_test_plan_for_issue(issue)
             return
 
         log.info("qa_starting", pr=pr.number, branch=pr.head)
@@ -52,7 +54,7 @@ class QAStage(WorkflowStage):
                 f"Branch: `{pr.head}`\n"
                 f"PR: #{pr.number}\n\n"
                 f"I'll build the project and run tests.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
 
             # Checkout branch in playground repo
@@ -88,7 +90,7 @@ class QAStage(WorkflowStage):
                     issue.number,
                     "📝 **No Tests Found - Creating Unit Tests**\n\n"
                     "I'll analyze the code and create unit tests.\n\n"
-                    "🤖 Posted by Builder Automation",
+                    "◆ Posted by Sapiens Automation",
                 )
 
                 # Use agent to create tests
@@ -159,7 +161,7 @@ class QAStage(WorkflowStage):
             if test_result.get("output"):
                 result_lines.append(f"```\n{test_result['output'][-1000:]}\n```")
 
-            result_lines.extend(["", "---", "", "🤖 Posted by Builder Automation"])
+            result_lines.extend(["", "---", "", "◆ Posted by Sapiens Automation"])
 
             await self.git.add_comment(issue.number, "\n".join(result_lines))
 
@@ -177,7 +179,7 @@ class QAStage(WorkflowStage):
                 f"❌ **QA Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Builder Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             raise
 
@@ -363,3 +365,109 @@ Focus on creating working, comprehensive tests that validate the code works corr
             "output": "No test system detected (no tests found)",
             "command": "none",
         }
+
+    async def _create_test_plan_for_issue(self, issue: Issue) -> None:
+        """Create a test plan for an issue when no PR is associated.
+
+        This fallback provides a comprehensive test plan for the feature/fix.
+        """
+        log.info("creating_test_plan_for_issue", issue=issue.number)
+
+        try:
+            # Notify start
+            await self.git.add_comment(
+                issue.number,
+                f"📋 **Creating Test Plan**\n\n"
+                f"Issue #{issue.number}: {issue.title}\n\n"
+                f"Since there's no associated PR, I'll create a comprehensive "
+                f"test plan for this feature/fix.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+
+            # Build context for agent
+            context = {
+                "issue_number": issue.number,
+                "issue_title": issue.title,
+                "issue_body": issue.body,
+            }
+
+            # Execute test plan generation with agent
+            prompt = f"""You are creating a comprehensive test plan for an issue.
+
+**Issue Title**: {issue.title}
+
+**Issue Description**:
+{issue.body or "(No description provided)"}
+
+**Instructions**:
+Create a detailed test plan that covers:
+
+1. **Test Objectives**: What are we testing and why?
+
+2. **Test Scope**:
+   - In scope: What will be tested
+   - Out of scope: What won't be tested
+
+3. **Test Types Required**:
+   - Unit tests
+   - Integration tests
+   - End-to-end tests (if applicable)
+   - Performance tests (if applicable)
+
+4. **Test Cases**: For each type, provide specific test cases:
+   - Test case ID (TC-001, TC-002, etc.)
+   - Description
+   - Preconditions
+   - Test steps
+   - Expected result
+   - Priority (High/Medium/Low)
+
+5. **Edge Cases and Negative Tests**:
+   - Error handling scenarios
+   - Boundary conditions
+   - Invalid inputs
+
+6. **Test Data Requirements**:
+   - What test data is needed
+   - How to set it up
+
+7. **Acceptance Criteria**:
+   - What constitutes a passing test suite
+
+Format the test plan in clear markdown with sections and tables where appropriate.
+"""
+
+            result = await self.agent.execute_prompt(prompt, context, f"test-plan-{issue.number}")
+
+            if not result.get("success"):
+                raise Exception(f"Test plan generation failed: {result.get('error')}")
+
+            output = result.get("output", "No test plan generated.")
+
+            # Post test plan
+            await self.git.add_comment(
+                issue.number,
+                f"✅ **Test Plan Generated**\n\n"
+                f"{output}\n\n"
+                f"---\n"
+                f"Use this test plan when implementing and reviewing the feature.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+
+            # Update labels: remove requires-qa, add qa-ready
+            updated_labels = [label for label in issue.labels if label not in ["requires-qa", "sapiens/requires-qa"]]
+            updated_labels.append("qa-ready")
+            await self.git.update_issue(issue.number, labels=updated_labels)
+
+            log.info("test_plan_complete", issue=issue.number)
+
+        except Exception as e:
+            log.error("test_plan_failed", issue=issue.number, error=str(e), exc_info=True)
+            await self.git.add_comment(
+                issue.number,
+                f"❌ **Test Plan Generation Failed**\n\n"
+                f"Error: {str(e)}\n\n"
+                f"Please try again.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+            raise

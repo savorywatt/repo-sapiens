@@ -225,6 +225,43 @@ class ClaudeLocalProvider(AgentProvider):
         log.info("conflict_resolved", file=conflict_info.get("file"))
         return resolved_content
 
+    async def execute_prompt(
+        self,
+        prompt: str,
+        context: dict[str, Any] | None = None,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Execute a prompt and return the result.
+
+        Args:
+            prompt: The prompt text to execute.
+            context: Optional context dict with additional information.
+            task_id: Optional task identifier for logging.
+
+        Returns:
+            Dict with 'success', 'output' or 'error', and 'files_changed'.
+        """
+        log.info("executing_prompt", task_id=task_id)
+
+        try:
+            branch = (context or {}).get("branch", "main")
+            output = await self._run_claude(prompt, branch)
+
+            return {
+                "success": True,
+                "output": output,
+                "files_changed": self._extract_files_changed(output),
+                "error": None,
+            }
+        except Exception as e:
+            log.error("prompt_execution_failed", task_id=task_id, error=str(e))
+            return {
+                "success": False,
+                "output": "",
+                "files_changed": [],
+                "error": str(e),
+            }
+
     async def _run_claude(self, prompt: str, branch: str) -> str:
         """Execute Claude CLI with prompt.
 

@@ -1,0 +1,88 @@
+name: QA Build & Test
+
+# Triggers when 'requires-qa' label is added
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  qa-build-test:
+    name: Run QA Build and Tests
+    if: github.event.label.name == 'requires-qa'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Download pre-built wheel (if available)
+        uses: actions/download-artifact@v3
+        with:
+          name: sapiens-wheel
+          path: dist/
+        continue-on-error: true
+
+      - name: Install sapiens
+        run: |
+          pip install --upgrade pip
+          if [ -f dist/*.whl ]; then
+            echo "✅ Using pre-built wheel"
+            pip install dist/*.whl
+          else
+            echo "⚠️ Building from source"
+            pip install -e .
+          fi
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Sapiens Bot"
+          git config --global user.email "bot@sapiens.local"
+
+      - name: Run QA
+        env:
+          AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
+          AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+          AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
+          AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
+          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+        run: |
+          echo "🔨 Running QA for issue/PR #${{ github.event.issue.number }}"
+          sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .github/workflows/sapiens/prompts/requires-qa.md
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: qa-results-${{ github.event.issue.number }}
+          path: |
+            .automation/qa-results/
+            test-results/
+            coverage/
+          retention-days: 30
+
+      - name: Post failure comment
+        if: failure()
+        env:
+          GITEA_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"body": "❌ **QA Failed**\n\nBuild or tests failed. Check the workflow logs for details.\n\n◆ Posted by Sapiens Automation"}' \
+            "${{ github.server_url }}/api/v1/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments"

@@ -7,10 +7,12 @@ from pathlib import Path
 import click
 import structlog
 
+from repo_sapiens.__version__ import __version__
 from repo_sapiens.cli.credentials import credentials_group
 from repo_sapiens.cli.health import health_check
 from repo_sapiens.cli.init import init_command
 from repo_sapiens.cli.mcp import mcp_group
+from repo_sapiens.cli.process_comment import process_comment_command
 from repo_sapiens.cli.process_label import process_label_command
 from repo_sapiens.cli.update import update_command
 from repo_sapiens.config.settings import AutomationSettings
@@ -23,7 +25,6 @@ from repo_sapiens.providers.external_agent import ExternalAgentProvider
 from repo_sapiens.providers.factory import create_git_provider
 from repo_sapiens.utils.interactive import InteractiveQAHandler
 from repo_sapiens.utils.logging_config import configure_logging
-from repo_sapiens.__version__ import __version__
 
 log = structlog.get_logger(__name__)
 
@@ -236,7 +237,7 @@ def task_command(
     # Get settings from config (may be None if config doesn't exist)
     settings = ctx.obj.get("settings") if ctx.obj else None
 
-    # Resolve model and URL from config or defaults
+    # Resolve model, URL, and backend type from config or defaults
     if model is None:
         if settings and settings.agent_provider:
             model = settings.agent_provider.model or "qwen3:8b"
@@ -248,6 +249,19 @@ def task_command(
             ollama_url = settings.agent_provider.base_url
         else:
             ollama_url = "http://localhost:11434"
+
+    # Determine backend type and API key from settings
+    backend_type: str = "ollama"  # Default to ollama
+    api_key: str | None = None
+
+    if settings and settings.agent_provider:
+        provider_type = str(settings.agent_provider.provider_type)
+        # OpenAI-compatible providers use the openai backend
+        if provider_type in ("openai-compatible", "openai"):
+            backend_type = "openai"
+            # Extract API key from SecretStr if available
+            if settings.agent_provider.api_key:
+                api_key = settings.agent_provider.api_key.get_secret_value()
 
     # Load custom system prompt if provided
     custom_system_prompt = None
@@ -390,11 +404,17 @@ def task_command(
                 break
 
     async def run() -> None:
-        config = ReActConfig(model=model, max_iterations=max_iterations, ollama_url=ollama_url)
+        config = ReActConfig(
+            model=model,
+            max_iterations=max_iterations,
+            backend_type=backend_type,  # type: ignore[arg-type]
+            base_url=ollama_url,
+            api_key=api_key,
+        )
         agent = ReActAgentProvider(working_dir=working_dir, config=config, system_prompt=custom_system_prompt)
 
         click.echo(f"Starting ReAct agent with model: {model}")
-        click.echo(f"Ollama server: {ollama_url}")
+        click.echo(f"Backend: {backend_type} ({ollama_url})")
         click.echo(f"Working directory: {Path(working_dir).resolve()}")
 
         async with agent:
@@ -627,9 +647,19 @@ async def _run_react_agent(
     model = settings.agent_provider.model or "qwen3:8b"
     base_url = settings.agent_provider.base_url or "http://localhost:11434"
 
+    # Determine backend type and API key
+    provider_type = str(settings.agent_provider.provider_type)
+    backend_type: str = "ollama"  # Default
+    api_key: str | None = None
+
+    if provider_type in ("openai-compatible", "openai"):
+        backend_type = "openai"
+        if settings.agent_provider.api_key:
+            api_key = settings.agent_provider.api_key.get_secret_value()
+
     click.echo("Running task with ReAct agent...")
     click.echo(f"Model: {model}")
-    click.echo(f"Backend: {base_url}")
+    click.echo(f"Backend: {backend_type} ({base_url})")
     click.echo(f"Working directory: {Path(working_dir).resolve()}")
     click.echo("-" * 40)
 
@@ -639,7 +669,9 @@ async def _run_react_agent(
     config = ReActConfig(
         model=model,
         max_iterations=max_iterations,
-        ollama_url=base_url,
+        backend_type=backend_type,  # type: ignore[arg-type]
+        base_url=base_url,
+        api_key=api_key,
     )
     agent = ReActAgentProvider(working_dir=working_dir, config=config, system_prompt=system_prompt)
 
@@ -700,6 +732,9 @@ cli.add_command(update_command)
 
 # Add process-label command
 cli.add_command(process_label_command)
+
+# Add process-comment command
+cli.add_command(process_comment_command)
 
 
 async def _create_orchestrator(settings: AutomationSettings) -> WorkflowOrchestrator:

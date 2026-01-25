@@ -180,8 +180,13 @@ class EventClassifier:
         source: EventSource,
     ) -> str | None:
         """Extract the label that triggered the event."""
+        # First check simple CLI format (works for all sources)
+        label_data = event_data.get("label", {})
+        if label_data.get("name"):
+            return label_data.get("name")
+
         if source == EventSource.GITLAB:
-            # GitLab structure differs
+            # GitLab webhook structure differs
             changes = event_data.get("changes", {})
             labels = changes.get("labels", {})
             current = labels.get("current", [])
@@ -192,9 +197,8 @@ class EventClassifier:
                     return label.get("title") if isinstance(label, dict) else label
             return None
 
-        # Gitea and GitHub use similar structure
-        label_data = event_data.get("label", {})
-        return label_data.get("name")
+        # Gitea and GitHub use label.name (already checked above)
+        return None
 
     def _extract_issue_number(
         self,

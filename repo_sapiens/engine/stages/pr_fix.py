@@ -52,16 +52,11 @@ class PRFixStage(WorkflowStage):
             comments = await self.git.get_comments(issue.number)
 
             if not comments:
-                log.warning("no_comments_found", issue=issue.number)
-                await self.git.add_comment(
-                    issue.number,
-                    "⚠️ **No Review Comments Found**\n\n"
-                    "I couldn't find any review comments to address.\n"
-                    "Add comments to this PR and re-add the `needs-fix` label.\n\n"
-                    "🤖 Posted by Sapiens Automation",
-                )
-                # Remove both labels
-                updated_labels = [label for label in updated_labels if label not in ["needs-fix", "fixes-in-progress"]]
+                # No review comments - analyze issue and propose a fix
+                log.info("no_comments_proposing_fix", issue=issue.number)
+                await self._propose_fix_for_issue(issue)
+                # Remove in-progress label
+                updated_labels = [label for label in updated_labels if label != "fixes-in-progress"]
                 await self.git.update_issue(issue.number, labels=updated_labels)
                 return
 
@@ -99,7 +94,7 @@ class PRFixStage(WorkflowStage):
                 f"❌ **Fix Processing Failed**\n\n"
                 f"Error: {str(e)}\n\n"
                 f"Please review the error and try again.\n\n"
-                f"🤖 Posted by Sapiens Automation",
+                f"◆ Posted by Sapiens Automation",
             )
             # Remove in-progress label on failure
             updated_labels = [label for label in issue.labels if label != "fixes-in-progress"]
@@ -139,7 +134,7 @@ class PRFixStage(WorkflowStage):
                 "I'll reply to each comment with my planned action.",
                 "",
                 "---",
-                "🤖 Posted by Sapiens Automation",
+                "◆ Posted by Sapiens Automation",
             ]
         )
 
@@ -193,7 +188,7 @@ class PRFixStage(WorkflowStage):
         else:
             reply = f"🤔 **Analyzed**: {comment.reasoning}"
 
-        reply += "\n\n---\n🤖 Posted by Sapiens Automation"
+        reply += "\n\n---\n◆ Posted by Sapiens Automation"
 
         # Post reply
         try:
@@ -362,3 +357,86 @@ Implement the fix now.
         await self.git.update_issue(pr_number, labels=updated_labels)
 
         log.info("labels_updated", pr_number=pr_number, labels=updated_labels)
+
+    async def _propose_fix_for_issue(self, issue: Issue) -> None:
+        """Propose a fix for an issue when no review comments exist.
+
+        This fallback analyzes the issue content and proposes a solution.
+        """
+        log.info("proposing_fix_for_issue", issue=issue.number)
+
+        try:
+            # Notify start
+            await self.git.add_comment(
+                issue.number,
+                f"🔧 **Analyzing Issue for Fix**\n\n"
+                f"Issue #{issue.number}: {issue.title}\n\n"
+                f"I'll analyze the problem and propose a solution.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+
+            # Build context for agent
+            context = {
+                "issue_number": issue.number,
+                "issue_title": issue.title,
+                "issue_body": issue.body,
+            }
+
+            # Execute fix proposal with agent
+            prompt = f"""You are analyzing an issue and proposing a fix.
+
+**Issue Title**: {issue.title}
+
+**Issue Description**:
+{issue.body or "(No description provided)"}
+
+**Instructions**:
+Analyze this issue and provide:
+1. **Problem Summary**: A clear summary of what needs to be fixed
+2. **Root Cause Analysis**: What might be causing this issue
+3. **Proposed Fix**: A detailed proposal for how to fix it
+4. **Implementation Steps**: Step-by-step instructions
+5. **Testing Suggestions**: How to verify the fix works
+
+Be specific and actionable. If code changes are needed, describe them clearly.
+If this is a feature request rather than a bug, propose an implementation approach.
+
+Format your response with clear sections and bullet points.
+"""
+
+            result = await self.agent.execute_prompt(prompt, context, f"fix-proposal-{issue.number}")
+
+            if not result.get("success"):
+                raise Exception(f"Fix proposal failed: {result.get('error')}")
+
+            output = result.get("output", "No fix proposal generated.")
+
+            # Post fix proposal
+            await self.git.add_comment(
+                issue.number,
+                f"📋 **Fix Proposal**\n\n"
+                f"{output}\n\n"
+                f"---\n"
+                f"To approve this fix, add the `approved` label.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+
+            # Update labels: remove needs-fix, add fix-proposed
+            updated_labels = [
+                label for label in issue.labels if label not in ["needs-fix", "sapiens/needs-fix", "fixes-in-progress"]
+            ]
+            updated_labels.append("fix-proposed")
+            await self.git.update_issue(issue.number, labels=updated_labels)
+
+            log.info("fix_proposal_complete", issue=issue.number)
+
+        except Exception as e:
+            log.error("fix_proposal_failed", issue=issue.number, error=str(e), exc_info=True)
+            await self.git.add_comment(
+                issue.number,
+                f"❌ **Fix Proposal Failed**\n\n"
+                f"Error: {str(e)}\n\n"
+                f"Please try again.\n\n"
+                f"◆ Posted by Sapiens Automation",
+            )
+            raise

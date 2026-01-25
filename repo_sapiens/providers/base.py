@@ -265,8 +265,8 @@ class GitProvider(ABC):
         pass
 
     @abstractmethod
-    async def get_diff(self, base: str, head: str) -> str:
-        """Get diff between two branches.
+    async def get_diff(self, base: str, head: str, pr_number: int | None = None) -> str:
+        """Get diff between two branches or a pull request.
 
         Returns the unified diff showing changes from base to head.
         The diff format follows Git's unified diff format with
@@ -275,6 +275,10 @@ class GitProvider(ABC):
         Args:
             base: Base branch name (the "before" state).
             head: Head branch name (the "after" state).
+            pr_number: Optional PR/MR number to get diff from. When provided,
+                uses the PR/MR API endpoint which is more reliable for large diffs.
+                Supported by Gitea (pr_number) and GitLab (mr_number).
+                GitHub ignores this parameter.
 
         Returns:
             Unified diff as string. May be empty if branches are identical.

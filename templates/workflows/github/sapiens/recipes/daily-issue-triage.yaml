@@ -1,0 +1,41 @@
+# @repo-sapiens-template
+# @version: 2.0.0
+# @name: daily-issue-triage
+# @type: thin-wrapper
+#
+# Daily Issue Triage - Thin Wrapper
+#
+# Calls the reusable workflow from savorywatt/repo-sapiens.
+# Automatically reviews and labels new issues.
+#
+# Setup:
+# 1. Copy to .github/workflows/daily-issue-triage.yaml
+# 2. Set required secrets:
+#    - SAPIENS_GITHUB_TOKEN: GitHub token with repo access
+#    - ANTHROPIC_API_KEY: Claude API key
+# 3. Create labels: bug, enhancement, question, needs-triage, priority-high
+# 4. Adjust schedule as needed
+
+name: Daily Issue Triage
+
+on:
+  schedule:
+    # Every day at 8am UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+# Required for cross-repo reusable workflow
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  issue-triage:
+    uses: savorywatt/repo-sapiens/.github/workflows/sapiens-issue-triage.yaml@v2
+    with:
+      auto_label: true
+    secrets:
+      GIT_TOKEN: ${{ secrets.SAPIENS_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+      AI_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

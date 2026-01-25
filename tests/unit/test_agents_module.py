@@ -219,7 +219,7 @@ class TestReActAgentStateManagement:
         """Create a test configuration."""
         return ReActConfig(
             model="test-model",
-            ollama_url="http://localhost:11434",
+            base_url="http://localhost:11434",
             max_iterations=5,
         )
 
@@ -282,7 +282,8 @@ class TestReActAgentStateManagement:
         import os
 
         agent = ReActAgentProvider()
-        assert agent.working_dir == Path(os.getcwd()).resolve()
+        # working_dir may be string or Path, normalize for comparison
+        assert str(agent.working_dir) == str(Path(os.getcwd()).resolve())
 
     def test_tools_reset_clears_state(self, agent: ReActAgentProvider) -> None:
         """Test that tools.reset() clears files_written list."""
@@ -341,7 +342,8 @@ class TestReActConfigValidation:
         """Test ReActConfig with all default values."""
         config = ReActConfig()
         assert config.model == "qwen3:latest"
-        assert config.ollama_url == "http://localhost:11434"
+        assert config.base_url is None  # base_url defaults to None
+        assert config.ollama_url == "http://localhost:11434"  # Legacy property returns default
         assert config.max_iterations == 10
         assert config.temperature == 0.7
         assert config.timeout == 300
@@ -350,13 +352,13 @@ class TestReActConfigValidation:
         """Test ReActConfig with custom values."""
         config = ReActConfig(
             model="custom-model",
-            ollama_url="http://remote:11434",
+            base_url="http://remote:11434",
             max_iterations=20,
             temperature=0.5,
             timeout=600,
         )
         assert config.model == "custom-model"
-        assert config.ollama_url == "http://remote:11434"
+        assert config.base_url == "http://remote:11434"
         assert config.max_iterations == 20
         assert config.temperature == 0.5
         assert config.timeout == 600

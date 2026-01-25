@@ -197,7 +197,7 @@ class TestOllamaBackend:
         assert captured_args["json"]["messages"] == [{"role": "user", "content": "Hello"}]
         assert captured_args["json"]["stream"] is False
         assert captured_args["json"]["options"]["temperature"] == 0.5
-        assert response == "response text"
+        assert response.content == "response text"
 
     @pytest.mark.asyncio
     async def test_chat_parses_ollama_response(self, ollama_backend: OllamaBackend) -> None:
@@ -212,7 +212,7 @@ class TestOllamaBackend:
                 model="qwen3:latest",
             )
 
-        assert response == "This is the response from Ollama"
+        assert response.content == "This is the response from Ollama"
 
     @pytest.mark.asyncio
     async def test_chat_handles_empty_message(self, ollama_backend: OllamaBackend) -> None:
@@ -227,7 +227,7 @@ class TestOllamaBackend:
                 model="qwen3:latest",
             )
 
-        assert response == ""
+        assert response.content == ""
 
     @pytest.mark.asyncio
     async def test_chat_raises_on_http_error(self, ollama_backend: OllamaBackend) -> None:
@@ -482,7 +482,7 @@ class TestOpenAIBackend:
         assert captured_args["json"]["model"] == "gpt-4"
         assert captured_args["json"]["messages"] == [{"role": "user", "content": "Hello"}]
         assert captured_args["json"]["temperature"] == 0.3
-        assert response == "response"
+        assert response.content == "response"
 
     @pytest.mark.asyncio
     async def test_chat_includes_auth_header_when_api_key_provided(
@@ -535,7 +535,7 @@ class TestOpenAIBackend:
                 model="gpt-4",
             )
 
-        assert response == "This is the OpenAI response"
+        assert response.content == "This is the OpenAI response"
 
     @pytest.mark.asyncio
     async def test_chat_handles_api_error_response(self, openai_backend: OpenAIBackend) -> None:

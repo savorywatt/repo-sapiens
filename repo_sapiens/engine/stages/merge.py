@@ -308,6 +308,6 @@ This pull request implements the complete development plan #{plan_id}.
         body += "- [ ] Manual testing completed\n"
 
         body += "\n---\n"
-        body += "🤖 Generated with automation system\n"
+        body += "◆ Generated with automation system\n"
 
         return body
