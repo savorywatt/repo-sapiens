@@ -45,7 +45,7 @@ jobs:
 
       - name: Install tools
         run: |
-          pip install repo-sapiens==0.5.0 pip-audit safety
+          pip install repo-sapiens==0.5.1 pip-audit safety
 
       - name: Check for outdated packages
         id: outdated
