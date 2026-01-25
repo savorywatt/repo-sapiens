@@ -73,22 +73,6 @@ class DependencyAuditStage(WorkflowStage):
             )
             raise
 
-    def _sanitize_error(self, error: str) -> str:
-        """Remove potentially sensitive information from error messages.
-
-        Strips paths, tokens, and other sensitive data that could be
-        exposed in public issue comments.
-        """
-        import re
-
-        # Remove file paths
-        error = re.sub(r"/[^\s:]+", "[path]", error)
-        # Remove anything that looks like a token or key
-        error = re.sub(r"(token|key|secret|password|api_key)[:=]\s*\S+", r"\1=[redacted]", error, flags=re.I)
-        # Remove URLs with credentials
-        error = re.sub(r"https?://[^@\s]+@", "https://[redacted]@", error)
-        return error
-
     async def _run_audits(self, project_dir: Path) -> dict[str, Any]:
         """Run dependency audit commands for detected package managers."""
         log.info("running_dependency_audits", dir=str(project_dir))
