@@ -862,6 +862,7 @@ agent_provider:
   model: "${ai_model}"
   api_key: \${SAPIENS_AI_API_KEY}
   local_mode: false
+  strip_thinking_tags: true
 
 automation:
   label_triggers:
@@ -1387,6 +1388,7 @@ agent_provider:
   provider_type: ollama
   base_url: "http://localhost:11434"
   model: qwen3:8b
+  strip_thinking_tags: true
 
 workflow:
   plans_directory: plans

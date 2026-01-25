@@ -166,6 +166,10 @@ class AgentProviderConfig(BaseModel):
         default=None,
         description="Copilot-specific configuration (required for provider_type='copilot-local')",
     )
+    strip_thinking_tags: bool = Field(
+        default=False,
+        description="Strip <think>...</think> tags from responses (for reasoning models like DeepSeek R1)",
+    )
 
     @model_validator(mode="after")
     def validate_provider_config(self) -> AgentProviderConfig:
