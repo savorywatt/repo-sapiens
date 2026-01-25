@@ -317,14 +317,26 @@ class TestAgentProviderConfig:
 
     def test_valid_provider_types(self):
         """Test all valid provider types can be created."""
-        valid_types = ["claude-local", "goose-local", "copilot-local", "ollama", "openai-compatible"]
+        # Note: copilot-local requires copilot_config, so we test it separately
+        basic_types = ["claude-local", "goose-local", "ollama", "openai-compatible"]
 
-        for provider_type in valid_types:
+        for provider_type in basic_types:
             config = AgentProviderConfig(
                 provider_type=provider_type,
-                api_key="test-key" if provider_type not in ("claude-local", "goose-local", "copilot-local") else None,
+                api_key="test-key" if provider_type not in ("claude-local", "goose-local") else None,
             )
             assert config.provider_type == provider_type
+
+        # Test copilot-local with required copilot_config
+        copilot_config = AgentProviderConfig(
+            provider_type="copilot-local",
+            copilot_config={
+                "github_token": "gho_test_token",
+                "manage_proxy": True,
+                "proxy_port": 4141,
+            },
+        )
+        assert copilot_config.provider_type == "copilot-local"
 
     def test_credential_reference_in_api_key(self):
         """Test credential references in api_key field."""

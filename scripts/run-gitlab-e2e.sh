@@ -866,36 +866,52 @@ agent_provider:
 automation:
   label_triggers:
     "sapiens/triage":
+      label_pattern: "sapiens/triage"
       handler: triage
     "sapiens/needs-work":
+      label_pattern: "sapiens/needs-work"
       handler: proposal
     "sapiens/approved":
+      label_pattern: "sapiens/approved"
       handler: execution
     "sapiens/needs-review":
+      label_pattern: "sapiens/needs-review"
       handler: code_review
     "sapiens/needs-fix":
+      label_pattern: "sapiens/needs-fix"
       handler: fix_request
     "sapiens/requires-qa":
+      label_pattern: "sapiens/requires-qa"
       handler: qa_request
     "sapiens/security-review":
+      label_pattern: "sapiens/security-review"
       handler: security_review
     "sapiens/dependency-audit":
+      label_pattern: "sapiens/dependency-audit"
       handler: dependency_audit
     "sapiens/docs-generation":
+      label_pattern: "sapiens/docs-generation"
       handler: docs_generation
     "sapiens/test-coverage":
+      label_pattern: "sapiens/test-coverage"
       handler: test_coverage
     "sapiens/plan-review":
+      label_pattern: "sapiens/plan-review"
       handler: plan_review
     "triage":
+      label_pattern: "triage"
       handler: triage
     "needs-work":
+      label_pattern: "needs-work"
       handler: proposal
     "needs-review":
+      label_pattern: "needs-review"
       handler: code_review
     "needs-fix":
+      label_pattern: "needs-fix"
       handler: fix_request
     "requires-qa":
+      label_pattern: "requires-qa"
       handler: qa_request
 CONFIG_EOF
     )

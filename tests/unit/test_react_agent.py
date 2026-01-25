@@ -459,7 +459,7 @@ class TestReActAgentProvider:
 
     def test_init(self, agent, temp_dir):
         """Test agent initialization."""
-        assert agent.working_dir == temp_dir.resolve()
+        assert agent.working_dir == str(temp_dir.resolve())
         assert agent.config.model == "test-model"
         assert agent.config.max_iterations == 3
 
@@ -590,12 +590,12 @@ ACTION_INPUT: {"path": "."}
 
     @pytest.mark.asyncio
     async def test_connect_success(self, agent):
-        """Test successful connection to Ollama."""
+        """Test successful connection to backend."""
         mock_response = MagicMock()
         mock_response.json.return_value = {"models": [{"name": "test-model:latest"}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(agent.client, "get", AsyncMock(return_value=mock_response)):
+        with patch.object(agent.backend.client, "get", AsyncMock(return_value=mock_response)):
             await agent.connect()  # Should not raise
 
     @pytest.mark.asyncio
@@ -603,12 +603,14 @@ ACTION_INPUT: {"path": "."}
         """Test connection failure when Ollama is not running."""
         import httpx
 
+        from repo_sapiens.exceptions import ProviderConnectionError
+
         with patch.object(
-            agent.client,
+            agent.backend.client,
             "get",
             AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
         ):
-            with pytest.raises(RuntimeError, match="Ollama not running"):
+            with pytest.raises(ProviderConnectionError, match="Ollama not running"):
                 await agent.connect()
 
     def test_trajectory_tracking(self, agent):
@@ -690,7 +692,7 @@ class TestGenerateStep:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(agent.client, "post", AsyncMock(return_value=mock_response)):
+        with patch.object(agent.backend.client, "post", AsyncMock(return_value=mock_response)):
             result = await agent._generate_step("Test task")
 
         assert "read_file" in result
@@ -703,7 +705,7 @@ class TestGenerateStep:
         mock_response.json.return_value = {"message": {}}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(agent.client, "post", AsyncMock(return_value=mock_response)):
+        with patch.object(agent.backend.client, "post", AsyncMock(return_value=mock_response)):
             result = await agent._generate_step("Test task")
 
         assert result == ""
@@ -714,7 +716,7 @@ class TestGenerateStep:
         import httpx
 
         with patch.object(
-            agent.client,
+            agent.backend.client,
             "post",
             AsyncMock(side_effect=httpx.HTTPStatusError("Server error", request=MagicMock(), response=MagicMock())),
         ):
@@ -747,7 +749,7 @@ class TestGenerateStep:
             mock_resp.raise_for_status = MagicMock()
             return mock_resp
 
-        with patch.object(agent.client, "post", capture_post):
+        with patch.object(agent.backend.client, "post", capture_post):
             await agent._generate_step("Test task")
 
         # Verify trajectory is in messages
@@ -1184,8 +1186,8 @@ class TestAsyncContextManager:
         async with agent as a:
             assert a is agent
 
-        # Client should be closed after exit
-        assert agent.client.is_closed
+        # Backend client should be closed after exit
+        assert agent.backend._client is None or agent.backend._client.is_closed
 
 
 class TestListModels:
@@ -1214,7 +1216,7 @@ class TestListModels:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(agent.client, "get", AsyncMock(return_value=mock_response)):
+        with patch.object(agent.backend.client, "get", AsyncMock(return_value=mock_response)):
             models = await agent.list_models()
 
         assert "llama3.1:8b" in models
@@ -1226,7 +1228,7 @@ class TestListModels:
         import httpx
 
         with patch.object(
-            agent.client,
+            agent.backend.client,
             "get",
             AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
         ):
@@ -1240,7 +1242,7 @@ class TestListModels:
         import httpx
 
         with patch.object(
-            agent.client,
+            agent.backend.client,
             "get",
             AsyncMock(side_effect=httpx.ConnectError("Connection refused")),
         ):
@@ -1255,7 +1257,7 @@ class TestListModels:
         mock_response.json.return_value = {"models": [{"name": "other-model:latest"}]}
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(agent.client, "get", AsyncMock(return_value=mock_response)):
+        with patch.object(agent.backend.client, "get", AsyncMock(return_value=mock_response)):
             # Should not raise, just warn
             await agent.connect()
 

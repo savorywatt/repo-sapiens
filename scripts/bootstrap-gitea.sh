@@ -468,13 +468,16 @@ run_sapiens_init() {
     # Run sapiens init non-interactively with essential workflows
     # Gitea doesn't support reusable workflows, so we deploy actual workflow files
     # Use --run-mode cicd to generate env-var-based config (not keyring refs)
-    log "Running: sapiens init --non-interactive --run-mode cicd --deploy-workflows essential --ai-provider claude-api"
+    # Use ollama on the local network for AI provider
+    local ollama_url="${OLLAMA_BASE_URL:-http://192.168.1.241:11434}"
+    log "Running: sapiens init --non-interactive --run-mode cicd --deploy-workflows essential --ai-provider ollama --ai-base-url $ollama_url"
 
     if command -v sapiens > /dev/null 2>&1; then
         sapiens init --non-interactive \
             --run-mode cicd \
             --git-token-env SAPIENS_GITEA_TOKEN \
-            --ai-provider claude-api \
+            --ai-provider ollama \
+            --ai-base-url "$ollama_url" \
             --deploy-workflows essential \
             --no-setup-secrets || {
             warn "sapiens init failed, falling back to manual config"
@@ -487,7 +490,8 @@ run_sapiens_init() {
         uv run --project "$SCRIPT_DIR/.." sapiens init --non-interactive \
             --run-mode cicd \
             --git-token-env SAPIENS_GITEA_TOKEN \
-            --ai-provider claude-api \
+            --ai-provider ollama \
+            --ai-base-url "$ollama_url" \
             --deploy-workflows essential \
             --no-setup-secrets || {
             warn "sapiens init (via uv) failed, falling back to manual config"

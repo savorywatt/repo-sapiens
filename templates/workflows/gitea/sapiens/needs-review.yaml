@@ -35,7 +35,8 @@ jobs:
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__REPOSITORY__OWNER: ${{ github.repository_owner }}
           AUTOMATION__REPOSITORY__NAME: ${{ github.event.repository.name }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+          # For ollama - pass base URL (no API key needed)
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_OLLAMA_URL }}
         run: |
           echo "🔍 Running code review for issue/PR #${{ github.event.issue.number }}"
           sapiens --config sapiens_config.ci.yaml process-issue --issue ${{ github.event.issue.number }} --system-prompt .gitea/workflows/sapiens/prompts/needs-review.md

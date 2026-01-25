@@ -11,7 +11,7 @@
 # 1. Copy to .gitea/workflows/weekly-test-coverage.yaml
 # 2. Set required secrets:
 #    - SAPIENS_GITEA_TOKEN: Gitea API token with repo/PR write access
-#    - SAPIENS_CLAUDE_API_KEY: Claude API key
+#    - SAPIENS_OLLAMA_URL: Ollama base URL (e.g., http://192.168.1.241:11434)
 # 3. Adjust the coverage threshold and schedule as needed
 
 name: Improve Test Coverage
@@ -87,7 +87,8 @@ jobs:
         env:
           AUTOMATION__GIT_PROVIDER__API_TOKEN: ${{ secrets.SAPIENS_GITEA_TOKEN }}
           AUTOMATION__GIT_PROVIDER__BASE_URL: ${{ github.server_url }}
-          AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.SAPIENS_CLAUDE_API_KEY }}
+          # For ollama - pass base URL (no API key needed)
+          AUTOMATION__AGENT_PROVIDER__BASE_URL: ${{ secrets.SAPIENS_OLLAMA_URL }}
         run: |
           TARGET=${{ github.event.inputs.target_coverage || '60' }}
 
