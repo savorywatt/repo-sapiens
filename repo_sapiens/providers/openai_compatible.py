@@ -199,15 +199,15 @@ class OpenAICompatibleProvider(AgentProvider):
             }
 
     def _strip_thinking_tags(self, output: str) -> str:
-        """Strip <think>...</think> tags from output.
+        """Strip <think>...</think> tags from output, keeping the content.
 
-        Reasoning models like DeepSeek R1 include thinking blocks that
-        should be removed before parsing the actual response.
+        Reasoning models like DeepSeek R1 wrap their response in thinking blocks.
+        We remove just the tags but preserve the content inside.
         """
-        # Remove <think>...</think> blocks (case-insensitive, multiline)
-        output = re.sub(r"<think>.*?</think>", "", output, flags=re.DOTALL | re.IGNORECASE)
+        # Remove <think>...</think> tags but keep content (case-insensitive, multiline)
+        output = re.sub(r"<think>(.*?)</think>", r"\1", output, flags=re.DOTALL | re.IGNORECASE)
         # Also handle <thinking>...</thinking> variant
-        output = re.sub(r"<thinking>.*?</thinking>", "", output, flags=re.DOTALL | re.IGNORECASE)
+        output = re.sub(r"<thinking>(.*?)</thinking>", r"\1", output, flags=re.DOTALL | re.IGNORECASE)
         return output.strip()
 
     def _detect_changed_files(self, output: str) -> list[str]:
