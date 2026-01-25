@@ -1,0 +1,51 @@
+# Dockerfile for GitLab Comment Webhook Handler
+#
+# Build:
+#   docker build -t gitlab-comment-webhook -f Dockerfile.gitlab-webhook .
+#
+# Run:
+#   docker run -d --name gitlab-webhook \
+#       -e GITLAB_URL=https://gitlab.example.com \
+#       -e GITLAB_API_TOKEN=glpat-xxx \
+#       -e GITLAB_WEBHOOK_SECRET=your-secret \
+#       -p 8000:8000 \
+#       gitlab-comment-webhook
+
+FROM python:3.12-slim
+
+# Labels
+LABEL org.opencontainers.image.title="GitLab Comment Webhook Handler"
+LABEL org.opencontainers.image.description="Webhook handler for triggering sapiens-comment pipeline on GitLab issue comments"
+LABEL org.opencontainers.image.source="https://github.com/savorywatt/repo-sapiens"
+
+# Security: run as non-root user
+RUN useradd --create-home --shell /bin/bash appuser
+
+WORKDIR /app
+
+# Install dependencies
+COPY gitlab-comment-webhook.py requirements-webhook.txt* ./
+
+# Create requirements file if it doesn't exist
+RUN echo "fastapi>=0.100.0\nuvicorn>=0.23.0\nhttpx>=0.24.0" > requirements.txt
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Switch to non-root user
+USER appuser
+
+# Expose webhook port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5).raise_for_status()"
+
+# Environment defaults
+ENV LISTEN_PORT=8000
+ENV LOG_LEVEL=INFO
+ENV GITLAB_URL=http://localhost
+ENV TRIGGER_REF=main
+
+# Run the webhook server
+CMD ["python", "gitlab-comment-webhook.py"]
