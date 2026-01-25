@@ -48,8 +48,8 @@ class DependencyAuditStage(WorkflowStage):
             )
 
             # Determine project directory
-            playground_dir = Path(__file__).parent.parent.parent.parent.parent / "playground"
-            if not playground_dir.exists():
+            playground_dir = self.get_playground_dir()
+            if playground_dir is None:
                 await self._provide_audit_guidance(issue)
                 return
 
@@ -66,11 +66,28 @@ class DependencyAuditStage(WorkflowStage):
             await self.git.add_comment(
                 issue.number,
                 f"❌ **Dependency Audit Failed**\n\n"
-                f"Error: {str(e)}\n\n"
-                f"Please try again.\n\n"
+                f"An error occurred during the dependency audit. "
+                f"Please check the CI logs for details.\n\n"
+                f"Error type: `{type(e).__name__}`\n\n"
                 f"◆ Posted by Sapiens Automation",
             )
             raise
+
+    def _sanitize_error(self, error: str) -> str:
+        """Remove potentially sensitive information from error messages.
+
+        Strips paths, tokens, and other sensitive data that could be
+        exposed in public issue comments.
+        """
+        import re
+
+        # Remove file paths
+        error = re.sub(r"/[^\s:]+", "[path]", error)
+        # Remove anything that looks like a token or key
+        error = re.sub(r"(token|key|secret|password|api_key)[:=]\s*\S+", r"\1=[redacted]", error, flags=re.I)
+        # Remove URLs with credentials
+        error = re.sub(r"https?://[^@\s]+@", "https://[redacted]@", error)
+        return error
 
     async def _run_audits(self, project_dir: Path) -> dict[str, Any]:
         """Run dependency audit commands for detected package managers."""

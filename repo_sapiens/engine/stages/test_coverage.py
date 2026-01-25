@@ -6,7 +6,7 @@ from typing import Any
 import structlog
 
 from repo_sapiens.engine.stages.base import WorkflowStage
-from repo_sapiens.models.domain import Issue
+from repo_sapiens.models.domain import Issue, PullRequest
 from repo_sapiens.utils.async_subprocess import run_command
 
 log = structlog.get_logger(__name__)
@@ -68,7 +68,7 @@ class TestCoverageStage(WorkflowStage):
             )
             raise
 
-    async def _get_pr_for_issue(self, issue: Issue) -> Any:
+    async def _get_pr_for_issue(self, issue: Issue) -> PullRequest | None:
         """Try to find a PR associated with this issue."""
         try:
             pr = await self.git.get_pull_request(issue.number)
@@ -77,13 +77,13 @@ class TestCoverageStage(WorkflowStage):
             log.debug("pr_lookup_failed", issue=issue.number, error=str(e))
             return None
 
-    async def _analyze_pr_coverage(self, issue: Issue, pr: Any) -> None:
+    async def _analyze_pr_coverage(self, issue: Issue, pr: PullRequest) -> None:
         """Analyze test coverage for a specific PR."""
         log.info("analyzing_pr_coverage", pr=pr.number)
 
-        playground_dir = Path(__file__).parent.parent.parent.parent.parent / "playground"
-        if not playground_dir.exists():
-            raise Exception(f"Playground repo not found at {playground_dir}")
+        playground_dir = self.get_playground_dir()
+        if playground_dir is None:
+            raise Exception("Playground directory not configured or not found")
 
         # Checkout the PR branch
         await run_command("git", "fetch", "origin", cwd=playground_dir, check=True)
@@ -107,8 +107,8 @@ class TestCoverageStage(WorkflowStage):
         """Analyze test coverage for the main repository branch."""
         log.info("analyzing_repo_coverage", issue=issue.number)
 
-        playground_dir = Path(__file__).parent.parent.parent.parent.parent / "playground"
-        if not playground_dir.exists():
+        playground_dir = self.get_playground_dir()
+        if playground_dir is None:
             # Fallback: provide guidance on running coverage
             await self._provide_coverage_guidance(issue)
             return
@@ -179,7 +179,9 @@ class TestCoverageStage(WorkflowStage):
             "language": "unknown",
         }
 
-    async def _post_coverage_report(self, issue: Issue, coverage_result: dict[str, Any], pr: Any = None) -> None:
+    async def _post_coverage_report(
+        self, issue: Issue, coverage_result: dict[str, Any], pr: PullRequest | None = None
+    ) -> None:
         """Post coverage report as a comment."""
         context_str = f"PR #{pr.number}" if pr else f"Issue #{issue.number}"
 
