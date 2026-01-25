@@ -353,8 +353,19 @@ jobs:
           print("Report generated: sbom-report.md")
           EOF
 
+      - name: Check AI API key
+        id: check-ai
+        env:
+          AI_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -n "$AI_KEY" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: AI Analysis (optional)
-        if: (env.VULN_TOTAL != '0' || env.LICENSE_PROBLEMS != '0') && secrets.AI_API_KEY != ''
+        if: (env.VULN_TOTAL != '0' || env.LICENSE_PROBLEMS != '0') && steps.check-ai.outputs.has_key == 'true'
         continue-on-error: true
         env:
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}

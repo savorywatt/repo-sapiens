@@ -57,8 +57,20 @@ jobs:
           git log --oneline -5 >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Check AI API key
+        id: check-ai
+        env:
+          AI_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -n "$AI_KEY" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "::notice::AI_API_KEY not provided - skipping AI-powered documentation update"
+          fi
+
       - name: Update documentation
-        if: secrets.AI_API_KEY != ''
+        if: steps.check-ai.outputs.has_key == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
           AUTOMATION__AGENT_PROVIDER__API_KEY: ${{ secrets.AI_API_KEY }}

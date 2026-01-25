@@ -3315,12 +3315,14 @@ tags:
                     else:
                         target_file = workflows_dir / ".gitlab-ci.yml"
                 else:
-                    # GitHub/Gitea: use subdirectory structure
-                    sapiens_dir = workflows_dir / "sapiens"
+                    # GitHub/Gitea: workflows must be directly in workflows directory
+                    # GitHub Actions only recognizes files directly in .github/workflows/
                     if is_recipe:
-                        target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
+                        # Recipe files go directly to workflows dir (e.g., post-merge-docs.yaml)
+                        target_file = workflows_dir / template_name.replace("recipes/", "")
                     else:
-                        target_file = sapiens_dir / template_name
+                        # Non-recipe files also go directly to workflows dir
+                        target_file = workflows_dir / template_name
                     target_file.parent.mkdir(parents=True, exist_ok=True)
 
                 target_file.write_text(content)
@@ -3409,10 +3411,9 @@ jobs:
                             else:
                                 click.echo(f"   ✓ {description} → .gitlab-ci.yml")
                         else:
-                            if template_name.startswith("recipes/"):
-                                click.echo(f"   ✓ {description} → sapiens/recipes/")
-                            else:
-                                click.echo(f"   ✓ {description} → sapiens/")
+                            # GitHub/Gitea: show the actual filename in workflows dir
+                            filename = template_name.replace("recipes/", "")
+                            click.echo(f"   ✓ {description} → {filename}")
                     else:
                         click.echo(click.style(f"   ⚠ Could not deploy: {description}", fg="yellow"))
 
@@ -3516,11 +3517,9 @@ jobs:
                             # GitLab main workflow is .gitlab-ci.yml
                             target_file = self.repo_path / ".gitlab-ci.yml"
                     else:
-                        # GitHub/Gitea
-                        if is_recipe:
-                            target_file = sapiens_dir / "recipes" / template_name.replace("recipes/", "")
-                        else:
-                            target_file = sapiens_dir / template_name
+                        # GitHub/Gitea: workflows are directly in workflows directory
+                        filename = template_name.replace("recipes/", "")
+                        target_file = workflows_dir / filename
 
                     if remove_file(target_file, description):
                         removed_count += 1

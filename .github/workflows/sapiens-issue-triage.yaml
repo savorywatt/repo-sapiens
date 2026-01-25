@@ -60,8 +60,20 @@ jobs:
           echo "untriaged_count=$COUNT" >> $GITHUB_OUTPUT
           echo "Found $COUNT untriaged issues"
 
+      - name: Check AI API key
+        id: check-ai
+        env:
+          AI_KEY: ${{ secrets.AI_API_KEY }}
+        run: |
+          if [ -n "$AI_KEY" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "::notice::AI_API_KEY not provided - skipping AI-powered triage"
+          fi
+
       - name: Triage issues
-        if: steps.issues.outputs.untriaged_count != '0' && secrets.AI_API_KEY != ''
+        if: steps.issues.outputs.untriaged_count != '0' && steps.check-ai.outputs.has_key == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
           GH_TOKEN: ${{ secrets.GIT_TOKEN }}
