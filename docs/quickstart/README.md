@@ -4,8 +4,8 @@ Choose your Git provider to get started with repo-sapiens.
 
 | Provider | Guide | Time | Notes |
 |----------|-------|------|-------|
-| [GitHub](GITHUB.md) | 5 min | Uses reusable workflows, minimal setup |
-| [Gitea](GITEA.md) | 5 min | Full workflows deployed to repo |
+| [GitHub](GITHUB.md) | 5 min | Label-triggered workflows, individual workflow files |
+| [Gitea](GITEA.md) | 5 min | Label-triggered workflows, Ollama default, self-hosted |
 | [GitLab](GITLAB.md) | 10 min | Daemon mode (polling) or webhook mode |
 
 ---
@@ -14,9 +14,9 @@ Choose your Git provider to get started with repo-sapiens.
 
 All three providers are fully supported. Choose based on where your code lives:
 
-- **GitHub** - Best developer experience, native label triggers, reusable workflows
-- **Gitea** - Self-hosted, GitHub-compatible Actions, full control
-- **GitLab** - Enterprise features, CI/CD Components, requires daemon or webhook
+- **GitHub** - Best developer experience, native label triggers, individual workflow files
+- **Gitea** - Self-hosted, GitHub-compatible Actions, Ollama as default AI, full control
+- **GitLab** - Enterprise features, remote CI/CD includes, daemon (polling) or webhook mode
 
 ---
 
@@ -26,7 +26,7 @@ Regardless of provider, you'll need:
 
 1. **Install repo-sapiens**
    ```bash
-   pip install repo-sapiens==0.5.1
+   pip install repo-sapiens
    ```
 
 2. **Run the init wizard**
